@@ -177,21 +177,21 @@ Official Business Document
 ORDER #
 [ORDER_NUMBER]
 
-VENDOR:
-[VENDOR_NAME]
-[VENDOR_ADDRESS]
-Phone:
-[VENDOR_PHONE]
-Contact:
-[VENDOR_CONTACT]
-
-SHIP TO:
+FROM:
 [BUSINESS_NAME]
 [BUSINESS_ADDRESS]
 Phone:
 [BUSINESS_PHONE]
 Contact:
 [BUSINESS_CONTACT]
+
+TO (Supplier):
+[VENDOR_NAME]
+[VENDOR_ADDRESS]
+Phone:
+[VENDOR_PHONE]
+Contact:
+[VENDOR_CONTACT]
 
 DATE
 [DATE]
@@ -1732,23 +1732,7 @@ Date: [DATE]`,
                             <div className="font-bold mb-1">ORDER #</div>
                             <div className="text-sm font-bold mb-4">{purchaseOrderData.poNumber}</div>
                             
-                            <div className="font-bold mb-1">VENDOR:</div>
-                            <div className="text-sm mb-1">{purchaseOrderData.supplierName}</div>
-                            <div className="text-sm mb-1">{purchaseOrderData.supplierAddress}</div>
-                            <div className="flex items-center gap-2 text-sm mt-1">
-                              <span>Phone:</span>
-                              <span>{purchaseOrderData.supplierPhone}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm mt-1">
-                              <span>Contact:</span>
-                              <span>{purchaseOrderData.supplierEmail}</span>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <div className="h-8 mb-4"></div>
-                            
-                            <div className="font-bold mb-1">SHIP TO:</div>
+                            <div className="font-bold mb-1">FROM:</div>
                             <div className="text-sm mb-1">{purchaseOrderData.businessName}</div>
                             <div className="text-sm mb-1">{purchaseOrderData.businessAddress}</div>
                             <div className="flex items-center gap-2 text-sm mt-1">
@@ -1758,6 +1742,22 @@ Date: [DATE]`,
                             <div className="flex items-center gap-2 text-sm mt-1">
                               <span>Contact:</span>
                               <span>{purchaseOrderData.businessEmail}</span>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="h-8 mb-4"></div>
+                            
+                            <div className="font-bold mb-1">TO (Supplier):</div>
+                            <div className="text-sm mb-1">{purchaseOrderData.supplierName}</div>
+                            <div className="text-sm mb-1">{purchaseOrderData.supplierAddress}</div>
+                            <div className="flex items-center gap-2 text-sm mt-1">
+                              <span>Phone:</span>
+                              <span>{purchaseOrderData.supplierPhone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm mt-1">
+                              <span>Contact:</span>
+                              <span>{purchaseOrderData.supplierEmail}</span>
                             </div>
                           </div>
                         </div>
