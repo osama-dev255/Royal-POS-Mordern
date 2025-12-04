@@ -1,0 +1,442 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 248 250% 99%;
+    --foreground: 213 31% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 31% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 31% 16%;
+
+    --primary: 214 100% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 213 31% 16%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 214 32% 91%;
+    --accent-foreground: 213 31% 16%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 214 100% 24%;
+    --info-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 213 31% 9%;
+    --foreground: 210 40% 98%;
+
+    --card: 213 31% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 213 31% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 214 100% 60%;
+    --primary-foreground: 213 31% 9%;
+
+    --secondary: 213 19% 18%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 213 19% 18%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 213 19% 18%;
+    --accent-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 214 100% 60%;
+    --info-foreground: 213 31% 9%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Improve touch scrolling on mobile */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Enhanced responsive utilities */
+  .container-responsive {
+    @apply container mx-auto px-4 sm:px-6;
+  }
+  
+  /* Touch-friendly button sizes */
+  .btn-touch {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+  
+  /* Responsive grid utilities */
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+  
+  .grid-responsive-4 {
+    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
+  }
+  
+  /* Responsive card padding */
+  .card-padding {
+    @apply p-4 sm:p-6;
+  }
+  
+  /* Responsive text sizes */
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+  
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl;
+  }
+  
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl;
+  }
+  
+  .text-responsive-2xl {
+    @apply text-2xl sm:text-3xl;
+  }
+  
+  /* Responsive spacing */
+  .space-y-responsive {
+    @apply space-y-4 sm:space-y-6;
+  }
+  
+  /* Mobile-specific utilities */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+  
+  .desktop-only {
+    @apply hidden sm:block;
+  }
+  
+  /* Improved focus states for accessibility */
+  button:focus-visible, a:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2;
+  }
+  
+  /* Better touch targets */
+  .touch-target {
+    @apply relative;
+  }
+  
+  .touch-target::after {
+    @apply content-[''] absolute inset-0 sm:inset-[-4px];
+  }
+}
+
+/* Responsive adjustments for specific components */
+@media (max-width: 640px) {
+  .mobile-full-width {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  
+  .mobile-padded {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Prevent text size adjustment on iOS */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  select,
+  textarea,
+  input {
+    font-size: 16px;
+  }
+}
+
+/* Ensure proper z-index stacking for splash screen and login form */
+#root {
+  position: relative;
+  z-index: 0;
+}
+
+.splash-screen {
+  z-index: 9999;
+}
+
+.login-form {
+  z-index: 9998;
+}
+
+/* Ensure proper z-index for sign up link */
+.login-form .signup-link {
+  position: relative;
+  z-index: 10000;
+}
+
+/* Ensure proper z-index for register page */
+.register-page {
+  position: relative;
+  z-index: 9997;
+}
+
+/* Dashboard card icon positioning */
+.dashboard-card-icon {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-card-header {
+  display: flex;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+/* Responsive icon sizing */
+@media (max-width: 360px) {
+  .dashboard-card-icon {
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 1.25rem;
+    width: 1.25rem;
+  }
+}
+
+@media (min-width: 361px) and (max-width: 480px) {
+  .dashboard-card-icon {
+    height: 2.75rem;
+    width: 2.75rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 1.375rem;
+    width: 1.375rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .dashboard-card-icon {
+    height: 3rem;
+    width: 3rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1023px) {
+  .dashboard-card-icon {
+    height: 3.25rem;
+    width: 3.25rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 1.625rem;
+    width: 1.625rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-card-icon {
+    height: 3.5rem;
+    width: 3.5rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 1.75rem;
+    width: 1.75rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-card-icon {
+    height: 3.75rem;
+    width: 3.75rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 1.875rem;
+    width: 1.875rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .dashboard-card-icon {
+    height: 4rem;
+    width: 4rem;
+  }
+  
+  .dashboard-card-icon svg {
+    height: 2rem;
+    width: 2rem;
+  }
+}
+
+/* Card content spacing */
+.dashboard-card-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-grow: 1;
+}
+
+.card-title {
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.025em;
+}
+
+.card-description {
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* Ensure proper text truncation */
+.truncate-multiline {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-title.truncate {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+/* Ensure consistent card heights */
+.auto-rows-fr {
+  grid-auto-rows: 1fr;
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 140px;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.dashboard-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 360px) {
+  .dashboard-card {
+    min-height: 150px;
+  }
+}
+
+@media (min-width: 480px) {
+  .dashboard-card {
+    min-height: 160px;
+  }
+}
+
+@media (min-width: 768px) {
+  .dashboard-card {
+    min-height: 170px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-card {
+    min-height: 180px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-card {
+    min-height: 190px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .dashboard-card {
+    min-height: 200px;
+  }
+}
