@@ -123,6 +123,105 @@ interface PurchaseOrderData {
   authorizationDate: string;
 }
 
+interface InvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+}
+
+interface InvoiceData {
+  businessName: string;
+  businessAddress: string;
+  businessPhone: string;
+  businessEmail: string;
+  clientName: string;
+  clientAddress: string;
+  clientCityState: string;
+  clientPhone: string;
+  clientEmail: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  amountDue: number;
+  items: InvoiceItem[];
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  amountPaid: number;
+  terms: string;
+  notes: string;
+  paymentOptions: string;
+}
+
+interface ExpenseVoucherItem {
+  id: string;
+  description: string;
+  category: string;
+  amount: number;
+  date: string;
+}
+
+interface ExpenseVoucherData {
+  voucherNumber: string;
+  date: string;
+  submittedBy: string;
+  employeeId: string;
+  department: string;
+  items: ExpenseVoucherItem[];
+  totalAmount: number;
+  purpose: string;
+  approvedBy: string;
+  approvedDate: string;
+  notes: string;
+}
+
+interface SalarySlipData {
+  employeeName: string;
+  employeeId: string;
+  payPeriod: string;
+  paidDate: string;
+  basicSalary: number;
+  allowances: number;
+  overtime: number;
+  bonus: number;
+  grossPay: number;
+  tax: number;
+  insurance: number;
+  otherDeductions: number;
+  totalDeductions: number;
+  netPay: number;
+  bankName: string;
+  accountNumber: string;
+  department: string;
+  position: string;
+  paymentMethod: string;
+}
+
+interface ComplimentaryGoodsItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+}
+
+interface ComplimentaryGoodsData {
+  voucherNumber: string;
+  date: string;
+  customerName: string;
+  customerAddress: string;
+  customerPhone: string;
+  customerEmail: string;
+  items: ComplimentaryGoodsItem[];
+  reason: string;
+  authorizedByName: string;
+  authorizedByTitle: string;
+  authorizedDate: string;
+}
+
 interface TemplatesProps {
   onBack?: () => void;
 }
@@ -257,32 +356,55 @@ Date:                Date:`,
       type: "invoice",
       description: "Professional invoice template for billing",
       content: `INVOICE
-Invoice #[INVOICE_NUMBER]
-Date: [DATE]
-Due Date: [DUE_DATE]
+[INVOICE_NUMBER]
+AMOUNT DUE
 
-From:
+[AMOUNT_DUE]
+Due:
+[DUE_DATE]
+FROM:
+
 [BUSINESS_NAME]
 [BUSINESS_ADDRESS]
+Phone:
 [BUSINESS_PHONE]
+Email:
+[BUSINESS_EMAIL]
+BILL TO:
 
-To:
-[CUSTOMER_NAME]
-[CUSTOMER_ADDRESS]
-[CUSTOMER_PHONE]
+[CLIENT_NAME]
+[CLIENT_ADDRESS]
+[CLIENT_CITY_STATE]
+Phone:
+[CLIENT_PHONE]
+Email:
+[CLIENT_EMAIL]
+INVOICE DATE
 
-Items:
+[INVOICE_DATE]
+DUE DATE
+
+[DUE_DATE]
+TERMS
+
+[TERMS]
+SERVICES RENDERED:
+Item	Description	Quantity	Unit	Rate	Amount
 [ITEM_LIST]
+NOTES:
+[NOTES]
+PAYMENT OPTIONS:
 
-Subtotal: [SUBTOTAL]
-Tax: [TAX]
-Discount: [DISCOUNT]
-Total: [TOTAL]
+[PAYMENT_OPTIONS]
+Subtotal:	[SUBTOTAL]
+Discount:	[DISCOUNT]
+Tax:	[TAX]
+TOTAL:	[TOTAL]
+Amount Paid:	[AMOUNT_PAID]
+AMOUNT DUE:	[AMOUNT_DUE]
+[NOTES]
 
-Terms:
-Payment due within 30 days
-
-Thank you for your business!`,
+Please make checks payable to [BUSINESS_NAME]`,
       lastModified: "2023-08-15",
       isActive: false
     },
@@ -564,6 +686,92 @@ Date: [DATE]`,
     authorizationDate: ""
   });
   
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>({
+    businessName: "Your Business Name",
+    businessAddress: "123 Business Street",
+    businessPhone: "(555) 123-4567",
+    businessEmail: "billing@yourbusiness.com",
+    clientName: "Client Company Name",
+    clientAddress: "456 Client Avenue",
+    clientCityState: "Client City, State 67890",
+    clientPhone: "(555) 987-6543",
+    clientEmail: "accounts@clientcompany.com",
+    invoiceNumber: "INV-2024-001",
+    invoiceDate: "12/3/2025",
+    dueDate: "1/2/2026",
+    amountDue: 2395.84,
+    items: [
+      { id: "1", description: "Website Design & Development", quantity: 1, unit: "Project", rate: 1800.00, amount: 1800.00 },
+      { id: "2", description: "Monthly Support (3 months)", quantity: 3, unit: "Months", rate: 150.00, amount: 450.00 }
+    ],
+    subtotal: 2250.00,
+    tax: 195.84,
+    discount: 50.00,
+    total: 2395.84,
+    amountPaid: 0.00,
+    terms: "Net 30",
+    notes: "Thank you for your business! Payment due within 30 days.",
+    paymentOptions: "Bank Transfer, Check, or Credit Card"
+  });
+  
+  const [expenseVoucherData, setExpenseVoucherData] = useState<ExpenseVoucherData>({
+    voucherNumber: "EV-2024-001",
+    date: "12/3/2025",
+    submittedBy: "John Smith",
+    employeeId: "EMP-00123",
+    department: "Marketing",
+    items: [
+      { id: "1", description: "Office Supplies", category: "Office Expenses", amount: 150.00, date: "12/1/2025" },
+      { id: "2", description: "Travel Expenses", category: "Travel", amount: 320.50, date: "12/2/2025" },
+      { id: "3", description: "Client Dinner", category: "Entertainment", amount: 85.75, date: "12/2/2025" }
+    ],
+    totalAmount: 556.25,
+    purpose: "Monthly marketing expenses for Q4 campaign",
+    approvedBy: "Jane Manager",
+    approvedDate: "12/5/2025",
+    notes: "All receipts attached."
+  });
+  
+  const [salarySlipData, setSalarySlipData] = useState<SalarySlipData>({
+    employeeName: "John Smith",
+    employeeId: "EMP-00123",
+    payPeriod: "December 2025",
+    paidDate: "12/5/2025",
+    basicSalary: 5000.00,
+    allowances: 800.00,
+    overtime: 200.00,
+    bonus: 500.00,
+    grossPay: 6500.00,
+    tax: 650.00,
+    insurance: 325.00,
+    otherDeductions: 125.00,
+    totalDeductions: 1100.00,
+    netPay: 5400.00,
+    bankName: "Global Bank",
+    accountNumber: "**** **** **** 1234",
+    department: "Marketing",
+    position: "Senior Marketing Specialist",
+    paymentMethod: "Direct Deposit"
+  });
+  
+  const [complimentaryGoodsData, setComplimentaryGoodsData] = useState<ComplimentaryGoodsData>({
+    voucherNumber: "CG-2024-001",
+    date: "12/3/2025",
+    customerName: "ABC Corporation",
+    customerAddress: "456 Business Avenue, Suite 100, Business City, BC 67890",
+    customerPhone: "(555) 123-4567",
+    customerEmail: "contact@abccorp.com",
+    items: [
+      { id: "1", description: "Sample Product A", quantity: 5, unit: "pcs" },
+      { id: "2", description: "Sample Product B", quantity: 10, unit: "boxes" },
+      { id: "3", description: "Sample Product C", quantity: 2, unit: "units" }
+    ],
+    reason: "Customer appreciation for loyal business partnership",
+    authorizedByName: "Jane Manager",
+    authorizedByTitle: "Sales Director",
+    authorizedDate: "12/5/2025"
+  });
+  
   // Get the next delivery note number from localStorage
   const getNextDeliveryNoteNumber = () => {
     const lastNumber = localStorage.getItem('lastDeliveryNoteNumber');
@@ -611,7 +819,7 @@ Date: [DATE]`,
 
   const handlePreviewTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
-    if (template && (template.type === "delivery-note" || template.type === "order-form")) {
+    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods")) {
       setViewingTemplate(templateId);
       setActiveTab("preview");
     } else {
@@ -1517,6 +1725,181 @@ Date: [DATE]`,
     
     return { subtotal, tax, total };
   };
+  
+  // Handle invoice data changes
+  const handleInvoiceChange = (field: keyof InvoiceData, value: string | number) => {
+    setInvoiceData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  // Handle invoice item changes
+  const handleInvoiceItemChange = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
+    setInvoiceData(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+  
+  // Add new invoice item
+  const handleAddInvoiceItem = () => {
+    setInvoiceData(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: Date.now().toString(),
+          description: "",
+          quantity: 1,
+          unit: "",
+          rate: 0,
+          amount: 0
+        }
+      ]
+    }));
+  };
+  
+  // Remove invoice item
+  const handleRemoveInvoiceItem = (itemId: string) => {
+    setInvoiceData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }));
+  };
+  
+  // Calculate invoice totals
+  const calculateInvoiceTotals = () => {
+    const subtotal = invoiceData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const total = subtotal + Number(invoiceData.tax || 0) - Number(invoiceData.discount || 0);
+    const amountDue = total - Number(invoiceData.amountPaid || 0);
+    
+    return { subtotal, total, amountDue };
+  };
+  
+  // Handle expense voucher data changes
+  const handleExpenseVoucherChange = (field: keyof ExpenseVoucherData, value: string | number) => {
+    setExpenseVoucherData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  // Handle expense voucher item changes
+  const handleExpenseVoucherItemChange = (itemId: string, field: keyof ExpenseVoucherItem, value: string | number) => {
+    setExpenseVoucherData(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+  
+  // Add new expense voucher item
+  const handleAddExpenseVoucherItem = () => {
+    setExpenseVoucherData(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: Date.now().toString(),
+          description: "",
+          category: "",
+          amount: 0,
+          date: ""
+        }
+      ]
+    }));
+  };
+  
+  // Remove expense voucher item
+  const handleRemoveExpenseVoucherItem = (itemId: string) => {
+    setExpenseVoucherData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }));
+  };
+  
+  // Calculate expense voucher totals
+  const calculateExpenseVoucherTotals = () => {
+    const totalAmount = expenseVoucherData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    
+    return { totalAmount };
+  };
+  
+  // Handle salary slip data changes
+  const handleSalarySlipChange = (field: keyof SalarySlipData, value: string | number) => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  // Calculate salary slip totals
+  const calculateSalarySlipTotals = () => {
+    const grossPay = salarySlipData.basicSalary + salarySlipData.allowances + salarySlipData.overtime + salarySlipData.bonus;
+    const totalDeductions = salarySlipData.tax + salarySlipData.insurance + salarySlipData.otherDeductions;
+    const netPay = grossPay - totalDeductions;
+    
+    return { grossPay, totalDeductions, netPay };
+  };
+  
+  // Handle complimentary goods data changes
+  const handleComplimentaryGoodsChange = (field: keyof ComplimentaryGoodsData, value: string) => {
+    setComplimentaryGoodsData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  // Handle complimentary goods item changes
+  const handleComplimentaryGoodsItemChange = (itemId: string, field: keyof ComplimentaryGoodsItem, value: string | number) => {
+    setComplimentaryGoodsData(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+  
+  // Add new complimentary goods item
+  const handleAddComplimentaryGoodsItem = () => {
+    setComplimentaryGoodsData(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: Date.now().toString(),
+          description: "",
+          quantity: 1,
+          unit: ""
+        }
+      ]
+    }));
+  };
+  
+  // Remove complimentary goods item
+  const handleRemoveComplimentaryGoodsItem = (itemId: string) => {
+    setComplimentaryGoodsData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }));
+  };
+  
+  // Calculate complimentary goods totals
+  const calculateComplimentaryGoodsTotals = () => {
+    const totalItems = complimentaryGoodsData.items.length;
+    const totalQuantity = complimentaryGoodsData.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    
+    return { totalItems, totalQuantity };
+  };
+  
+  // Effect to recalculate complimentary goods totals when data changes
+  useEffect(() => {
+    calculateComplimentaryGoodsTotals();
+  }, [complimentaryGoodsData.items]);
 
   // Find the template being viewed/edited
   const currentTemplate = templates.find(t => t.id === (selectedTemplate || viewingTemplate)) || templates[0];
@@ -1566,7 +1949,17 @@ Date: [DATE]`,
               {activeTab === "manage" 
                 ? "Template Management" 
                 : activeTab === "preview" && viewingTemplate
-                  ? (currentTemplate?.type === "order-form" ? "Purchase Order Preview" : "Delivery Note Preview")
+                  ? (currentTemplate?.type === "order-form" 
+                    ? "Purchase Order Preview" 
+                    : currentTemplate?.type === "invoice" 
+                      ? "Invoice Preview" 
+                      : currentTemplate?.type === "expense-voucher" 
+                        ? "Expense Voucher Preview" 
+                        : currentTemplate?.type === "salary-slip" 
+                          ? "Salary Slip Preview" 
+                          : currentTemplate?.type === "complimentary-goods" 
+                            ? "Complimentary Goods Preview" 
+                            : "Delivery Note Preview")
                   : viewingTemplate 
                     ? `Viewing Template: ${currentTemplate?.name || 'Template'}`
                     : selectedTemplate 
@@ -1605,7 +1998,7 @@ Date: [DATE]`,
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">
-                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : "Delivery Note Preview"}
+                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : "Delivery Note Preview"}
                   </h3>
                   <div className="flex gap-2">
                     {currentTemplate?.type === "order-form" ? (
@@ -1614,6 +2007,30 @@ Date: [DATE]`,
                         placeholder="Purchase Order Name"
                         value={purchaseOrderData.poNumber}
                         onChange={(e) => handlePurchaseOrderChange("poNumber", e.target.value)}
+                        className="w-48 h-10"
+                      />
+                    ) : currentTemplate?.type === "invoice" ? (
+                      <Input
+                        type="text"
+                        placeholder="Invoice Number"
+                        value={invoiceData.invoiceNumber}
+                        onChange={(e) => handleInvoiceChange("invoiceNumber", e.target.value)}
+                        className="w-48 h-10"
+                      />
+                    ) : currentTemplate?.type === "salary-slip" ? (
+                      <Input
+                        type="text"
+                        placeholder="Employee Name"
+                        value={salarySlipData.employeeName}
+                        onChange={(e) => handleSalarySlipChange("employeeName", e.target.value)}
+                        className="w-48 h-10"
+                      />
+                    ) : currentTemplate?.type === "complimentary-goods" ? (
+                      <Input
+                        type="text"
+                        placeholder="Voucher Number"
+                        value={complimentaryGoodsData.voucherNumber}
+                        onChange={(e) => handleComplimentaryGoodsChange("voucherNumber", e.target.value)}
                         className="w-48 h-10"
                       />
                     ) : (
@@ -1628,6 +2045,12 @@ Date: [DATE]`,
                     <Button onClick={() => {
                       if (currentTemplate?.type === "order-form") {
                         alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
+                      } else if (currentTemplate?.type === "invoice") {
+                        alert(`Invoice ${invoiceData.invoiceNumber} saved successfully!`);
+                      } else if (currentTemplate?.type === "salary-slip") {
+                        alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
+                      } else if (currentTemplate?.type === "complimentary-goods") {
+                        alert(`Complimentary Goods Voucher ${complimentaryGoodsData.voucherNumber} saved successfully!`);
                       } else {
                         handleSaveDeliveryNote();
                       }
@@ -1640,6 +2063,12 @@ Date: [DATE]`,
                     </Button>
                     <Button onClick={() => {
                       if (currentTemplate?.type === "order-form") {
+                        window.print();
+                      } else if (currentTemplate?.type === "invoice") {
+                        window.print();
+                      } else if (currentTemplate?.type === "salary-slip") {
+                        window.print();
+                      } else if (currentTemplate?.type === "complimentary-goods") {
                         window.print();
                       } else {
                         handlePrintDeliveryNote();
@@ -1657,6 +2086,39 @@ Date: [DATE]`,
                           const link = document.createElement('a');
                           link.href = url;
                           link.download = `Purchase_Order_${purchaseOrderData.poNumber}.html`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }
+                      } else if (currentTemplate?.type === "invoice") {
+                        const content = document.getElementById('template-preview-content');
+                        if (content) {
+                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `Invoice_${invoiceData.invoiceNumber}.html`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }
+                      } else if (currentTemplate?.type === "salary-slip") {
+                        const content = document.getElementById('template-preview-content');
+                        if (content) {
+                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `Salary_Slip_${salarySlipData.employeeName.replace(/\s+/g, '_')}.html`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }
+                      } else if (currentTemplate?.type === "complimentary-goods") {
+                        const content = document.getElementById('template-preview-content');
+                        if (content) {
+                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `Complimentary_Goods_Voucher_${complimentaryGoodsData.voucherNumber}.html`;
                           link.click();
                           URL.revokeObjectURL(url);
                         }
@@ -1887,6 +2349,537 @@ Date: [DATE]`,
                             <div className="text-sm space-y-2">
                               <div className="border-t border-black pt-1 mt-8">
                                 <div className="text-xs">Name & Title</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">DATE</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">&nbsp;</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentTemplate?.type === "invoice" ? (
+                      // Invoice Content
+                      <div className="space-y-6">
+                        {/* Header with Amount Due */}
+                        <div className="text-center">
+                          <h2 className="text-2xl font-bold">INVOICE</h2>
+                          <div className="text-xl font-bold mt-2">{invoiceData.invoiceNumber}</div>
+                          <div className="text-sm mt-1">AMOUNT DUE</div>
+                          <div className="text-2xl font-bold text-red-600 mt-1">${invoiceData.amountDue.toFixed(2)}</div>
+                          <div className="text-sm mt-1">Due: {invoiceData.dueDate}</div>
+                        </div>
+                        
+                        {/* Business and Client Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                            <div className="font-bold mb-1">FROM:</div>
+                            <div className="text-sm mb-1">{invoiceData.businessName}</div>
+                            <div className="text-sm mb-1">{invoiceData.businessAddress}</div>
+                            <div className="flex items-center gap-2 text-sm mt-1">
+                              <span>Phone:</span>
+                              <span>{invoiceData.businessPhone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm mt-1">
+                              <span>Email:</span>
+                              <span>{invoiceData.businessEmail}</span>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-1">BILL TO:</div>
+                            <div className="text-sm mb-1">{invoiceData.clientName}</div>
+                            <div className="text-sm mb-1">{invoiceData.clientAddress}</div>
+                            <div className="text-sm mb-1">{invoiceData.clientCityState}</div>
+                            <div className="flex items-center gap-2 text-sm mt-1">
+                              <span>Phone:</span>
+                              <span>{invoiceData.clientPhone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm mt-1">
+                              <span>Email:</span>
+                              <span>{invoiceData.clientEmail}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Invoice Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <div className="text-sm font-medium">INVOICE DATE</div>
+                            <div className="text-sm">{invoiceData.invoiceDate}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">DUE DATE</div>
+                            <div className="text-sm">{invoiceData.dueDate}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">TERMS</div>
+                            <div className="text-sm">{invoiceData.terms}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Items Table */}
+                        <div>
+                          <div className="font-bold mb-2">SERVICES RENDERED:</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-gray-300 p-2 text-left">Item</th>
+                                  <th className="border border-gray-300 p-2 text-left">Description</th>
+                                  <th className="border border-gray-300 p-2 text-left">Quantity</th>
+                                  <th className="border border-gray-300 p-2 text-left">Unit</th>
+                                  <th className="border border-gray-300 p-2 text-left">Rate</th>
+                                  <th className="border border-gray-300 p-2 text-left">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {invoiceData.items.map((item, index) => (
+                                  <tr key={item.id}>
+                                    <td className="border border-gray-300 p-2">
+                                      {String(index + 1).padStart(3, '0')}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.description}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.quantity}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.unit}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.rate.toFixed(2)}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.amount.toFixed(2)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <Button 
+                            onClick={handleAddInvoiceItem}
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Item
+                          </Button>
+                        </div>
+                        
+                        {/* Notes */}
+                        <div>
+                          <div className="font-bold mb-2">NOTES:</div>
+                          <div className="text-sm min-h-[40px]">
+                            {invoiceData.notes}
+                          </div>
+                        </div>
+                        
+                        {/* Payment Options */}
+                        <div>
+                          <div className="font-bold mb-2">PAYMENT OPTIONS:</div>
+                          <div className="text-sm min-h-[40px]">
+                            {invoiceData.paymentOptions}
+                          </div>
+                        </div>
+                        
+                        {/* Financial Summary */}
+                        <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Subtotal:</span>
+                            <span>${calculateInvoiceTotals().subtotal.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Discount:</span>
+                            <span>${invoiceData.discount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Tax:</span>
+                            <span>${invoiceData.tax.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                            <span className="font-bold">TOTAL:</span>
+                            <span className="font-bold">${calculateInvoiceTotals().total.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Amount Paid:</span>
+                            <span>${invoiceData.amountPaid.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                            <span className="font-bold">AMOUNT DUE:</span>
+                            <span className="font-bold text-red-600">${calculateInvoiceTotals().amountDue.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Footer Note */}
+                        <div className="text-center text-sm mt-4 pt-4 border-t border-gray-300">
+                          <div>{invoiceData.notes}</div>
+                          <div className="mt-2">Please make checks payable to {invoiceData.businessName}</div>
+                        </div>
+                      </div>
+                    ) : currentTemplate?.type === "expense-voucher" ? (
+                      // Expense Voucher Content
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center">
+                          <h2 className="text-2xl font-bold">EXPENSE VOUCHER</h2>
+                          <div className="text-xl font-bold mt-2">{expenseVoucherData.voucherNumber}</div>
+                          <div className="text-sm mt-1">Date: {expenseVoucherData.date}</div>
+                        </div>
+                        
+                        {/* Employee Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                            <div className="font-bold mb-1">SUBMITTED BY:</div>
+                            <div className="text-sm mb-1">{expenseVoucherData.submittedBy}</div>
+                            <div className="text-sm mb-1">Employee ID: {expenseVoucherData.employeeId}</div>
+                            <div className="text-sm mb-1">Department: {expenseVoucherData.department}</div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-1">APPROVAL:</div>
+                            <div className="text-sm mb-1">Approved by: {expenseVoucherData.approvedBy}</div>
+                            <div className="text-sm mb-1">Date: {expenseVoucherData.approvedDate}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Purpose */}
+                        <div>
+                          <div className="font-bold mb-2">PURPOSE:</div>
+                          <div className="text-sm min-h-[40px]">
+                            {expenseVoucherData.purpose}
+                          </div>
+                        </div>
+                        
+                        {/* Items Table */}
+                        <div>
+                          <div className="font-bold mb-2">EXPENSE DETAILS:</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-gray-300 p-2 text-left">Date</th>
+                                  <th className="border border-gray-300 p-2 text-left">Description</th>
+                                  <th className="border border-gray-300 p-2 text-left">Category</th>
+                                  <th className="border border-gray-300 p-2 text-left">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {expenseVoucherData.items.map((item) => (
+                                  <tr key={item.id}>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.date}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.description}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.category}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      ${item.amount.toFixed(2)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <Button 
+                            onClick={handleAddExpenseVoucherItem}
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Item
+                          </Button>
+                        </div>
+                        
+                        {/* Total */}
+                        <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                            <span className="font-bold">TOTAL AMOUNT:</span>
+                            <span className="font-bold">${calculateExpenseVoucherTotals().totalAmount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Notes */}
+                        <div>
+                          <div className="font-bold mb-2">NOTES:</div>
+                          <div className="text-sm min-h-[40px]">
+                            {expenseVoucherData.notes}
+                          </div>
+                        </div>
+                        
+                        {/* Signatures */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                          <div>
+                            <div className="font-bold mb-2">SUBMITTED BY</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">Name & Signature</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">APPROVED BY</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">Name & Signature</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">DATE</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">&nbsp;</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentTemplate?.type === "salary-slip" ? (
+                      // Salary Slip Content
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center">
+                          <h2 className="text-2xl font-bold">SALARY SLIP</h2>
+                          <div className="text-sm mt-1">Pay Period: {salarySlipData.payPeriod}</div>
+                        </div>
+                        
+                        {/* Employee Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                            <div className="font-bold mb-1">EMPLOYEE INFORMATION:</div>
+                            <div className="text-sm mb-1">Name: {salarySlipData.employeeName}</div>
+                            <div className="text-sm mb-1">Employee ID: {salarySlipData.employeeId}</div>
+                            <div className="text-sm mb-1">Department: {salarySlipData.department}</div>
+                            <div className="text-sm mb-1">Position: {salarySlipData.position}</div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-1">PAYMENT DETAILS:</div>
+                            <div className="text-sm mb-1">Payment Method: {salarySlipData.paymentMethod}</div>
+                            <div className="text-sm mb-1">Bank: {salarySlipData.bankName}</div>
+                            <div className="text-sm mb-1">Account #: {salarySlipData.accountNumber}</div>
+                            <div className="text-sm mb-1">Paid Date: {salarySlipData.paidDate}</div>
+                          </div>
+                        </div>
+                        
+                        {/* Earnings */}
+                        <div>
+                          <div className="font-bold mb-2">EARNINGS:</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-gray-300 p-2 text-left">Description</th>
+                                  <th className="border border-gray-300 p-2 text-right">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Basic Salary</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.basicSalary.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Allowances</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.allowances.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Overtime</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.overtime.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Bonus</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.bonus.toFixed(2)}</td>
+                                </tr>
+                                <tr className="bg-gray-50 font-bold">
+                                  <td className="border border-gray-300 p-2">Gross Pay</td>
+                                  <td className="border border-gray-300 p-2 text-right">${calculateSalarySlipTotals().grossPay.toFixed(2)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        
+                        {/* Deductions */}
+                        <div>
+                          <div className="font-bold mb-2">DEDUCTIONS:</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-gray-300 p-2 text-left">Description</th>
+                                  <th className="border border-gray-300 p-2 text-right">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Tax</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.tax.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Insurance</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.insurance.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-gray-300 p-2">Other Deductions</td>
+                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.otherDeductions.toFixed(2)}</td>
+                                </tr>
+                                <tr className="bg-gray-50 font-bold">
+                                  <td className="border border-gray-300 p-2">Total Deductions</td>
+                                  <td className="border border-gray-300 p-2 text-right">${calculateSalarySlipTotals().totalDeductions.toFixed(2)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        
+                        {/* Net Pay */}
+                        <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
+                          <div className="flex justify-between text-lg pt-2 border-t border-gray-300">
+                            <span className="font-bold">NET PAY:</span>
+                            <span className="font-bold text-green-600">${calculateSalarySlipTotals().netPay.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Signatures */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                          <div>
+                            <div className="font-bold mb-2">EMPLOYEE SIGNATURE</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">Name & Signature</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">MANAGER APPROVAL</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">Name & Signature</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">DATE</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">&nbsp;</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentTemplate?.type === "complimentary-goods" ? (
+                      // Complimentary Goods Content
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center">
+                          <h2 className="text-2xl font-bold">COMPLIMENTARY GOODS VOUCHER</h2>
+                          <div className="text-sm mt-1">Voucher #{complimentaryGoodsData.voucherNumber}</div>
+                          <div className="text-sm mt-1">Date: {complimentaryGoodsData.date}</div>
+                        </div>
+                        
+                        {/* Customer Info */}
+                        <div>
+                          <div className="font-bold mb-1">THIS IS TO CERTIFY THAT THE FOLLOWING GOODS HAVE BEEN PROVIDED FREE OF CHARGE TO:</div>
+                          <div className="text-sm mb-1">{complimentaryGoodsData.customerName}</div>
+                          <div className="text-sm mb-1">{complimentaryGoodsData.customerAddress}</div>
+                          <div className="flex items-center gap-2 text-sm mt-1">
+                            <span>Phone:</span>
+                            <span>{complimentaryGoodsData.customerPhone}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm mt-1">
+                            <span>Email:</span>
+                            <span>{complimentaryGoodsData.customerEmail}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Items Table */}
+                        <div>
+                          <div className="font-bold mb-2">ITEMS:</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-gray-300 p-2 text-left">Item #</th>
+                                  <th className="border border-gray-300 p-2 text-left">Description</th>
+                                  <th className="border border-gray-300 p-2 text-left">Quantity</th>
+                                  <th className="border border-gray-300 p-2 text-left">Unit</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {complimentaryGoodsData.items.map((item, index) => (
+                                  <tr key={item.id}>
+                                    <td className="border border-gray-300 p-2">
+                                      {String(index + 1).padStart(3, '0')}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.description}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.quantity}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {item.unit}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <Button 
+                            onClick={handleAddComplimentaryGoodsItem}
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Item
+                          </Button>
+                        </div>
+                        
+                        {/* Reason */}
+                        <div>
+                          <div className="font-bold mb-2">REASON FOR COMPLIMENTARY GOODS:</div>
+                          <div className="text-sm min-h-[40px]">
+                            {complimentaryGoodsData.reason}
+                          </div>
+                        </div>
+                        
+                        {/* Signatures */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                          <div>
+                            <div className="font-bold mb-2">AUTHORIZED BY</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">Name: {complimentaryGoodsData.authorizedByName}</div>
+                              </div>
+                              <div className="text-xs">Title: {complimentaryGoodsData.authorizedByTitle}</div>
+                              <div className="text-xs">Date: {complimentaryGoodsData.authorizedDate}</div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">SIGNATURE</div>
+                            <div className="text-sm space-y-2">
+                              <div className="border-t border-black pt-1 mt-8">
+                                <div className="text-xs">&nbsp;</div>
                               </div>
                             </div>
                           </div>
