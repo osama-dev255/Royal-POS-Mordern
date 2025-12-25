@@ -27,7 +27,9 @@ import {
   FileCheck,
   FileX,
   Plus,
-  Minus
+  Minus,
+  Share,
+  ExternalLink
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from "@/utils/templateUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -155,6 +157,8 @@ interface InvoiceData {
   terms: string;
   notes: string;
   paymentOptions: string;
+  checkPayableMessage: string;
+  timestamp: string;
 }
 
 interface ExpenseVoucherItem {
@@ -686,7 +690,8 @@ Date: [DATE]`,
     authorizationDate: ""
   });
   
-  const [invoiceData, setInvoiceData] = useState<InvoiceData>({
+  // Initialize invoice data with current date and time-based invoice number
+  const initialInvoiceData: InvoiceData = {
     businessName: "Your Business Name",
     businessAddress: "123 Business Street",
     businessPhone: "(555) 123-4567",
@@ -696,9 +701,9 @@ Date: [DATE]`,
     clientCityState: "Client City, State 67890",
     clientPhone: "(555) 987-6543",
     clientEmail: "accounts@clientcompany.com",
-    invoiceNumber: "INV-2024-001",
-    invoiceDate: "12/3/2025",
-    dueDate: "1/2/2026",
+    invoiceNumber: `INV-${new Date().getTime()}`,
+    invoiceDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
     amountDue: 2395.84,
     items: [
       { id: "1", description: "Website Design & Development", quantity: 1, unit: "Project", rate: 1800.00, amount: 1800.00 },
@@ -711,8 +716,14 @@ Date: [DATE]`,
     amountPaid: 0.00,
     terms: "Net 30",
     notes: "Thank you for your business! Payment due within 30 days.",
-    paymentOptions: "Bank Transfer, Check, or Credit Card"
-  });
+    paymentOptions: "Bank Transfer, Check, or Credit Card",
+    checkPayableMessage: "Please make checks payable to Your Business Name",
+    timestamp: new Date().toLocaleString()
+  };
+  
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>(initialInvoiceData);
+  
+  const [showInvoiceOptions, setShowInvoiceOptions] = useState(false);
   
   const [expenseVoucherData, setExpenseVoucherData] = useState<ExpenseVoucherData>({
     voucherNumber: "EV-2024-001",
@@ -1728,20 +1739,236 @@ Date: [DATE]`,
   
   // Handle invoice data changes
   const handleInvoiceChange = (field: keyof InvoiceData, value: string | number) => {
-    setInvoiceData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setInvoiceData(prev => {
+      // Prevent changes to invoice number, date, and timestamp
+      if (field === 'invoiceNumber' || field === 'invoiceDate' || field === 'timestamp') {
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        [field]: value
+      };
+    });
   };
   
   // Handle invoice item changes
   const handleInvoiceItemChange = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
+    setInvoiceData(prev => {
+      const updatedItems = prev.items.map(item => {
+        if (item.id === itemId) {
+          const updatedItem = { ...item, [field]: value };
+          
+          // If quantity or rate changes, update amount
+          if (field === 'quantity' || field === 'rate') {
+            if (field === 'quantity') {
+              updatedItem.amount = Number(value) * updatedItem.rate;
+            } else if (field === 'rate') {
+              updatedItem.amount = updatedItem.quantity * Number(value);
+            }
+          }
+          
+          return updatedItem;
+        }
+        return item;
+      });
+      
+      // Calculate new totals
+      const subtotal = updatedItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const total = subtotal + Number(prev.tax || 0) - Number(prev.discount || 0);
+      const amountDue = total - Number(prev.amountPaid || 0);
+      
+      return {
+        ...prev,
+        items: updatedItems,
+        subtotal,
+        total,
+        amountDue
+      };
+    });
+  };
+  
+  // Show invoice options dialog
+  const showInvoiceOptionsDialog = () => {
+    // Update invoice date and timestamp to current date/time when saving
     setInvoiceData(prev => ({
       ...prev,
-      items: prev.items.map(item => 
-        item.id === itemId ? { ...item, [field]: value } : item
-      )
+      invoiceDate: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toLocaleString()
     }));
+    
+    setShowInvoiceOptions(true);
+  };
+  
+  // Close invoice options dialog
+  const closeInvoiceOptionsDialog = () => {
+    setShowInvoiceOptions(false);
+  };
+  
+  // Handle print invoice - generate PDF and print
+  const handlePrintInvoice = () => {
+    // Import jsPDF and html2pdf dynamically
+    Promise.all([
+      import('jspdf'),
+      import('html2pdf.js')
+    ]).then(([jsPDFModule, html2pdfModule]) => {
+      const doc = new jsPDFModule.jsPDF();
+      
+      // Add content to PDF
+      const content = document.getElementById('template-preview-content');
+      if (content) {
+        const element = content;
+        const opt = {
+          margin: 5,
+          filename: `Invoice_${invoiceData.invoiceNumber}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        html2pdfModule.default(element, opt).then(() => {
+          // After PDF is generated, print it
+          const pdfBlob = new Blob([doc.output('blob')], { type: 'application/pdf' });
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          
+          const printWindow = window.open(pdfUrl);
+          if (printWindow) {
+            printWindow.onload = () => {
+              printWindow.print();
+            };
+          }
+        });
+      }
+    }).catch(err => {
+      console.error('Error generating PDF:', err);
+      alert('Error generating PDF. Please try again.');
+    });
+    
+    closeInvoiceOptionsDialog();
+  };
+  
+  // Handle download invoice as PDF
+  const handleDownloadInvoice = () => {
+    // Import jsPDF and html2pdf dynamically
+    Promise.all([
+      import('jspdf'),
+      import('html2pdf.js')
+    ]).then(([jsPDFModule, html2pdfModule]) => {
+      const content = document.getElementById('template-preview-content');
+      if (content) {
+        const element = content;
+        const opt = {
+          margin: 5,
+          filename: `Invoice_${invoiceData.invoiceNumber}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        html2pdfModule.default(element, opt);
+      }
+    }).catch(err => {
+      console.error('Error generating PDF:', err);
+      alert('Error generating PDF. Please try again.');
+    });
+    
+    closeInvoiceOptionsDialog();
+  };
+  
+  // Handle share invoice - copy invoice details to clipboard
+  const handleShareInvoice = () => {
+    // Create a text version of the invoice for sharing
+    let invoiceText = `INVOICE\n`;
+    invoiceText += `Invoice Number: ${invoiceData.invoiceNumber}\n`;
+    invoiceText += `Invoice Date: ${invoiceData.invoiceDate}\n`;
+    invoiceText += `Due Date: ${invoiceData.dueDate}\n`;
+    invoiceText += `Generated at: ${new Date().toLocaleString()}\n\n`;
+    
+    invoiceText += `FROM:\n`;
+    invoiceText += `${invoiceData.businessName}\n`;
+    invoiceText += `${invoiceData.businessAddress}\n`;
+    invoiceText += `Phone: ${invoiceData.businessPhone}\n`;
+    invoiceText += `Email: ${invoiceData.businessEmail}\n\n`;
+    
+    invoiceText += `BILL TO:\n`;
+    invoiceText += `${invoiceData.clientName}\n`;
+    invoiceText += `${invoiceData.clientAddress}\n`;
+    invoiceText += `${invoiceData.clientCityState}\n`;
+    invoiceText += `Phone: ${invoiceData.clientPhone}\n`;
+    invoiceText += `Email: ${invoiceData.clientEmail}\n\n`;
+    
+    invoiceText += `ITEMS:\n`;
+    invoiceData.items.forEach(item => {
+      invoiceText += `${item.description} - ${item.quantity} ${item.unit} @ TSH ${item.rate.toFixed(2)} = TSH ${item.amount.toFixed(2)}\n`;
+    });
+    
+    invoiceText += `\nSUBTOTAL: TSH ${calculateInvoiceTotals().subtotal.toFixed(2)}\n`;
+    invoiceText += `DISCOUNT: TSH ${invoiceData.discount.toFixed(2)}\n`;
+    invoiceText += `TAX: TSH ${invoiceData.tax.toFixed(2)}\n`;
+    invoiceText += `TOTAL: TSH ${calculateInvoiceTotals().total.toFixed(2)}\n`;
+    invoiceText += `AMOUNT DUE: TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}\n`;
+    
+    navigator.clipboard.writeText(invoiceText)
+      .then(() => {
+        alert('Invoice details copied to clipboard!');
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy invoice details to clipboard');
+      });
+    
+    closeInvoiceOptionsDialog();
+  };
+  
+  // Handle export invoice as Excel
+  const handleExportInvoice = () => {
+    import('xlsx').then((XLSXModule) => {
+      // Create worksheet data
+      const wsData = [
+        ['INVOICE', invoiceData.invoiceNumber],
+        ['Invoice Date', invoiceData.invoiceDate],
+        ['Due Date', invoiceData.dueDate],
+        [],
+        ['FROM:'],
+        [invoiceData.businessName],
+        [invoiceData.businessAddress],
+        ['Phone:', invoiceData.businessPhone],
+        ['Email:', invoiceData.businessEmail],
+        [],
+        ['BILL TO:'],
+        [invoiceData.clientName],
+        [invoiceData.clientAddress],
+        [invoiceData.clientCityState],
+        ['Phone:', invoiceData.clientPhone],
+        ['Email:', invoiceData.clientEmail],
+        [],
+        ['DESCRIPTION', 'QUANTITY', 'UNIT', 'RATE', 'AMOUNT'],
+        ...invoiceData.items.map(item => [
+          item.description, 
+          item.quantity, 
+          item.unit, 
+          `TSH ${item.rate.toFixed(2)}`, 
+          `TSH ${item.amount.toFixed(2)}`
+        ]),
+        [],
+        ['SUBTOTAL', `TSH ${calculateInvoiceTotals().subtotal.toFixed(2)}`],
+        ['DISCOUNT', `TSH ${invoiceData.discount.toFixed(2)}`],
+        ['TAX', `TSH ${invoiceData.tax.toFixed(2)}`],
+        ['TOTAL', `TSH ${calculateInvoiceTotals().total.toFixed(2)}`],
+        ['AMOUNT DUE', `TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}`]
+      ];
+      
+      const ws = XLSXModule.utils.aoa_to_sheet(wsData);
+      const wb = XLSXModule.utils.book_new();
+      XLSXModule.utils.book_append_sheet(wb, ws, 'Invoice');
+      
+      XLSXModule.writeFile(wb, `Invoice_${invoiceData.invoiceNumber}.xlsx`);
+    }).catch(err => {
+      console.error('Error generating Excel:', err);
+      alert('Error generating Excel file. Please try again.');
+    });
+    
+    closeInvoiceOptionsDialog();
   };
   
   // Add new invoice item
@@ -1778,6 +2005,21 @@ Date: [DATE]`,
     
     return { subtotal, total, amountDue };
   };
+  
+  // Update totals when invoice data changes
+  useEffect(() => {
+    // Recalculate totals when items, tax, or discount change
+    const newSubtotal = invoiceData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const newTotal = newSubtotal + Number(invoiceData.tax || 0) - Number(invoiceData.discount || 0);
+    const newAmountDue = newTotal - Number(invoiceData.amountPaid || 0);
+    
+    setInvoiceData(prev => ({
+      ...prev,
+      subtotal: newSubtotal,
+      total: newTotal,
+      amountDue: newAmountDue
+    }));
+  }, [invoiceData.items, invoiceData.tax, invoiceData.discount, invoiceData.amountPaid]);
   
   // Handle expense voucher data changes
   const handleExpenseVoucherChange = (field: keyof ExpenseVoucherData, value: string | number) => {
@@ -2046,7 +2288,8 @@ Date: [DATE]`,
                       if (currentTemplate?.type === "order-form") {
                         alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
                       } else if (currentTemplate?.type === "invoice") {
-                        alert(`Invoice ${invoiceData.invoiceNumber} saved successfully!`);
+                        // Show dialog with print, download, share, or export options
+                        showInvoiceOptionsDialog();
                       } else if (currentTemplate?.type === "salary-slip") {
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
                       } else if (currentTemplate?.type === "complimentary-goods") {
@@ -2061,74 +2304,65 @@ Date: [DATE]`,
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
                       Back to Templates
                     </Button>
-                    <Button onClick={() => {
-                      if (currentTemplate?.type === "order-form") {
-                        window.print();
-                      } else if (currentTemplate?.type === "invoice") {
-                        window.print();
-                      } else if (currentTemplate?.type === "salary-slip") {
-                        window.print();
-                      } else if (currentTemplate?.type === "complimentary-goods") {
-                        window.print();
-                      } else {
-                        handlePrintDeliveryNote();
-                      }
-                    }}>
-                      <Printer className="h-4 w-4 mr-2" />
-                      Print
-                    </Button>
-                    <Button onClick={() => {
-                      if (currentTemplate?.type === "order-form") {
-                        const content = document.getElementById('template-preview-content');
-                        if (content) {
-                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `Purchase_Order_${purchaseOrderData.poNumber}.html`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }
-                      } else if (currentTemplate?.type === "invoice") {
-                        const content = document.getElementById('template-preview-content');
-                        if (content) {
-                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `Invoice_${invoiceData.invoiceNumber}.html`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }
-                      } else if (currentTemplate?.type === "salary-slip") {
-                        const content = document.getElementById('template-preview-content');
-                        if (content) {
-                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `Salary_Slip_${salarySlipData.employeeName.replace(/\s+/g, '_')}.html`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }
-                      } else if (currentTemplate?.type === "complimentary-goods") {
-                        const content = document.getElementById('template-preview-content');
-                        if (content) {
-                          const blob = new Blob([content.innerHTML], { type: 'text/html' });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `Complimentary_Goods_Voucher_${complimentaryGoodsData.voucherNumber}.html`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }
-                      } else {
-                        handleDownloadDeliveryNote();
-                      }
-                    }}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
+                    {currentTemplate?.type !== "invoice" && (
+                      <>
+                        <Button onClick={() => {
+                          if (currentTemplate?.type === "order-form") {
+                            window.print();
+                          } else if (currentTemplate?.type === "salary-slip") {
+                            window.print();
+                          } else if (currentTemplate?.type === "complimentary-goods") {
+                            window.print();
+                          } else {
+                            handlePrintDeliveryNote();
+                          }
+                        }}>
+                          <Printer className="h-4 w-4 mr-2" />
+                          Print
+                        </Button>
+                        <Button onClick={() => {
+                          if (currentTemplate?.type === "order-form") {
+                            const content = document.getElementById('template-preview-content');
+                            if (content) {
+                              const blob = new Blob([content.innerHTML], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `Purchase_Order_${purchaseOrderData.poNumber}.html`;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                            }
+                          } else if (currentTemplate?.type === "salary-slip") {
+                            const content = document.getElementById('template-preview-content');
+                            if (content) {
+                              const blob = new Blob([content.innerHTML], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `Salary_Slip_${salarySlipData.employeeName.replace(/\s+/g, '_')}.html`;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                            }
+                          } else if (currentTemplate?.type === "complimentary-goods") {
+                            const content = document.getElementById('template-preview-content');
+                            if (content) {
+                              const blob = new Blob([content.innerHTML], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `Complimentary_Goods_Voucher_${complimentaryGoodsData.voucherNumber}.html`;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                            }
+                          } else {
+                            handleDownloadDeliveryNote();
+                          }
+                        }}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
                 
@@ -2369,40 +2603,78 @@ Date: [DATE]`,
                         {/* Header with Amount Due */}
                         <div className="text-center">
                           <h2 className="text-2xl font-bold">INVOICE</h2>
-                          <div className="text-xl font-bold mt-2">{invoiceData.invoiceNumber}</div>
+                          <div className="text-xl font-bold mt-2">
+                            {invoiceData.invoiceNumber}
+                          </div>
+                          <div className="text-sm mt-1">Generated: {invoiceData.timestamp}</div>
                           <div className="text-sm mt-1">AMOUNT DUE</div>
-                          <div className="text-2xl font-bold text-red-600 mt-1">${invoiceData.amountDue.toFixed(2)}</div>
-                          <div className="text-sm mt-1">Due: {invoiceData.dueDate}</div>
+                          <div className="text-2xl font-bold text-red-600 mt-1">TSH {invoiceData.amountDue.toFixed(2)}</div>
                         </div>
                         
                         {/* Business and Client Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div>
                             <div className="font-bold mb-1">FROM:</div>
-                            <div className="text-sm mb-1">{invoiceData.businessName}</div>
-                            <div className="text-sm mb-1">{invoiceData.businessAddress}</div>
+                            <Input
+                              value={invoiceData.businessName}
+                              onChange={(e) => handleInvoiceChange('businessName', e.target.value)}
+                              className="text-sm mb-1 p-1 h-8"
+                            />
+                            <Input
+                              value={invoiceData.businessAddress}
+                              onChange={(e) => handleInvoiceChange('businessAddress', e.target.value)}
+                              className="text-sm mb-1 p-1 h-8"
+                            />
                             <div className="flex items-center gap-2 text-sm mt-1">
                               <span>Phone:</span>
-                              <span>{invoiceData.businessPhone}</span>
+                              <Input
+                                value={invoiceData.businessPhone}
+                                onChange={(e) => handleInvoiceChange('businessPhone', e.target.value)}
+                                className="text-sm p-1 h-8 w-40 inline-block"
+                              />
                             </div>
                             <div className="flex items-center gap-2 text-sm mt-1">
                               <span>Email:</span>
-                              <span>{invoiceData.businessEmail}</span>
+                              <Input
+                                value={invoiceData.businessEmail}
+                                onChange={(e) => handleInvoiceChange('businessEmail', e.target.value)}
+                                className="text-sm p-1 h-8 w-40 inline-block"
+                              />
                             </div>
                           </div>
                           
                           <div>
                             <div className="font-bold mb-1">BILL TO:</div>
-                            <div className="text-sm mb-1">{invoiceData.clientName}</div>
-                            <div className="text-sm mb-1">{invoiceData.clientAddress}</div>
-                            <div className="text-sm mb-1">{invoiceData.clientCityState}</div>
+                            <Input
+                              value={invoiceData.clientName}
+                              onChange={(e) => handleInvoiceChange('clientName', e.target.value)}
+                              className="text-sm mb-1 p-1 h-8"
+                            />
+                            <Input
+                              value={invoiceData.clientAddress}
+                              onChange={(e) => handleInvoiceChange('clientAddress', e.target.value)}
+                              className="text-sm mb-1 p-1 h-8"
+                            />
+                            <Input
+                              value={invoiceData.clientCityState}
+                              onChange={(e) => handleInvoiceChange('clientCityState', e.target.value)}
+                              className="text-sm mb-1 p-1 h-8"
+                            />
                             <div className="flex items-center gap-2 text-sm mt-1">
                               <span>Phone:</span>
-                              <span>{invoiceData.clientPhone}</span>
+                              <Input
+                                value={invoiceData.clientPhone}
+                                onChange={(e) => handleInvoiceChange('clientPhone', e.target.value)}
+                                className="text-sm p-1 h-8 w-40 inline-block"
+                              />
                             </div>
                             <div className="flex items-center gap-2 text-sm mt-1">
                               <span>Email:</span>
-                              <span>{invoiceData.clientEmail}</span>
+                              <Input
+                                value={invoiceData.clientEmail}
+                                onChange={(e) => handleInvoiceChange('clientEmail', e.target.value)}
+                                className="text-sm p-1 h-8 w-40 inline-block"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2415,11 +2687,20 @@ Date: [DATE]`,
                           </div>
                           <div>
                             <div className="text-sm font-medium">DUE DATE</div>
-                            <div className="text-sm">{invoiceData.dueDate}</div>
+                            <Input
+                              type="date"
+                              value={invoiceData.dueDate}
+                              onChange={(e) => handleInvoiceChange('dueDate', e.target.value)}
+                              className="text-sm p-1 h-8"
+                            />
                           </div>
                           <div>
                             <div className="text-sm font-medium">TERMS</div>
-                            <div className="text-sm">{invoiceData.terms}</div>
+                            <Input
+                              value={invoiceData.terms}
+                              onChange={(e) => handleInvoiceChange('terms', e.target.value)}
+                              className="text-sm p-1 h-8"
+                            />
                           </div>
                         </div>
                         
@@ -2436,6 +2717,7 @@ Date: [DATE]`,
                                   <th className="border border-gray-300 p-2 text-left">Unit</th>
                                   <th className="border border-gray-300 p-2 text-left">Rate</th>
                                   <th className="border border-gray-300 p-2 text-left">Amount</th>
+                                  <th className="border border-gray-300 p-2 text-left">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -2445,19 +2727,58 @@ Date: [DATE]`,
                                       {String(index + 1).padStart(3, '0')}
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.description}
+                                      <Input
+                                        value={item.description}
+                                        onChange={(e) => handleInvoiceItemChange(item.id, 'description', e.target.value)}
+                                        className="p-1 h-8 text-sm"
+                                      />
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.quantity}
+                                      <Input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const newQuantity = parseFloat(e.target.value);
+                                          handleInvoiceItemChange(item.id, 'quantity', newQuantity);
+                                          // Update amount when quantity changes
+                                          handleInvoiceItemChange(item.id, 'amount', newQuantity * item.rate);
+                                        }}
+                                        className="p-1 h-8 text-sm"
+                                      />
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.unit}
+                                      <Input
+                                        value={item.unit}
+                                        onChange={(e) => handleInvoiceItemChange(item.id, 'unit', e.target.value)}
+                                        className="p-1 h-8 text-sm"
+                                      />
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.rate.toFixed(2)}
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={item.rate}
+                                        onChange={(e) => {
+                                          const newRate = parseFloat(e.target.value);
+                                          handleInvoiceItemChange(item.id, 'rate', newRate);
+                                          // Update amount when rate changes
+                                          handleInvoiceItemChange(item.id, 'amount', item.quantity * newRate);
+                                        }}
+                                        className="p-1 h-8 text-sm"
+                                      />
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.amount.toFixed(2)}
+                                      TSH {item.amount.toFixed(2)}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Button
+                                        onClick={() => handleRemoveInvoiceItem(item.id)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="p-1 h-8"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
                                     </td>
                                   </tr>
                                 ))}
@@ -2478,51 +2799,77 @@ Date: [DATE]`,
                         {/* Notes */}
                         <div>
                           <div className="font-bold mb-2">NOTES:</div>
-                          <div className="text-sm min-h-[40px]">
-                            {invoiceData.notes}
-                          </div>
+                          <Textarea
+                            value={invoiceData.notes}
+                            onChange={(e) => handleInvoiceChange('notes', e.target.value)}
+                            className="min-h-[80px]"
+                          />
                         </div>
                         
                         {/* Payment Options */}
                         <div>
                           <div className="font-bold mb-2">PAYMENT OPTIONS:</div>
-                          <div className="text-sm min-h-[40px]">
-                            {invoiceData.paymentOptions}
-                          </div>
+                          <Textarea
+                            value={invoiceData.paymentOptions}
+                            onChange={(e) => handleInvoiceChange('paymentOptions', e.target.value)}
+                            className="min-h-[80px]"
+                          />
                         </div>
                         
                         {/* Financial Summary */}
                         <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Subtotal:</span>
-                            <span>${calculateInvoiceTotals().subtotal.toFixed(2)}</span>
+                            <span>TSH {calculateInvoiceTotals().subtotal.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Discount:</span>
-                            <span>${invoiceData.discount.toFixed(2)}</span>
+                            <span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={invoiceData.discount}
+                                onChange={(e) => handleInvoiceChange('discount', parseFloat(e.target.value))}
+                                className="w-24 inline-block p-1 h-8 text-right"
+                              />
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Tax:</span>
-                            <span>${invoiceData.tax.toFixed(2)}</span>
+                            <span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={invoiceData.tax}
+                                onChange={(e) => handleInvoiceChange('tax', parseFloat(e.target.value))}
+                                className="w-24 inline-block p-1 h-8 text-right"
+                              />
+                            </span>
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">TOTAL:</span>
-                            <span className="font-bold">${calculateInvoiceTotals().total.toFixed(2)}</span>
+                            <span className="font-bold">TSH {calculateInvoiceTotals().total.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Amount Paid:</span>
-                            <span>${invoiceData.amountPaid.toFixed(2)}</span>
+                            <span>TSH {invoiceData.amountPaid.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">AMOUNT DUE:</span>
-                            <span className="font-bold text-red-600">${calculateInvoiceTotals().amountDue.toFixed(2)}</span>
+                            <span className="font-bold text-red-600">TSH {calculateInvoiceTotals().amountDue.toFixed(2)}</span>
                           </div>
                         </div>
                         
                         {/* Footer Note */}
                         <div className="text-center text-sm mt-4 pt-4 border-t border-gray-300">
                           <div>{invoiceData.notes}</div>
-                          <div className="mt-2">Please make checks payable to {invoiceData.businessName}</div>
+                          <div className="mt-2">
+                            <Input
+                              value={invoiceData.checkPayableMessage}
+                              onChange={(e) => handleInvoiceChange('checkPayableMessage', e.target.value)}
+                              className="text-center"
+                            />
+                          </div>
                         </div>
                       </div>
                     ) : currentTemplate?.type === "expense-voucher" ? (
@@ -3239,6 +3586,63 @@ Date: [DATE]`,
           className="hidden" 
         />
       </main>
+      
+      {/* Invoice Options Dialog */}
+      {showInvoiceOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold mb-4">Invoice Options</h3>
+            <p className="mb-4">Choose an action for your invoice:</p>
+            
+            <div className="space-y-2">
+              <Button 
+                onClick={handlePrintInvoice}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Invoice
+              </Button>
+              
+              <Button 
+                onClick={handleDownloadInvoice}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Invoice
+              </Button>
+              
+              <Button 
+                onClick={handleShareInvoice}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Share className="h-4 w-4 mr-2" />
+                Share Invoice
+              </Button>
+              
+              <Button 
+                onClick={handleExportInvoice}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Export as PDF
+              </Button>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={closeInvoiceOptionsDialog}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
