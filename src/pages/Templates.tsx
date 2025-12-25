@@ -1805,43 +1805,190 @@ Date: [DATE]`,
     setShowInvoiceOptions(false);
   };
   
+  // Function to generate clean invoice HTML for printing
+  const generateCleanInvoiceHTML = (): string => {
+    // Create a clean version of the invoice without input fields
+    const cleanHTML = `
+      <div class="invoice-container" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="font-size: 24px; margin: 0; padding: 0;">INVOICE</h2>
+          <div style="font-size: 18px; font-weight: bold; margin: 10px 0;">${invoiceData.invoiceNumber}</div>
+          <div style="font-size: 14px; margin: 5px 0;">Generated: ${invoiceData.timestamp}</div>
+          <div style="font-size: 14px; margin: 5px 0;">AMOUNT DUE</div>
+          <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin: 10px 0;">TSH ${invoiceData.amountDue.toFixed(2)}</div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+          <div style="flex: 1; padding-right: 20px;">
+            <div style="font-weight: bold; margin-bottom: 5px;">FROM:</div>
+            <div style="margin-bottom: 5px;">${invoiceData.businessName}</div>
+            <div style="margin-bottom: 5px;">${invoiceData.businessAddress}</div>
+            <div style="margin-bottom: 5px;">Phone: ${invoiceData.businessPhone}</div>
+            <div style="margin-bottom: 5px;">Email: ${invoiceData.businessEmail}</div>
+          </div>
+          
+          <div style="flex: 1;">
+            <div style="font-weight: bold; margin-bottom: 5px;">BILL TO:</div>
+            <div style="margin-bottom: 5px;">${invoiceData.clientName}</div>
+            <div style="margin-bottom: 5px;">${invoiceData.clientAddress}</div>
+            <div style="margin-bottom: 5px;">${invoiceData.clientCityState}</div>
+            <div style="margin-bottom: 5px;">Phone: ${invoiceData.clientPhone}</div>
+            <div style="margin-bottom: 5px;">Email: ${invoiceData.clientEmail}</div>
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; font-size: 14px;">
+          <div><strong>INVOICE DATE:</strong></div>
+          <div>${invoiceData.invoiceDate}</div>
+          <div><strong>DUE DATE:</strong></div>
+          <div>${invoiceData.dueDate}</div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 10px;">SERVICES RENDERED:</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead style="background-color: #f3f4f6;">
+              <tr>
+                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Item</th>
+                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Description</th>
+                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Quantity</th>
+                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Unit</th>
+                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Rate</th>
+                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${invoiceData.items.map((item, index) => `
+                <tr>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${String(index + 1).padStart(3, '0')}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${item.description}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${item.quantity}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${item.unit}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">${item.rate.toFixed(2)}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px;">TSH ${item.amount.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 5px;">NOTES:</div>
+          <div style="min-height: 40px;">${invoiceData.notes}</div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: bold; margin-bottom: 5px;">PAYMENT OPTIONS:</div>
+          <div style="min-height: 40px;">${invoiceData.paymentOptions}</div>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+          <table style="width: 300px; font-size: 14px;">
+            <tr>
+              <td style="padding: 5px;"><strong>Subtotal:</strong></td>
+              <td style="padding: 5px; text-align: right;">TSH ${calculateInvoiceTotals().subtotal.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px;"><strong>Discount:</strong></td>
+              <td style="padding: 5px; text-align: right;">TSH ${invoiceData.discount.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px;"><strong>Tax:</strong></td>
+              <td style="padding: 5px; text-align: right;">TSH ${invoiceData.tax.toFixed(2)}</td>
+            </tr>
+            <tr style="border-top: 2px solid #000; padding-top: 5px;">
+              <td style="padding: 5px;"><strong>TOTAL:</strong></td>
+              <td style="padding: 5px; text-align: right;"><strong>TSH ${calculateInvoiceTotals().total.toFixed(2)}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding: 5px;"><strong>Amount Paid:</strong></td>
+              <td style="padding: 5px; text-align: right;">TSH ${invoiceData.amountPaid.toFixed(2)}</td>
+            </tr>
+            <tr style="border-top: 2px solid #000; padding-top: 5px;">
+              <td style="padding: 5px;"><strong>AMOUNT DUE:</strong></td>
+              <td style="padding: 5px; text-align: right; color: #dc2626;"><strong>TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}</strong></td>
+            </tr>
+          </table>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #d1d5db;">
+          <div>${invoiceData.checkPayableMessage}</div>
+        </div>
+      </div>
+    `;
+    
+    return cleanHTML;
+  };
+  
   // Handle print invoice - generate PDF and print
   const handlePrintInvoice = () => {
-    // Import jsPDF and html2pdf dynamically
-    Promise.all([
-      import('jspdf'),
-      import('html2pdf.js')
-    ]).then(([jsPDFModule, html2pdfModule]) => {
-      const doc = new jsPDFModule.jsPDF();
+    // Import html2pdf dynamically
+    import('html2pdf.js').then((html2pdfModule) => {
+      // Generate clean invoice HTML
+      const cleanInvoiceHTML = generateCleanInvoiceHTML();
       
-      // Add content to PDF
-      const content = document.getElementById('template-preview-content');
-      if (content) {
-        const element = content;
-        const opt = {
-          margin: 5,
-          filename: `Invoice_${invoiceData.invoiceNumber}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+      // Create a temporary container for the clean HTML
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = cleanInvoiceHTML;
+      tempContainer.id = 'clean-invoice-content';
+      tempContainer.style.display = 'none';
+      document.body.appendChild(tempContainer);
+      
+      const opt = {
+        margin: 5,
+        filename: `Invoice_${invoiceData.invoiceNumber}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      // Generate PDF and print
+      html2pdfModule.default(tempContainer, opt).then(() => {
+        // After PDF is generated, trigger browser print
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
         
-        html2pdfModule.default(element, opt).then(() => {
-          // After PDF is generated, print it
-          const pdfBlob = new Blob([doc.output('blob')], { type: 'application/pdf' });
-          const pdfUrl = URL.createObjectURL(pdfBlob);
+        const printDoc = iframe.contentDocument;
+        if (printDoc) {
+          printDoc.open();
+          printDoc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Invoice ${invoiceData.invoiceNumber}</title>
+              <style>
+                ${Array.from(document.styleSheets)
+                  .map(sheet => sheet.cssRules ? Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n') : '')
+                  .join('\n')}
+                table { border-collapse: collapse; }
+                th, td { border: 1px solid #d1d5db; padding: 8px; }
+              </style>
+            </head>
+            <body>
+              ${cleanInvoiceHTML}
+            </body>
+            </html>
+          `);
+          printDoc.close();
           
-          const printWindow = window.open(pdfUrl);
-          if (printWindow) {
-            printWindow.onload = () => {
-              printWindow.print();
-            };
-          }
-        });
-      }
+          // Wait for content to load then print
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        }
+        
+        // Remove temporary container after printing
+        setTimeout(() => {
+          document.body.removeChild(tempContainer);
+          document.body.removeChild(iframe);
+        }, 1000);
+      }).catch(err => {
+        console.error('Error generating PDF:', err);
+        alert('Error generating PDF. Please try again.');
+      });
     }).catch(err => {
-      console.error('Error generating PDF:', err);
-      alert('Error generating PDF. Please try again.');
+      console.error('Error loading html2pdf:', err);
+      alert('Error loading PDF library. Please try again.');
     });
     
     closeInvoiceOptionsDialog();
@@ -1849,27 +1996,41 @@ Date: [DATE]`,
   
   // Handle download invoice as PDF
   const handleDownloadInvoice = () => {
-    // Import jsPDF and html2pdf dynamically
-    Promise.all([
-      import('jspdf'),
-      import('html2pdf.js')
-    ]).then(([jsPDFModule, html2pdfModule]) => {
-      const content = document.getElementById('template-preview-content');
-      if (content) {
-        const element = content;
-        const opt = {
-          margin: 5,
-          filename: `Invoice_${invoiceData.invoiceNumber}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        
-        html2pdfModule.default(element, opt);
-      }
+    // Import html2pdf dynamically
+    import('html2pdf.js').then((html2pdfModule) => {
+      // Generate clean invoice HTML
+      const cleanInvoiceHTML = generateCleanInvoiceHTML();
+      
+      // Create a temporary container for the clean HTML
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = cleanInvoiceHTML;
+      tempContainer.id = 'clean-invoice-content';
+      tempContainer.style.display = 'none';
+      document.body.appendChild(tempContainer);
+      
+      const opt = {
+        margin: 5,
+        filename: `Invoice_${invoiceData.invoiceNumber}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      // Generate PDF
+      html2pdfModule.default(tempContainer, opt).then(() => {
+        // Remove temporary container after PDF generation
+        setTimeout(() => {
+          document.body.removeChild(tempContainer);
+        }, 1000);
+      }).catch(err => {
+        console.error('Error generating PDF:', err);
+        alert('Error generating PDF. Please try again.');
+        // Remove temporary container in case of error
+        document.body.removeChild(tempContainer);
+      });
     }).catch(err => {
-      console.error('Error generating PDF:', err);
-      alert('Error generating PDF. Please try again.');
+      console.error('Error loading html2pdf:', err);
+      alert('Error loading PDF library. Please try again.');
     });
     
     closeInvoiceOptionsDialog();
@@ -2862,7 +3023,6 @@ Date: [DATE]`,
                         
                         {/* Footer Note */}
                         <div className="text-center text-sm mt-4 pt-4 border-t border-gray-300">
-                          <div>{invoiceData.notes}</div>
                           <div className="mt-2">
                             <Input
                               value={invoiceData.checkPayableMessage}
