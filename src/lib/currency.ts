@@ -8,7 +8,8 @@ export function formatCurrency(amount: number): string {
     style: 'currency',
     currency: 'TZS',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
+    useGrouping: true
   }).format(amount);
 }
 

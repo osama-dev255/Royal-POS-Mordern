@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatCurrency } from "@/lib/currency";
 import { 
   FileText, 
   Receipt, 
@@ -2670,10 +2671,10 @@ Date: [DATE]`,
                                       {item.unit}
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.unitPrice.toFixed(2)}
+                                      {formatCurrency(item.unitPrice)}
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      {item.total.toFixed(2)}
+                                      {formatCurrency(item.total)}
                                     </td>
                                   </tr>
                                 ))}
@@ -2695,19 +2696,19 @@ Date: [DATE]`,
                         <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">SUBTOTAL</span>
-                            <span>${calculatePurchaseOrderTotals().subtotal.toFixed(2)}</span>
+                            <span>{formatCurrency(calculatePurchaseOrderTotals().subtotal)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">TAX (8.5%)</span>
-                            <span>${calculatePurchaseOrderTotals().tax.toFixed(2)}</span>
+                            <span>{formatCurrency(calculatePurchaseOrderTotals().tax)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">SHIPPING</span>
-                            <span>${purchaseOrderData.shipping.toFixed(2)}</span>
+                            <span>{formatCurrency(purchaseOrderData.shipping)}</span>
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">TOTAL</span>
-                            <span className="font-bold">${calculatePurchaseOrderTotals().total.toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(calculatePurchaseOrderTotals().total)}</span>
                           </div>
                         </div>
                         
@@ -2769,7 +2770,7 @@ Date: [DATE]`,
                           </div>
                           <div className="text-sm mt-1">Generated: {invoiceData.timestamp}</div>
                           <div className="text-sm mt-1">AMOUNT DUE</div>
-                          <div className="text-2xl font-bold text-red-600 mt-1">TSH {invoiceData.amountDue.toFixed(2)}</div>
+                          <div className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(invoiceData.amountDue)}</div>
                         </div>
                         
                         {/* Business and Client Info */}
@@ -2929,7 +2930,7 @@ Date: [DATE]`,
                                       />
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      TSH {item.amount.toFixed(2)}
+                                      {formatCurrency(item.amount)}
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Button
@@ -2981,7 +2982,7 @@ Date: [DATE]`,
                         <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Subtotal:</span>
-                            <span>TSH {calculateInvoiceTotals().subtotal.toFixed(2)}</span>
+                            <span>{formatCurrency(calculateInvoiceTotals().subtotal)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Discount:</span>
@@ -3009,15 +3010,15 @@ Date: [DATE]`,
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">TOTAL:</span>
-                            <span className="font-bold">TSH {calculateInvoiceTotals().total.toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(calculateInvoiceTotals().total)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Amount Paid:</span>
-                            <span>TSH {invoiceData.amountPaid.toFixed(2)}</span>
+                            <span>{formatCurrency(invoiceData.amountPaid)}</span>
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">AMOUNT DUE:</span>
-                            <span className="font-bold text-red-600">TSH {calculateInvoiceTotals().amountDue.toFixed(2)}</span>
+                            <span className="font-bold text-red-600">{formatCurrency(calculateInvoiceTotals().amountDue)}</span>
                           </div>
                         </div>
                         
@@ -3092,7 +3093,7 @@ Date: [DATE]`,
                                       {item.category}
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      ${item.amount.toFixed(2)}
+                                      {formatCurrency(item.amount)}
                                     </td>
                                   </tr>
                                 ))}
@@ -3114,7 +3115,7 @@ Date: [DATE]`,
                         <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">TOTAL AMOUNT:</span>
-                            <span className="font-bold">${calculateExpenseVoucherTotals().totalAmount.toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(calculateExpenseVoucherTotals().totalAmount)}</span>
                           </div>
                         </div>
                         
@@ -3198,23 +3199,23 @@ Date: [DATE]`,
                               <tbody>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Basic Salary</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.basicSalary.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.basicSalary)}</td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Allowances</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.allowances.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.allowances)}</td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Overtime</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.overtime.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.overtime)}</td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Bonus</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.bonus.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.bonus)}</td>
                                 </tr>
                                 <tr className="bg-gray-50 font-bold">
                                   <td className="border border-gray-300 p-2">Gross Pay</td>
-                                  <td className="border border-gray-300 p-2 text-right">${calculateSalarySlipTotals().grossPay.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(calculateSalarySlipTotals().grossPay)}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -3235,19 +3236,19 @@ Date: [DATE]`,
                               <tbody>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Tax</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.tax.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.tax)}</td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Insurance</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.insurance.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.insurance)}</td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Other Deductions</td>
-                                  <td className="border border-gray-300 p-2 text-right">${salarySlipData.otherDeductions.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.otherDeductions)}</td>
                                 </tr>
                                 <tr className="bg-gray-50 font-bold">
                                   <td className="border border-gray-300 p-2">Total Deductions</td>
-                                  <td className="border border-gray-300 p-2 text-right">${calculateSalarySlipTotals().totalDeductions.toFixed(2)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(calculateSalarySlipTotals().totalDeductions)}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -3258,7 +3259,7 @@ Date: [DATE]`,
                         <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
                           <div className="flex justify-between text-lg pt-2 border-t border-gray-300">
                             <span className="font-bold">NET PAY:</span>
-                            <span className="font-bold text-green-600">${calculateSalarySlipTotals().netPay.toFixed(2)}</span>
+                            <span className="font-bold text-green-600">{formatCurrency(calculateSalarySlipTotals().netPay)}</span>
                           </div>
                         </div>
                         
