@@ -157,6 +157,7 @@ interface InvoiceData {
   discount: number;
   total: number;
   amountPaid: number;
+  creditBroughtForward: number;
   terms: string;
   notes: string;
   paymentOptions: string;
@@ -408,6 +409,7 @@ Discount:	[DISCOUNT]
 Tax:	[TAX]
 TOTAL:	[TOTAL]
 Amount Paid:	[AMOUNT_PAID]
+Credit Brought Forward from previous:	[CREDIT_BROUGHT_FORWARD]
 AMOUNT DUE:	[AMOUNT_DUE]
 [NOTES]
 
@@ -717,6 +719,7 @@ Date: [DATE]`,
     discount: 50.00,
     total: 2395.84,
     amountPaid: 0.00,
+    creditBroughtForward: 0.00,
     terms: "Net 30",
     notes: "Thank you for your business! Payment due within 30 days.",
     paymentOptions: "Bank Transfer, Check, or Credit Card",
@@ -1781,7 +1784,7 @@ Date: [DATE]`,
       // Calculate new totals
       const subtotal = updatedItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
       const total = subtotal + Number(prev.tax || 0) - Number(prev.discount || 0);
-      const amountDue = total - Number(prev.amountPaid || 0);
+      const amountDue = total - Number(prev.amountPaid || 0) + Number(prev.creditBroughtForward || 0);
       
       return {
         ...prev,
@@ -1908,6 +1911,10 @@ Date: [DATE]`,
             <tr>
               <td style="padding: 5px;"><strong>Amount Paid:</strong></td>
               <td style="padding: 5px; text-align: right;">TSH ${invoiceData.amountPaid.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px;"><strong>Credit Brought Forward from previous:</strong></td>
+              <td style="padding: 5px; text-align: right;">TSH ${invoiceData.creditBroughtForward.toFixed(2)}</td>
             </tr>
             <tr style="border-top: 2px solid #000; padding-top: 5px;">
               <td style="padding: 5px;"><strong>AMOUNT DUE:</strong></td>
@@ -2094,6 +2101,8 @@ Date: [DATE]`,
         ['DISCOUNT', `TSH ${invoiceData.discount.toFixed(2)}`],
         ['TAX', `TSH ${invoiceData.tax.toFixed(2)}`],
         ['TOTAL', `TSH ${calculateInvoiceTotals().total.toFixed(2)}`],
+        ['Amount Paid', `TSH ${invoiceData.amountPaid.toFixed(2)}`],
+        ['Credit Brought Forward from previous', `TSH ${invoiceData.creditBroughtForward.toFixed(2)}`],
         ['AMOUNT DUE', `TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}`]
       ];
       
@@ -2141,6 +2150,8 @@ Date: [DATE]`,
     csvContent += `Discount,TSH ${invoiceData.discount.toFixed(2)}\n`;
     csvContent += `Tax,TSH ${invoiceData.tax.toFixed(2)}\n`;
     csvContent += `Total,TSH ${calculateInvoiceTotals().total.toFixed(2)}\n`;
+    csvContent += `Amount Paid,TSH ${invoiceData.amountPaid.toFixed(2)}\n`;
+    csvContent += `Credit Brought Forward from previous,TSH ${invoiceData.creditBroughtForward.toFixed(2)}\n`;
     csvContent += `Amount Due,TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}\n`;
     
     const encodedUri = encodeURI(csvContent);
@@ -2199,6 +2210,8 @@ Date: [DATE]`,
     invoiceText += `*DISCOUNT:* TSH ${invoiceData.discount.toFixed(2)}\n`;
     invoiceText += `*TAX:* TSH ${invoiceData.tax.toFixed(2)}\n`;
     invoiceText += `*TOTAL:* TSH ${calculateInvoiceTotals().total.toFixed(2)}\n`;
+    invoiceText += `*Amount Paid:* TSH ${invoiceData.amountPaid.toFixed(2)}\n`;
+    invoiceText += `*Credit Brought Forward from previous:* TSH ${invoiceData.creditBroughtForward.toFixed(2)}\n`;
     invoiceText += `*AMOUNT DUE:* TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}\n`;
     
     // Format phone number for WhatsApp (remove all non-digit characters except the plus sign)
@@ -2243,6 +2256,8 @@ Date: [DATE]`,
     invoiceText += `DISCOUNT: TSH ${invoiceData.discount.toFixed(2)}\n`;
     invoiceText += `TAX: TSH ${invoiceData.tax.toFixed(2)}\n`;
     invoiceText += `TOTAL: TSH ${calculateInvoiceTotals().total.toFixed(2)}\n`;
+    invoiceText += `Amount Paid: TSH ${invoiceData.amountPaid.toFixed(2)}\n`;
+    invoiceText += `Credit Brought Forward from previous: TSH ${invoiceData.creditBroughtForward.toFixed(2)}\n`;
     invoiceText += `AMOUNT DUE: TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}\n`;
     
     // Create mailto link
@@ -2344,6 +2359,8 @@ Date: [DATE]`,
         ['DISCOUNT', `TSH ${invoiceData.discount.toFixed(2)}`],
         ['TAX', `TSH ${invoiceData.tax.toFixed(2)}`],
         ['TOTAL', `TSH ${calculateInvoiceTotals().total.toFixed(2)}`],
+        ['Amount Paid', `TSH ${invoiceData.amountPaid.toFixed(2)}`],
+        ['Credit Brought Forward from previous', `TSH ${invoiceData.creditBroughtForward.toFixed(2)}`],
         ['AMOUNT DUE', `TSH ${calculateInvoiceTotals().amountDue.toFixed(2)}`]
       ];
       
@@ -2390,7 +2407,7 @@ Date: [DATE]`,
   const calculateInvoiceTotals = () => {
     const subtotal = invoiceData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const total = subtotal + Number(invoiceData.tax || 0) - Number(invoiceData.discount || 0);
-    const amountDue = total - Number(invoiceData.amountPaid || 0);
+    const amountDue = total - Number(invoiceData.amountPaid || 0) + Number(invoiceData.creditBroughtForward || 0);
     
     return { subtotal, total, amountDue };
   };
@@ -2400,7 +2417,7 @@ Date: [DATE]`,
     // Recalculate totals when items, tax, or discount change
     const newSubtotal = invoiceData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const newTotal = newSubtotal + Number(invoiceData.tax || 0) - Number(invoiceData.discount || 0);
-    const newAmountDue = newTotal - Number(invoiceData.amountPaid || 0);
+    const newAmountDue = newTotal - Number(invoiceData.amountPaid || 0) + Number(invoiceData.creditBroughtForward || 0);
     
     setInvoiceData(prev => ({
       ...prev,
@@ -3246,6 +3263,16 @@ Date: [DATE]`,
                               step="0.01"
                               value={invoiceData.amountPaid}
                               onChange={(e) => handleInvoiceChange('amountPaid', parseFloat(e.target.value) || 0)}
+                              className="w-24 inline-block p-1 h-8 text-right"
+                            />
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Credit Brought Forward from previous:</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={invoiceData.creditBroughtForward}
+                              onChange={(e) => handleInvoiceChange('creditBroughtForward', parseFloat(e.target.value) || 0)}
                               className="w-24 inline-block p-1 h-8 text-right"
                             />
                           </div>
