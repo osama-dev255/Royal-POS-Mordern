@@ -3241,7 +3241,13 @@ Date: [DATE]`,
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Amount Paid:</span>
-                            <span>{formatCurrency(invoiceData.amountPaid)}</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={invoiceData.amountPaid}
+                              onChange={(e) => handleInvoiceChange('amountPaid', parseFloat(e.target.value) || 0)}
+                              className="w-24 inline-block p-1 h-8 text-right"
+                            />
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">AMOUNT DUE:</span>
