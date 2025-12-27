@@ -2425,7 +2425,7 @@ Date: [DATE]`,
       total: newTotal,
       amountDue: newAmountDue
     }));
-  }, [invoiceData.items, invoiceData.tax, invoiceData.discount, invoiceData.amountPaid]);
+  }, [invoiceData.items, invoiceData.tax, invoiceData.discount, invoiceData.amountPaid, invoiceData.creditBroughtForward]);
   
   // Handle expense voucher data changes
   const handleExpenseVoucherChange = (field: keyof ExpenseVoucherData, value: string | number) => {
