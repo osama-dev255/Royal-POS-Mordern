@@ -16,6 +16,7 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { AutomationService } from "@/services/automationService";
 import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
+import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
 import { getProducts, getCustomers, updateProductStock, createCustomer, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
@@ -431,6 +432,35 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
       
       // Set transaction ID for the dialog
       setTransactionId(createdSale.id || Date.now().toString());
+      
+      // Save invoice to localStorage
+      try {
+        const invoiceToSave: InvoiceData = {
+          id: createdSale.id || Date.now().toString(),
+          invoiceNumber: createdSale.invoice_number || `INV-${Date.now()}`,
+          date: createdSale.sale_date || new Date().toISOString(),
+          customer: selectedCustomer?.name || 'Walk-in Customer',
+          items: cart.reduce((sum, item) => sum + item.quantity, 0),
+          total: totalWithTax,
+          paymentMethod: paymentMethod,
+          status: "completed",
+          itemsList: cart,
+          subtotal: subtotal,
+          tax: tax,
+          discount: discountAmount,
+          amountReceived: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) : (parseFloat(amountReceived) || 0),
+          change: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) - totalWithTax : change,
+        };
+        
+        saveInvoice(invoiceToSave);
+      } catch (error) {
+        console.error('Error saving invoice:', error);
+        toast({
+          title: "Warning",
+          description: "Invoice was not saved locally, but transaction completed successfully",
+          variant: "destructive",
+        });
+      }
       
       // Show transaction complete dialog instead of toast
       setIsPaymentDialogOpen(false);

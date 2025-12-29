@@ -36,6 +36,7 @@ import {
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from "@/utils/templateUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
+import { saveInvoice, InvoiceData as SavedInvoiceData } from "@/utils/invoiceUtils";
 
 interface Template {
   id: string;
@@ -847,8 +848,47 @@ Date: [DATE]`,
   };
 
   const handleSaveTemplate = () => {
-    // Save template logic would go here
-    console.log("Saving template:", selectedTemplate);
+    // Check if we're working with an invoice template
+    const currentTemplate = templates.find(t => t.id === selectedTemplate || t.id === viewingTemplate);
+    
+    if (currentTemplate?.type === "invoice") {
+      // For invoice templates, automatically save to saved invoices
+      try {
+        // Create invoice data for saving
+        const invoiceToSave: SavedInvoiceData = {
+          id: invoiceData.invoiceNumber, // Use invoice number as ID
+          invoiceNumber: invoiceData.invoiceNumber,
+          date: invoiceData.invoiceDate,
+          customer: invoiceData.clientName,
+          items: invoiceData.items.reduce((sum, item) => sum + item.quantity, 0), // Total number of items
+          total: invoiceData.total,
+          paymentMethod: 'N/A', // Templates don't have payment method
+          status: 'completed', // For templates, mark as completed
+          itemsList: invoiceData.items.map(item => ({
+            name: item.description,
+            quantity: item.quantity,
+            price: item.rate,
+            total: item.amount
+          })),
+          subtotal: invoiceData.subtotal,
+          tax: invoiceData.tax,
+          discount: invoiceData.discount,
+          amountReceived: 0,
+          change: 0,
+        };
+        
+        saveInvoice(invoiceToSave);
+        
+        alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+      } catch (error) {
+        console.error('Error saving invoice:', error);
+        alert('Error saving invoice. Please try again.');
+      }
+    } else {
+      // For other templates, just log the save action
+      console.log("Saving template:", selectedTemplate);
+    }
+    
     // Reset after save
     setSelectedTemplate(null);
     setViewingTemplate(null);
@@ -2173,6 +2213,38 @@ Date: [DATE]`,
     setShowDownloadOptions(false);
   };
   
+  // Handle save invoice to saved invoices section
+  const handleSaveInvoice = () => {
+    try {
+      // Create invoice data for saving
+      const invoiceToSave: SavedInvoiceData = {
+        id: invoiceData.invoiceNumber, // Use invoice number as ID
+        invoiceNumber: invoiceData.invoiceNumber,
+        date: invoiceData.invoiceDate,
+        customer: invoiceData.clientName,
+        items: invoiceData.items.reduce((sum, item) => sum + item.quantity, 0),
+        total: invoiceData.total,
+        paymentMethod: 'N/A', // Templates don't have payment method
+        status: 'completed', // For templates, mark as completed
+        itemsList: invoiceData.items,
+        subtotal: invoiceData.subtotal,
+        tax: invoiceData.tax,
+        discount: invoiceData.discount,
+        amountReceived: 0,
+        change: 0,
+      };
+      
+      saveInvoice(invoiceToSave);
+      
+      // Close the dialog and show success message
+      setShowInvoiceOptions(false);
+      alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+    } catch (error) {
+      console.error('Error saving invoice:', error);
+      alert('Error saving invoice. Please try again.');
+    }
+  };
+  
   // Handle share invoice - show share options dialog
   const handleShareInvoice = () => {
     setShowInvoiceOptions(false);
@@ -2694,8 +2766,38 @@ Date: [DATE]`,
                       if (currentTemplate?.type === "order-form") {
                         alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
                       } else if (currentTemplate?.type === "invoice") {
-                        // Show dialog with print, download, share, or export options
-                        showInvoiceOptionsDialog();
+                        // Automatically save invoice to saved invoices
+                        try {
+                          // Create invoice data for saving
+                          const invoiceToSave: SavedInvoiceData = {
+                            id: invoiceData.invoiceNumber, // Use invoice number as ID
+                            invoiceNumber: invoiceData.invoiceNumber,
+                            date: invoiceData.invoiceDate,
+                            customer: invoiceData.clientName,
+                            items: invoiceData.items.reduce((sum, item) => sum + item.quantity, 0), // Total number of items
+                            total: invoiceData.total,
+                            paymentMethod: 'N/A', // Templates don't have payment method
+                            status: 'completed', // For templates, mark as completed
+                            itemsList: invoiceData.items.map(item => ({
+                              name: item.description,
+                              quantity: item.quantity,
+                              price: item.rate,
+                              total: item.amount
+                            })),
+                            subtotal: invoiceData.subtotal,
+                            tax: invoiceData.tax,
+                            discount: invoiceData.discount,
+                            amountReceived: 0,
+                            change: 0,
+                          };
+                          
+                          saveInvoice(invoiceToSave);
+                          
+                          alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+                        } catch (error) {
+                          console.error('Error saving invoice:', error);
+                          alert('Error saving invoice. Please try again.');
+                        }
                       } else if (currentTemplate?.type === "salary-slip") {
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
                       } else if (currentTemplate?.type === "complimentary-goods") {
@@ -4050,6 +4152,15 @@ Date: [DATE]`,
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Export as Excel
+              </Button>
+              
+              <Button 
+                onClick={handleSaveInvoice}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save to Saved Invoices
               </Button>
             </div>
             

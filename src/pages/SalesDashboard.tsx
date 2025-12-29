@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardCard } from "@/components/DashboardCard";
 import { 
   ShoppingCart,
@@ -31,6 +32,7 @@ interface SalesDashboardProps {
 
 export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: SalesDashboardProps) => {
   const [userRole, setUserRole] = useState<string | null>(null);
+  const navigate = useNavigate();
   
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -125,6 +127,13 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
       description: "Quickly add products to cart using barcode scanner",
       icon: Scan,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "saved-invoices",
+      title: "Saved Invoices",
+      description: "View and manage your saved invoices from completed transactions",
+      icon: FileText,
+      color: "bg-white border border-gray-200"
     }
   ];
 
@@ -148,7 +157,12 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
       return;
     }
     
-    onNavigate(module);
+    if (module === "saved-invoices") {
+      // Navigate to the saved invoices page
+      navigate('/sales/saved-invoices');
+    } else {
+      onNavigate(module);
+    }
   };
 
   return (
