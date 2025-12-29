@@ -33,10 +33,12 @@ import {
   ExternalLink,
   MessageCircle
 } from "lucide-react";
-import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from "@/utils/templateUtils";
-import { PrintUtils } from "@/utils/printUtils";
-import WhatsAppUtils from "@/utils/whatsappUtils";
-import { saveInvoice, InvoiceData as SavedInvoiceData } from "@/utils/invoiceUtils";
+import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
+import { PrintUtils } from '@/utils/printUtils';
+import WhatsAppUtils from '@/utils/whatsappUtils';
+import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUtils';
+import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
+import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 
 interface Template {
   id: string;
@@ -92,6 +94,39 @@ interface SavedDeliveryNote {
   createdAt: string;
   updatedAt: string;
 }
+
+// Initial delivery note data
+const initialDeliveryNoteData: DeliveryNoteData = {
+  businessName: "YOUR BUSINESS NAME",
+  businessAddress: "123 Business Street, City, Country",
+  businessPhone: "+1234567890",
+  businessEmail: "info@yourbusiness.com",
+  customerName: "Customer Name",
+  customerAddress1: "Customer Address Line 1",
+  customerAddress2: "Customer Address Line 2",
+  customerPhone: "+1234567890",
+  customerEmail: "customer@example.com",
+  deliveryNoteNumber: "DN-001",
+  date: "11/30/2025",
+  deliveryDate: "",
+  vehicle: "",
+  driver: "",
+  items: [
+    { id: "1", description: "Sample Product 1", quantity: 10, unit: "pcs", delivered: 10, remarks: "Good condition" },
+    { id: "2", description: "Sample Product 2", quantity: 5, unit: "boxes", delivered: 5, remarks: "Fragile" },
+    { id: "3", description: "Sample Product 3", quantity: 2, unit: "units", delivered: 2, remarks: "" }
+  ],
+  deliveryNotes: "Please handle with care. Fragile items included.\nSignature required upon delivery.",
+  totalItems: 3,
+  totalQuantity: 17,
+  totalPackages: 3,
+  preparedByName: "",
+  preparedByDate: "",
+  driverName: "",
+  driverDate: "",
+  receivedByName: "",
+  receivedByDate: ""
+};
 
 // Purchase Order Item interface with unit field
 interface PurchaseOrderItem {
@@ -236,7 +271,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([
@@ -604,7 +639,7 @@ Date: [DATE]`,
     }
   ]);
   
-  const [deliveryNoteData, setDeliveryNoteData] = useState<DeliveryNoteData>({
+  const initialDeliveryNoteData: DeliveryNoteData = {
     businessName: "YOUR BUSINESS NAME",
     businessAddress: "123 Business Street, City, Country",
     businessPhone: "+1234567890",
@@ -634,7 +669,9 @@ Date: [DATE]`,
     driverDate: "",
     receivedByName: "",
     receivedByDate: ""
-  });
+  };
+  
+  const [deliveryNoteData, setDeliveryNoteData] = useState<DeliveryNoteData>(initialDeliveryNoteData);
   
   const [savedDeliveryNotes, setSavedDeliveryNotes] = useState<SavedDeliveryNote[]>(() => {
     const saved = localStorage.getItem('savedDeliveryNotes');
@@ -889,6 +926,54 @@ Date: [DATE]`,
         console.error('Error saving invoice:', error);
         alert('Error saving invoice. Please try again.');
       }
+    } else if (currentTemplate?.type === "delivery-note") {
+      // For delivery note templates, automatically save to saved deliveries
+      try {
+        // Calculate total items
+        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + item.quantity, 0);
+        
+        // For delivery notes, we don't have rates, so total is based on quantity
+        const totalAmount = totalItems; // Just using quantity as a simple total
+        
+        // Create delivery data for saving
+        const deliveryToSave: DeliveryData = {
+          id: deliveryNoteData.deliveryNoteNumber, // Use delivery note number as ID
+          deliveryNoteNumber: deliveryNoteData.deliveryNoteNumber,
+          date: deliveryNoteData.date,
+          customer: deliveryNoteData.customerName, // Use customerName instead of clientName
+          items: totalItems, // Total number of items
+          total: totalAmount,
+          paymentMethod: 'N/A', // Templates don't have payment method
+          status: 'completed', // For templates, mark as completed
+          itemsList: deliveryNoteData.items.map(item => ({
+            name: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            delivered: item.delivered,
+            remarks: item.remarks,
+            price: 0, // Delivery notes don't have prices
+            total: 0  // Delivery notes don't have totals
+          })),
+          subtotal: totalAmount, // For delivery notes, subtotal is same as total
+          tax: 0,
+          discount: 0,
+          amountReceived: 0,
+          change: 0,
+          vehicle: deliveryNoteData.vehicle,
+          driver: deliveryNoteData.driver,
+          deliveryNotes: deliveryNoteData.deliveryNotes
+        };
+        
+        saveDelivery(deliveryToSave);
+        
+        alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!`);
+        
+        // Show a success message and reset the form
+        resetDeliveryNoteData();
+      } catch (error) {
+        console.error('Error saving delivery:', error);
+        alert('Error saving delivery. Please try again.');
+      }
     } else {
       // For other templates, just log the save action
       console.log("Saving template:", selectedTemplate);
@@ -907,6 +992,15 @@ Date: [DATE]`,
       invoiceNumber: `INV-${new Date().getTime()}`, // Generate new invoice number
       invoiceDate: new Date().toISOString().split('T')[0], // Set to current date
       timestamp: new Date().toLocaleString() // Update timestamp
+    });
+  };
+  
+  // Function to reset delivery note data to initial state
+  const resetDeliveryNoteData = () => {
+    setDeliveryNoteData({
+      ...initialDeliveryNoteData,
+      deliveryNoteNumber: `DN-${new Date().getTime()}`, // Generate new delivery note number
+      date: new Date().toISOString().split('T')[0], // Set to current date
     });
   };
   
@@ -2717,6 +2811,19 @@ Date: [DATE]`,
           <CardContent>
             {activeTab === "manage" ? (
               <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-semibold">Available Templates</h3>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedDeliveries')}
+                      className="flex items-center gap-2"
+                    >
+                      <Truck className="h-4 w-4" />
+                      Saved Deliveries
+                    </Button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {templates.map((template) => (
                     <Card 
@@ -2740,6 +2847,27 @@ Date: [DATE]`,
                     </Card>
                   ))}
                 </div>
+              </div>
+            ) : activeTab === "savedDeliveries" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Saved Deliveries</h3>
+                    <p className="text-sm text-muted-foreground">View and manage your saved delivery notes</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <SavedDeliveriesSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
               </div>
             ) : activeTab === "preview" ? (
               <div className="space-y-6">

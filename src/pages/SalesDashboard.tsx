@@ -134,6 +134,13 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
       description: "View and manage your saved invoices from completed transactions",
       icon: FileText,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "saved-deliveries",
+      title: "Saved Delivery Notes",
+      description: "View and manage your saved delivery notes from completed transactions",
+      icon: Truck,
+      color: "bg-white border border-gray-200"
     }
   ];
 
@@ -160,6 +167,9 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
     if (module === "saved-invoices") {
       // Navigate to the saved invoices page
       navigate('/sales/saved-invoices');
+    } else if (module === "saved-deliveries") {
+      // Navigate to the saved deliveries page
+      navigate('/sales/saved-deliveries');
     } else {
       onNavigate(module);
     }

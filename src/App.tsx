@@ -18,6 +18,7 @@ import { QRDebugTest } from "./pages/QRDebugTest";
 import QRTestPage from "./pages/QRTestPage";
 import TestAssets from "./pages/TestAssets";
 import { SavedInvoicesSection } from "@/components/SavedInvoicesSection";
+import { SavedDeliveriesSection } from "@/components/SavedDeliveriesSection";
 import { useEffect } from "react";
 // Import authentication context
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -85,6 +86,7 @@ const App = () => {
                 <Route path="/test/qr-test" element={<QRTestPage />} />
                 <Route path="/test/assets" element={<TestAssets />} />
                 <Route path="/sales/saved-invoices" element={<SavedInvoicesSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/saved-deliveries" element={<SavedDeliveriesSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
