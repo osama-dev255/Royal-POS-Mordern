@@ -900,6 +900,16 @@ Date: [DATE]`,
     }
   };
   
+  // Function to reset invoice data to initial state
+  const resetInvoiceData = () => {
+    setInvoiceData({
+      ...initialInvoiceData,
+      invoiceNumber: `INV-${new Date().getTime()}`, // Generate new invoice number
+      invoiceDate: new Date().toISOString().split('T')[0], // Set to current date
+      timestamp: new Date().toLocaleString() // Update timestamp
+    });
+  };
+  
   const handleDeleteTemplate = (templateId: string) => {
     setTemplates(prev => prev.filter(t => t.id !== templateId));
   };
@@ -2055,6 +2065,9 @@ Date: [DATE]`,
     });
     
     closeInvoiceOptionsDialog();
+    
+    // Reset the invoice data for new input
+    resetInvoiceData();
   };
   
   // Handle download invoice - show download options dialog
@@ -2109,6 +2122,9 @@ Date: [DATE]`,
     });
     
     setShowDownloadOptions(false);
+    
+    // Reset the invoice data for new input
+    resetInvoiceData();
   };
   
   // Handle download as Excel (reusing existing export functionality)
@@ -2244,6 +2260,9 @@ Date: [DATE]`,
       // Close the dialog and show success message
       setShowInvoiceOptions(false);
       alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+      
+      // Reset the invoice data for new input
+      resetInvoiceData();
     } catch (error) {
       console.error('Error saving invoice:', error);
       alert('Error saving invoice. Please try again.');
@@ -2452,6 +2471,9 @@ Date: [DATE]`,
     });
     
     closeInvoiceOptionsDialog();
+    
+    // Reset the invoice data for new input
+    resetInvoiceData();
   };
   
   // Add new invoice item
@@ -3845,7 +3867,7 @@ Date: [DATE]`,
                         </div>
                         
                         {/* Document Details */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
                             <div className="text-sm font-medium">Delivery Note #:</div>
                             <div className="text-sm">{deliveryNoteData.deliveryNoteNumber}</div>
@@ -3856,15 +3878,31 @@ Date: [DATE]`,
                           </div>
                           <div>
                             <div className="text-sm font-medium">Delivery Date:</div>
-                            <div className="text-sm">{deliveryNoteData.deliveryDate || "_________"}</div>
+                            <Input
+                              value={deliveryNoteData.deliveryDate || ""}
+                              onChange={(e) => handleDeliveryNoteChange("deliveryDate", e.target.value)}
+                              className="text-sm p-1 h-6"
+                            />
                           </div>
                           <div>
                             <div className="text-sm font-medium">Vehicle #:</div>
-                            <div className="text-sm">{deliveryNoteData.vehicle || "_________"}</div>
+                            <Input
+                              value={deliveryNoteData.vehicle || ""}
+                              onChange={(e) => handleDeliveryNoteChange("vehicle", e.target.value)}
+                              className="text-sm p-1 h-6"
+                            />
                           </div>
                           <div>
                             <div className="text-sm font-medium">Driver:</div>
-                            <div className="text-sm">{deliveryNoteData.driver || "_________"}</div>
+                            <Input
+                              value={deliveryNoteData.driver || ""}
+                              onChange={(e) => handleDeliveryNoteChange("driver", e.target.value)}
+                              className="text-sm p-1 h-6"
+                            />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">Generated:</div>
+                            <div className="text-sm">{new Date().toLocaleString()}</div>
                           </div>
                         </div>
                         
@@ -3880,29 +3918,81 @@ Date: [DATE]`,
                                   <th className="border border-gray-300 p-2 text-left">Unit</th>
                                   <th className="border border-gray-300 p-2 text-left">Delivered</th>
                                   <th className="border border-gray-300 p-2 text-left">Remarks</th>
+                                  <th className="border border-gray-300 p-2 text-left">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {deliveryNoteData.items.map((item) => (
                                   <tr key={item.id}>
-                                    <td className="border border-gray-300 p-2">{item.description}</td>
-                                    <td className="border border-gray-300 p-2">{item.quantity}</td>
-                                    <td className="border border-gray-300 p-2">{item.unit}</td>
-                                    <td className="border border-gray-300 p-2">{item.delivered}</td>
-                                    <td className="border border-gray-300 p-2">{item.remarks}</td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        value={item.description}
+                                        onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        value={item.unit}
+                                        onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        type="number"
+                                        value={item.delivered}
+                                        onChange={(e) => handleItemChange(item.id, 'delivered', parseFloat(e.target.value) || 0)}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        value={item.remarks}
+                                        onChange={(e) => handleItemChange(item.id, 'remarks', e.target.value)}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Button
+                                        onClick={() => handleRemoveItem(item.id)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="p-1 h-8">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           </div>
                         </div>
+                        <Button 
+                          onClick={handleAddItem}
+                          variant="outline"
+                          size="sm"
+                          className="mt-2">
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Item
+                        </Button>
                         
                         {/* Document Notes */}
                         <div>
                           <h4 className="font-bold mb-2">DELIVERY NOTES:</h4>
-                          <div className="text-sm min-h-[80px]">
-                            {deliveryNoteData.deliveryNotes}
-                          </div>
+                          <Textarea
+                            value={deliveryNoteData.deliveryNotes}
+                            onChange={(e) => handleDeliveryNoteChange("deliveryNotes", e.target.value)}
+                            className="min-h-[80px] text-sm"
+                          />
                         </div>
                         
                         {/* Totals */}
