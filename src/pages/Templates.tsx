@@ -880,6 +880,11 @@ Date: [DATE]`,
         saveInvoice(invoiceToSave);
         
         alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+        
+        // Show the invoice options dialog after saving
+        showInvoiceOptionsDialog();
+        
+        // Don't reset here - let the user choose an option first
       } catch (error) {
         console.error('Error saving invoice:', error);
         alert('Error saving invoice. Please try again.');
@@ -887,12 +892,12 @@ Date: [DATE]`,
     } else {
       // For other templates, just log the save action
       console.log("Saving template:", selectedTemplate);
+      
+      // Reset after save
+      setSelectedTemplate(null);
+      setViewingTemplate(null);
+      setActiveTab("manage");
     }
-    
-    // Reset after save
-    setSelectedTemplate(null);
-    setViewingTemplate(null);
-    setActiveTab("manage");
   };
   
   const handleDeleteTemplate = (templateId: string) => {
