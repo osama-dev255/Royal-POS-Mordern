@@ -61,7 +61,7 @@ Full access to all modules:
 - Customer Settlements
 - Supplier Settlements
 - Transaction History
-- Sales Terminal
+- Sales Management
 - Sales Orders
 - Sales Analytics
 - Product Management
@@ -97,7 +97,7 @@ Access to most modules except Employee Management:
 - Customer Settlements
 - Supplier Settlements
 - Transaction History
-- Sales Terminal
+- Sales Management
 - Sales Orders
 - Sales Analytics
 - Product Management
@@ -120,7 +120,7 @@ Access to sales-related modules only:
 - Transaction History
 - Discount Management
 - Barcode Scanning
-- Sales Terminal
+- Sales Management
 - Sales Orders
 - Sales Analytics
 - Test Data View

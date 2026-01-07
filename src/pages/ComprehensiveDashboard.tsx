@@ -66,8 +66,8 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
     },
     {
       id: "sales",
-      title: "Sales Terminal",
-      description: "Process sales transactions and manage customers",
+      title: "Sales Management",
+      description: "Manage sales transactions and customer relationships",
       icon: ShoppingCart,
       color: "bg-white border border-gray-200"
     },

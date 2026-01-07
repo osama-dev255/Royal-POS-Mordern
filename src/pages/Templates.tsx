@@ -703,6 +703,7 @@ Date: [DATE]`,
   }, []);
 
   const [deliveryNoteName, setDeliveryNoteName] = useState<string>("");
+  const [reportName, setReportName] = useState<string>("");
   
   const [purchaseOrderData, setPurchaseOrderData] = useState<PurchaseOrderData>({
     businessName: "Your Business Name",
@@ -878,7 +879,7 @@ Date: [DATE]`,
 
   const handlePreviewTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
-    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods")) {
+    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report")) {
       setViewingTemplate(templateId);
       setActiveTab("preview");
     } else {
@@ -3061,7 +3062,9 @@ Date: [DATE]`,
                           ? "Salary Slip Preview" 
                           : currentTemplate?.type === "complimentary-goods" 
                             ? "Complimentary Goods Preview" 
-                            : "Delivery Note Preview")
+                            : currentTemplate?.type === "report" 
+                              ? "Report Template Preview" 
+                              : "Delivery Note Preview")
                   : viewingTemplate 
                     ? `Viewing Template: ${currentTemplate?.name || 'Template'}`
                     : selectedTemplate 
@@ -3134,7 +3137,7 @@ Date: [DATE]`,
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">
-                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : "Delivery Note Preview"}
+                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : currentTemplate?.type === "report" ? "Report Template Preview" : "Delivery Note Preview"}
                   </h3>
                   <div className="flex gap-2">
                     {currentTemplate?.type === "order-form" ? (
@@ -3167,6 +3170,14 @@ Date: [DATE]`,
                         placeholder="Voucher Number"
                         value={complimentaryGoodsData.voucherNumber}
                         onChange={(e) => handleComplimentaryGoodsChange("voucherNumber", e.target.value)}
+                        className="w-48 h-10"
+                      />
+                    ) : currentTemplate?.type === "report" ? (
+                      <Input
+                        type="text"
+                        placeholder="Report Name"
+                        value={reportName}
+                        onChange={(e) => setReportName(e.target.value)}
                         className="w-48 h-10"
                       />
                     ) : (
@@ -3221,6 +3232,8 @@ Date: [DATE]`,
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
                       } else if (currentTemplate?.type === "complimentary-goods") {
                         alert(`Complimentary Goods Voucher ${complimentaryGoodsData.voucherNumber} saved successfully!`);
+                      } else if (currentTemplate?.type === "report") {
+                        alert(`Report Template ${reportName} saved successfully!`);
                       } else {
                         handleSaveDeliveryNote();
                       }
@@ -3239,6 +3252,8 @@ Date: [DATE]`,
                           } else if (currentTemplate?.type === "salary-slip") {
                             window.print();
                           } else if (currentTemplate?.type === "complimentary-goods") {
+                            window.print();
+                          } else if (currentTemplate?.type === "report") {
                             window.print();
                           } else {
                             handlePrintDeliveryNote();
@@ -4083,6 +4098,65 @@ Date: [DATE]`,
                           <div className="text-sm mt-1">Voucher #{complimentaryGoodsData.voucherNumber}</div>
                           <div className="text-sm mt-1">Date: {complimentaryGoodsData.date}</div>
                         </div>
+                    ) : currentTemplate?.type === "report" ? (
+                      // Report Template Content
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center border-b-2 border-gray-800 pb-2">
+                          <h2 className="text-2xl font-bold">BUSINESS REPORT</h2>
+                          <p className="text-sm">Report #{reportName || 'REPORT_NUMBER'}</p>
+                          <p className="text-sm">Date: {new Date().toLocaleDateString()}</p>
+                        </div>
+                        
+                        {/* Report Content */}
+                        <div className="space-y-4">
+                          <div>
+                            <div className="font-bold mb-1">EXECUTIVE SUMMARY:</div>
+                            <div className="text-sm min-h-[60px] p-2 border rounded bg-gray-50">
+                              [Enter executive summary here]
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-1">REPORT DETAILS:</div>
+                            <div className="text-sm min-h-[100px] p-2 border rounded bg-gray-50">
+                              [Enter report details here]
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-1">CONCLUSION:</div>
+                            <div className="text-sm min-h-[60px] p-2 border rounded bg-gray-50">
+                              [Enter conclusion here]
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-1">RECOMMENDATIONS:</div>
+                            <div className="text-sm min-h-[60px] p-2 border rounded bg-gray-50">
+                              [Enter recommendations here]
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Prepared by */}
+                        <div className="mt-8">
+                          <div className="grid grid-cols-2 gap-8">
+                            <div>
+                              <div className="font-bold mb-2">Prepared by:</div>
+                              <div className="text-sm min-h-[40px] p-2 border rounded bg-gray-50">
+                                [Preparer Name]
+                              </div>
+                            </div>
+                            <div>
+                              <div className="font-bold mb-2">Date:</div>
+                              <div className="text-sm min-h-[40px] p-2 border rounded bg-gray-50">
+                                {new Date().toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                         
                         {/* Customer Info */}
                         <div>
