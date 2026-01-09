@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,11 @@ import {
   Calendar,
   FileSpreadsheet
 } from "lucide-react";
-import { ExportUtils } from "@/utils/exportUtils";
-import { PrintUtils } from "@/utils/printUtils";
-import { ExcelUtils } from "@/utils/excelUtils";
+import { ExportUtils } from '@/utils/exportUtils';
+import { PrintUtils } from '@/utils/printUtils';
+import { ExcelUtils } from '@/utils/excelUtils';
+import { getSavedInvoices } from '@/utils/invoiceUtils';
+import { formatCurrency } from '@/lib/currency';
 
 interface ReportsProps {
   username: string;
@@ -56,6 +58,45 @@ const mockTransactions = [
 export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
   const [dateRange, setDateRange] = useState("this-month");
   const [reportType, setReportType] = useState("sales");
+  const [savedInvoices, setSavedInvoices] = useState<any[]>([]);
+  const [loadingSavedInvoices, setLoadingSavedInvoices] = useState(false);
+
+  // Helper function to format dates
+  const formatDate = (dateValue: string | Date | undefined): string => {
+    if (!dateValue) return 'N/A';
+    try {
+      if (typeof dateValue === 'string') {
+        return new Date(dateValue).toLocaleDateString();
+      }
+      return dateValue.toLocaleDateString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  // Load saved invoices when report type is changed to saved-invoices
+  useEffect(() => {
+    if (reportType === "saved-invoices") {
+      setLoadingSavedInvoices(true);
+      const loadInvoices = async () => {
+        try {
+          const invoices = await getSavedInvoices();
+          setSavedInvoices(invoices);
+        } catch (error) {
+          console.error('Error loading saved invoices:', error);
+          setSavedInvoices([]);
+        } finally {
+          setLoadingSavedInvoices(false);
+        }
+      };
+      
+      loadInvoices();
+    } else {
+      // Clear saved invoices when switching away from saved-invoices report
+      setSavedInvoices([]);
+      setLoadingSavedInvoices(false);
+    }
+  }, [reportType]);
 
   // Handle export
   const handleExport = (format: string) => {
@@ -65,7 +106,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       case "inventory":
         if (format === "csv") ExportUtils.exportToCSV(mockProducts, filename);
         else if (format === "excel") ExcelUtils.exportToExcel(mockProducts, filename);
-        else if (format === "pdf") PrintUtils.printInventoryReport(mockProducts);
+        else if (format === "pdf") PrintUtils.printSalesReport(mockProducts);
         break;
       case "customers":
         if (format === "csv") ExportUtils.exportToCSV(mockCustomers, filename);
@@ -88,6 +129,11 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         else if (format === "excel") ExcelUtils.exportToExcel(mockTransactions, filename);
         else if (format === "pdf") PrintUtils.printSalesReport(mockTransactions);
         break;
+      case "saved-invoices":
+        if (format === "csv") ExportUtils.exportToCSV(savedInvoices, filename);
+        else if (format === "excel") ExcelUtils.exportToExcel(savedInvoices, filename);
+        else if (format === "pdf") ExportUtils.exportToPDF(savedInvoices, filename, "Saved Invoices Report");
+        break;
     }
   };
 
@@ -99,6 +145,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       case "suppliers": return "Supplier Report";
       case "expenses": return "Expense Report";
       case "sales": 
+      case "saved-invoices": return "Saved Invoices Report";
       default: return "Sales Report";
     }
   };
@@ -123,7 +170,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                   <tr key={product.id} className="border-b">
                     <td className="py-2">{product.name}</td>
                     <td className="py-2">{product.category}</td>
-                    <td className="py-2 text-right">{product.price.toFixed(2)}</td>
+                    <td className="py-2 text-right">{formatCurrency(product.price)}</td>
                     <td className="py-2 text-right">{product.stock}</td>
                   </tr>
                 ))}
@@ -153,7 +200,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                       <div className="text-sm text-muted-foreground">{customer.phone}</div>
                     </td>
                     <td className="py-2 text-right">{customer.loyaltyPoints}</td>
-                    <td className="py-2 text-right">{customer.totalSpent.toFixed(2)}</td>
+                    <td className="py-2 text-right">{formatCurrency(customer.totalSpent)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -197,7 +244,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
             <div className="mb-4 p-4 bg-muted rounded-lg">
               <div className="flex justify-between">
                 <span>Total Expenses:</span>
-                <span className="font-bold">{totalExpenses.toFixed(2)}</span>
+                <span className="font-bold">{formatCurrency(totalExpenses)}</span>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -216,7 +263,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                       <td className="py-2">{expense.date}</td>
                       <td className="py-2">{expense.category}</td>
                       <td className="py-2">{expense.description}</td>
-                      <td className="py-2 text-right font-medium">{expense.amount.toFixed(2)}</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(expense.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -233,7 +280,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
             <div className="mb-4 p-4 bg-muted rounded-lg">
               <div className="flex justify-between">
                 <span>Total Sales:</span>
-                <span className="font-bold">{totalSales.toFixed(2)}</span>
+                <span className="font-bold">{formatCurrency(totalSales)}</span>
               </div>
               <div className="flex justify-between mt-2">
                 <span>Total Transactions:</span>
@@ -256,7 +303,81 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                       <td className="py-2">{new Date(transaction.date).toLocaleDateString()}</td>
                       <td className="py-2">{transaction.customer}</td>
                       <td className="py-2">{transaction.items} items</td>
-                      <td className="py-2 text-right font-medium">{transaction.total.toFixed(2)}</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(transaction.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      case "saved-invoices":
+        if (loadingSavedInvoices) {
+          return (
+            <div className="flex justify-center items-center h-64">
+              <p>Loading saved invoices...</p>
+            </div>
+          );
+        }
+        
+        if (savedInvoices.length === 0) {
+          return (
+            <div className="text-center py-12">
+              <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No Saved Invoices</h3>
+              <p className="text-muted-foreground mb-4">
+                You haven't saved any invoices yet.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Invoices are automatically saved when you complete a transaction in the Sales Terminal.
+              </p>
+            </div>
+          );
+        }
+        
+        const totalInvoices = savedInvoices.reduce((sum, invoice) => sum + (invoice.total || 0), 0);
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-muted rounded-lg">
+              <div className="flex justify-between">
+                <span>Total Invoices:</span>
+                <span className="font-bold">{savedInvoices.length}</span>
+              </div>
+              <div className="flex justify-between mt-2">
+                <span>Total Amount:</span>
+                <span className="font-bold">{formatCurrency(totalInvoices)}</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b">
+                    <th className="pb-2">Invoice #</th>
+                    <th className="pb-2">Date</th>
+                    <th className="pb-2">Customer</th>
+                    <th className="pb-2">Items</th>
+                    <th className="pb-2 text-right">Total</th>
+                    <th className="pb-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {savedInvoices.map((invoice) => (
+                    <tr key={invoice.id} className="border-b">
+                      <td className="py-2">#{invoice.invoiceNumber}</td>
+                      <td className="py-2">{formatDate(invoice.date)}</td>
+                      <td className="py-2">{invoice.customer}</td>
+                      <td className="py-2">{invoice.items || 0} items</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(invoice.total || 0)}</td>
+                      <td className="py-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          invoice.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          invoice.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          invoice.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {invoice.status}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -330,6 +451,12 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                         <div className="flex items-center gap-2">
                           <Wallet className="h-4 w-4" />
                           Expense Report
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="saved-invoices">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Saved Invoices Report
                         </div>
                       </SelectItem>
                     </SelectContent>
