@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
+import { ExportUtils } from '@/utils/exportUtils';
 import WhatsAppUtils from '@/utils/whatsappUtils';
 import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUtils';
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
@@ -1070,6 +1071,243 @@ We appreciate your business.`,
       deliveryNoteNumber: `DN-${new Date().getTime()}`, // Generate new delivery note number
       date: new Date().toISOString().split('T')[0], // Set to current date
     });
+  };
+  
+  // Function to export delivery note as PDF
+  const exportDeliveryNoteAsPDF = () => {
+    // Prepare delivery note data for export
+    const exportData = {
+      deliveryNoteInfo: {
+        'Delivery Note Number': deliveryNoteData.deliveryNoteNumber,
+        'Date': deliveryNoteData.date,
+        'Delivery Date': deliveryNoteData.deliveryDate,
+        'Business Name': deliveryNoteData.businessName,
+        'Business Address': deliveryNoteData.businessAddress,
+        'Business Phone': deliveryNoteData.businessPhone,
+        'Business Email': deliveryNoteData.businessEmail,
+        'Customer Name': deliveryNoteData.customerName,
+        'Customer Address': `${deliveryNoteData.customerAddress1} ${deliveryNoteData.customerAddress2}`,
+        'Customer Phone': deliveryNoteData.customerPhone,
+        'Customer Email': deliveryNoteData.customerEmail,
+        'Vehicle': deliveryNoteData.vehicle,
+        'Driver': deliveryNoteData.driver,
+        'Total Items': deliveryNoteData.totalItems,
+        'Total Quantity': deliveryNoteData.totalQuantity,
+        'Total Packages': deliveryNoteData.totalPackages,
+        'Delivery Notes': deliveryNoteData.deliveryNotes,
+        'Prepared By': deliveryNoteData.preparedByName,
+        'Prepared Date': deliveryNoteData.preparedByDate,
+        'Driver Name': deliveryNoteData.driverName,
+        'Driver Date': deliveryNoteData.driverDate,
+        'Received By': deliveryNoteData.receivedByName,
+        'Received Date': deliveryNoteData.receivedByDate,
+      },
+      items: deliveryNoteData.items.map(item => ({
+        'Item Description': item.description,
+        'Quantity': item.quantity,
+        'Unit': item.unit,
+        'Delivered': item.delivered,
+        'Remarks': item.remarks,
+      }))
+    };
+    
+    // Create a simpler array structure for export
+    const pdfRows = [];
+    
+    // Add delivery note header
+    pdfRows.push(['Field', 'Value']);
+    pdfRows.push(['Delivery Note Number', exportData.deliveryNoteInfo['Delivery Note Number']]);
+    pdfRows.push(['Date', exportData.deliveryNoteInfo['Date']]);
+    pdfRows.push(['Delivery Date', exportData.deliveryNoteInfo['Delivery Date']]);
+    pdfRows.push(['Business Name', exportData.deliveryNoteInfo['Business Name']]);
+    pdfRows.push(['Business Address', exportData.deliveryNoteInfo['Business Address']]);
+    pdfRows.push(['Business Phone', exportData.deliveryNoteInfo['Business Phone']]);
+    pdfRows.push(['Business Email', exportData.deliveryNoteInfo['Business Email']]);
+    pdfRows.push(['Customer Name', exportData.deliveryNoteInfo['Customer Name']]);
+    pdfRows.push(['Customer Address', exportData.deliveryNoteInfo['Customer Address']]);
+    pdfRows.push(['Customer Phone', exportData.deliveryNoteInfo['Customer Phone']]);
+    pdfRows.push(['Customer Email', exportData.deliveryNoteInfo['Customer Email']]);
+    pdfRows.push(['Vehicle', exportData.deliveryNoteInfo['Vehicle']]);
+    pdfRows.push(['Driver', exportData.deliveryNoteInfo['Driver']]);
+    pdfRows.push(['Total Items', exportData.deliveryNoteInfo['Total Items']]);
+    pdfRows.push(['Total Quantity', exportData.deliveryNoteInfo['Total Quantity']]);
+    pdfRows.push(['Total Packages', exportData.deliveryNoteInfo['Total Packages']]);
+    pdfRows.push(['Delivery Notes', exportData.deliveryNoteInfo['Delivery Notes']]);
+    pdfRows.push(['Prepared By', exportData.deliveryNoteInfo['Prepared By']]);
+    pdfRows.push(['Prepared Date', exportData.deliveryNoteInfo['Prepared Date']]);
+    pdfRows.push(['Driver Name', exportData.deliveryNoteInfo['Driver Name']]);
+    pdfRows.push(['Driver Date', exportData.deliveryNoteInfo['Driver Date']]);
+    pdfRows.push(['Received By', exportData.deliveryNoteInfo['Received By']]);
+    pdfRows.push(['Received Date', exportData.deliveryNoteInfo['Received Date']]);
+    
+    // Add empty row as separator
+    pdfRows.push(['', '']);
+    
+    // Add items header
+    pdfRows.push(['Item Description', 'Quantity', 'Unit', 'Delivered', 'Remarks']);
+    
+    // Add each item
+    exportData.items.forEach(item => {
+      pdfRows.push([
+        item['Item Description'],
+        item['Quantity'],
+        item['Unit'],
+        item['Delivered'],
+        item['Remarks']
+      ]);
+    });
+    
+    // Convert the 2D array to the format expected by ExportUtils
+    const formattedData = pdfRows.map(row => {
+      if (Array.isArray(row)) {
+        // If it's an array, create an object with generic column names
+        const obj: any = {};
+        row.forEach((val, idx) => {
+          obj[`Column ${idx + 1}`] = val;
+        });
+        return obj;
+      } else {
+        return row;
+      }
+    });
+    
+    ExportUtils.exportToPDF(formattedData, `delivery-note-${deliveryNoteData.deliveryNoteNumber}`, `Delivery Note - ${deliveryNoteData.deliveryNoteNumber}`);
+  };
+  
+  // Function to export delivery note as CSV
+  const exportDeliveryNoteAsCSV = () => {
+    // Prepare delivery note data for export
+    const exportData = {
+      deliveryNoteInfo: {
+        'Delivery Note Number': deliveryNoteData.deliveryNoteNumber,
+        'Date': deliveryNoteData.date,
+        'Delivery Date': deliveryNoteData.deliveryDate,
+        'Business Name': deliveryNoteData.businessName,
+        'Business Address': deliveryNoteData.businessAddress,
+        'Business Phone': deliveryNoteData.businessPhone,
+        'Business Email': deliveryNoteData.businessEmail,
+        'Customer Name': deliveryNoteData.customerName,
+        'Customer Address': `${deliveryNoteData.customerAddress1} ${deliveryNoteData.customerAddress2}`,
+        'Customer Phone': deliveryNoteData.customerPhone,
+        'Customer Email': deliveryNoteData.customerEmail,
+        'Vehicle': deliveryNoteData.vehicle,
+        'Driver': deliveryNoteData.driver,
+        'Total Items': deliveryNoteData.totalItems,
+        'Total Quantity': deliveryNoteData.totalQuantity,
+        'Total Packages': deliveryNoteData.totalPackages,
+        'Delivery Notes': deliveryNoteData.deliveryNotes,
+        'Prepared By': deliveryNoteData.preparedByName,
+        'Prepared Date': deliveryNoteData.preparedByDate,
+        'Driver Name': deliveryNoteData.driverName,
+        'Driver Date': deliveryNoteData.driverDate,
+        'Received By': deliveryNoteData.receivedByName,
+        'Received Date': deliveryNoteData.receivedByDate,
+      },
+      items: deliveryNoteData.items.map(item => ({
+        'Item Description': item.description,
+        'Quantity': item.quantity,
+        'Unit': item.unit,
+        'Delivered': item.delivered,
+        'Remarks': item.remarks,
+      }))
+    };
+    
+    // Create a simpler array structure for export
+    const csvRows = [];
+    
+    // Add delivery note header
+    csvRows.push(['Field', 'Value']);
+    csvRows.push(['Delivery Note Number', exportData.deliveryNoteInfo['Delivery Note Number']]);
+    csvRows.push(['Date', exportData.deliveryNoteInfo['Date']]);
+    csvRows.push(['Delivery Date', exportData.deliveryNoteInfo['Delivery Date']]);
+    csvRows.push(['Business Name', exportData.deliveryNoteInfo['Business Name']]);
+    csvRows.push(['Business Address', exportData.deliveryNoteInfo['Business Address']]);
+    csvRows.push(['Business Phone', exportData.deliveryNoteInfo['Business Phone']]);
+    csvRows.push(['Business Email', exportData.deliveryNoteInfo['Business Email']]);
+    csvRows.push(['Customer Name', exportData.deliveryNoteInfo['Customer Name']]);
+    csvRows.push(['Customer Address', exportData.deliveryNoteInfo['Customer Address']]);
+    csvRows.push(['Customer Phone', exportData.deliveryNoteInfo['Customer Phone']]);
+    csvRows.push(['Customer Email', exportData.deliveryNoteInfo['Customer Email']]);
+    csvRows.push(['Vehicle', exportData.deliveryNoteInfo['Vehicle']]);
+    csvRows.push(['Driver', exportData.deliveryNoteInfo['Driver']]);
+    csvRows.push(['Total Items', exportData.deliveryNoteInfo['Total Items']]);
+    csvRows.push(['Total Quantity', exportData.deliveryNoteInfo['Total Quantity']]);
+    csvRows.push(['Total Packages', exportData.deliveryNoteInfo['Total Packages']]);
+    csvRows.push(['Delivery Notes', exportData.deliveryNoteInfo['Delivery Notes']]);
+    csvRows.push(['Prepared By', exportData.deliveryNoteInfo['Prepared By']]);
+    csvRows.push(['Prepared Date', exportData.deliveryNoteInfo['Prepared Date']]);
+    csvRows.push(['Driver Name', exportData.deliveryNoteInfo['Driver Name']]);
+    csvRows.push(['Driver Date', exportData.deliveryNoteInfo['Driver Date']]);
+    csvRows.push(['Received By', exportData.deliveryNoteInfo['Received By']]);
+    csvRows.push(['Received Date', exportData.deliveryNoteInfo['Received Date']]);
+    
+    // Add empty row as separator
+    csvRows.push(['', '']);
+    
+    // Add items header
+    csvRows.push(['Item Description', 'Quantity', 'Unit', 'Delivered', 'Remarks']);
+    
+    // Add each item
+    exportData.items.forEach(item => {
+      csvRows.push([
+        item['Item Description'],
+        item['Quantity'],
+        item['Unit'],
+        item['Delivered'],
+        item['Remarks']
+      ]);
+    });
+    
+    // Convert the 2D array to the format expected by ExportUtils
+    const formattedData = csvRows.map(row => {
+      if (Array.isArray(row)) {
+        // If it's an array, create an object with generic column names
+        const obj: any = {};
+        row.forEach((val, idx) => {
+          obj[`Column ${idx + 1}`] = val;
+        });
+        return obj;
+      } else {
+        return row;
+      }
+    });
+    
+    ExportUtils.exportToCSV(formattedData, `delivery-note-${deliveryNoteData.deliveryNoteNumber}`);
+  };
+  
+  // Function to export delivery note as JSON
+  const exportDeliveryNoteAsJSON = () => {
+    const exportData = {
+      deliveryNoteInfo: {
+        deliveryNoteNumber: deliveryNoteData.deliveryNoteNumber,
+        date: deliveryNoteData.date,
+        deliveryDate: deliveryNoteData.deliveryDate,
+        businessName: deliveryNoteData.businessName,
+        businessAddress: deliveryNoteData.businessAddress,
+        businessPhone: deliveryNoteData.businessPhone,
+        businessEmail: deliveryNoteData.businessEmail,
+        customerName: deliveryNoteData.customerName,
+        customerAddress: `${deliveryNoteData.customerAddress1} ${deliveryNoteData.customerAddress2}`,
+        customerPhone: deliveryNoteData.customerPhone,
+        customerEmail: deliveryNoteData.customerEmail,
+        vehicle: deliveryNoteData.vehicle,
+        driver: deliveryNoteData.driver,
+        totalItems: deliveryNoteData.totalItems,
+        totalQuantity: deliveryNoteData.totalQuantity,
+        totalPackages: deliveryNoteData.totalPackages,
+        deliveryNotes: deliveryNoteData.deliveryNotes,
+        preparedByName: deliveryNoteData.preparedByName,
+        preparedByDate: deliveryNoteData.preparedByDate,
+        driverName: deliveryNoteData.driverName,
+        driverDate: deliveryNoteData.driverDate,
+        receivedByName: deliveryNoteData.receivedByName,
+        receivedByDate: deliveryNoteData.receivedByDate,
+      },
+      items: deliveryNoteData.items,
+      timestamp: new Date().toISOString(),
+    };
+    
+    ExportUtils.exportToJSON([exportData], `delivery-note-${deliveryNoteData.deliveryNoteNumber}`);
   };
   
   const handleDeleteTemplate = (templateId: string) => {
@@ -3337,7 +3575,7 @@ We appreciate your business.`,
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
                       Back to Templates
                     </Button>
-                    {currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && (
+                    {currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && (
                       <>
                         <Button onClick={() => {
                           if (currentTemplate?.type === "order-form") {
@@ -3347,8 +3585,6 @@ We appreciate your business.`,
                           } else if (currentTemplate?.type === "complimentary-goods") {
                             window.print();
                           } else if (currentTemplate?.type === "report") {
-                            window.print();
-                          } else if (currentTemplate?.type === "customer-settlement") {
                             window.print();
                           } else {
                             handlePrintDeliveryNote();
@@ -3388,17 +3624,6 @@ We appreciate your business.`,
                               const link = document.createElement('a');
                               link.href = url;
                               link.download = `Complimentary_Goods_Voucher_${complimentaryGoodsData.voucherNumber}.html`;
-                              link.click();
-                              URL.revokeObjectURL(url);
-                            }
-                          } else if (currentTemplate?.type === "customer-settlement") {
-                            const content = document.getElementById('template-preview-content');
-                            if (content) {
-                              const blob = new Blob([content.innerHTML], { type: 'text/html' });
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = `Customer_Settlement_${settlementReference}.html`;
                               link.click();
                               URL.revokeObjectURL(url);
                             }
@@ -5272,27 +5497,6 @@ We appreciate your business.`,
 2. CSV
 3. JSON
 Enter choice (1-3):`);
-                  
-                  switch(exportChoice) {
-                    case '1':
-                    case 'PDF':
-                    case 'pdf':
-                      exportDeliveryNoteAsPDF();
-                      break;
-                    case '2':
-                    case 'CSV':
-                    case 'csv':
-                      exportDeliveryNoteAsCSV();
-                      break;
-                    case '3':
-                    case 'JSON':
-                    case 'json':
-                      exportDeliveryNoteAsJSON();
-                      break;
-                    default:
-                      alert('Invalid choice. Defaulting to PDF export.');
-                      exportDeliveryNoteAsPDF();
-                  }
                   
                   closeDeliveryNoteOptionsDialog();
                 }}
