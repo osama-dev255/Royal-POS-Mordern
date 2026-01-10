@@ -237,7 +237,7 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
                     <div className="grid gap-2">
                       <Label htmlFor="amount">Amount *</Label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                        <span className="absolute left-3 top-2.5 text-muted-foreground">TZS</span>
                         <Input
                           id="amount"
                           type="number"

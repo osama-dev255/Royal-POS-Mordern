@@ -830,7 +830,7 @@ We appreciate your business.`,
     terms: "Net 30",
     notes: "Thank you for your business!.",
     paymentOptions: "Cash , Bank Transfer, Check, or Credit Card",
-    checkPayableMessage: "Please make checks payable to Your Business Name",
+    checkPayableMessage: "Please make checks payable to KILANGO GROUP LTD",
     timestamp: new Date().toLocaleString()
   };
   
@@ -3036,10 +3036,18 @@ We appreciate your business.`,
   
   // Handle customer settlement changes
   const handleCustomerSettlementChange = (field: keyof CustomerSettlementData, value: string | number) => {
-    setCustomerSettlementData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setCustomerSettlementData(prev => {
+      let updatedData = { ...prev, [field]: value };
+      
+      // Calculate new balance when previous balance or amount paid changes
+      if (field === 'previousBalance' || field === 'amountPaid') {
+        const prevBalance = field === 'previousBalance' ? Number(value) : prev.previousBalance;
+        const amountPaid = field === 'amountPaid' ? Number(value) : prev.amountPaid;
+        updatedData.newBalance = prevBalance - amountPaid;
+      }
+      
+      return updatedData;
+    });
   };
   
   // Add new complimentary goods item
@@ -4416,13 +4424,21 @@ We appreciate your business.`,
                             </div>
                             <div className="text-sm mb-1">
                               <span className="font-medium">Amount:</span>
-                              <Input 
-                                type="number" 
-                                step="0.01"
-                                value={customerSettlementData.settlementAmount}
-                                onChange={(e) => handleCustomerSettlementChange("settlementAmount", parseFloat(e.target.value) || 0)}
-                                className="w-full p-1 text-sm mt-1"
-                              />
+                              <div className="flex">
+                                <span className="inline-flex items-center px-3 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-300 rounded-l-md">
+                                  TZS
+                                </span>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  value={customerSettlementData.settlementAmount}
+                                  onChange={(e) => handleCustomerSettlementChange("settlementAmount", parseFloat(e.target.value) || 0)}
+                                  className="w-full p-1 text-sm mt-1 rounded-l-none"
+                                />
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Formatted: {formatCurrency(customerSettlementData.settlementAmount)}
+                              </div>
                             </div>
                             <div className="text-sm mb-1">
                               <span className="font-medium">Payment Method:</span>
@@ -4456,6 +4472,9 @@ We appreciate your business.`,
                                 onChange={(e) => handleCustomerSettlementChange("previousBalance", parseFloat(e.target.value) || 0)}
                                 className="w-full p-1 text-sm mt-1"
                               />
+                              <div className="text-xs text-gray-500 mt-1">
+                                Formatted: {formatCurrency(customerSettlementData.previousBalance)}
+                              </div>
                             </div>
                             <div className="border p-3 rounded">
                               <div className="text-sm font-medium">Amount Paid</div>
@@ -4466,6 +4485,9 @@ We appreciate your business.`,
                                 onChange={(e) => handleCustomerSettlementChange("amountPaid", parseFloat(e.target.value) || 0)}
                                 className="w-full p-1 text-sm mt-1"
                               />
+                              <div className="text-xs text-gray-500 mt-1">
+                                Formatted: {formatCurrency(customerSettlementData.amountPaid)}
+                              </div>
                             </div>
                             <div className="border p-3 rounded">
                               <div className="text-sm font-medium">New Balance</div>
@@ -4476,6 +4498,9 @@ We appreciate your business.`,
                                 onChange={(e) => handleCustomerSettlementChange("newBalance", parseFloat(e.target.value) || 0)}
                                 className="w-full p-1 text-sm mt-1"
                               />
+                              <div className="text-xs text-gray-500 mt-1">
+                                Formatted: {formatCurrency(customerSettlementData.newBalance)}
+                              </div>
                             </div>
                           </div>
                         </div>
