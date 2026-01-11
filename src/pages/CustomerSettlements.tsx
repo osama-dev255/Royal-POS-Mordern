@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Plus, Edit, Trash2, Users, Wallet, Calendar, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
-import { getSavedSettlements, deleteCustomerSettlement, saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from "@/utils/customerSettlementUtils";
+import { getSavedSettlements, deleteCustomerSettlement, saveCustomerSettlement, updateCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from "@/utils/customerSettlementUtils";
 
 interface Settlement {
   id: string;
@@ -163,8 +163,25 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
       setSettlements(settlements.map(s => s.id === editingSettlement.id ? editingSettlement : s));
       
       // Update the settlement in storage
-      // Note: For now, we're not implementing update functionality in the utility
-      // In a real implementation, you would need an updateCustomerSettlement function
+      const settlementToUpdate: SavedCustomerSettlementData = {
+        id: editingSettlement.id,
+        customerName: editingSettlement.customerName,
+        customerId: editingSettlement.customerId,
+        customerPhone: "", // Default empty
+        customerEmail: "", // Default empty
+        referenceNumber: editingSettlement.reference,
+        settlementAmount: editingSettlement.amount,
+        paymentMethod: editingSettlement.paymentMethod,
+        cashierName: "System", // Default cashier
+        previousBalance: 0, // Default
+        amountPaid: editingSettlement.amount, // Assume full payment
+        newBalance: 0, // Default
+        notes: editingSettlement.notes,
+        date: editingSettlement.date,
+        time: new Date().toLocaleTimeString() // Current time
+      };
+      
+      await updateCustomerSettlement(settlementToUpdate);
       
       resetForm();
       setIsDialogOpen(false);
