@@ -23,6 +23,9 @@ interface Settlement {
   reference: string;
   notes?: string;
   status: "completed" | "pending" | "cancelled";
+  previousBalance?: number;
+  newBalance?: number;
+  processedBy?: string;
 }
 
 // Map the saved settlement data from utility to the Settlement interface
@@ -36,7 +39,10 @@ const mapSavedSettlementToSettlement = (saved: SavedCustomerSettlementData): Set
     paymentMethod: saved.paymentMethod,
     reference: saved.referenceNumber,
     notes: saved.notes,
-    status: "completed" // Default to completed for saved settlements
+    status: "completed", // Default to completed for saved settlements
+    previousBalance: saved.previousBalance,
+    newBalance: saved.newBalance,
+    processedBy: saved.cashierName
   };
 };
 
@@ -62,7 +68,10 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
     amount: 0,
     paymentMethod: paymentMethods[0],
     reference: "",
-    status: "completed"
+    status: "completed",
+    previousBalance: 0,
+    newBalance: 0,
+    processedBy: ""
   });
   const { toast } = useToast();
   
@@ -240,7 +249,10 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
       amount: 0,
       paymentMethod: paymentMethods[0],
       reference: "",
-      status: "completed"
+      status: "completed",
+      previousBalance: 0,
+      newBalance: 0,
+      processedBy: ""
     });
     setEditingSettlement(null);
   };
@@ -369,6 +381,46 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
                     />
                   </div>
                   
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="previousBalance">Previous Balance</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground">TZS</span>
+                        <Input
+                          id="previousBalance"
+                          type="number"
+                          step="0.01"
+                          className="pl-8"
+                          value={editingSettlement ? editingSettlement.previousBalance : newSettlement.previousBalance}
+                          onChange={(e) => 
+                            editingSettlement 
+                              ? setEditingSettlement({...editingSettlement, previousBalance: parseFloat(e.target.value) || 0}) 
+                              : setNewSettlement({...newSettlement, previousBalance: parseFloat(e.target.value) || 0})
+                          }
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid gap-2">
+                      <Label htmlFor="newBalance">New Balance</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground">TZS</span>
+                        <Input
+                          id="newBalance"
+                          type="number"
+                          step="0.01"
+                          className="pl-8"
+                          value={editingSettlement ? editingSettlement.newBalance : newSettlement.newBalance}
+                          onChange={(e) => 
+                            editingSettlement 
+                              ? setEditingSettlement({...editingSettlement, newBalance: parseFloat(e.target.value) || 0}) 
+                              : setNewSettlement({...newSettlement, newBalance: parseFloat(e.target.value) || 0})
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="grid gap-2">
                     <Label htmlFor="reference">Reference</Label>
                     <Input
@@ -378,6 +430,19 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
                         editingSettlement 
                           ? setEditingSettlement({...editingSettlement, reference: e.target.value}) 
                           : setNewSettlement({...newSettlement, reference: e.target.value})
+                      }
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="processedBy">Processed by</Label>
+                    <Input
+                      id="processedBy"
+                      value={editingSettlement ? editingSettlement.processedBy : newSettlement.processedBy}
+                      onChange={(e) => 
+                        editingSettlement 
+                          ? setEditingSettlement({...editingSettlement, processedBy: e.target.value}) 
+                          : setNewSettlement({...newSettlement, processedBy: e.target.value})
                       }
                     />
                   </div>
@@ -503,8 +568,11 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
                   <TableHead>Reference</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Customer</TableHead>
+                  <TableHead>Previous Balance</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>New Balance</TableHead>
                   <TableHead>Payment Method</TableHead>
+                  <TableHead>Processed by</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -522,10 +590,13 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
                       <TableCell className="font-medium">{settlement.reference}</TableCell>
                       <TableCell>{settlement.date}</TableCell>
                       <TableCell>{settlement.customerName}</TableCell>
+                      <TableCell>{settlement.previousBalance !== undefined ? formatCurrency(settlement.previousBalance) : '-'}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(settlement.amount)}</TableCell>
+                      <TableCell>{settlement.newBalance !== undefined ? formatCurrency(settlement.newBalance) : '-'}</TableCell>
                       <TableCell>
                         <Badge variant="secondary">{settlement.paymentMethod}</Badge>
                       </TableCell>
+                      <TableCell>{settlement.processedBy || '-'}</TableCell>
                       <TableCell>
                         <Badge 
                           variant={
