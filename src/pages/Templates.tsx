@@ -1455,6 +1455,183 @@ We appreciate your business.`,
     ExportUtils.exportToJSON([exportData], `customer-settlement-${exportData.customerSettlementInfo.referenceNumber}`);
   };
   
+  // Function to generate clean customer settlement HTML for printing
+  const generateCleanCustomerSettlementHTML = (): string => {
+    return `
+      <div class="customer-settlement-container" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <style>
+          body { margin: 0; padding: 20px; }
+          .customer-settlement-container { border: 1px solid #ccc; }
+          .text-center { text-align: center; }
+          .border-b-2 { border-bottom: 2px solid #000; }
+          .pb-2 { padding-bottom: 0.5rem; }
+          .font-bold { font-weight: bold; }
+          .text-2xl { font-size: 1.5rem; }
+          .text-sm { font-size: 0.875rem; }
+          .mb-1 { margin-bottom: 0.25rem; }
+          .mb-2 { margin-bottom: 0.5rem; }
+          .mt-4 { margin-top: 1rem; }
+          .mt-8 { margin-top: 2rem; }
+          .pt-4 { padding-top: 1rem; }
+          .border-t { border-top: 1px solid #ccc; }
+          .grid { display: grid; }
+          .gap-8 { gap: 2rem; }
+          .gap-4 { gap: 1rem; }
+          .grid-cols-1 { grid-template-columns: 1fr; }
+          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+          .border { border: 1px solid #e5e7eb; }
+          .p-3 { padding: 0.75rem; }
+          .rounded { border-radius: 0.25rem; }
+          .font-medium { font-weight: 500; }
+        </style>
+        <div class="text-center border-b-2 pb-2">
+          <h2 class="text-2xl font-bold">CUSTOMER SETTLEMENT RECEIPT</h2>
+          <p class="text-sm">Receipt #${customerSettlementData.referenceNumber || 'RECEIPT_NUMBER'}</p>
+          <p class="text-sm">Date: ${customerSettlementData.date || new Date().toLocaleDateString()}</p>
+          <p class="text-sm">Time: ${customerSettlementData.time || new Date().toLocaleTimeString()}</p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+          <div>
+            <div class="font-bold mb-1">CUSTOMER INFORMATION:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Name:</span> ${customerSettlementData.customerName}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">ID:</span> ${customerSettlementData.customerId}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Phone:</span> ${customerSettlementData.customerPhone}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Email:</span> ${customerSettlementData.customerEmail}
+            </div>
+          </div>
+          
+          <div>
+            <div class="font-bold mb-1">SETTLEMENT DETAILS:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Reference:</span> ${customerSettlementData.referenceNumber}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Amount:</span> TZS ${customerSettlementData.settlementAmount?.toLocaleString() || '0.00'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Payment Method:</span> ${customerSettlementData.paymentMethod}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Processed by:</span> ${customerSettlementData.cashierName}
+            </div>
+          </div>
+        </div>
+        
+        <div class="space-y-4 mt-4">
+          <div class="font-bold mb-2">TRANSACTION SUMMARY:</div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border p-3 rounded">
+              <div class="text-sm font-medium">Previous Balance</div>
+              <div class="text-sm">TZS ${customerSettlementData.previousBalance?.toLocaleString() || '0.00'}</div>
+            </div>
+            <div class="border p-3 rounded">
+              <div class="text-sm font-medium">Amount Paid</div>
+              <div class="text-sm">TZS ${customerSettlementData.amountPaid?.toLocaleString() || '0.00'}</div>
+            </div>
+            <div class="border p-3 rounded">
+              <div class="text-sm font-medium">New Balance</div>
+              <div class="text-sm">TZS ${customerSettlementData.newBalance?.toLocaleString() || '0.00'}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-4">
+          <div class="font-bold mb-2">NOTES:</div>
+          <div class="text-sm">${customerSettlementData.notes || 'No notes'}</div>
+        </div>
+        
+        <div class="text-center mt-8 pt-4 border-t">
+          <div class="text-sm font-bold">Thank you for your payment!</div>
+          <div class="text-sm">We appreciate your business.</div>
+        </div>
+      </div>
+    `;
+  };
+  
+  // Function to download customer settlement as PDF
+  const downloadCustomerSettlementAsPDF = () => {
+    // Show a loading message to the user
+    const loadingMsg = 'Generating PDF... Please wait.';
+    const loadingEl = document.createElement('div');
+    loadingEl.style.position = 'fixed';
+    loadingEl.style.top = '10px';
+    loadingEl.style.right = '10px';
+    loadingEl.style.backgroundColor = '#3b82f6';
+    loadingEl.style.color = 'white';
+    loadingEl.style.padding = '10px 15px';
+    loadingEl.style.borderRadius = '4px';
+    loadingEl.style.zIndex = '10000';
+    loadingEl.textContent = loadingMsg;
+    document.body.appendChild(loadingEl);
+    
+    import('html2pdf.js').then((html2pdfModule) => {
+      const customerSettlementContent = generateCleanCustomerSettlementHTML();
+      
+      // Create a temporary container to hold the customer settlement content
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = customerSettlementContent;
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.width = '800px';
+      tempContainer.style.fontFamily = 'Arial, sans-serif';
+      tempContainer.style.fontSize = '14px';
+      document.body.appendChild(tempContainer);
+      
+      // Configure PDF options
+      const opt = {
+        margin: 5,
+        filename: `Customer_Settlement_${customerSettlementData.referenceNumber || 'unknown'}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          width: tempContainer.scrollWidth,
+          windowWidth: tempContainer.scrollWidth
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+      
+      // Generate PDF
+      html2pdfModule.default(tempContainer, opt)
+        .then(() => {
+          // Remove temporary container after PDF generation
+          if (tempContainer.parentNode) {
+            tempContainer.parentNode.removeChild(tempContainer);
+          }
+          // Remove loading message
+          if (loadingEl.parentNode) {
+            loadingEl.parentNode.removeChild(loadingEl);
+          }
+          console.log('PDF generated successfully');
+        })
+        .catch((error) => {
+          console.error('Error generating PDF:', error);
+          // Remove loading message
+          if (loadingEl.parentNode) {
+            loadingEl.parentNode.removeChild(loadingEl);
+          }
+          alert('Error generating PDF. Please try again.');
+        });
+    }).catch((error) => {
+      console.error('Error importing html2pdf.js:', error);
+      // Remove loading message
+      if (loadingEl.parentNode) {
+        loadingEl.parentNode.removeChild(loadingEl);
+      }
+      alert('Error loading PDF generator. Please try again.');
+    });
+  };
+  
   const handleDeleteTemplate = (templateId: string) => {
     setTemplates(prev => prev.filter(t => t.id !== templateId));
   };
@@ -5734,7 +5911,60 @@ Enter choice (1-3):`);
               <Button 
                 onClick={() => {
                   // Print functionality for customer settlement
-                  window.print();
+                  const customerSettlementContent = generateCleanCustomerSettlementHTML();
+                  
+                  // Create a temporary window for printing
+                  const printWindow = window.open('', '_blank', 'width=800,height=600');
+                  if (printWindow) {
+                    printWindow.document.write(`
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <title>Customer Settlement</title>
+                        <style>
+                          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+                          .customer-settlement-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
+                          .text-center { text-align: center; }
+                          .border-b-2 { border-bottom: 2px solid #000; }
+                          .pb-2 { padding-bottom: 0.5rem; }
+                          .font-bold { font-weight: bold; }
+                          .text-2xl { font-size: 1.5rem; }
+                          .text-sm { font-size: 0.875rem; }
+                          .mb-1 { margin-bottom: 0.25rem; }
+                          .mb-2 { margin-bottom: 0.5rem; }
+                          .mt-4 { margin-top: 1rem; }
+                          .mt-8 { margin-top: 2rem; }
+                          .pt-4 { padding-top: 1rem; }
+                          .border-t { border-top: 1px solid #ccc; }
+                          .grid { display: grid; }
+                          .gap-8 { gap: 2rem; }
+                          .gap-4 { gap: 1rem; }
+                          .grid-cols-1 { grid-template-columns: 1fr; }
+                          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+                          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+                          .border { border: 1px solid #e5e7eb; }
+                          .p-3 { padding: 0.75rem; }
+                          .rounded { border-radius: 0.25rem; }
+                          .font-medium { font-weight: 500; }
+                        </style>
+                      </head>
+                      <body>
+                        ${customerSettlementContent}
+                      </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    
+                    // Wait a bit for content to render before printing
+                    setTimeout(() => {
+                      printWindow.focus();
+                      printWindow.print();
+                      printWindow.close();
+                    }, 500);
+                  } else {
+                    // Fallback: Alert user to allow popups
+                    alert('Please enable popups for this site to print the customer settlement');
+                  }
                   closeCustomerSettlementOptionsDialog();
                 }}
                 className="w-full flex items-center justify-start"
@@ -5747,7 +5977,7 @@ Enter choice (1-3):`);
               <Button 
                 onClick={() => {
                   // Download functionality for customer settlement
-                  alert('Downloading customer settlement...');
+                  downloadCustomerSettlementAsPDF();
                   closeCustomerSettlementOptionsDialog();
                 }}
                 className="w-full flex items-center justify-start"
