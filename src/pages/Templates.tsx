@@ -31,7 +31,8 @@ import {
   Minus,
   Share,
   ExternalLink,
-  MessageCircle
+  MessageCircle,
+  RotateCcw
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -762,12 +763,43 @@ We appreciate your business.`,
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
     
+  // Function to generate a unique customer ID
+  const generateCustomerId = () => {
+    return `CUST-${Date.now()}`;
+  };
+  
+  // Function to generate a unique settlement reference number
+  const generateSettlementReference = () => {
+    return `SET-${Date.now()}`;
+  };
+  
+  // Function to reset customer settlement data to default layout
+  const resetCustomerSettlementData = () => {
+    setCustomerSettlementData({
+      customerName: "Customer Name",
+      customerId: generateCustomerId(),
+      customerPhone: "(555) 123-4567",
+      customerEmail: "customer@example.com",
+      referenceNumber: generateSettlementReference(),
+      settlementAmount: 0,
+      paymentMethod: "Cash",
+      cashierName: "Cashier Name",
+      previousBalance: 0,
+      amountPaid: 0,
+      newBalance: 0,
+      notes: "",
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString(),
+      status: "completed"
+    });
+  };
+  
   const [customerSettlementData, setCustomerSettlementData] = useState<CustomerSettlementData>({
     customerName: "Customer Name",
-    customerId: "CUST-001",
+    customerId: generateCustomerId(),
     customerPhone: "(555) 123-4567",
     customerEmail: "customer@example.com",
-    referenceNumber: "SET-001",
+    referenceNumber: generateSettlementReference(),
     settlementAmount: 0,
     paymentMethod: "Cash",
     cashierName: "Cashier Name",
@@ -3914,11 +3946,6 @@ We appreciate your business.`,
                             return;
                           }
                           
-                          if (!customerSettlementData.referenceNumber || customerSettlementData.referenceNumber.trim() === "" || customerSettlementData.referenceNumber === "SET-001") {
-                            alert("Please enter a valid reference number.");
-                            return;
-                          }
-                          
                           if (customerSettlementData.settlementAmount <= 0) {
                             alert("Please enter a valid settlement amount greater than 0.");
                             return;
@@ -3951,10 +3978,10 @@ We appreciate your business.`,
                           // Reset form to default values
                           setCustomerSettlementData({
                             customerName: "Customer Name",
-                            customerId: "CUST-001",
+                            customerId: generateCustomerId(),
                             customerPhone: "(555) 123-4567",
                             customerEmail: "customer@example.com",
-                            referenceNumber: "SET-001",
+                            referenceNumber: generateSettlementReference(),
                             settlementAmount: 0,
                             paymentMethod: "Cash",
                             cashierName: "Cashier Name",
@@ -5034,6 +5061,7 @@ We appreciate your business.`,
                                 value={customerSettlementData.customerId}
                                 onChange={(e) => handleCustomerSettlementChange("customerId", e.target.value)}
                                 className="w-full p-1 text-sm mt-1"
+                                readOnly
                               />
                             </div>
                             <div className="text-sm mb-1">
@@ -5062,6 +5090,7 @@ We appreciate your business.`,
                                 value={customerSettlementData.referenceNumber}
                                 onChange={(e) => handleCustomerSettlementChange("referenceNumber", e.target.value)}
                                 className="w-full p-1 text-sm mt-1"
+                                readOnly
                               />
                             </div>
                             <div className="text-sm mb-1">
@@ -6030,12 +6059,15 @@ Enter choice (1-3):`);
                   // Download functionality for customer settlement
                   downloadCustomerSettlementAsPDF();
                   closeCustomerSettlementOptionsDialog();
+                  
+                  // Reset form after action
+                  resetCustomerSettlementData();
                 }}
                 className="w-full flex items-center justify-start"
                 variant="outline"
               >
                 <Download className="h-4 w-4 mr-2" />
-                DownloadSettlement
+                Download Settlement
               </Button>
               
               <Button 
@@ -6095,6 +6127,9 @@ Enter choice (1-3):`);
                     alert('Error sharing customer settlement. Please try again.');
                   }
                   closeCustomerSettlementOptionsDialog();
+                  
+                  // Reset form after action
+                  resetCustomerSettlementData();
                 }}
                 className="w-full flex items-center justify-start"
                 variant="outline"
@@ -6121,12 +6156,29 @@ Enter choice (1-3):`);
 Enter choice (1-3):`);
                   
                   closeCustomerSettlementOptionsDialog();
+                  
+                  // Reset form after action
+                  resetCustomerSettlementData();
                 }}
                 className="w-full flex items-center justify-start"
                 variant="outline"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                ExportSettlement
+                Export Settlement
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Reset functionality for customer settlement
+                  resetCustomerSettlementData();
+                  closeCustomerSettlementOptionsDialog();
+                  alert('Customer settlement form has been reset to default layout');
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset Form
               </Button>
             </div>
             
