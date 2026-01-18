@@ -42,7 +42,7 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { error } = await supabase
-        .from('customer_settlements')
+        .from('saved_customer_settlements')
         .insert({
           user_id: user.id,
           customer_name: settlement.customerName || '',
@@ -129,16 +129,26 @@ export const getSavedSettlements = async (): Promise<CustomerSettlementData[]> =
     let data, error;
     
     if (user) {
-      ({ data, error } = await supabase
-        .from('customer_settlements')
-        .select('*')
-        .or(`user_id.eq.${user.id},user_id.is.null`)
-        .order('created_at', { ascending: false }));
+      // Check if user is admin to determine query scope
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      let query = supabase.from('saved_customer_settlements').select('*');
+      
+      // Admins can see all settlements, others see only their own
+      if (userData?.role !== 'admin') {
+        query = query.eq('user_id', user.id);
+      }
+      
+      ({ data, error } = await query.order('created_at', { ascending: false }));
     } else {
       ({ data, error } = await supabase
-        .from('customer_settlements')
+        .from('saved_customer_settlements')
         .select('*')
-        .is('user_id', null)
+        .eq('user_id', null)
         .order('created_at', { ascending: false }));
     }
     
@@ -219,13 +229,24 @@ export const deleteCustomerSettlement = async (settlementId: string): Promise<vo
     
     // Also delete from database
     const { data: { user } } = await supabase.auth.getUser();
+    
     let deleteQuery = supabase
-      .from('customer_settlements')
+      .from('saved_customer_settlements')
       .delete()
       .eq('id', settlementId);
     
     if (user) {
-      deleteQuery = deleteQuery.eq('user_id', user.id);
+      // Check if user is admin to determine delete scope
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      // Admins can delete any settlement, others can only delete their own
+      if (userData?.role !== 'admin') {
+        deleteQuery = deleteQuery.eq('user_id', user.id);
+      }
     } else {
       deleteQuery = deleteQuery.is('user_id', null);
     }
@@ -252,8 +273,9 @@ export const updateCustomerSettlement = async (updatedSettlement: CustomerSettle
     
     // Also update in database
     const { data: { user } } = await supabase.auth.getUser();
+    
     let updateQuery = supabase
-      .from('customer_settlements')
+      .from('saved_customer_settlements')
       .update({
         customer_name: updatedSettlement.customerName || '',
         customer_id: updatedSettlement.customerId || '',
@@ -274,7 +296,17 @@ export const updateCustomerSettlement = async (updatedSettlement: CustomerSettle
       .eq('id', updatedSettlement.id);
     
     if (user) {
-      updateQuery = updateQuery.eq('user_id', user.id);
+      // Check if user is admin to determine update scope
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      // Admins can update any settlement, others can only update their own
+      if (userData?.role !== 'admin') {
+        updateQuery = updateQuery.eq('user_id', user.id);
+      }
     } else {
       updateQuery = updateQuery.is('user_id', null);
     }
@@ -297,6 +329,64 @@ export const getCustomerSettlementById = async (settlementId: string): Promise<C
     return savedSettlements.find(settlement => settlement.id === settlementId);
   } catch (error) {
     console.error('Error retrieving customer settlement by ID:', error);
+    return undefined;
+  }
+};
+
+// New function to get a specific saved settlement by ID directly from the database
+export const getSavedCustomerSettlementById = async (settlementId: string): Promise<CustomerSettlementData | undefined> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      // Check if user is admin to determine query scope
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      let query = supabase
+        .from('saved_customer_settlements')
+        .select('*')
+        .eq('id', settlementId);
+      
+      // Admins can access any settlement, others can only access their own
+      if (userData?.role !== 'admin') {
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { data, error } = await query.single();
+      
+      if (error) {
+        console.error('Error retrieving saved customer settlement by ID:', error);
+        return undefined;
+      }
+      
+      // Transform database record to CustomerSettlementData format
+      return {
+        id: data.id,
+        customerName: data.customer_name,
+        customerId: data.customer_id,
+        customerPhone: data.customer_phone,
+        customerEmail: data.customer_email,
+        referenceNumber: data.reference_number,
+        settlementAmount: data.settlement_amount,
+        paymentMethod: data.payment_method,
+        cashierName: data.cashier_name,
+        previousBalance: data.previous_balance,
+        amountPaid: data.amount_paid,
+        newBalance: data.new_balance,
+        notes: data.notes,
+        date: data.date,
+        time: data.time,
+        status: data.status
+      };
+    }
+    
+    return undefined;
+  } catch (error) {
+    console.error('Error retrieving saved customer settlement by ID:', error);
     return undefined;
   }
 };
