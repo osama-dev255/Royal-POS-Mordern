@@ -74,8 +74,7 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
   const handleDeleteSettlement = (settlementId: string) => {
     try {
       deleteCustomerSettlement(settlementId);
-      // Update the state to reflect the deletion
-      setSettlements(prev => prev.filter(settlement => settlement.id !== settlementId));
+      // The state will be updated automatically via the refreshSettlements event listener
     } catch (error) {
       console.error("Error deleting settlement:", error);
     }

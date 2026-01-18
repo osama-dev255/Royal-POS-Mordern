@@ -64,11 +64,14 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
       
       if (error) {
         console.error('Error saving customer settlement to database:', error);
+      } else {
+        // Trigger refresh to update UI components
+        window.dispatchEvent(new CustomEvent('refreshSettlements'));
       }
     } else {
       // If not authenticated, still try to save to database with null user_id
       const { error } = await supabase
-        .from('customer_settlements')
+        .from('saved_customer_settlements')
         .insert({
           user_id: null,
           customer_name: settlement.customerName || '',
@@ -90,6 +93,9 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
       
       if (error) {
         console.error('Error saving customer settlement to database:', error);
+      } else {
+        // Trigger refresh to update UI components
+        window.dispatchEvent(new CustomEvent('refreshSettlements'));
       }
     }
   } catch (error) {
@@ -100,31 +106,7 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
 
 export const getSavedSettlements = async (): Promise<CustomerSettlementData[]> => {
   try {
-    // Check localStorage first as primary source
-    const localStorageData = localStorage.getItem(SAVED_SETTLEMENTS_KEY);
-    let localStorageSettlements: any[] = [];
-    
-    if (localStorageData) {
-      try {
-        localStorageSettlements = JSON.parse(localStorageData);
-        
-        // Validate localStorage data
-        const validLocalSettlements = localStorageSettlements.filter(settlement => 
-          settlement && 
-          settlement.id &&
-          settlement.customerName && 
-          settlement.referenceNumber
-        );
-        
-        if (validLocalSettlements.length > 0) {
-          return validLocalSettlements;
-        }
-      } catch (parseError) {
-        console.error('Error parsing localStorage data:', parseError);
-      }
-    }
-    
-    // Try database as secondary source
+    // Try database as primary source
     const { data: { user } } = await supabase.auth.getUser();
     let data, error;
     
@@ -153,13 +135,23 @@ export const getSavedSettlements = async (): Promise<CustomerSettlementData[]> =
     }
     
     if (error) {
-      // Return localStorage data even if database fails
-      return localStorageSettlements.filter(settlement => 
-        settlement && 
-        settlement.id &&
-        settlement.customerName && 
-        settlement.referenceNumber
-      );
+      console.error('Error retrieving saved settlements from database:', error);
+      // Fallback to localStorage if database fails
+      const localStorageData = localStorage.getItem(SAVED_SETTLEMENTS_KEY);
+      if (localStorageData) {
+        try {
+          const localStorageSettlements = JSON.parse(localStorageData);
+          return localStorageSettlements.filter((settlement: any) => 
+            settlement && 
+            settlement.id &&
+            settlement.customerName && 
+            settlement.referenceNumber
+          );
+        } catch (parseError) {
+          console.error('Error parsing localStorage data:', parseError);
+        }
+      }
+      return [];
     }
     
     // Transform database records
@@ -190,8 +182,27 @@ export const getSavedSettlements = async (): Promise<CustomerSettlementData[]> =
       settlement.referenceNumber
     );
     
+    // As a fallback, combine with localStorage data to avoid data loss
+    const localStorageData = localStorage.getItem(SAVED_SETTLEMENTS_KEY);
+    let localStorageSettlements: any[] = [];
+    if (localStorageData) {
+      try {
+        localStorageSettlements = JSON.parse(localStorageData);
+        
+        // Validate localStorage data
+        localStorageSettlements = localStorageSettlements.filter(settlement => 
+          settlement && 
+          settlement.id &&
+          settlement.customerName && 
+          settlement.referenceNumber
+        );
+      } catch (parseError) {
+        console.error('Error parsing localStorage data:', parseError);
+      }
+    }
+    
     // Combine both sources and deduplicate
-    const allSettlements = [...localStorageSettlements, ...validDbSettlements];
+    const allSettlements = [...validDbSettlements, ...localStorageSettlements];
     const uniqueSettlements = allSettlements.filter((settlement, index, self) => 
       index === self.findIndex(s => s.id === settlement.id)
     );
@@ -256,6 +267,9 @@ export const deleteCustomerSettlement = async (settlementId: string): Promise<vo
     if (error) {
       console.error('Error deleting customer settlement from database:', error);
       // Don't throw error - still have local storage backup
+    } else {
+      // Trigger refresh to update UI components
+      window.dispatchEvent(new CustomEvent('refreshSettlements'));
     }
   } catch (error) {
     console.error('Error deleting customer settlement:', error);
@@ -316,6 +330,9 @@ export const updateCustomerSettlement = async (updatedSettlement: CustomerSettle
     if (error) {
       console.error('Error updating customer settlement in database:', error);
       // Don't throw error - still have local storage backup
+    } else {
+      // Trigger refresh to update UI components
+      window.dispatchEvent(new CustomEvent('refreshSettlements'));
     }
   } catch (error) {
     console.error('Error updating customer settlement:', error);
