@@ -1595,93 +1595,407 @@ export class PrintUtils {
     }, 250);
   }
 
-  // Print financial report
+  // Print financial report with summary header and table layout
   static printFinancialReport(reportData: any) {
-    const reportWindow = window.open('', '_blank');
-    if (!reportWindow) return;
-    
-    const reportContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${reportData.title}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 20px;
-              color: #333;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #333;
-              padding-bottom: 10px;
-              margin-bottom: 20px;
-            }
-            .report-title {
-              font-size: 24px;
-              font-weight: bold;
-              margin-bottom: 5px;
-            }
-            .report-period {
-              font-size: 16px;
-              color: #666;
-              margin-bottom: 10px;
-            }
-            .report-data {
-              margin: 20px 0;
-            }
-            .data-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              border-bottom: 1px solid #eee;
-            }
-            .data-label {
-              font-weight: bold;
-            }
-            .data-value {
-              font-weight: bold;
-            }
-            .footer {
-              margin-top: 30px;
-              text-align: center;
-              font-size: 12px;
-              color: #999;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="report-title">${reportData.title}</div>
-            <div class="report-period">${reportData.period || 'Current Period'}</div>
-          </div>
-          
-          <div class="report-data">
-            ${reportData.data.map((item: any) => `
-              <div class="data-row">
-                <span class="data-label">${item.name}:</span>
-                <span class="data-value">${item.value}</span>
+    try {
+      const reportWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!reportWindow) {
+        console.error('Failed to open print window');
+        return;
+      }
+      
+      let reportContent = '';
+      
+      // Check if data exists
+      if (!reportData.data || reportData.data.length === 0) {
+        // Create a simple message for empty data
+        reportContent = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${reportData.title}</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  margin: 20px;
+                  color: #333;
+                  text-align: center;
+                }
+                .header {
+                  text-align: center;
+                  border-bottom: 2px solid #333;
+                  padding-bottom: 10px;
+                  margin-bottom: 20px;
+                }
+                .report-title {
+                  font-size: 24px;
+                  font-weight: bold;
+                  margin-bottom: 5px;
+                }
+                .report-period {
+                  font-size: 16px;
+                  color: #666;
+                  margin-bottom: 10px;
+                }
+                .message {
+                  font-size: 18px;
+                  margin: 50px 0;
+                  color: #666;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div class="report-title">${reportData.title}</div>
+                <div class="report-period">${reportData.period || 'Current Period'}</div>
               </div>
-            `).join('')}
-          </div>
+              
+              <div class="message">
+                No data available for the selected date range
+              </div>
+              
+              <div style="position: fixed; bottom: 20px; width: 100%; text-align: center; font-size: 12px; color: #999;">
+                Generated on: ${new Date().toLocaleDateString()}<br/>
+                Confidential - For Internal Use Only
+              </div>
+            </body>
+          </html>
+        `;
+      } else {
+        // Determine if this is a table-based report by checking if data has specific fields
+        const hasTableStructure = reportData.data && reportData.data.length > 0 && 
+                                 typeof reportData.data[0] === 'object' && 
+                                 ('productName' in reportData.data[0] || 'customerName' in reportData.data[0] || 
+                                  'supplierName' in reportData.data[0] || 'itemName' in reportData.data[0] ||
+                                  'reference' in reportData.data[0] || 'transactionId' in reportData.data[0] ||
+                                  'invoiceNumber' in reportData.data[0]);
+        
+        if (hasTableStructure) {
+          // Create table-based report with summary header
+          // Determine columns based on the keys in the first data item
+          const firstItem = reportData.data[0];
+          const columns = Object.keys(firstItem).filter(key => key !== 'id'); // exclude id from display
           
-          <div class="footer">
-            <p>Generated on: ${new Date().toLocaleDateString()}</p>
-            <p>Confidential - For Internal Use Only</p>
-          </div>
-        </body>
-      </html>
-    `;
-    
-    reportWindow.document.write(reportContent);
-    reportWindow.document.close();
-    reportWindow.focus();
-    
-    // Give time for content to load before printing
-    setTimeout(() => {
-      reportWindow.print();
-      reportWindow.close();
-    }, 250);
+          const tableRows = reportData.data.map((item: any, index: number) => {
+            let row = '<tr>';
+            // Add row number
+            row += `<td>${index + 1}</td>`;
+            columns.forEach(col => {
+              let value = item[col];
+              
+              // Handle undefined/null values
+              if (value === undefined || value === null) {
+                value = 'N/A';
+              }
+              
+              // Format dates
+              if (col.toLowerCase().includes('date') && value !== 'N/A' && typeof value === 'string') {
+                try {
+                  value = new Date(value).toLocaleDateString();
+                } catch (e) {
+                  value = 'Invalid Date';
+                }
+              }
+              
+              row += `<td>${value}</td>`;
+            });
+            row += '</tr>';
+            return row;
+          }).join('');
+          
+          // Create a mapping of camelCase field names to human-readable labels
+          const fieldLabels: Record<string, string> = {
+            'invoiceNumber': 'Invoice #',
+            'date': 'Date',
+            'customer': 'Customer',
+            'items': 'Items',
+            'total': 'Total',
+            'status': 'Status',
+            'transactionId': 'Transaction ID',
+            'paymentMethod': 'Payment Method',
+            'category': 'Category',
+            'description': 'Description',
+            'amount': 'Amount',
+            'price': 'Price',
+            'cost': 'Cost',
+            'stock': 'Stock',
+            'barcode': 'Barcode',
+            'email': 'Email',
+            'phone': 'Phone',
+            'loyaltyPoints': 'Loyalty Points',
+            'totalSpent': 'Total Spent',
+            'contactPerson': 'Contact Person',
+            'products': 'Products',
+            'reference': 'Reference',
+            'previousBalance': 'Previous Balance',
+            'amountPaid': 'Amount Paid',
+            'newBalance': 'New Balance',
+            'productName': 'Product',
+            'customerName': 'Customer',
+            'supplierName': 'Supplier',
+            'itemName': 'Item'
+          };
+          
+          const tableHeaders = `<th>#</th>${columns.map(col => {
+            // Use the mapped label if available, otherwise format the camelCase name
+            const label = fieldLabels[col] || col.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase());
+            return `<th>${label}</th>`;
+          }).join('')}`;
+          
+          // Create summary information based on the report type
+          let summaryInfo = '';
+          
+          if (reportData.title.toLowerCase().includes('settlement')) {
+            const totalSettlements = reportData.data.length;
+            const totalAmount = reportData.data.reduce((sum: number, item: any) => {
+              // Extract numeric value from formatted currency string like 'TSh 1,000.00'
+              const amountStr = item.amountPaid || item.total;
+              if (typeof amountStr === 'string') {
+                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+                return sum + (isNaN(numericValue) ? 0 : numericValue);
+              }
+              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+            }, 0);
+            
+            summaryInfo = `
+              <div class="summary">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                  <div>Total Settlements (${reportData.period || 'Current'}): ${totalSettlements}</div>
+                  <div>Total Amount: ${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(totalAmount)}</div>
+                </div>
+              </div>
+            `;
+          } else if (reportData.title.toLowerCase().includes('sale') || reportData.title.toLowerCase().includes('transaction')) {
+            const totalTransactions = reportData.data.length;
+            const totalAmount = reportData.data.reduce((sum: number, item: any) => {
+              const amountStr = item.total;
+              if (typeof amountStr === 'string') {
+                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+                return sum + (isNaN(numericValue) ? 0 : numericValue);
+              }
+              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+            }, 0);
+            
+            summaryInfo = `
+              <div class="summary">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                  <div>Total Transactions (${reportData.period || 'Current'}): ${totalTransactions}</div>
+                  <div>Total Amount: ${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(totalAmount)}</div>
+                </div>
+              </div>
+            `;
+          } else if (reportData.title.toLowerCase().includes('expense')) {
+            const totalExpenses = reportData.data.length;
+            const totalAmount = reportData.data.reduce((sum: number, item: any) => {
+              const amountStr = item.amount;
+              if (typeof amountStr === 'string') {
+                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+                return sum + (isNaN(numericValue) ? 0 : numericValue);
+              }
+              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+            }, 0);
+            
+            summaryInfo = `
+              <div class="summary">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                  <div>Total Expenses (${reportData.period || 'Current'}): ${totalExpenses}</div>
+                  <div>Total Amount: ${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(totalAmount)}</div>
+                </div>
+              </div>
+            `;
+          } else if (reportData.title.toLowerCase().includes('invoice')) {
+            const totalInvoices = reportData.data.length;
+            const totalAmount = reportData.data.reduce((sum: number, item: any) => {
+              const amountStr = item.total;
+              if (typeof amountStr === 'string') {
+                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+                return sum + (isNaN(numericValue) ? 0 : numericValue);
+              }
+              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+            }, 0);
+            
+            summaryInfo = `
+              <div class="summary">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                  <div>Total Invoices (${reportData.period || 'Current'}): ${totalInvoices}</div>
+                  <div>Total Amount: ${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(totalAmount)}</div>
+                </div>
+              </div>
+            `;
+          } else {
+            // For other report types, just show the count
+            summaryInfo = `
+              <div class="summary">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                  <div>Total Records (${reportData.period || 'Current'}): ${reportData.data.length}</div>
+                </div>
+              </div>
+            `;
+          }
+          
+          reportContent = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>${reportData.title}</title>
+                <style>
+                  body {
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    color: #333;
+                  }
+                  .header {
+                    text-align: center;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                  }
+                  .report-title {
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                  }
+                  .report-period {
+                    font-size: 16px;
+                    color: #666;
+                    margin-bottom: 10px;
+                  }
+                  table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                  }
+                  th, td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                  }
+                  th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                  }
+                  .footer {
+                    margin-top: 30px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #999;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <div class="report-title">${reportData.title}</div>
+                  <div class="report-period">${reportData.period || 'Current Period'}</div>
+                </div>
+                
+                ${summaryInfo}
+                
+                <table>
+                  <thead>
+                    <tr>${tableHeaders}</tr>
+                  </thead>
+                  <tbody>
+                    ${tableRows}
+                  </tbody>
+                </table>
+                
+                <div class="footer">
+                  <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                  <p>Confidential - For Internal Use Only</p>
+                </div>
+              </body>
+            </html>
+          `;
+        } else {
+          // Create list-based report (original format)
+          reportContent = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>${reportData.title}</title>
+                <style>
+                  body {
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    color: #333;
+                  }
+                  .header {
+                    text-align: center;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                  }
+                  .report-title {
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                  }
+                  .report-period {
+                    font-size: 16px;
+                    color: #666;
+                    margin-bottom: 10px;
+                  }
+                  .report-data {
+                    margin: 20px 0;
+                  }
+                  .data-row {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #eee;
+                  }
+                  .data-label {
+                    font-weight: bold;
+                  }
+                  .data-value {
+                    font-weight: bold;
+                  }
+                  .footer {
+                    margin-top: 30px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #999;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <div class="report-title">${reportData.title}</div>
+                  <div class="report-period">${reportData.period || 'Current Period'}</div>
+                </div>
+                
+                <div class="report-data">
+                  ${reportData.data.map((item: any) => `
+                    <div class="data-row">
+                      <span class="data-label">${item.name}:</span>
+                      <span class="data-value">${item.value}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                
+                <div class="footer">
+                  <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                  <p>Confidential - For Internal Use Only</p>
+                </div>
+              </body>
+            </html>
+          `;
+        }
+      }
+      
+      reportWindow.document.write(reportContent);
+      reportWindow.document.close();
+      reportWindow.focus();
+      
+      // Give time for content to load before printing
+      setTimeout(() => {
+        reportWindow.print();
+        reportWindow.close();
+      }, 500); // Increased timeout to ensure content loads
+    } catch (error) {
+      console.error('Error in printFinancialReport:', error);
+      alert('There was an error generating the print report. Please try again.');
+    }
   }
 
   // Print income statement

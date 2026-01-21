@@ -228,141 +228,138 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
 
   // Handle print report
   const handlePrint = () => {
-    let reportData: any = {};
-    
-    switch (reportType) {
-      case "inventory":
-        // Inventory doesn't have dates, print all data
-        reportData = {
-          title: "Inventory Report",
-          period: `As of ${new Date().toLocaleDateString()}`,
-          data: [
-            { name: "Total Products", value: mockProducts.length },
-            ...mockProducts.map((product: any) => ({
-              name: product.name,
-              value: product.stock  // Quantity, not currency
+    try {
+      let reportData: any = {};
+        
+      switch (reportType) {
+        case "inventory":
+          // Inventory doesn't have dates, print all data
+          reportData = {
+            title: "Inventory Report",
+            period: `As of ${new Date().toLocaleDateString()}`,
+            data: mockProducts.map((product: any) => ({
+              productName: product.name,
+              category: product.category,
+              price: formatCurrency(product.price),
+              cost: formatCurrency(product.cost),
+              stock: product.stock,
+              barcode: product.barcode
             }))
-          ]
-        };
-        break;
-      case "customers":
-        // Customers don't have dates, print all data
-        reportData = {
-          title: "Customer Report",
-          period: `As of ${new Date().toLocaleDateString()}`,
-          data: [
-            { name: "Total Customers", value: mockCustomers.length },
-            ...mockCustomers.map((customer: any) => ({
-              name: customer.name,
-              value: customer.totalSpent  // This is currency
+          };
+          break;
+        case "customers":
+          // Customers don't have dates, print all data
+          reportData = {
+            title: "Customer Report",
+            period: `As of ${new Date().toLocaleDateString()}`,
+            data: mockCustomers.map((customer: any) => ({
+              customerName: customer.name,
+              email: customer.email,
+              phone: customer.phone,
+              loyaltyPoints: customer.loyaltyPoints,
+              totalSpent: formatCurrency(customer.totalSpent)
             }))
-          ]
-        };
-        break;
-      case "suppliers":
-        // Suppliers don't have dates, print all data
-        reportData = {
-          title: "Supplier Report",
-          period: `As of ${new Date().toLocaleDateString()}`,
-          data: [
-            { name: "Total Suppliers", value: mockSuppliers.length },
-            ...mockSuppliers.map((supplier: any) => ({
-              name: supplier.name,
-              value: supplier.products.length  // Count, not currency
+          };
+          break;
+        case "suppliers":
+          // Suppliers don't have dates, print all data
+          reportData = {
+            title: "Supplier Report",
+            period: `As of ${new Date().toLocaleDateString()}`,
+            data: mockSuppliers.map((supplier: any) => ({
+              supplierName: supplier.name,
+              contactPerson: supplier.contactPerson,
+              email: supplier.email,
+              phone: supplier.phone,
+              products: supplier.products.join(', ')
             }))
-          ]
-        };
-        break;
-      case "expenses":
-        const filteredExpenses = filterDataByDateRange(mockExpenses, 'date');
-        const totalFilteredExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-        reportData = {
-          title: "Expense Report",
-          period: `From ${dateRange} (${new Date().toLocaleDateString()})`,
-          data: [
-            { name: "Total Expenses", value: totalFilteredExpenses },
-            { name: "Number of Expenses", value: filteredExpenses.length },
-            ...filteredExpenses.map((expense: any) => ({
-              name: expense.category,
-              value: expense.amount
+          };
+          break;
+        case "expenses":
+          const filteredExpenses = filterDataByDateRange(mockExpenses, 'date');
+          reportData = {
+            title: "Expense Report",
+            period: `${dateRange} (${new Date().toLocaleDateString()})`,
+            data: filteredExpenses.map((expense: any) => ({
+              date: expense.date,
+              category: expense.category,
+              description: expense.description,
+              amount: formatCurrency(expense.amount),
+              paymentMethod: expense.paymentMethod,
+              status: expense.status
             }))
-          ]
-        };
-        break;
-      case "sales":
-      default:
-        const filteredTransactions = filterDataByDateRange(mockTransactions, 'date');
-        const totalFilteredSales = filteredTransactions.reduce((sum, transaction) => sum + transaction.total, 0);
-        reportData = {
-          title: "Sales Report",
-          period: `From ${dateRange} (${new Date().toLocaleDateString()})`,
-          data: [
-            { name: "Total Sales", value: totalFilteredSales },
-            { name: "Total Transactions", value: filteredTransactions.length },
-            ...filteredTransactions.map((transaction: any) => ({
-              name: `Transaction #${transaction.id}`,
-              value: transaction.total
+          };
+          break;
+        case "sales":
+        default:
+          const filteredTransactions = filterDataByDateRange(mockTransactions, 'date');
+          reportData = {
+            title: "Sales Report",
+            period: `${dateRange} (${new Date().toLocaleDateString()})`,
+            data: filteredTransactions.map((transaction: any) => ({
+              transactionId: transaction.id || 'N/A',
+              date: transaction.date ? new Date(transaction.date).toLocaleDateString() : 'N/A',
+              customer: transaction.customer || 'N/A',
+              items: transaction.items || 0,
+              total: formatCurrency(transaction.total || 0),
+              paymentMethod: transaction.paymentMethod || 'N/A',
+              status: transaction.status || 'N/A'
             }))
-          ]
-        };
-        break;
-      case "saved-invoices":
-        const filteredSavedInvoices = filterDataByDateRange(savedInvoices, 'date');
-        const totalFilteredInvoices = filteredSavedInvoices.reduce((sum, invoice) => sum + (invoice.total || 0), 0);
-        reportData = {
-          title: "Saved Invoices Report",
-          period: `From ${dateRange} (${new Date().toLocaleDateString()})`,
-          data: [
-            { name: "Total Invoices", value: filteredSavedInvoices.length },
-            { name: "Total Amount", value: totalFilteredInvoices },
-            ...filteredSavedInvoices.map((invoice: any) => ({
-              name: `Invoice #${invoice.invoiceNumber || invoice.id}`,
-              value: invoice.total || 0
+          };
+          break;
+        case "saved-invoices":
+          const filteredSavedInvoices = filterDataByDateRange(savedInvoices, 'date');
+          console.log('Saved Invoices Data:', filteredSavedInvoices);
+          reportData = {
+            title: "Saved Invoices Report",
+            period: `${dateRange} (${new Date().toLocaleDateString()})`,
+            data: filteredSavedInvoices.map((invoice: any) => ({
+              invoiceNumber: invoice.invoiceNumber || 'N/A',
+              date: formatDate(invoice.date),
+              customer: invoice.customer || 'N/A',
+              items: invoice.items || invoice.itemsList?.length || 0,
+              total: formatCurrency(invoice.total || invoice.amountDue || 0),
+              status: invoice.status || 'N/A'
             }))
-          ]
-        };
-        break;
-      case "saved-customer-settlements":
-        const filteredSavedSettlements = filterDataByDateRange(savedSettlements, 'date');
-        const totalFilteredSettlements = filteredSavedSettlements.reduce((sum, settlement) => sum + (settlement.settlementAmount || 0), 0);
-        reportData = {
-          title: "Saved Customer Settlements Report",
-          period: `From ${dateRange} (${new Date().toLocaleDateString()})`,
-          data: [
-            { name: "Total Settlements", value: filteredSavedSettlements.length },
-            { name: "Total Amount", value: totalFilteredSettlements },
-            ...filteredSavedSettlements.map((settlement: any) => ({
-              name: `Settlement #${settlement.referenceNumber || settlement.id}`,
-              value: settlement.settlementAmount || 0
+          };
+          console.log('Formatted Report Data:', reportData);
+          break;
+        case "saved-customer-settlements":
+          const filteredSavedSettlements = filterDataByDateRange(savedSettlements, 'date');
+          reportData = {
+            title: "Saved Customer Settlements Report",
+            period: `${dateRange} (${new Date().toLocaleDateString()})`,
+            data: filteredSavedSettlements.map((settlement: any) => ({
+              reference: settlement.referenceNumber,
+              date: formatDate(settlement.date),
+              customer: settlement.customerName,
+              previousBalance: settlement.previousBalance !== undefined ? formatCurrency(settlement.previousBalance) : 'N/A',
+              amountPaid: formatCurrency(settlement.settlementAmount),
+              newBalance: settlement.newBalance !== undefined ? formatCurrency(settlement.newBalance) : 'N/A',
+              paymentMethod: settlement.paymentMethod,
+              status: settlement.status || 'completed'
             }))
-          ]
+          };
+          break;
+      }
+        
+      // Validate that we have data to print
+      if (!reportData.data || reportData.data.length === 0) {
+        console.warn(`No data available to print for report type: ${reportType}`);
+        // Create a default message if no data
+        reportData = {
+          title: reportData.title || `${getReportTitle()} - No Data`,
+          period: reportData.period || `As of ${new Date().toLocaleDateString()}`,
+          data: [{ message: 'No data available for the selected date range' }]
         };
-        break;
+      }
+        
+      // Use PrintUtils to print the report
+      PrintUtils.printFinancialReport(reportData);
+    } catch (error) {
+      console.error('Error in handlePrint:', error);
+      alert('There was an error generating the report. Please try again.');
     }
-    
-    // Format values for financial report if they represent currency amounts
-    // Apply TZS formatting to financial values only, not quantities or counts
-    reportData.data = reportData.data.map((item: any) => ({
-      ...item,
-      // Format as currency only if the field name suggests it's a monetary value
-      value: typeof item.value === 'number' && (
-             item.name.toLowerCase().includes('amount') || 
-             item.name.toLowerCase().includes('total') || 
-             item.name.toLowerCase().includes('expense') || 
-             item.name.toLowerCase().includes('sales') || 
-             item.name.toLowerCase().includes('cost') || 
-             item.name.toLowerCase().includes('price') ||
-             item.name.toLowerCase().includes('paid') ||
-             item.name.toLowerCase().includes('balance') ||
-             item.name.toLowerCase().includes('spent') ||
-             item.name.toLowerCase().includes('value')
-           )
-           ? formatCurrency(item.value)
-           : item.value
-    }));
-    
-    // Use PrintUtils to print the report
-    PrintUtils.printFinancialReport(reportData);
   };
 
   // Get report title
