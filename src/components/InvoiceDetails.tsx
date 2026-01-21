@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Package, CreditCard, FileText, Printer, Download, Mail, Phone, Building } from "lucide-react";
+import { Calendar, User, Package, CreditCard, FileText, Printer, Download, Mail, Phone, Building, Edit } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 
 interface Customer {
@@ -45,6 +45,7 @@ interface InvoiceDetailsProps {
   onBack: () => void;
   onPrint?: () => void;
   onDownload?: () => void;
+  onEdit?: () => void;
 }
 
 export const InvoiceDetails = ({ 
@@ -70,7 +71,8 @@ export const InvoiceDetails = ({
   businessPhone: propBusinessPhone,
   onBack,
   onPrint,
-  onDownload
+  onDownload,
+  onEdit
 }: InvoiceDetailsProps) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -110,6 +112,15 @@ export const InvoiceDetails = ({
     } else {
       // For now, just alert that download would happen
       alert('Download functionality would be implemented here');
+    }
+  };
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit();
+    } else {
+      // For now, just alert that edit would happen
+      alert('Edit functionality would be implemented here');
     }
   };
 
@@ -295,6 +306,10 @@ export const InvoiceDetails = ({
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="outline" onClick={onBack}>
               Back
+            </Button>
+            <Button variant="outline" onClick={handleEdit}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
             </Button>
             <Button variant="outline" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
