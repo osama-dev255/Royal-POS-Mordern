@@ -1748,13 +1748,15 @@ export class PrintUtils {
           if (reportData.title.toLowerCase().includes('settlement')) {
             const totalSettlements = reportData.data.length;
             const totalAmount = reportData.data.reduce((sum: number, item: any) => {
-              // Extract numeric value from formatted currency string like 'TSh 1,000.00'
-              const amountStr = item.amountPaid || item.total;
-              if (typeof amountStr === 'string') {
-                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+              // Use amountPaidRaw if available (for formatted reports), otherwise use amountPaid
+              const amountValue = item.amountPaidRaw !== undefined ? item.amountPaidRaw : item.amountPaid;
+              if (typeof amountValue === 'number') {
+                return sum + amountValue;
+              } else if (typeof amountValue === 'string') {
+                const numericValue = parseFloat(amountValue.replace(/[^0-9.,-]/g, ''));
                 return sum + (isNaN(numericValue) ? 0 : numericValue);
               }
-              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+              return sum;
             }, 0);
             
             summaryInfo = `
@@ -1768,12 +1770,15 @@ export class PrintUtils {
           } else if (reportData.title.toLowerCase().includes('sale') || reportData.title.toLowerCase().includes('transaction')) {
             const totalTransactions = reportData.data.length;
             const totalAmount = reportData.data.reduce((sum: number, item: any) => {
-              const amountStr = item.total;
-              if (typeof amountStr === 'string') {
-                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+              // Use totalRaw if available (for formatted reports), otherwise use total
+              const amountValue = item.totalRaw !== undefined ? item.totalRaw : item.total;
+              if (typeof amountValue === 'number') {
+                return sum + amountValue;
+              } else if (typeof amountValue === 'string') {
+                const numericValue = parseFloat(amountValue.replace(/[^0-9.,-]/g, ''));
                 return sum + (isNaN(numericValue) ? 0 : numericValue);
               }
-              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+              return sum;
             }, 0);
             
             summaryInfo = `
@@ -1787,12 +1792,15 @@ export class PrintUtils {
           } else if (reportData.title.toLowerCase().includes('expense')) {
             const totalExpenses = reportData.data.length;
             const totalAmount = reportData.data.reduce((sum: number, item: any) => {
-              const amountStr = item.amount;
-              if (typeof amountStr === 'string') {
-                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+              // Use amountRaw if available (for formatted reports), otherwise use amount
+              const amountValue = item.amountRaw !== undefined ? item.amountRaw : item.amount;
+              if (typeof amountValue === 'number') {
+                return sum + amountValue;
+              } else if (typeof amountValue === 'string') {
+                const numericValue = parseFloat(amountValue.replace(/[^0-9.,-]/g, ''));
                 return sum + (isNaN(numericValue) ? 0 : numericValue);
               }
-              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+              return sum;
             }, 0);
             
             summaryInfo = `
@@ -1806,12 +1814,15 @@ export class PrintUtils {
           } else if (reportData.title.toLowerCase().includes('invoice')) {
             const totalInvoices = reportData.data.length;
             const totalAmount = reportData.data.reduce((sum: number, item: any) => {
-              const amountStr = item.total;
-              if (typeof amountStr === 'string') {
-                const numericValue = parseFloat(amountStr.replace(/[^[0-9]\,.-]/g, ''));
+              // Use totalRaw if available (for formatted reports), otherwise use total
+              const amountValue = item.totalRaw !== undefined ? item.totalRaw : item.total;
+              if (typeof amountValue === 'number') {
+                return sum + amountValue;
+              } else if (typeof amountValue === 'string') {
+                const numericValue = parseFloat(amountValue.replace(/[^0-9.,-]/g, ''));
                 return sum + (isNaN(numericValue) ? 0 : numericValue);
               }
-              return sum + (typeof amountStr === 'number' ? amountStr : 0);
+              return sum;
             }, 0);
             
             summaryInfo = `

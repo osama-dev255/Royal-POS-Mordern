@@ -285,6 +285,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
               category: expense.category,
               description: expense.description,
               amount: formatCurrency(expense.amount),
+              amountRaw: expense.amount, // Raw value for calculations
               paymentMethod: expense.paymentMethod,
               status: expense.status
             }))
@@ -302,6 +303,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
               customer: transaction.customer || 'N/A',
               items: transaction.items || 0,
               total: formatCurrency(transaction.total || 0),
+              totalRaw: transaction.total || 0, // Raw value for calculations
               paymentMethod: transaction.paymentMethod || 'N/A',
               status: transaction.status || 'N/A'
             }))
@@ -319,6 +321,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
               customer: invoice.customer || 'N/A',
               items: invoice.items || invoice.itemsList?.length || 0,
               total: formatCurrency(invoice.total || invoice.amountDue || 0),
+              totalRaw: invoice.total || invoice.amountDue || 0, // Raw value for calculations
               status: invoice.status || 'N/A'
             }))
           };
@@ -334,8 +337,11 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
               date: formatDate(settlement.date),
               customer: settlement.customerName,
               previousBalance: settlement.previousBalance !== undefined ? formatCurrency(settlement.previousBalance) : 'N/A',
+              previousBalanceRaw: settlement.previousBalance, // Raw value for calculations
               amountPaid: formatCurrency(settlement.settlementAmount),
+              amountPaidRaw: settlement.settlementAmount, // Raw value for calculations
               newBalance: settlement.newBalance !== undefined ? formatCurrency(settlement.newBalance) : 'N/A',
+              newBalanceRaw: settlement.newBalance, // Raw value for calculations
               paymentMethod: settlement.paymentMethod,
               status: settlement.status || 'completed'
             }))
