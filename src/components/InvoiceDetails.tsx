@@ -124,6 +124,11 @@ export const InvoiceDetails = ({
     }
   };
 
+  // Calculate missing financial values based on available data
+  const calculatedAmountPaid = amountPaid !== undefined ? amountPaid : (paymentMethod === "debt" ? 0 : amountReceived);
+  const calculatedCreditBroughtForward = creditBroughtForward !== undefined ? creditBroughtForward : 0;
+  const calculatedAmountDue = amountDue !== undefined ? amountDue : (total - calculatedAmountPaid + calculatedCreditBroughtForward);
+
   // Use business information from the invoice data if available, otherwise fallback to current settings from localStorage
   const businessName = propBusinessName || localStorage.getItem('businessName') || 'Your Business Name';
   const businessAddress = propBusinessAddress || localStorage.getItem('businessAddress') || '123 Business Street';
@@ -277,25 +282,19 @@ export const InvoiceDetails = ({
                   <span>{formatCurrency(total)}</span>
                 </div>
                 
-                {/* Additional payment fields */}
-                {amountPaid !== undefined && (
-                  <div className="flex justify-between pt-2 border-t mt-2">
-                    <span className="text-muted-foreground">Amount Paid:</span>
-                    <span>{formatCurrency(amountPaid)}</span>
-                  </div>
-                )}
-                {creditBroughtForward !== undefined && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Credit Brought Forward:</span>
-                    <span>{formatCurrency(creditBroughtForward)}</span>
-                  </div>
-                )}
-                {amountDue !== undefined && (
-                  <div className="flex justify-between font-bold">
-                    <span>AMOUNT DUE:</span>
-                    <span>{formatCurrency(amountDue)}</span>
-                  </div>
-                )}
+                {/* Additional payment fields - always show these with calculated values */}
+                <div className="flex justify-between pt-2 border-t mt-2">
+                  <span className="text-muted-foreground">Amount Paid:</span>
+                  <span>{formatCurrency(calculatedAmountPaid)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Credit Brought Forward:</span>
+                  <span>{formatCurrency(calculatedCreditBroughtForward)}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>AMOUNT DUE:</span>
+                  <span>{formatCurrency(calculatedAmountDue)}</span>
+                </div>
                 
 
               </div>

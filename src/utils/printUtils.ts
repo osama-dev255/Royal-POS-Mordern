@@ -2567,6 +2567,392 @@ export class PrintUtils {
     }
   }
 
+  // Print saved invoice with view layout format
+  static printSavedInvoice(invoice: any) {
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) return;
+    
+    const getStatusVariant = (status: string) => {
+      switch (status) {
+        case "completed": return "default";
+        case "refunded": return "destructive";
+        case "pending": return "secondary";
+        case "cancelled": return "outline";
+        default: return "default";
+      }
+    };
+    
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString();
+    };
+    
+    const reportContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice #${invoice.invoiceNumber}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              margin: 20px;
+              color: #333;
+              font-size: 14px;
+              line-height: 1.5;
+            }
+            .card {
+              border: 1px solid #e5e7eb;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+              overflow: hidden;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .card-header {
+              padding: 20px;
+              border-bottom: 1px solid #e5e7eb;
+              background-color: #fafafa;
+            }
+            .header-content {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+            }
+            .header-title {
+              font-size: 20px;
+              font-weight: 600;
+              color: #1f2937;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .file-icon {
+              color: #3b82f6;
+            }
+            .date-info {
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              color: #6b7280;
+              font-size: 14px;
+              margin-top: 4px;
+            }
+            .calendar-icon {
+              width: 16px;
+              height: 16px;
+            }
+            .status-badge {
+              padding: 4px 12px;
+              border-radius: 9999px;
+              font-size: 12px;
+              font-weight: 500;
+              text-transform: capitalize;
+            }
+            .status-completed { background-color: #dcfce7; color: #166534; }
+            .status-refunded { background-color: #fee2e2; color: #991b1b; }
+            .status-pending { background-color: #fef3c7; color: #92400e; }
+            .status-cancelled { background-color: #f3f4f6; color: #374151; }
+            .card-content {
+              padding: 20px;
+            }
+            .info-item {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 12px;
+            }
+            .info-icon {
+              color: #6b7280;
+              width: 16px;
+              height: 16px;
+            }
+            .customer-name {
+              font-size: 14px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .amount-section {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding-top: 8px;
+              margin-bottom: 12px;
+            }
+            .items-count {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              color: #6b7280;
+              font-size: 14px;
+            }
+            .total-amount {
+              font-weight: 700;
+              font-size: 16px;
+              color: #1f2937;
+            }
+            .payment-info {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 14px;
+              margin-bottom: 12px;
+            }
+            .payment-label {
+              color: #6b7280;
+            }
+            .payment-method {
+              text-transform: capitalize;
+            }
+            .financial-summary {
+              margin: 12px 0;
+              padding: 12px;
+              background-color: #f9fafb;
+              border-radius: 6px;
+            }
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 8px;
+            }
+            .summary-label {
+              font-weight: 500;
+              color: #6b7280;
+            }
+            .summary-value {
+              font-weight: 500;
+            }
+            .items-table-section {
+              padding-top: 12px;
+            }
+            .items-toggle {
+              width: 100%;
+              padding: 8px 12px;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              background-color: #f9fafb;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 14px;
+              cursor: pointer;
+            }
+            .items-table-container {
+              margin-top: 12px;
+              border: 1px solid #e5e7eb;
+              border-radius: 6px;
+              overflow: hidden;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .table-header {
+              background-color: #f3f4f6;
+            }
+            .table-header th {
+              text-align: left;
+              padding: 12px;
+              font-size: 12px;
+              font-weight: 600;
+              color: #374151;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .table-body tr:nth-child(even) {
+              background-color: #f9fafb;
+            }
+            .table-body td {
+              padding: 12px;
+              font-size: 12px;
+              color: #374151;
+              border-bottom: 1px solid #f3f4f6;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .font-medium {
+              font-weight: 500;
+            }
+            .footer {
+              padding: 20px;
+              background-color: #f9fafb;
+              border-top: 1px solid #e5e7eb;
+              text-align: center;
+              font-size: 12px;
+              color: #6b7280;
+            }
+            .business-info {
+              margin-bottom: 12px;
+              padding: 8px;
+              background-color: #f9fafb;
+              border-radius: 6px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="card-header">
+              <div class="header-content">
+                <div>
+                  <div class="header-title">
+                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    Invoice #${invoice.invoiceNumber}
+                  </div>
+                  <div class="date-info">
+                    <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    ${formatDate(invoice.date)}
+                  </div>
+                </div>
+                <div class="status-badge status-${invoice.status}">
+                  ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                </div>
+              </div>
+            </div>
+            
+            <div class="card-content">
+              ${invoice.businessName || invoice.businessAddress || invoice.businessPhone ? `
+                <div class="business-info">
+                  ${invoice.businessName ? `<div class="info-item"><span class="summary-label">Business:</span> <span>${invoice.businessName}</span></div>` : ''}
+                  ${invoice.businessAddress ? `<div class="info-item"><span class="summary-label">Address:</span> <span>${invoice.businessAddress}</span></div>` : ''}
+                  ${invoice.businessPhone ? `<div class="info-item"><span class="summary-label">Phone:</span> <span>${invoice.businessPhone}</span></div>` : ''}
+                </div>
+              ` : ''}
+              
+              <div class="info-item">
+                <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span class="customer-name">${invoice.customer}</span>
+              </div>
+              
+              <div class="amount-section">
+                <div class="items-count">
+                  <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                  </svg>
+                  <span>${invoice.items} items</span>
+                </div>
+                <div class="total-amount">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.total)}</div>
+              </div>
+              
+              <div class="payment-info">
+                <span class="payment-label">Payment:</span>
+                <span class="payment-method">${invoice.paymentMethod}</span>
+              </div>
+              
+              <div class="financial-summary">
+                <div class="summary-row">
+                  <span class="summary-label">Subtotal:</span>
+                  <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.subtotal || 0)}</span>
+                </div>
+                ${invoice.tax ? `
+                  <div class="summary-row">
+                    <span class="summary-label">Tax:</span>
+                    <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.tax)}</span>
+                  </div>
+                ` : ''}
+                ${invoice.discount ? `
+                  <div class="summary-row">
+                    <span class="summary-label">Discount:</span>
+                    <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.discount)}</span>
+                  </div>
+                ` : ''}
+                ${invoice.amountReceived ? `
+                  <div class="summary-row">
+                    <span class="summary-label">Amount Received:</span>
+                    <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.amountReceived)}</span>
+                  </div>
+                ` : ''}
+                ${invoice.change ? `
+                  <div class="summary-row">
+                    <span class="summary-label">Change:</span>
+                    <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.change)}</span>
+                  </div>
+                ` : ''}
+                
+                <!-- Calculate and show Amount Paid, Credit Brought Forward, and Amount Due consistently -->
+                <div class="summary-row">
+                  <span class="summary-label">Amount Paid:</span>
+                  <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.amountPaid !== undefined ? invoice.amountPaid : (invoice.paymentMethod === "debt" ? 0 : invoice.amountReceived))}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Credit Brought Forward:</span>
+                  <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.creditBroughtForward !== undefined ? invoice.creditBroughtForward : 0)}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Amount Due:</span>
+                  <span class="summary-value">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(invoice.amountDue !== undefined ? invoice.amountDue : (invoice.total - (invoice.amountPaid !== undefined ? invoice.amountPaid : (invoice.paymentMethod === "debt" ? 0 : invoice.amountReceived)) + (invoice.creditBroughtForward !== undefined ? invoice.creditBroughtForward : 0)))}</span>
+                </div>
+              </div>
+              
+              <!-- Items Table Section -->
+              ${invoice.itemsList && invoice.itemsList.length > 0 ? `
+                <div class="items-table-section">
+                  <div class="items-toggle">
+                    <span>Items Details</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(180deg);">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+                  
+                  <div class="items-table-container">
+                    <table class="items-table">
+                      <thead class="table-header">
+                        <tr>
+                          <th>Item</th>
+                          <th>Description</th>
+                          <th class="text-right">Qty</th>
+                          <th>Unit</th>
+                          <th class="text-right">Rate</th>
+                          <th class="text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody class="table-body">
+                        ${invoice.itemsList.map((item: any, index: number) => `
+                          <tr>
+                            <td>${index + 1}</td>
+                            <td>${item.name}</td>
+                            <td class="text-right">${item.quantity}</td>
+                            <td>${item.unit || ''}</td>
+                            <td class="text-right">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(item.rate ?? item.price ?? 0)}</td>
+                            <td class="text-right font-medium">${new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(item.amount ?? (item.price != null && item.quantity != null ? item.price * item.quantity : 0))}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+            
+            <div class="footer">
+              <p>Generated on: ${new Date().toLocaleDateString()}</p>
+              <p>Invoice #${invoice.invoiceNumber}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    reportWindow.document.write(reportContent);
+    reportWindow.document.close();
+    reportWindow.focus();
+    
+    // Give time for content to load before printing
+    setTimeout(() => {
+      reportWindow.print();
+      reportWindow.close();
+    }, 250);
+  }
+
   // Print purchase order
   static printPurchaseOrder(poData: any) {
     const reportWindow = window.open('', '_blank');

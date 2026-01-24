@@ -86,23 +86,8 @@ export const SavedInvoicesSection = ({ onBack, onLogout, username }: SavedInvoic
   };
 
   const handlePrintInvoice = (invoice: InvoiceData) => {
-    // Create a transaction object for printing
-    const transaction = {
-      id: invoice.id,
-      receiptNumber: invoice.invoiceNumber,
-      date: invoice.date,
-      items: invoice.itemsList || [],
-      subtotal: invoice.subtotal || 0,
-      tax: invoice.tax || 0,
-      discount: invoice.discount || 0,
-      total: invoice.total,
-      paymentMethod: invoice.paymentMethod,
-      amountReceived: invoice.amountReceived || invoice.total,
-      change: invoice.change || 0,
-      customer: { name: invoice.customer }
-    };
-
-    PrintUtils.printReceipt(transaction);
+    // Pass the invoice object directly to the new print function
+    PrintUtils.printSavedInvoice(invoice);
   };
 
   const handleDownloadInvoice = (invoice: InvoiceData) => {
@@ -216,7 +201,7 @@ export const SavedInvoicesSection = ({ onBack, onLogout, username }: SavedInvoic
       const calculatedTotal = calculatedSubtotal + (editingInvoice.tax || 0) - (editingInvoice.discount || 0);
       
       // Calculate amount due: Total - Amount Paid + Credit Brought Forward
-      const amountDue = calculatedTotal - (editingInvoice.amountPaid || 0) + (editingInvoice.creditBroughtForward || 0);
+      const amountDue = calculatedTotal - (editingInvoice.amountPaid !== undefined ? editingInvoice.amountPaid : 0) + (editingInvoice.creditBroughtForward !== undefined ? editingInvoice.creditBroughtForward : 0);
       
       // Update the invoice in the database with the new items list
       await updateInvoice({
@@ -588,8 +573,8 @@ export const SavedInvoicesSection = ({ onBack, onLogout, username }: SavedInvoic
             total={viewingInvoice.total}
             paymentMethod={viewingInvoice.paymentMethod}
             status={viewingInvoice.status as "completed" | "pending" | "cancelled" | "refunded"}
-            amountReceived={viewingInvoice.amountReceived || viewingInvoice.total}
-            change={viewingInvoice.change || 0}
+            amountReceived={viewingInvoice.amountReceived !== undefined ? viewingInvoice.amountReceived : viewingInvoice.total}
+            change={viewingInvoice.change !== undefined ? viewingInvoice.change : 0}
             amountPaid={viewingInvoice.amountPaid}
             creditBroughtForward={viewingInvoice.creditBroughtForward}
             amountDue={viewingInvoice.amountDue}

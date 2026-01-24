@@ -1084,6 +1084,9 @@ We appreciate your business.`,
           discount: invoiceData.discount,
           amountReceived: 0,
           change: 0,
+          amountPaid: invoiceData.amountPaid || 0,
+          creditBroughtForward: invoiceData.creditBroughtForward || 0,
+          amountDue: invoiceData.amountDue || (invoiceData.total - (invoiceData.amountPaid || 0) + (invoiceData.creditBroughtForward || 0)),
         };
         
         await saveInvoice(invoiceToSave);
@@ -3487,6 +3490,9 @@ We appreciate your business.`,
         discount: invoiceData.discount,
         amountReceived: 0,
         change: 0,
+        amountPaid: invoiceData.amountPaid || 0,
+        creditBroughtForward: invoiceData.creditBroughtForward || 0,
+        amountDue: invoiceData.amountDue || (invoiceData.total - (invoiceData.amountPaid || 0) + (invoiceData.creditBroughtForward || 0)),
       };
       
       await saveInvoice(invoiceToSave);
@@ -4147,6 +4153,9 @@ We appreciate your business.`,
                             discount: invoiceData.discount,
                             amountReceived: 0,
                             change: 0,
+                            amountPaid: invoiceData.amountPaid || 0,
+                            creditBroughtForward: invoiceData.creditBroughtForward || 0,
+                            amountDue: invoiceData.amountDue || (invoiceData.total - (invoiceData.amountPaid || 0) + (invoiceData.creditBroughtForward || 0)),
                           };
                           
                           await saveInvoice(invoiceToSave);
