@@ -6833,7 +6833,7 @@ Thank you for your business!`,
                                   value={grnData.supplierTinNumber}
                                   onChange={(e) => setGrnData(prev => ({ ...prev, supplierTinNumber: e.target.value }))}
                                   className="mt-1"
-                                  placeholder="Enter supplier TIN number"
+                                  placeholder="Enter Implimented TIN number"
                                 />
                               </div>
                             )}
