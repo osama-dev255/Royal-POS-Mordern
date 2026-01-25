@@ -318,9 +318,19 @@ interface GRNItem {
   orderedQuantity: number;
   receivedQuantity: number;
   unit: string;
+  unitCost?: number;  // Cost per unit
+  totalCost?: number;  // Total cost without receiving costs
+  receivingCostPerUnit?: number;  // Receiving cost per unit
+  totalWithReceivingCost?: number;  // Total cost including receiving costs
   batchNumber?: string;
   expiryDate?: string;
   remarks: string;
+}
+
+interface GRNReceivingCost {
+  id: string;
+  description: string;
+  amount: number;
 }
 
 interface GRNData {
@@ -341,7 +351,9 @@ interface GRNData {
   vehicleNumber: string;
   driverName: string;
   receivedBy: string;
+  receivedLocation?: string;
   items: GRNItem[];
+  receivingCosts: GRNReceivingCost[];
   qualityCheckNotes: string;
   discrepancies: string;
   preparedBy: string;
@@ -1042,10 +1054,16 @@ Thank you for your business!`,
       vehicleNumber: "TRUCK-001",
       driverName: "John Driver",
       receivedBy: "Warehouse Staff",
+      receivedLocation: "Main Warehouse",
       items: [
-        { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
-        { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
-        { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+        { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
+        { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
+        { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+      ],
+      receivingCosts: [
+        { id: "1", description: "Transport Charges", amount: 0 },
+        { id: "2", description: "Offloaders Charges", amount: 0 },
+        { id: "3", description: "Traffic Charges", amount: 0 }
       ],
       qualityCheckNotes: "All items inspected. Overall condition good. Minor damage to 2 units of Product B.",
       discrepancies: "Product B: 2 units damaged, will need replacement",
@@ -1067,6 +1085,7 @@ Thank you for your business!`,
     if (grn) {
       setGrnData({
         ...grn.data,
+        receivingCosts: grn.data.receivingCosts || [],
         status: grn.data.status || "completed"
       });
       setActiveTab('preview');
@@ -1079,6 +1098,7 @@ Thank you for your business!`,
     if (grn) {
       setGrnData({
         ...grn.data,
+        receivingCosts: grn.data.receivingCosts || [],
         status: grn.data.status || "completed"
       });
       setActiveTab('preview');
@@ -1128,6 +1148,9 @@ Thank you for your business!`,
   };
   
   const handlePrintGRN = () => {
+    const itemsWithCosts = distributeReceivingCosts([...grnData.items], grnData.receivingCosts);
+    const totalReceivingCosts = grnData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+    
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       const printContent = `
@@ -1263,7 +1286,28 @@ Thank you for your business!`,
           </div>
           
           <div class="section">
-            <h3 class="font-bold mb-2">ITEMS RECEIVED:</h3>
+            <h3 class="font-bold mb-2">RECEIVING COSTS:</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${grnData.receivingCosts.map(cost => `
+                  <tr>
+                    <td>${cost.description}</td>
+                    <td>${formatCurrency(cost.amount)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="font-bold mt-2">Total Receiving Costs: ${formatCurrency(totalReceivingCosts)}</div>
+          </div>
+          
+          <div class="section">
+            <h3 class="font-bold mb-2">ITEMS RECEIVED WITH UPDATED PRICES:</h3>
             <table>
               <thead>
                 <tr>
@@ -1271,18 +1315,26 @@ Thank you for your business!`,
                   <th>Ordered</th>
                   <th>Received</th>
                   <th>Unit</th>
+                  <th>Original Unit Cost</th>
+                  <th>Receiving Cost Per Unit</th>
+                  <th>New Unit Cost</th>
+                  <th>Total Cost with Receiving</th>
                   <th>Batch #</th>
                   <th>Expiry</th>
                   <th>Remarks</th>
                 </tr>
               </thead>
               <tbody>
-                ${grnData.items.map(item => `
+                ${itemsWithCosts.map(item => `
                   <tr>
                     <td>${item.description}</td>
                     <td>${item.orderedQuantity}</td>
                     <td>${item.receivedQuantity}</td>
                     <td>${item.unit}</td>
+                    <td>${formatCurrency(item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}</td>
+                    <td>${formatCurrency(item.receivingCostPerUnit || 0)}</td>
+                    <td>${formatCurrency(item.unitCost || 0)}</td>
+                    <td>${formatCurrency(item.totalWithReceivingCost || 0)}</td>
                     <td>${item.batchNumber || ''}</td>
                     <td>${item.expiryDate || ''}</td>
                     <td>${item.remarks}</td>
@@ -1327,6 +1379,7 @@ Thank you for your business!`,
             <div>
               <h4 class="font-bold mb-2">Received By</h4>
               <p>${grnData.receivedBy || '_________'}</p>
+              <p>Location: ${grnData.receivedLocation || '_________'}</p>
               <p>Date: ${grnData.receivedDate || '_________'}</p>
               <p class="signature-line">Signature</p>
             </div>
@@ -1392,6 +1445,76 @@ Thank you for your business!`,
     return `GRN-${Date.now()}`;
   };
   
+  // Calculate total receiving costs
+  const calculateTotalReceivingCosts = () => {
+    return grnData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+  };
+  
+  // Function to handle receiving cost changes
+  const handleReceivingCostChange = (costId: string, field: keyof GRNReceivingCost, value: string | number) => {
+    setGrnData(prev => ({
+      ...prev,
+      receivingCosts: prev.receivingCosts.map(cost => 
+        cost.id === costId ? { ...cost, [field]: value } : cost
+      )
+    }));
+  };
+  
+  // Add new receiving cost
+  const handleAddReceivingCost = () => {
+    setGrnData(prev => ({
+      ...prev,
+      receivingCosts: [
+        ...prev.receivingCosts,
+        {
+          id: Date.now().toString(),
+          description: "",
+          amount: 0
+        }
+      ]
+    }));
+  };
+  
+  // Remove receiving cost
+  const handleRemoveReceivingCost = (costId: string) => {
+    setGrnData(prev => ({
+      ...prev,
+      receivingCosts: prev.receivingCosts.filter(cost => cost.id !== costId)
+    }));
+  };
+  
+  // Add new GRN item
+  const handleAddGRNItem = () => {
+    setGrnData(prev => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: Date.now().toString(),
+          description: "",
+          orderedQuantity: 0,
+          receivedQuantity: 0,
+          unit: "",
+          unitCost: 0,
+          totalCost: 0,
+          receivingCostPerUnit: 0,
+          totalWithReceivingCost: 0,
+          batchNumber: "",
+          expiryDate: "",
+          remarks: ""
+        }
+      ]
+    }));
+  };
+  
+  // Remove GRN item
+  const handleRemoveGRNItem = (itemId: string) => {
+    setGrnData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }));
+  };
+  
   // Initial GRN data
   const initialGRNData: GRNData = {
     grnNumber: generateGRNNumber(),
@@ -1411,10 +1534,16 @@ Thank you for your business!`,
     vehicleNumber: "TRUCK-001",
     driverName: "John Driver",
     receivedBy: "Warehouse Staff",
+    receivedLocation: "Main Warehouse",
     items: [
-      { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
-      { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
-      { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+      { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", unitCost: 10, totalCost: 1000, receivingCostPerUnit: 0, totalWithReceivingCost: 1000, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
+      { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", unitCost: 15, totalCost: 750, receivingCostPerUnit: 0, totalWithReceivingCost: 750, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
+      { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", unitCost: 20, totalCost: 500, receivingCostPerUnit: 0, totalWithReceivingCost: 500, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+    ],
+    receivingCosts: [
+      { id: "1", description: "Transport Charges", amount: 0 },
+      { id: "2", description: "Offloaders Charges", amount: 0 },
+      { id: "3", description: "Traffic Charges", amount: 0 }
     ],
     qualityCheckNotes: "All items inspected. Overall condition good. Minor damage to 2 units of Product B.",
     discrepancies: "Product B: 2 units damaged, will need replacement",
@@ -1782,6 +1911,150 @@ Thank you for your business!`,
     });
   };
   
+  // Function to export GRN as PDF
+  const exportGRNAsPDF = () => {
+    const itemsWithCosts = distributeReceivingCosts([...grnData.items], grnData.receivingCosts);
+    
+    // Prepare GRN data for export
+    const exportData = {
+      grnInfo: {
+        'GRN Number': grnData.grnNumber,
+        'Date': grnData.date,
+        'Time': grnData.time,
+        'Supplier Name': grnData.supplierName,
+        'Supplier ID': grnData.supplierId,
+        'Supplier Phone': grnData.supplierPhone,
+        'Supplier Email': grnData.supplierEmail,
+        'Supplier Address': grnData.supplierAddress,
+        'Business Name': grnData.businessName,
+        'Business Address': grnData.businessAddress,
+        'Business Phone': grnData.businessPhone,
+        'Business Email': grnData.businessEmail,
+        'PO Number': grnData.poNumber,
+        'Delivery Note #': grnData.deliveryNoteNumber,
+        'Vehicle #': grnData.vehicleNumber,
+        'Driver': grnData.driverName,
+        'Received By': grnData.receivedBy,
+        'Received Location': grnData.receivedLocation || '',
+        'Quality Check Notes': grnData.qualityCheckNotes,
+        'Discrepancies': grnData.discrepancies,
+        'Prepared By': grnData.preparedBy,
+        'Prepared Date': grnData.preparedDate,
+        'Checked By': grnData.checkedBy,
+        'Checked Date': grnData.checkedDate,
+        'Approved By': grnData.approvedBy,
+        'Approved Date': grnData.approvedDate,
+        'Received Date': grnData.receivedDate,
+        'Status': grnData.status || 'completed',
+        'Total Receiving Costs': calculateTotalReceivingCosts(),
+      },
+      receivingCosts: grnData.receivingCosts.map(cost => ({
+        'Description': cost.description,
+        'Amount': cost.amount,
+      })),
+      items: itemsWithCosts.map(item => ({
+        'Description': item.description,
+        'Ordered': item.orderedQuantity,
+        'Received': item.receivedQuantity,
+        'Unit': item.unit,
+        'Original Unit Cost': item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0,
+        'Receiving Cost Per Unit': item.receivingCostPerUnit || 0,
+        'New Unit Cost': item.unitCost || 0,
+        'Total Cost with Receiving': item.totalWithReceivingCost || 0,
+        'Batch #': item.batchNumber || '',
+        'Expiry': item.expiryDate || '',
+        'Remarks': item.remarks,
+      }))
+    };
+    
+    // Create a simpler array structure for export
+    const pdfRows = [];
+    
+    // Add GRN header
+    pdfRows.push(['Field', 'Value']);
+    pdfRows.push(['GRN Number', exportData.grnInfo['GRN Number']]);
+    pdfRows.push(['Date', exportData.grnInfo['Date']]);
+    pdfRows.push(['Time', exportData.grnInfo['Time']]);
+    pdfRows.push(['Supplier Name', exportData.grnInfo['Supplier Name']]);
+    pdfRows.push(['Supplier ID', exportData.grnInfo['Supplier ID']]);
+    pdfRows.push(['Supplier Phone', exportData.grnInfo['Supplier Phone']]);
+    pdfRows.push(['Supplier Email', exportData.grnInfo['Supplier Email']]);
+    pdfRows.push(['Supplier Address', exportData.grnInfo['Supplier Address']]);
+    pdfRows.push(['Business Name', exportData.grnInfo['Business Name']]);
+    pdfRows.push(['Business Address', exportData.grnInfo['Business Address']]);
+    pdfRows.push(['Business Phone', exportData.grnInfo['Business Phone']]);
+    pdfRows.push(['Business Email', exportData.grnInfo['Business Email']]);
+    pdfRows.push(['PO Number', exportData.grnInfo['PO Number']]);
+    pdfRows.push(['Delivery Note #', exportData.grnInfo['Delivery Note #']]);
+    pdfRows.push(['Vehicle #', exportData.grnInfo['Vehicle #']]);
+    pdfRows.push(['Driver', exportData.grnInfo['Driver']]);
+    pdfRows.push(['Received By', exportData.grnInfo['Received By']]);
+    pdfRows.push(['Received Location', exportData.grnInfo['Received Location']]);
+    pdfRows.push(['Quality Check Notes', exportData.grnInfo['Quality Check Notes']]);
+    pdfRows.push(['Discrepancies', exportData.grnInfo['Discrepancies']]);
+    pdfRows.push(['Prepared By', exportData.grnInfo['Prepared By']]);
+    pdfRows.push(['Prepared Date', exportData.grnInfo['Prepared Date']]);
+    pdfRows.push(['Checked By', exportData.grnInfo['Checked By']]);
+    pdfRows.push(['Checked Date', exportData.grnInfo['Checked Date']]);
+    pdfRows.push(['Approved By', exportData.grnInfo['Approved By']]);
+    pdfRows.push(['Approved Date', exportData.grnInfo['Approved Date']]);
+    pdfRows.push(['Received Date', exportData.grnInfo['Received Date']]);
+    pdfRows.push(['Total Receiving Costs', exportData.grnInfo['Total Receiving Costs']]);
+    
+    // Add empty row as separator
+    pdfRows.push(['', '']);
+    
+    // Add receiving costs header
+    pdfRows.push(['Receiving Cost Description', 'Amount']);
+    
+    // Add each receiving cost
+    exportData.receivingCosts.forEach(cost => {
+      pdfRows.push([
+        cost['Description'],
+        cost['Amount']
+      ]);
+    });
+    
+    // Add empty row as separator
+    pdfRows.push(['', '']);
+    
+    // Add items header
+    pdfRows.push(['Item Description', 'Ordered', 'Received', 'Unit', 'Original Unit Cost', 'Receiving Cost Per Unit', 'New Unit Cost', 'Total Cost with Receiving', 'Batch #', 'Expiry', 'Remarks']);
+    
+    // Add each item
+    exportData.items.forEach(item => {
+      pdfRows.push([
+        item['Description'],
+        item['Ordered'],
+        item['Received'],
+        item['Unit'],
+        item['Original Unit Cost'],
+        item['Receiving Cost Per Unit'],
+        item['New Unit Cost'],
+        item['Total Cost with Receiving'],
+        item['Batch #'],
+        item['Expiry'],
+        item['Remarks']
+      ]);
+    });
+    
+    // Convert the 2D array to the format expected by ExportUtils
+    const formattedData = pdfRows.map(row => {
+      if (Array.isArray(row)) {
+        // If it's an array, create an object with generic column names
+        const obj: any = {};
+        row.forEach((val, idx) => {
+          obj[`Column ${idx + 1}`] = val;
+        });
+        return obj;
+      } else {
+        return row;
+      }
+    });
+    
+    ExportUtils.exportToPDF(formattedData, `grn-${grnData.grnNumber}`, `Goods Received Note - ${grnData.grnNumber}`);
+  };
+  
   // Function to export delivery note as PDF
   const exportDeliveryNoteAsPDF = () => {
     // Prepare delivery note data for export
@@ -1881,6 +2154,216 @@ Thank you for your business!`,
     });
     
     ExportUtils.exportToPDF(formattedData, `delivery-note-${deliveryNoteData.deliveryNoteNumber}`, `Delivery Note - ${deliveryNoteData.deliveryNoteNumber}`);
+  };
+  
+  // Function to export GRN as CSV
+  const exportGRNAsCSV = () => {
+    // Prepare GRN data for export
+    const exportData = {
+      grnInfo: {
+        'GRN Number': grnData.grnNumber,
+        'Date': grnData.date,
+        'Time': grnData.time,
+        'Supplier Name': grnData.supplierName,
+        'Supplier ID': grnData.supplierId,
+        'Supplier Phone': grnData.supplierPhone,
+        'Supplier Email': grnData.supplierEmail,
+        'Supplier Address': grnData.supplierAddress,
+        'Business Name': grnData.businessName,
+        'Business Address': grnData.businessAddress,
+        'Business Phone': grnData.businessPhone,
+        'Business Email': grnData.businessEmail,
+        'PO Number': grnData.poNumber,
+        'Delivery Note #': grnData.deliveryNoteNumber,
+        'Vehicle #': grnData.vehicleNumber,
+        'Driver': grnData.driverName,
+        'Received By': grnData.receivedBy,
+        'Received Location': grnData.receivedLocation || '',
+        'Quality Check Notes': grnData.qualityCheckNotes,
+        'Discrepancies': grnData.discrepancies,
+        'Prepared By': grnData.preparedBy,
+        'Prepared Date': grnData.preparedDate,
+        'Checked By': grnData.checkedBy,
+        'Checked Date': grnData.checkedDate,
+        'Approved By': grnData.approvedBy,
+        'Approved Date': grnData.approvedDate,
+        'Received Date': grnData.receivedDate,
+        'Status': grnData.status || 'completed',
+        'Total Receiving Costs': calculateTotalReceivingCosts(),
+      },
+      receivingCosts: grnData.receivingCosts.map(cost => ({
+        'Description': cost.description,
+        'Amount': cost.amount,
+      })),
+      items: grnData.items.map(item => ({
+        'Description': item.description,
+        'Ordered': item.orderedQuantity,
+        'Received': item.receivedQuantity,
+        'Unit': item.unit,
+        'Batch #': item.batchNumber || '',
+        'Expiry': item.expiryDate || '',
+        'Remarks': item.remarks,
+      }))
+    };
+    
+    // Create a simpler array structure for export
+    const csvRows = [];
+    
+    // Add GRN header
+    csvRows.push(['Field', 'Value']);
+    csvRows.push(['GRN Number', exportData.grnInfo['GRN Number']]);
+    csvRows.push(['Date', exportData.grnInfo['Date']]);
+    csvRows.push(['Time', exportData.grnInfo['Time']]);
+    csvRows.push(['Supplier Name', exportData.grnInfo['Supplier Name']]);
+    csvRows.push(['Supplier ID', exportData.grnInfo['Supplier ID']]);
+    csvRows.push(['Supplier Phone', exportData.grnInfo['Supplier Phone']]);
+    csvRows.push(['Supplier Email', exportData.grnInfo['Supplier Email']]);
+    csvRows.push(['Supplier Address', exportData.grnInfo['Supplier Address']]);
+    csvRows.push(['Business Name', exportData.grnInfo['Business Name']]);
+    csvRows.push(['Business Address', exportData.grnInfo['Business Address']]);
+    csvRows.push(['Business Phone', exportData.grnInfo['Business Phone']]);
+    csvRows.push(['Business Email', exportData.grnInfo['Business Email']]);
+    csvRows.push(['PO Number', exportData.grnInfo['PO Number']]);
+    csvRows.push(['Delivery Note #', exportData.grnInfo['Delivery Note #']]);
+    csvRows.push(['Vehicle #', exportData.grnInfo['Vehicle #']]);
+    csvRows.push(['Driver', exportData.grnInfo['Driver']]);
+    csvRows.push(['Received By', exportData.grnInfo['Received By']]);
+    csvRows.push(['Received Location', exportData.grnInfo['Received Location']]);
+    csvRows.push(['Quality Check Notes', exportData.grnInfo['Quality Check Notes']]);
+    csvRows.push(['Discrepancies', exportData.grnInfo['Discrepancies']]);
+    csvRows.push(['Prepared By', exportData.grnInfo['Prepared By']]);
+    csvRows.push(['Prepared Date', exportData.grnInfo['Prepared Date']]);
+    csvRows.push(['Checked By', exportData.grnInfo['Checked By']]);
+    csvRows.push(['Checked Date', exportData.grnInfo['Checked Date']]);
+    csvRows.push(['Approved By', exportData.grnInfo['Approved By']]);
+    csvRows.push(['Approved Date', exportData.grnInfo['Approved Date']]);
+    csvRows.push(['Received Date', exportData.grnInfo['Received Date']]);
+    csvRows.push(['Total Receiving Costs', exportData.grnInfo['Total Receiving Costs']]);
+    
+    // Add empty row as separator
+    csvRows.push(['', '']);
+    
+    // Add receiving costs header
+    csvRows.push(['Receiving Cost Description', 'Amount']);
+    
+    // Add each receiving cost
+    exportData.receivingCosts.forEach(cost => {
+      csvRows.push([
+        cost['Description'],
+        cost['Amount']
+      ]);
+    });
+    
+    // Add empty row as separator
+    csvRows.push(['', '']);
+    
+    // Add items header
+    csvRows.push(['Item Description', 'Ordered', 'Received', 'Unit', 'Batch #', 'Expiry', 'Remarks']);
+    
+    // Add each item
+    exportData.items.forEach(item => {
+      csvRows.push([
+        item['Description'],
+        item['Ordered'],
+        item['Received'],
+        item['Unit'],
+        item['Batch #'],
+        item['Expiry'],
+        item['Remarks']
+      ]);
+    });
+    
+    // Convert the 2D array to the format expected by ExportUtils
+    const formattedData = csvRows.map(row => {
+      if (Array.isArray(row)) {
+        // If it's an array, create an object with generic column names
+        const obj: any = {};
+        row.forEach((val, idx) => {
+          obj[`Column ${idx + 1}`] = val;
+        });
+        return obj;
+      } else {
+        return row;
+      }
+    });
+    
+    ExportUtils.exportToCSV(formattedData, `grn-${grnData.grnNumber}`);
+  };
+  
+  // Function to distribute receiving costs among items based on quantity
+  const distributeReceivingCosts = (items: GRNItem[], receivingCosts: GRNReceivingCost[]) => {
+    // Calculate total quantity of all items
+    const totalQuantity = items.reduce((sum, item) => sum + item.receivedQuantity, 0);
+    
+    if (totalQuantity === 0) {
+      return items.map(item => ({
+        ...item,
+        receivingCostPerUnit: 0,
+        totalWithReceivingCost: item.unitCost ? item.unitCost * item.receivedQuantity : 0
+      }));
+    }
+    
+    // Calculate total receiving costs
+    const totalReceivingCosts = receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+    
+    // Calculate cost per unit based on total quantity
+    const costPerUnit = totalReceivingCosts / totalQuantity;
+    
+    // Update each item with receiving cost per unit and total cost with receiving costs
+    return items.map(item => {
+      const receivingCostPerUnit = costPerUnit;
+      const unitCostWithReceiving = (item.unitCost || 0) + receivingCostPerUnit;
+      const totalWithReceivingCost = unitCostWithReceiving * item.receivedQuantity;
+      
+      return {
+        ...item,
+        receivingCostPerUnit,
+        totalWithReceivingCost,
+        unitCost: unitCostWithReceiving
+      };
+    });
+  };
+  
+  // Function to export GRN as JSON
+  const exportGRNAsJSON = () => {
+    const exportData = {
+      grnInfo: {
+        grnNumber: grnData.grnNumber,
+        date: grnData.date,
+        time: grnData.time,
+        supplierName: grnData.supplierName,
+        supplierId: grnData.supplierId,
+        supplierPhone: grnData.supplierPhone,
+        supplierEmail: grnData.supplierEmail,
+        supplierAddress: grnData.supplierAddress,
+        businessName: grnData.businessName,
+        businessAddress: grnData.businessAddress,
+        businessPhone: grnData.businessPhone,
+        businessEmail: grnData.businessEmail,
+        poNumber: grnData.poNumber,
+        deliveryNoteNumber: grnData.deliveryNoteNumber,
+        vehicleNumber: grnData.vehicleNumber,
+        driverName: grnData.driverName,
+        receivedBy: grnData.receivedBy,
+        receivedLocation: grnData.receivedLocation || '',
+        qualityCheckNotes: grnData.qualityCheckNotes,
+        discrepancies: grnData.discrepancies,
+        preparedBy: grnData.preparedBy,
+        preparedDate: grnData.preparedDate,
+        checkedBy: grnData.checkedBy,
+        checkedDate: grnData.checkedDate,
+        approvedBy: grnData.approvedBy,
+        approvedDate: grnData.approvedDate,
+        receivedDate: grnData.receivedDate,
+        status: grnData.status || 'completed',
+        totalReceivingCosts: grnData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0),
+        timestamp: new Date().toISOString(),
+      },
+      receivingCosts: grnData.receivingCosts,
+      items: distributeReceivingCosts(grnData.items, grnData.receivingCosts),
+    };
+    
+    ExportUtils.exportToJSON([exportData], `grn-${grnData.grnNumber}`);
   };
   
   // Function to export delivery note as CSV
@@ -6323,9 +6806,77 @@ Thank you for your business!`,
                           </div>
                         </div>
                         
+                        {/* Receiving Costs Section */}
+                        <div>
+                          <div className="font-bold mb-2">RECEIVING COSTS:</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-gray-300 p-2 text-left">Description</th>
+                                  <th className="border border-gray-300 p-2 text-left">Amount</th>
+                                  <th className="border border-gray-300 p-2 text-left">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {grnData.receivingCosts.map((cost) => (
+                                  <tr key={cost.id}>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        value={cost.description}
+                                        onChange={(e) => handleReceivingCostChange(cost.id, 'description', e.target.value)}
+                                        className="p-1 h-8 text-sm w-full"
+                                        placeholder="Cost description"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <div className="flex">
+                                        <span className="inline-flex items-center px-3 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-300 rounded-l-md">
+                                          TZS
+                                        </span>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          value={cost.amount}
+                                          onChange={(e) => handleReceivingCostChange(cost.id, 'amount', parseFloat(e.target.value) || 0)}
+                                          className="p-1 h-8 text-sm w-full rounded-l-none"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Button
+                                        onClick={() => handleRemoveReceivingCost(cost.id)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="p-1 h-8"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="flex justify-between items-center mt-2">
+                            <Button 
+                              onClick={handleAddReceivingCost}
+                              variant="outline"
+                              size="sm"
+                              className="mt-2"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add Cost
+                            </Button>
+                            <div className="text-sm font-medium mt-2">
+                              Total Receiving Costs: {formatCurrency(calculateTotalReceivingCosts())}
+                            </div>
+                          </div>
+                        </div>
+                        
                         {/* Items Table */}
                         <div>
-                          <div className="font-bold mb-2">ITEMS RECEIVED:</div>
+                          <div className="font-bold mb-2">ITEMS RECEIVED WITH UPDATED PRICES:</div>
                           <div className="overflow-x-auto">
                             <table className="w-full border-collapse border border-gray-300 text-sm">
                               <thead>
@@ -6334,13 +6885,18 @@ Thank you for your business!`,
                                   <th className="border border-gray-300 p-2 text-left">Ordered</th>
                                   <th className="border border-gray-300 p-2 text-left">Received</th>
                                   <th className="border border-gray-300 p-2 text-left">Unit</th>
+                                  <th className="border border-gray-300 p-2 text-left">Original Unit Cost</th>
+                                  <th className="border border-gray-300 p-2 text-left">Receiving Cost Per Unit</th>
+                                  <th className="border border-gray-300 p-2 text-left">New Unit Cost</th>
+                                  <th className="border border-gray-300 p-2 text-left">Total Cost with Receiving</th>
                                   <th className="border border-gray-300 p-2 text-left">Batch #</th>
                                   <th className="border border-gray-300 p-2 text-left">Expiry</th>
                                   <th className="border border-gray-300 p-2 text-left">Remarks</th>
+                                  <th className="border border-gray-300 p-2 text-left">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {grnData.items.map((item) => (
+                                {distributeReceivingCosts(grnData.items, grnData.receivingCosts).map((item) => (
                                   <tr key={item.id}>
                                     <td className="border border-gray-300 p-2">
                                       <Input
@@ -6394,6 +6950,32 @@ Thank you for your business!`,
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0}
+                                        onChange={(e) => setGrnData(prev => ({
+                                          ...prev,
+                                          items: prev.items.map(i => 
+                                            i.id === item.id ? { 
+                                              ...i, 
+                                              unitCost: (parseFloat(e.target.value) || 0) + (item.receivingCostPerUnit || 0)
+                                            } : i
+                                          )
+                                        }))}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {formatCurrency(item.receivingCostPerUnit || 0)}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {formatCurrency(item.unitCost || 0)}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      {formatCurrency(item.totalWithReceivingCost || 0)}
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
                                         value={item.batchNumber || ""}
                                         onChange={(e) => setGrnData(prev => ({
                                           ...prev,
@@ -6429,10 +7011,31 @@ Thank you for your business!`,
                                         className="p-1 h-8 text-sm w-full"
                                       />
                                     </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Button
+                                        onClick={() => handleRemoveGRNItem(item.id)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="p-1 h-8"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
+                          </div>
+                          <div className="flex justify-between items-center mt-2">
+                            <Button 
+                              onClick={handleAddGRNItem}
+                              variant="outline"
+                              size="sm"
+                              className="mt-2"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add Item
+                            </Button>
                           </div>
                         </div>
                         
@@ -6548,6 +7151,20 @@ Thank you for your business!`,
                                 />
                               </div>
                               <div className="text-xs mt-2">(Signature Required)</div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-bold mb-2">Received Location</div>
+                            <div className="text-sm space-y-2">
+                              <div>
+                                <Input 
+                                  value={grnData.receivedLocation || ""}
+                                  onChange={(e) => setGrnData(prev => ({ ...prev, receivedLocation: e.target.value }))}
+                                  className="w-full h-6 p-1 text-sm mt-1"
+                                  placeholder="Enter location"
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
