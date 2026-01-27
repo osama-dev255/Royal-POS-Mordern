@@ -1681,6 +1681,7 @@ Thank you for your business!`,
   const [showDeliveryNoteOptions, setShowDeliveryNoteOptions] = useState(false);
   const [showCustomerSettlementOptions, setShowCustomerSettlementOptions] = useState(false);
   const [showSupplierSettlementOptions, setShowSupplierSettlementOptions] = useState(false);
+  const [showGRNOptions, setShowGRNOptions] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
   
@@ -2103,7 +2104,85 @@ Thank you for your business!`,
     
     ExportUtils.exportToPDF(formattedData, `grn-${grnData.grnNumber}`, `Goods Received Note - ${grnData.grnNumber}`);
   };
-  
+    
+  // Function to download GRN as PDF
+  const downloadGRNAsPDF = async () => {
+    // Show a loading message to the user
+    const loadingEl = document.createElement('div');
+    loadingEl.style.position = 'fixed';
+    loadingEl.style.top = '10px';
+    loadingEl.style.right = '10px';
+    loadingEl.style.backgroundColor = '#3b82f6';
+    loadingEl.style.color = 'white';
+    loadingEl.style.padding = '10px 15px';
+    loadingEl.style.borderRadius = '5px';
+    loadingEl.style.zIndex = '9999';
+    loadingEl.textContent = 'Generating PDF...';
+    document.body.appendChild(loadingEl);
+      
+    try {
+      // Dynamically import html2pdf.js
+      const html2pdfModule = await import('html2pdf.js');
+        
+      // Get the GRN content to print
+      const grnContent = generateCleanGRNHTML();
+        
+      // Create a temporary container to hold the GRN content
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = grnContent;
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.width = '800px';
+      tempContainer.style.fontFamily = 'Arial, sans-serif';
+      tempContainer.style.fontSize = '14px';
+      document.body.appendChild(tempContainer);
+        
+      // Configure PDF options
+      const opt = {
+        margin: 5,
+        filename: `GRN_${grnData.grnNumber || 'unknown'}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: tempContainer.scrollWidth,
+          windowWidth: tempContainer.scrollWidth
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+        
+      // Generate PDF
+      html2pdfModule.default(tempContainer, opt)
+        .then(() => {
+          // Remove temporary container after PDF generation
+          if (tempContainer.parentNode) {
+            tempContainer.parentNode.removeChild(tempContainer);
+          }
+          // Remove loading message
+          if (loadingEl.parentNode) {
+            loadingEl.parentNode.removeChild(loadingEl);
+          }
+          console.log('PDF generated successfully');
+        })
+        .catch((error) => {
+          console.error('Error generating PDF:', error);
+          // Remove loading message
+          if (loadingEl.parentNode) {
+            loadingEl.parentNode.removeChild(loadingEl);
+          }
+          alert('Error generating PDF. Please try again.');
+        });
+    } catch (error) {
+      console.error('Error importing html2pdf.js:', error);
+      // Remove loading message
+      if (loadingEl.parentNode) {
+        loadingEl.parentNode.removeChild(loadingEl);
+      }
+      alert('Error loading PDF generator. Please try again.');
+    }
+  };
+    
   // Function to export delivery note as PDF
   const exportDeliveryNoteAsPDF = () => {
     // Prepare delivery note data for export
@@ -3054,7 +3133,218 @@ Thank you for your business!`,
       alert('Error exporting supplier settlement to JSON. Please try again.');
     }
   };
+  
+  // Function to generate clean GRN HTML for printing
+  const generateCleanGRNHTML = (): string => {
+    return `
+      <div class="grn-container" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <style>
+          body { margin: 0; padding: 20px; }
+          .grn-container { border: 1px solid #ccc; }
+          .text-center { text-align: center; }
+          .border-b-2 { border-bottom: 2px solid #000; }
+          .pb-2 { padding-bottom: 0.5rem; }
+          .font-bold { font-weight: bold; }
+          .text-2xl { font-size: 1.5rem; }
+          .text-sm { font-size: 0.875rem; }
+          .mb-1 { margin-bottom: 0.25rem; }
+          .mb-2 { margin-bottom: 0.5rem; }
+          .mt-4 { margin-top: 1rem; }
+          .mt-8 { margin-top: 2rem; }
+          .pt-4 { padding-top: 1rem; }
+          .border-t { border-top: 1px solid #ccc; }
+          .grid { display: grid; }
+          .gap-8 { gap: 2rem; }
+          .gap-4 { gap: 1rem; }
+          .grid-cols-1 { grid-template-columns: 1fr; }
+          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+          .border { border: 1px solid #e5e7eb; }
+          .p-3 { padding: 0.75rem; }
+          .rounded { border-radius: 0.25rem; }
+          .font-medium { font-weight: 500; }
+        </style>
+        <div class="text-center border-b-2 pb-2">
+          <h2 class="text-2xl font-bold">GOODS RECEIVED NOTE</h2>
+          <p class="text-sm">GRN #: ${grnData.grnNumber || 'GRN_NUMBER'}</p>
+          <p class="text-sm">Date: ${new Date().toLocaleDateString()}</p>
+          <p class="text-sm">Time: ${new Date().toLocaleTimeString()}</p>
+        </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+          <div>
+            <div class="font-bold mb-1">SUPPLIER INFORMATION:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Name:</span> ${grnData.supplierName}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">ID:</span> ${grnData.supplierId || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Phone:</span> ${grnData.supplierPhone || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Email:</span> ${grnData.supplierEmail || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Address:</span> ${grnData.supplierAddress || 'N/A'}
+            </div>
+          </div>
+          
+          <div>
+            <div class="font-bold mb-1">RECEIVING BUSINESS:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Business Name:</span> ${grnData.businessName || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Address:</span> ${grnData.businessAddress || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Phone:</span> ${grnData.businessPhone || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Email:</span> ${grnData.businessEmail || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Stock Type:</span> ${grnData.businessStockType || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">VAT Status:</span> ${grnData.isVatable ? 'Vatable' : 'Exempt'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">TIN Number:</span> ${grnData.supplierTinNumber || 'N/A'}
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+          <div>
+            <div class="font-bold mb-1">DELIVERY DETAILS:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">PO Number:</span> ${grnData.poNumber || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Delivery Note Number:</span> ${grnData.deliveryNoteNumber || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Vehicle Number:</span> ${grnData.vehicleNumber || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Driver Name:</span> ${grnData.driverName || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Received By:</span> ${grnData.receivedBy || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Received Location:</span> ${grnData.receivedLocation || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Received Date:</span> ${grnData.receivedDate || 'N/A'}
+            </div>
+          </div>
+          
+          <div>
+            <div class="font-bold mb-1">APPROVAL DETAILS:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Prepared By:</span> ${grnData.preparedBy || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Prepared Date:</span> ${grnData.preparedDate || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Checked By:</span> ${grnData.checkedBy || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Checked Date:</span> ${grnData.checkedDate || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Approved By:</span> ${grnData.approvedBy || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Approved Date:</span> ${grnData.approvedDate || 'N/A'}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Status:</span> ${grnData.status || 'N/A'}
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-4">
+          <div class="font-bold mb-2">ITEMS RECEIVED:</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="background-color: #f3f4f6;">
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: left;">Description</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Ordered</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Received</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Unit</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Original Unit Cost</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Receiving Cost Per Unit</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Unit Cost</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total Cost with Receiving</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Batch #</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Expiry</th>
+                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(distributeReceivingCosts(grnData.items, grnData.receivingCosts) || []).map(item => `
+                <tr>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px;">${item.description || ''}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.batchNumber || ''}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.expiryDate || ''}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.remarks || ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="mt-4">
+          <div class="font-bold mb-2">RECEIVING COSTS:</div>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background-color: #f3f4f6;">
+                <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Cost Description</th>
+                <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(grnData.receivingCosts || []).map(cost => `
+                <tr>
+                  <td style="border: 1px solid #e5e7eb; padding: 8px;">${cost.description || ''}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">${cost.amount || 0}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="mt-4">
+          <div class="font-bold mb-1">QUALITY CHECK NOTES:</div>
+          <div class="text-sm">${grnData.qualityCheckNotes || 'N/A'}</div>
+        </div>
+        
+        <div class="mt-4">
+          <div class="font-bold mb-1">DISCREPANCIES:</div>
+          <div class="text-sm">${grnData.discrepancies || 'N/A'}</div>
+        </div>
+        
+        <div class="text-center mt-8 pt-4 border-t">
+          <div class="text-sm font-bold">Thank you for your delivery!</div>
+          <div class="text-sm">Goods received and verified.</div>
+        </div>
+      </div>
+    `;
+  };
+  
   // Function to download customer settlement as PDF
   const downloadCustomerSettlementAsPDF = () => {
     // Show a loading message to the user
@@ -4186,6 +4476,13 @@ Thank you for your business!`,
     setShowSupplierSettlementOptions(false);
     // Reset form after closing dialog
     resetSupplierSettlementData();
+  };
+  
+  // Close GRN options dialog
+  const closeGRNOptionsDialog = () => {
+    setShowGRNOptions(false);
+    // Reset form after closing dialog
+    resetGRNData();
   };
   
   // Function to generate clean invoice HTML for printing
@@ -5810,10 +6107,8 @@ Thank you for your business!`,
                             newValue: JSON.stringify(updatedGRNs)
                           }));
                           
-                          alert(`Goods Received Note ${grnData.grnNumber} saved successfully!`);
-                          
-                          // Reset form to default values
-                          resetGRNData();
+                          // Show the GRN options dialog after saving
+                          setShowGRNOptions(true);
                         } catch (error) {
                           console.error('Error saving GRN:', error);
                           alert('Error saving GRN. Please try again.');
@@ -8995,6 +9290,221 @@ Enter choice (1-3):`);
             <div className="mt-4 flex justify-end">
               <Button 
                 onClick={closeSupplierSettlementOptionsDialog}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* GRN Options Dialog */}
+      {showGRNOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold mb-4">GRN Options</h3>
+            <p className="mb-4">Choose an action for your GRN:</p>
+            
+            <div className="space-y-2">
+              <Button 
+                onClick={() => {
+                  // Print functionality for GRN
+                  // Create a print-friendly version of the GRN
+                  const grnContent = generateCleanGRNHTML();
+                  
+                  // Create a temporary window for printing
+                  const printWindow = window.open('', '_blank', 'width=800,height=600');
+                  if (printWindow) {
+                    printWindow.document.write(`
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <title>Goods Received Note</title>
+                        <style>
+                          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+                          .grn-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
+                          .text-center { text-align: center; }
+                          .border-b-2 { border-bottom: 2px solid #000; }
+                          .pb-2 { padding-bottom: 0.5rem; }
+                          .font-bold { font-weight: bold; }
+                          .text-2xl { font-size: 1.5rem; }
+                          .text-sm { font-size: 0.875rem; }
+                          .mb-1 { margin-bottom: 0.25rem; }
+                          .mb-2 { margin-bottom: 0.5rem; }
+                          .mt-4 { margin-top: 1rem; }
+                          .mt-8 { margin-top: 2rem; }
+                          .pt-4 { padding-top: 1rem; }
+                          .border-t { border-top: 1px solid #ccc; }
+                          .grid { display: grid; }
+                          .gap-8 { gap: 2rem; }
+                          .gap-4 { gap: 1rem; }
+                          .grid-cols-1 { grid-template-columns: 1fr; }
+                          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+                          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+                          .border { border: 1px solid #e5e7eb; }
+                          .p-3 { padding: 0.75rem; }
+                          .rounded { border-radius: 0.25rem; }
+                          .font-medium { font-weight: 500; }
+                        </style>
+                      </head>
+                      <body>
+                        ${grnContent}
+                      </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    
+                    // Wait a bit for content to render before printing
+                    setTimeout(() => {
+                      printWindow.focus();
+                      printWindow.print();
+                      printWindow.close();
+                    }, 500);
+                  } else {
+                    // Fallback: Alert user to allow popups
+                    alert('Please enable popups for this site to print the GRN');
+                  }
+                  closeGRNOptionsDialog();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print GRN
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Download functionality for GRN
+                  downloadGRNAsPDF();
+                  closeGRNOptionsDialog();
+                  
+                  // Reset form after action
+                  resetGRNData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download GRN
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Share functionality for GRN
+                  try {
+                    // Generate a shareable URL for the GRN
+                    const shareData = {
+                      title: `Goods Received Note ${grnData.grnNumber}`,
+                      text: `GRN #${grnData.grnNumber} for supplier ${grnData.supplierName}`,
+                      url: window.location.href // In a real app, this would be a specific GRN URL
+                    };
+                    
+                    // Use the Web Share API if available
+                    if (navigator.share) {
+                      navigator.share(shareData)
+                        .then(() => console.log('Shared successfully'))
+                        .catch((error) => {
+                          console.log('Sharing failed:', error);
+                          // Fallback to copying to clipboard
+                          try {
+                            // Try to copy the URL to clipboard
+                            navigator.clipboard.writeText(shareData.url || window.location.href)
+                              .then(() => {
+                                alert('GRN link copied to clipboard! You can now share it with others.');
+                              })
+                              .catch(err => {
+                                console.error('Failed to copy: ', err);
+                                // If clipboard fails, show the URL to the user
+                                const url = prompt('Copy this link to share the GRN:', shareData.url || window.location.href);
+                              });
+                          } catch (err) {
+                            console.error('Fallback sharing failed: ', err);
+                            alert('Could not share the GRN. Please copy the URL manually.');
+                          }
+                        });
+                    } else {
+                      // Fallback to copying to clipboard
+                      try {
+                        // Try to copy the URL to clipboard
+                        navigator.clipboard.writeText(shareData.url || window.location.href)
+                          .then(() => {
+                            alert('GRN link copied to clipboard! You can now share it with others.');
+                          })
+                          .catch(err => {
+                            console.error('Failed to copy: ', err);
+                            // If clipboard fails, show the URL to the user
+                            const url = prompt('Copy this link to share the GRN:', shareData.url || window.location.href);
+                          });
+                      } catch (err) {
+                        console.error('Fallback sharing failed: ', err);
+                        alert('Could not share the GRN. Please copy the URL manually.');
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error sharing GRN:', error);
+                    alert('Error sharing GRN. Please try again.');
+                  }
+                  closeGRNOptionsDialog();
+                  
+                  // Reset form after action
+                  resetGRNData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Share className="h-4 w-4 mr-2" />
+                Share GRN
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Export functionality for GRN
+                  // Allow user to export in different formats
+                  const exportOptions = [
+                    { name: 'PDF', action: () => exportGRNAsPDF() },
+                    { name: 'CSV', action: () => exportGRNAsCSV() },
+                    { name: 'JSON', action: () => exportGRNAsJSON() },
+                  ];
+                  
+                  // Show export options to user
+                  const exportChoice = prompt(`Choose export format:
+1. PDF
+2. CSV
+3. JSON
+Enter choice (1-3):`);
+                  
+                  closeGRNOptionsDialog();
+                  
+                  // Reset form after action
+                  resetGRNData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Export GRN
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Reset functionality for GRN
+                  resetGRNData();
+                  closeGRNOptionsDialog();
+                  alert('GRN form has been reset to default layout');
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset Form
+              </Button>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={closeGRNOptionsDialog}
                 variant="outline"
               >
                 Cancel
