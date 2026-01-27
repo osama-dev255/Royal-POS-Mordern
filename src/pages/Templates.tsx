@@ -1680,6 +1680,7 @@ Thank you for your business!`,
   const [showInvoiceOptions, setShowInvoiceOptions] = useState(false);
   const [showDeliveryNoteOptions, setShowDeliveryNoteOptions] = useState(false);
   const [showCustomerSettlementOptions, setShowCustomerSettlementOptions] = useState(false);
+  const [showSupplierSettlementOptions, setShowSupplierSettlementOptions] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
   
@@ -2805,6 +2806,255 @@ Thank you for your business!`,
     `;
   };
   
+  // Function to generate clean supplier settlement HTML for printing
+  const generateCleanSupplierSettlementHTML = (): string => {
+    return `
+      <div class="supplier-settlement-container" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <style>
+          body { margin: 0; padding: 20px; }
+          .supplier-settlement-container { border: 1px solid #ccc; }
+          .text-center { text-align: center; }
+          .border-b-2 { border-bottom: 2px solid #000; }
+          .pb-2 { padding-bottom: 0.5rem; }
+          .font-bold { font-weight: bold; }
+          .text-2xl { font-size: 1.5rem; }
+          .text-sm { font-size: 0.875rem; }
+          .mb-1 { margin-bottom: 0.25rem; }
+          .mb-2 { margin-bottom: 0.5rem; }
+          .mt-4 { margin-top: 1rem; }
+          .mt-8 { margin-top: 2rem; }
+          .pt-4 { padding-top: 1rem; }
+          .border-t { border-top: 1px solid #ccc; }
+          .grid { display: grid; }
+          .gap-8 { gap: 2rem; }
+          .gap-4 { gap: 1rem; }
+          .grid-cols-1 { grid-template-columns: 1fr; }
+          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+          .border { border: 1px solid #e5e7eb; }
+          .p-3 { padding: 0.75rem; }
+          .rounded { border-radius: 0.25rem; }
+          .font-medium { font-weight: 500; }
+        </style>
+        <div class="text-center border-b-2 pb-2">
+          <h2 class="text-2xl font-bold">SUPPLIER SETTLEMENT RECEIPT</h2>
+          <p class="text-sm">Receipt #${supplierSettlementData.referenceNumber || 'RECEIPT_NUMBER'}</p>
+          <p class="text-sm">Date: ${new Date().toLocaleDateString()}</p>
+          <p class="text-sm">Time: ${new Date().toLocaleTimeString()}</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+          <div>
+            <div class="font-bold mb-1">SUPPLIER INFORMATION:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Name:</span> ${supplierSettlementData.supplierName}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">ID:</span> ${supplierSettlementData.supplierId}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Phone:</span> ${supplierSettlementData.supplierPhone}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Email:</span> ${supplierSettlementData.supplierEmail}
+            </div>
+          </div>
+          
+          <div>
+            <div class="font-bold mb-1">SETTLEMENT DETAILS:</div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Reference:</span> ${supplierSettlementData.referenceNumber}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">PO Number:</span> ${supplierSettlementData.poNumber}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Amount:</span> ${formatCurrency(supplierSettlementData.settlementAmount)}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Payment Method:</span> ${supplierSettlementData.paymentMethod}
+            </div>
+            <div class="text-sm mb-1">
+              <span class="font-medium">Processed by:</span> ${supplierSettlementData.processedBy}
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="font-bold mb-2">TRANSACTION SUMMARY:</div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border p-3 rounded">
+              <div class="text-sm font-medium">Previous Balance</div>
+              <div>${formatCurrency(supplierSettlementData.previousBalance)}</div>
+            </div>
+            <div class="border p-3 rounded">
+              <div class="text-sm font-medium">Amount Paid</div>
+              <div>${formatCurrency(supplierSettlementData.amountPaid)}</div>
+            </div>
+            <div class="border p-3 rounded">
+              <div class="text-sm font-medium">New Balance</div>
+              <div>${formatCurrency(supplierSettlementData.newBalance)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="font-bold mb-2">NOTES:</div>
+          <div>${supplierSettlementData.notes || 'No notes provided'}</div>
+        </div>
+
+        <div class="text-center mt-8 pt-4 border-t border-gray-300">
+          <div class="text-sm font-bold">Thank you for your business!</div>
+          <div class="text-sm">We appreciate working with you.</div>
+        </div>
+      </div>
+    `;
+  };
+
+  // Function to download supplier settlement as PDF
+  const downloadSupplierSettlementAsPDF = () => {
+    // Show a loading message to the user
+    const loadingMsg = 'Generating PDF... Please wait.';
+    const loadingEl = document.createElement('div');
+    loadingEl.style.position = 'fixed';
+    loadingEl.style.top = '10px';
+    loadingEl.style.right = '10px';
+    loadingEl.style.backgroundColor = '#007bff';
+    loadingEl.style.color = 'white';
+    loadingEl.style.padding = '10px 15px';
+    loadingEl.style.borderRadius = '5px';
+    loadingEl.style.zIndex = '10000';
+    loadingEl.textContent = loadingMsg;
+    document.body.appendChild(loadingEl);
+
+    import('html2pdf.js').then((html2pdfModule) => {
+      const supplierSettlementContent = generateCleanSupplierSettlementHTML();
+
+      // Create a temporary container to hold the supplier settlement content
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = supplierSettlementContent;
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.width = '800px';
+      tempContainer.style.fontFamily = 'Arial, sans-serif';
+      tempContainer.style.fontSize = '14px';
+      document.body.appendChild(tempContainer);
+
+      // Configure PDF options
+      const opt = {
+        margin: 5,
+        filename: `Supplier_Settlement_${supplierSettlementData.referenceNumber || 'unknown'}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: tempContainer.scrollWidth,
+          windowWidth: tempContainer.scrollWidth
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+
+      // Generate PDF
+      html2pdfModule.default(tempContainer, opt)
+        .then(() => {
+          // Remove temporary container after PDF generation
+          if (tempContainer.parentNode) {
+            tempContainer.parentNode.removeChild(tempContainer);
+          }
+          // Remove loading message
+          if (loadingEl.parentNode) {
+            loadingEl.parentNode.removeChild(loadingEl);
+          }
+          console.log('PDF generated successfully');
+        })
+        .catch((error) => {
+          console.error('Error generating PDF:', error);
+          // Remove loading message
+          if (loadingEl.parentNode) {
+            loadingEl.parentNode.removeChild(loadingEl);
+          }
+          alert('Error generating PDF. Please try again.');
+        });
+    }).catch((error) => {
+      console.error('Error importing html2pdf.js:', error);
+      // Remove loading message
+      if (loadingEl.parentNode) {
+        loadingEl.parentNode.removeChild(loadingEl);
+      }
+      alert('Error loading PDF generator. Please try again.');
+    });
+  };
+
+  // Function to export supplier settlement as PDF
+  const exportSupplierSettlementAsPDF = () => {
+    downloadSupplierSettlementAsPDF();
+  };
+
+  // Function to export supplier settlement as CSV
+  const exportSupplierSettlementAsCSV = () => {
+    try {
+      // Prepare supplier settlement data for export
+      const exportData = {
+        supplierSettlementInfo: {
+          'Reference Number': supplierSettlementData.referenceNumber,
+          'Supplier Name': supplierSettlementData.supplierName,
+          'Supplier ID': supplierSettlementData.supplierId,
+          'Supplier Phone': supplierSettlementData.supplierPhone,
+          'Supplier Email': supplierSettlementData.supplierEmail,
+          'PO Number': supplierSettlementData.poNumber,
+          'Settlement Amount': supplierSettlementData.settlementAmount,
+          'Payment Method': supplierSettlementData.paymentMethod,
+          'Processed By': supplierSettlementData.processedBy,
+          'Previous Balance': supplierSettlementData.previousBalance,
+          'Amount Paid': supplierSettlementData.amountPaid,
+          'New Balance': supplierSettlementData.newBalance,
+          'Notes': supplierSettlementData.notes || '',
+          'Date': new Date().toISOString().split('T')[0],
+          'Time': new Date().toLocaleTimeString()
+        }
+      };
+
+      // Export using the utility function
+      ExportUtils.exportToCSV([exportData], `supplier-settlement-${exportData.supplierSettlementInfo['Reference Number']}`);
+    } catch (error) {
+      console.error('Error exporting supplier settlement to CSV:', error);
+      alert('Error exporting supplier settlement to CSV. Please try again.');
+    }
+  };
+
+  // Function to export supplier settlement as JSON
+  const exportSupplierSettlementAsJSON = () => {
+    try {
+      // Prepare supplier settlement data for export
+      const exportData = {
+        supplierSettlementInfo: {
+          'Reference Number': supplierSettlementData.referenceNumber,
+          'Supplier Name': supplierSettlementData.supplierName,
+          'Supplier ID': supplierSettlementData.supplierId,
+          'Supplier Phone': supplierSettlementData.supplierPhone,
+          'Supplier Email': supplierSettlementData.supplierEmail,
+          'PO Number': supplierSettlementData.poNumber,
+          'Settlement Amount': supplierSettlementData.settlementAmount,
+          'Payment Method': supplierSettlementData.paymentMethod,
+          'Processed By': supplierSettlementData.processedBy,
+          'Previous Balance': supplierSettlementData.previousBalance,
+          'Amount Paid': supplierSettlementData.amountPaid,
+          'New Balance': supplierSettlementData.newBalance,
+          'Notes': supplierSettlementData.notes || '',
+          'Date': new Date().toISOString().split('T')[0],
+          'Time': new Date().toLocaleTimeString()
+        }
+      };
+
+      // Export using the utility function
+      ExportUtils.exportToJSON([exportData], `supplier-settlement-${exportData.supplierSettlementInfo['Reference Number']}`);
+    } catch (error) {
+      console.error('Error exporting supplier settlement to JSON:', error);
+      alert('Error exporting supplier settlement to JSON. Please try again.');
+    }
+  };
+
   // Function to download customer settlement as PDF
   const downloadCustomerSettlementAsPDF = () => {
     // Show a loading message to the user
@@ -3929,6 +4179,13 @@ Thank you for your business!`,
     setShowCustomerSettlementOptions(false);
     // Clear the preserved settlement data
     setSettlementToPrint(null);
+  };
+  
+  // Close supplier settlement options dialog
+  const closeSupplierSettlementOptionsDialog = () => {
+    setShowSupplierSettlementOptions(false);
+    // Reset form after closing dialog
+    resetSupplierSettlementData();
   };
   
   // Function to generate clean invoice HTML for printing
@@ -5500,27 +5757,8 @@ Thank you for your business!`,
                           const saveResult = saveSupplierSettlement(settlementToSave as UtilsSupplierSettlementData);
                           
                           if (saveResult) {
-                            alert(`Supplier Settlement ${supplierSettlementData.referenceNumber} saved successfully to Saved Supplier Settlements!`);
-                            
-                            // Reset form to default values
-                            setSupplierSettlementData({
-                              supplierName: "Supplier Name",
-                              supplierId: "SUP-001",
-                              supplierPhone: "(555) 987-6543",
-                              supplierEmail: "supplier@example.com",
-                              referenceNumber: generateSupplierSettlementReference(),
-                              settlementAmount: 0,
-                              paymentMethod: "Cash",
-                              processedBy: "Processor Name",
-                              poNumber: "PO-001",
-                              previousBalance: 0,
-                              amountPaid: 0,
-                              newBalance: 0,
-                              notes: "",
-                              date: new Date().toISOString().split('T')[0],
-                              time: new Date().toLocaleTimeString(),
-                              status: "completed"
-                            });
+                            // Show the supplier settlement options dialog after saving
+                            setShowSupplierSettlementOptions(true);
                             
                             // Trigger storage event to notify other components
                             window.dispatchEvent(new StorageEvent('storage', {
@@ -8542,6 +8780,221 @@ Enter choice (1-3):`);
                   // Clear the preserved settlement data
                   setSettlementToPrint(null);
                 }}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Supplier Settlement Options Dialog */}
+      {showSupplierSettlementOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold mb-4">Supplier Settlements Options</h3>
+            <p className="mb-4">Choose an action for your Settlements:</p>
+            
+            <div className="space-y-2">
+              <Button 
+                onClick={() => {
+                  // Print functionality for supplier settlement
+                  // Create a print-friendly version of the supplier settlement
+                  const supplierSettlementContent = generateCleanSupplierSettlementHTML();
+                  
+                  // Create a temporary window for printing
+                  const printWindow = window.open('', '_blank', 'width=800,height=600');
+                  if (printWindow) {
+                    printWindow.document.write(`
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <title>Supplier Settlement</title>
+                        <style>
+                          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+                          .supplier-settlement-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
+                          .text-center { text-align: center; }
+                          .border-b-2 { border-bottom: 2px solid #000; }
+                          .pb-2 { padding-bottom: 0.5rem; }
+                          .font-bold { font-weight: bold; }
+                          .text-2xl { font-size: 1.5rem; }
+                          .text-sm { font-size: 0.875rem; }
+                          .mb-1 { margin-bottom: 0.25rem; }
+                          .mb-2 { margin-bottom: 0.5rem; }
+                          .mt-4 { margin-top: 1rem; }
+                          .mt-8 { margin-top: 2rem; }
+                          .pt-4 { padding-top: 1rem; }
+                          .border-t { border-top: 1px solid #ccc; }
+                          .grid { display: grid; }
+                          .gap-8 { gap: 2rem; }
+                          .gap-4 { gap: 1rem; }
+                          .grid-cols-1 { grid-template-columns: 1fr; }
+                          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+                          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+                          .border { border: 1px solid #e5e7eb; }
+                          .p-3 { padding: 0.75rem; }
+                          .rounded { border-radius: 0.25rem; }
+                          .font-medium { font-weight: 500; }
+                        </style>
+                      </head>
+                      <body>
+                        ${supplierSettlementContent}
+                      </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    
+                    // Wait a bit for content to render before printing
+                    setTimeout(() => {
+                      printWindow.focus();
+                      printWindow.print();
+                      printWindow.close();
+                    }, 500);
+                  } else {
+                    // Fallback: Alert user to allow popups
+                    alert('Please enable popups for this site to print the supplier settlement');
+                  }
+                  closeSupplierSettlementOptionsDialog();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Settlement
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Download functionality for supplier settlement
+                  downloadSupplierSettlementAsPDF();
+                  closeSupplierSettlementOptionsDialog();
+                  
+                  // Reset form after action
+                  resetSupplierSettlementData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Settlement
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Share functionality for supplier settlement
+                  try {
+                    // Generate a shareable URL for the supplier settlement
+                    const shareData = {
+                      title: `Supplier Settlement ${supplierSettlementData.referenceNumber}`,
+                      text: `Supplier Settlement #${supplierSettlementData.referenceNumber} for supplier ${supplierSettlementData.supplierName}`,
+                      url: window.location.href // In a real app, this would be a specific settlement URL
+                    };
+                    
+                    // Use the Web Share API if available
+                    if (navigator.share) {
+                      navigator.share(shareData)
+                        .then(() => console.log('Shared successfully'))
+                        .catch((error) => {
+                          console.log('Sharing failed:', error);
+                          // Fallback to copying to clipboard
+                          try {
+                            // Try to copy the URL to clipboard
+                            navigator.clipboard.writeText(shareData.url || window.location.href)
+                              .then(() => {
+                                alert('Supplier settlement link copied to clipboard! You can now share it with others.');
+                              })
+                              .catch(err => {
+                                console.error('Failed to copy: ', err);
+                                // If clipboard fails, show the URL to the user
+                                const url = prompt('Copy this link to share the supplier settlement:', shareData.url || window.location.href);
+                              });
+                          } catch (err) {
+                            console.error('Fallback sharing failed: ', err);
+                            alert('Could not share the supplier settlement. Please copy the URL manually.');
+                          }
+                        });
+                    } else {
+                      // Fallback to copying to clipboard
+                      try {
+                        // Try to copy the URL to clipboard
+                        navigator.clipboard.writeText(shareData.url || window.location.href)
+                          .then(() => {
+                            alert('Supplier settlement link copied to clipboard! You can now share it with others.');
+                          })
+                          .catch(err => {
+                            console.error('Failed to copy: ', err);
+                            // If clipboard fails, show the URL to the user
+                            const url = prompt('Copy this link to share the supplier settlement:', shareData.url || window.location.href);
+                          });
+                      } catch (err) {
+                        console.error('Fallback sharing failed: ', err);
+                        alert('Could not share the supplier settlement. Please copy the URL manually.');
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error sharing supplier settlement:', error);
+                    alert('Error sharing supplier settlement. Please try again.');
+                  }
+                  closeSupplierSettlementOptionsDialog();
+                  
+                  // Reset form after action
+                  resetSupplierSettlementData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Share className="h-4 w-4 mr-2" />
+                Share Settlement
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Export functionality for supplier settlement
+                  // Allow user to export in different formats
+                  const exportOptions = [
+                    { name: 'PDF', action: () => exportSupplierSettlementAsPDF() },
+                    { name: 'CSV', action: () => exportSupplierSettlementAsCSV() },
+                    { name: 'JSON', action: () => exportSupplierSettlementAsJSON() },
+                  ];
+                  
+                  // Show export options to user
+                  const exportChoice = prompt(`Choose export format:
+1. PDF
+2. CSV
+3. JSON
+Enter choice (1-3):`);
+                  
+                  closeSupplierSettlementOptionsDialog();
+                  
+                  // Reset form after action
+                  resetSupplierSettlementData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Export Settlement
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Reset functionality for supplier settlement
+                  resetSupplierSettlementData();
+                  closeSupplierSettlementOptionsDialog();
+                  alert('Supplier settlement form has been reset to default layout');
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset Form
+              </Button>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={closeSupplierSettlementOptionsDialog}
                 variant="outline"
               >
                 Cancel
