@@ -51,6 +51,7 @@ import { CustomerStock } from "@/pages/CustomerStock";
 import { MonetaryAssets } from "@/pages/MonetaryAssets";
 import { Templates } from "@/pages/Templates";
 import { SavedGRNsSection } from "@/components/SavedGRNsSection";
+import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettlementsSection";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -302,6 +303,9 @@ export const Index = () => {
       case "saved-grns":
         setCurrentView("purchase");
         break;
+      case "saved-supplier-settlements":
+        setCurrentView("purchase");
+        break;
       default:
         setCurrentView("comprehensive");
     }
@@ -348,7 +352,7 @@ export const Index = () => {
     "expenses", "returns", "debts", "customer-settlements", "supplier-settlements",
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
-    "customer-stock", "monetary-assets", "templates", "saved-grns"
+    "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements"
   ];
 
   if (!authorizedViews.includes(currentView)) {
@@ -1680,6 +1684,15 @@ export const Index = () => {
               console.log("Rendering SavedGRNsSection");
               return (
                 <SavedGRNsSection
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "saved-supplier-settlements":
+              console.log("Rendering SavedSupplierSettlementsSection");
+              return (
+                <SavedSupplierSettlementsSection
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}

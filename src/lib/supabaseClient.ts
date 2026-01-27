@@ -17,6 +17,17 @@ if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
 }
 
 // Create a single supabase client for interacting with your database
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    // Auto-refresh session when token expires
+    autoRefreshToken: true,
+    // Persist session in localStorage
+    persistSession: true,
+    // Detect auth changes automatically
+    detectSessionInUrl: true,
+    // Set flow type for OAuth
+    flowType: 'implicit',
+  }
+})
 
 console.log('Supabase client created successfully')

@@ -23,8 +23,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const currentUser = await getCurrentUser();
         setUser(currentUser);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error checking user session:', error);
+        // If refresh token is invalid, clear local session
+        if (error.message && error.message.includes('Refresh Token Not Found')) {
+          console.log('Refresh token not found, clearing session');
+          setUser(null);
+          // Clear any stored session data
+          localStorage.removeItem('supabase.auth.token');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -34,7 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        console.log('Auth state changed:', event);
         setUser(session?.user || null);
         setIsLoading(false);
       }

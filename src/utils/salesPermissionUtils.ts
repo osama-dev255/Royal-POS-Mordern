@@ -113,7 +113,8 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-invoices',
       'saved-deliveries',
       'saved-customer-settlements',
-      'saved-grns'
+      'saved-grns',
+      'saved-supplier-settlements'
     ],
     'manager': [
       'sales', 'inventory', 'customers', 'suppliers', 'purchase', 'finance', 
@@ -131,7 +132,8 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-invoices',
       'saved-deliveries',
       'saved-customer-settlements',
-      'saved-grns'
+      'saved-grns',
+      'saved-supplier-settlements'
     ],
     'cashier': [
       'sales', 'customers', 'products', 'transactions', 'discounts', 'scanner',
@@ -140,14 +142,16 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-invoices',
       'saved-deliveries',
       'saved-customer-settlements',
-      'saved-grns'
+      'saved-grns',
+      'saved-supplier-settlements'
     ],
     'staff': [
       'inventory', 'customers', 'products', 'capital',
       'assets', 'templates',
       'saved-deliveries',
       'saved-customer-settlements',
-      'saved-grns'
+      'saved-grns',
+      'saved-supplier-settlements'
     ]
   };
   

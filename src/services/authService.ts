@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@/services/databaseService';
+import { AuthErrorHandler } from '@/utils/authErrorHandler';
 
 // Sign up a new user
 export const signUp = async (email: string, password: string, userData?: any) => {

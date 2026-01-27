@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 // Import Supabase auth service
 import { signIn } from "@/services/authService";
+import { AuthErrorHandler } from '@/utils/authErrorHandler';
 
 interface LoginFormProps {
   onLogin: (credentials: { username: string; password: string }) => void;
@@ -66,6 +67,17 @@ export const LoginForm = ({ onLogin, onNavigate }: LoginFormProps) => {
       const result = await signIn(email, password);
       
       if (result.error) {
+        // Handle refresh token errors specifically
+        if (AuthErrorHandler.isSessionInvalid(result.error)) {
+          toast({
+            title: "Session Expired",
+            description: "Your session has expired. Please log in again.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        
         // Handle specific email confirmation error
         if (result.error.message && result.error.message.includes('Email not confirmed')) {
           toast({

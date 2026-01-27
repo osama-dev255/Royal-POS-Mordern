@@ -34,7 +34,8 @@ import {
   ExternalLink,
   MessageCircle,
   RotateCcw,
-  HandCoins
+  HandCoins,
+  CreditCard
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -44,6 +45,7 @@ import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUti
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN } from '@/utils/grnUtils';
+import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
@@ -295,7 +297,7 @@ interface CustomerSettlementData {
   status?: "completed" | "pending" | "cancelled";
 }
 
-interface SupplierSettlementData {
+interface LocalSupplierSettlementData {
   supplierName: string;
   supplierId: string;
   supplierPhone: string;
@@ -919,7 +921,7 @@ Thank you for your business!`,
     return saved ? JSON.parse(saved) : [];
   });
   
-  const [savedSupplierSettlements, setSavedSupplierSettlements] = useState<SupplierSettlementData[]>(() => {
+  const [savedSupplierSettlements, setSavedSupplierSettlements] = useState<UtilsSupplierSettlementData[]>(() => {
     const saved = localStorage.getItem('savedSupplierSettlements');
     return saved ? JSON.parse(saved) : [];
   });
@@ -1461,7 +1463,7 @@ Thank you for your business!`,
     status: "completed"
   });
   
-  const [supplierSettlementData, setSupplierSettlementData] = useState<SupplierSettlementData>({
+  const [supplierSettlementData, setSupplierSettlementData] = useState<LocalSupplierSettlementData>({
     supplierName: "Supplier Name",
     supplierId: generateSupplierId(),
     supplierPhone: "(555) 987-6543",
@@ -5011,7 +5013,7 @@ Thank you for your business!`,
   };
   
   // Handle supplier settlement data changes
-  const handleSupplierSettlementChange = (field: keyof SupplierSettlementData, value: string | number) => {
+  const handleSupplierSettlementChange = (field: keyof UtilsSupplierSettlementData, value: string | number) => {
     setSupplierSettlementData(prev => {
       let updatedData = { ...prev, [field]: value };
       
@@ -5458,6 +5460,83 @@ Thank you for your business!`,
                           console.error('Error saving customer settlement:', error);
                           alert('Error saving customer settlement. Please try again.');
                         }
+                      } else if (currentTemplate?.type === "supplier-settlement") {
+                        try {
+                          // Validate required fields before saving
+                          if (!supplierSettlementData.supplierName || supplierSettlementData.supplierName.trim() === "" || supplierSettlementData.supplierName === "Supplier Name") {
+                            alert("Please enter a valid supplier name.");
+                            return;
+                          }
+                          
+                          if (supplierSettlementData.settlementAmount <= 0) {
+                            alert("Please enter a valid settlement amount greater than 0.");
+                            return;
+                          }
+                          
+                          // Prepare supplier settlement data for saving
+                          const settlementToSave = {
+                            id: Date.now().toString(), // Generate unique ID
+                            supplierName: supplierSettlementData.supplierName.trim(),
+                            supplierId: supplierSettlementData.supplierId || "",
+                            supplierPhone: supplierSettlementData.supplierPhone || "",
+                            supplierEmail: supplierSettlementData.supplierEmail || "",
+                            referenceNumber: supplierSettlementData.referenceNumber.trim(),
+                            settlementAmount: supplierSettlementData.settlementAmount,
+                            paymentMethod: supplierSettlementData.paymentMethod || "Cash",
+                            processedBy: supplierSettlementData.processedBy || "System",
+                            poNumber: supplierSettlementData.poNumber || "",
+                            previousBalance: supplierSettlementData.previousBalance || 0,
+                            amountPaid: supplierSettlementData.amountPaid || 0,
+                            newBalance: supplierSettlementData.newBalance || 0,
+                            notes: supplierSettlementData.notes || "",
+                            date: new Date().toISOString().split('T')[0], // Current date
+                            time: new Date().toLocaleTimeString(), // Current time
+                            status: "completed" // Default status for saved settlements
+                          };
+                          
+                          console.log("Saving supplier settlement:", settlementToSave);
+                          
+                          // Save using the utility function
+                          const saveResult = saveSupplierSettlement(settlementToSave as UtilsSupplierSettlementData);
+                          
+                          if (saveResult) {
+                            alert(`Supplier Settlement ${supplierSettlementData.referenceNumber} saved successfully to Saved Supplier Settlements!`);
+                            
+                            // Reset form to default values
+                            setSupplierSettlementData({
+                              supplierName: "Supplier Name",
+                              supplierId: "SUP-001",
+                              supplierPhone: "(555) 987-6543",
+                              supplierEmail: "supplier@example.com",
+                              referenceNumber: generateSupplierSettlementReference(),
+                              settlementAmount: 0,
+                              paymentMethod: "Cash",
+                              processedBy: "Processor Name",
+                              poNumber: "PO-001",
+                              previousBalance: 0,
+                              amountPaid: 0,
+                              newBalance: 0,
+                              notes: "",
+                              date: new Date().toISOString().split('T')[0],
+                              time: new Date().toLocaleTimeString(),
+                              status: "completed"
+                            });
+                            
+                            // Trigger storage event to notify other components
+                            window.dispatchEvent(new StorageEvent('storage', {
+                              key: 'savedSupplierSettlements',
+                              newValue: JSON.stringify([settlementToSave])
+                            }));
+                            
+                            // Trigger manual refresh event
+                            window.dispatchEvent(new Event('refreshSettlements'));
+                          } else {
+                            throw new Error('Failed to save supplier settlement');
+                          }
+                        } catch (error) {
+                          console.error('Error saving supplier settlement:', error);
+                          alert('Error saving supplier settlement. Please try again.');
+                        }
                       } else if (currentTemplate?.type === "goods-received-note") {
                         try {
                           // Validate required fields before saving
@@ -5515,6 +5594,16 @@ Thank you for your business!`,
                         className="flex items-center gap-2"
                       >
                         <HandCoins className="h-4 w-4" />
+                        View Saved Settlements
+                      </Button>
+                    )}
+                    {currentTemplate?.type === "supplier-settlement" && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setActiveTab('savedSupplierSettlements')}
+                        className="flex items-center gap-2"
+                      >
+                        <CreditCard className="h-4 w-4" />
                         View Saved Settlements
                       </Button>
                     )}
