@@ -269,27 +269,19 @@ interface ExpenseVoucherData {
   signatureDate?: string;
 }
 
-// Interfaces for dynamic salary slip items
-interface SalarySlipEarningItem {
-  id: string;
-  description: string;
-  amount: number;
-}
-
-interface SalarySlipDeductionItem {
-  id: string;
-  description: string;
-  amount: number;
-}
-
 interface SalarySlipData {
   employeeName: string;
   employeeId: string;
   payPeriod: string;
   paidDate: string;
-  earnings: SalarySlipEarningItem[];
-  deductions: SalarySlipDeductionItem[];
+  basicSalary: number;
+  allowances: number;
+  overtime: number;
+  bonus: number;
   grossPay: number;
+  tax: number;
+  insurance: number;
+  otherDeductions: number;
   totalDeductions: number;
   netPay: number;
   bankName: string;
@@ -1847,18 +1839,14 @@ Thank you for your business!`,
     employeeId: "EMP-00123",
     payPeriod: "December 2025",
     paidDate: "12/5/2025",
-    earnings: [
-      { id: "1", description: "Basic Salary", amount: 5000.00 },
-      { id: "2", description: "Allowances", amount: 800.00 },
-      { id: "3", description: "Overtime", amount: 200.00 },
-      { id: "4", description: "Bonus", amount: 500.00 }
-    ],
-    deductions: [
-      { id: "1", description: "Tax", amount: 650.00 },
-      { id: "2", description: "Insurance", amount: 325.00 },
-      { id: "3", description: "Other Deductions", amount: 125.00 }
-    ],
+    basicSalary: 5000.00,
+    allowances: 800.00,
+    overtime: 200.00,
+    bonus: 500.00,
     grossPay: 6500.00,
+    tax: 650.00,
+    insurance: 325.00,
+    otherDeductions: 125.00,
     totalDeductions: 1100.00,
     netPay: 5400.00,
     bankName: "Global Bank",
@@ -5838,78 +5826,12 @@ Thank you for your business!`,
     }));
   };
 
-  // Handle salary slip earning item changes
-  const handleSalarySlipEarningChange = (itemId: string, field: keyof SalarySlipEarningItem, value: string | number) => {
-    setSalarySlipData(prev => ({
-      ...prev,
-      earnings: prev.earnings.map(item => 
-        item.id === itemId ? { ...item, [field]: value } : item
-      )
-    }));
-  };
-
-  // Handle salary slip deduction item changes
-  const handleSalarySlipDeductionChange = (itemId: string, field: keyof SalarySlipDeductionItem, value: string | number) => {
-    setSalarySlipData(prev => ({
-      ...prev,
-      deductions: prev.deductions.map(item => 
-        item.id === itemId ? { ...item, [field]: value } : item
-      )
-    }));
-  };
-
-  // Add new earning item
-  const handleAddSalarySlipEarning = () => {
-    setSalarySlipData(prev => ({
-      ...prev,
-      earnings: [
-        ...prev.earnings,
-        {
-          id: Date.now().toString(),
-          description: "",
-          amount: 0
-        }
-      ]
-    }));
-  };
-
-  // Add new deduction item
-  const handleAddSalarySlipDeduction = () => {
-    setSalarySlipData(prev => ({
-      ...prev,
-      deductions: [
-        ...prev.deductions,
-        {
-          id: Date.now().toString(),
-          description: "",
-          amount: 0
-        }
-      ]
-    }));
-  };
-
-  // Remove earning item
-  const handleRemoveSalarySlipEarning = (itemId: string) => {
-    setSalarySlipData(prev => ({
-      ...prev,
-      earnings: prev.earnings.filter(item => item.id !== itemId)
-    }));
-  };
-
-  // Remove deduction item
-  const handleRemoveSalarySlipDeduction = (itemId: string) => {
-    setSalarySlipData(prev => ({
-      ...prev,
-      deductions: prev.deductions.filter(item => item.id !== itemId)
-    }));
-  };
-  
   // Calculate salary slip totals
   const calculateSalarySlipTotals = () => {
-    const grossPay = salarySlipData.earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const totalDeductions = salarySlipData.deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const grossPay = salarySlipData.basicSalary + salarySlipData.allowances + salarySlipData.overtime + salarySlipData.bonus;
+    const totalDeductions = salarySlipData.tax + salarySlipData.insurance + salarySlipData.otherDeductions;
     const netPay = grossPay - totalDeductions;
-    
+      
     return { grossPay, totalDeductions, netPay };
   };
   
