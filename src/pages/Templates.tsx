@@ -269,19 +269,27 @@ interface ExpenseVoucherData {
   signatureDate?: string;
 }
 
+// Interfaces for dynamic salary slip items
+interface SalarySlipEarningItem {
+  id: string;
+  description: string;
+  amount: number;
+}
+
+interface SalarySlipDeductionItem {
+  id: string;
+  description: string;
+  amount: number;
+}
+
 interface SalarySlipData {
   employeeName: string;
   employeeId: string;
   payPeriod: string;
   paidDate: string;
-  basicSalary: number;
-  allowances: number;
-  overtime: number;
-  bonus: number;
+  earnings: SalarySlipEarningItem[];
+  deductions: SalarySlipDeductionItem[];
   grossPay: number;
-  tax: number;
-  insurance: number;
-  otherDeductions: number;
   totalDeductions: number;
   netPay: number;
   bankName: string;
@@ -289,6 +297,9 @@ interface SalarySlipData {
   department: string;
   position: string;
   paymentMethod: string;
+  employeeSignature?: string;
+  managerSignature?: string;
+  signatureDate?: string;
 }
 
 interface ComplimentaryGoodsItem {
@@ -1836,21 +1847,28 @@ Thank you for your business!`,
     employeeId: "EMP-00123",
     payPeriod: "December 2025",
     paidDate: "12/5/2025",
-    basicSalary: 5000.00,
-    allowances: 800.00,
-    overtime: 200.00,
-    bonus: 500.00,
+    earnings: [
+      { id: "1", description: "Basic Salary", amount: 5000.00 },
+      { id: "2", description: "Allowances", amount: 800.00 },
+      { id: "3", description: "Overtime", amount: 200.00 },
+      { id: "4", description: "Bonus", amount: 500.00 }
+    ],
+    deductions: [
+      { id: "1", description: "Tax", amount: 650.00 },
+      { id: "2", description: "Insurance", amount: 325.00 },
+      { id: "3", description: "Other Deductions", amount: 125.00 }
+    ],
     grossPay: 6500.00,
-    tax: 650.00,
-    insurance: 325.00,
-    otherDeductions: 125.00,
     totalDeductions: 1100.00,
     netPay: 5400.00,
     bankName: "Global Bank",
     accountNumber: "**** **** **** 1234",
     department: "Marketing",
     position: "Senior Marketing Specialist",
-    paymentMethod: "Direct Deposit"
+    paymentMethod: "Direct Deposit",
+    employeeSignature: "",
+    managerSignature: "",
+    signatureDate: ""
   });
   
   const [complimentaryGoodsData, setComplimentaryGoodsData] = useState<ComplimentaryGoodsData>({
@@ -5819,11 +5837,77 @@ Thank you for your business!`,
       [field]: value
     }));
   };
+
+  // Handle salary slip earning item changes
+  const handleSalarySlipEarningChange = (itemId: string, field: keyof SalarySlipEarningItem, value: string | number) => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      earnings: prev.earnings.map(item => 
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  // Handle salary slip deduction item changes
+  const handleSalarySlipDeductionChange = (itemId: string, field: keyof SalarySlipDeductionItem, value: string | number) => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      deductions: prev.deductions.map(item => 
+        item.id === itemId ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  // Add new earning item
+  const handleAddSalarySlipEarning = () => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      earnings: [
+        ...prev.earnings,
+        {
+          id: Date.now().toString(),
+          description: "",
+          amount: 0
+        }
+      ]
+    }));
+  };
+
+  // Add new deduction item
+  const handleAddSalarySlipDeduction = () => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      deductions: [
+        ...prev.deductions,
+        {
+          id: Date.now().toString(),
+          description: "",
+          amount: 0
+        }
+      ]
+    }));
+  };
+
+  // Remove earning item
+  const handleRemoveSalarySlipEarning = (itemId: string) => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      earnings: prev.earnings.filter(item => item.id !== itemId)
+    }));
+  };
+
+  // Remove deduction item
+  const handleRemoveSalarySlipDeduction = (itemId: string) => {
+    setSalarySlipData(prev => ({
+      ...prev,
+      deductions: prev.deductions.filter(item => item.id !== itemId)
+    }));
+  };
   
   // Calculate salary slip totals
   const calculateSalarySlipTotals = () => {
-    const grossPay = salarySlipData.basicSalary + salarySlipData.allowances + salarySlipData.overtime + salarySlipData.bonus;
-    const totalDeductions = salarySlipData.tax + salarySlipData.insurance + salarySlipData.otherDeductions;
+    const grossPay = salarySlipData.earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const totalDeductions = salarySlipData.deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const netPay = grossPay - totalDeductions;
     
     return { grossPay, totalDeductions, netPay };
@@ -7413,25 +7497,100 @@ Thank you for your business!`,
                         {/* Header */}
                         <div className="text-center">
                           <h2 className="text-2xl font-bold">SALARY SLIP</h2>
-                          <div className="text-sm mt-1">Pay Period: {salarySlipData.payPeriod}</div>
+                          <div className="mt-1">
+                            <Input
+                              value={salarySlipData.payPeriod}
+                              onChange={(e) => handleSalarySlipChange("payPeriod", e.target.value)}
+                              className="text-sm p-1 h-8 w-48 mx-auto"
+                              placeholder="Pay Period"
+                            />
+                          </div>
                         </div>
                         
                         {/* Employee Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div>
                             <div className="font-bold mb-1">EMPLOYEE INFORMATION:</div>
-                            <div className="text-sm mb-1">Name: {salarySlipData.employeeName}</div>
-                            <div className="text-sm mb-1">Employee ID: {salarySlipData.employeeId}</div>
-                            <div className="text-sm mb-1">Department: {salarySlipData.department}</div>
-                            <div className="text-sm mb-1">Position: {salarySlipData.position}</div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Name:</span>
+                                <Input
+                                  value={salarySlipData.employeeName}
+                                  onChange={(e) => handleSalarySlipChange("employeeName", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="Employee Name"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Employee ID:</span>
+                                <Input
+                                  value={salarySlipData.employeeId}
+                                  onChange={(e) => handleSalarySlipChange("employeeId", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="EMP-00000"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Department:</span>
+                                <Input
+                                  value={salarySlipData.department}
+                                  onChange={(e) => handleSalarySlipChange("department", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="Department"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Position:</span>
+                                <Input
+                                  value={salarySlipData.position}
+                                  onChange={(e) => handleSalarySlipChange("position", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="Position"
+                                />
+                              </div>
+                            </div>
                           </div>
                           
                           <div>
                             <div className="font-bold mb-1">PAYMENT DETAILS:</div>
-                            <div className="text-sm mb-1">Payment Method: {salarySlipData.paymentMethod}</div>
-                            <div className="text-sm mb-1">Bank: {salarySlipData.bankName}</div>
-                            <div className="text-sm mb-1">Account #: {salarySlipData.accountNumber}</div>
-                            <div className="text-sm mb-1">Paid Date: {salarySlipData.paidDate}</div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Payment Method:</span>
+                                <Input
+                                  value={salarySlipData.paymentMethod}
+                                  onChange={(e) => handleSalarySlipChange("paymentMethod", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="Payment Method"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Bank:</span>
+                                <Input
+                                  value={salarySlipData.bankName}
+                                  onChange={(e) => handleSalarySlipChange("bankName", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="Bank Name"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Account #:</span>
+                                <Input
+                                  value={salarySlipData.accountNumber}
+                                  onChange={(e) => handleSalarySlipChange("accountNumber", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                  placeholder="Account Number"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Paid Date:</span>
+                                <Input
+                                  type="date"
+                                  value={salarySlipData.paidDate}
+                                  onChange={(e) => handleSalarySlipChange("paidDate", e.target.value)}
+                                  className="text-sm p-1 h-8 flex-1"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                         
@@ -7449,19 +7608,51 @@ Thank you for your business!`,
                               <tbody>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Basic Salary</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.basicSalary)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.basicSalary}
+                                      onChange={(e) => handleSalarySlipChange("basicSalary", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Allowances</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.allowances)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.allowances}
+                                      onChange={(e) => handleSalarySlipChange("allowances", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Overtime</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.overtime)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.overtime}
+                                      onChange={(e) => handleSalarySlipChange("overtime", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Bonus</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.bonus)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.bonus}
+                                      onChange={(e) => handleSalarySlipChange("bonus", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr className="bg-gray-50 font-bold">
                                   <td className="border border-gray-300 p-2">Gross Pay</td>
@@ -7486,15 +7677,39 @@ Thank you for your business!`,
                               <tbody>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Tax</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.tax)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.tax}
+                                      onChange={(e) => handleSalarySlipChange("tax", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Insurance</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.insurance)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.insurance}
+                                      onChange={(e) => handleSalarySlipChange("insurance", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr>
                                   <td className="border border-gray-300 p-2">Other Deductions</td>
-                                  <td className="border border-gray-300 p-2 text-right">{formatCurrency(salarySlipData.otherDeductions)}</td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={salarySlipData.otherDeductions}
+                                      onChange={(e) => handleSalarySlipChange("otherDeductions", parseFloat(e.target.value) || 0)}
+                                      className="p-1 h-8 w-full text-right"
+                                    />
+                                  </td>
                                 </tr>
                                 <tr className="bg-gray-50 font-bold">
                                   <td className="border border-gray-300 p-2">Total Deductions</td>
@@ -7518,8 +7733,13 @@ Thank you for your business!`,
                           <div>
                             <div className="font-bold mb-2">EMPLOYEE SIGNATURE</div>
                             <div className="text-sm space-y-2">
-                              <div className="border-t border-black pt-1 mt-8">
-                                <div className="text-xs">Name & Signature</div>
+                              <div className="pt-1 mt-8">
+                                <Input
+                                  value={salarySlipData.employeeSignature || ""}
+                                  onChange={(e) => handleSalarySlipChange("employeeSignature", e.target.value)}
+                                  className="text-xs p-1 h-8 border-b border-black rounded-none focus:ring-0 focus:border-black"
+                                  placeholder="Name & Signature"
+                                />
                               </div>
                             </div>
                           </div>
@@ -7527,8 +7747,13 @@ Thank you for your business!`,
                           <div>
                             <div className="font-bold mb-2">MANAGER APPROVAL</div>
                             <div className="text-sm space-y-2">
-                              <div className="border-t border-black pt-1 mt-8">
-                                <div className="text-xs">Name & Signature</div>
+                              <div className="pt-1 mt-8">
+                                <Input
+                                  value={salarySlipData.managerSignature || ""}
+                                  onChange={(e) => handleSalarySlipChange("managerSignature", e.target.value)}
+                                  className="text-xs p-1 h-8 border-b border-black rounded-none focus:ring-0 focus:border-black"
+                                  placeholder="Name & Signature"
+                                />
                               </div>
                             </div>
                           </div>
@@ -7536,8 +7761,13 @@ Thank you for your business!`,
                           <div>
                             <div className="font-bold mb-2">DATE</div>
                             <div className="text-sm space-y-2">
-                              <div className="border-t border-black pt-1 mt-8">
-                                <div className="text-xs">&nbsp;</div>
+                              <div className="pt-1 mt-8">
+                                <Input
+                                  type="date"
+                                  value={salarySlipData.signatureDate || ""}
+                                  onChange={(e) => handleSalarySlipChange("signatureDate", e.target.value)}
+                                  className="text-xs p-1 h-8 border-b border-black rounded-none focus:ring-0 focus:border-black w-full"
+                                />
                               </div>
                             </div>
                           </div>
