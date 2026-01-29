@@ -36,13 +36,14 @@ export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectio
 
     loadGRNs();
 
-    // Listen for storage changes to update GRNs in real-time
-    const handleStorageChange = () => {
-      loadGRNs();
+    // Listen for custom GRN save events to update GRNs in real-time
+    const handleGRNSaved = (event: CustomEvent) => {
+      const { grns } = event.detail;
+      setGrns(grns);
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener('grnSaved', handleGRNSaved as EventListener);
+    return () => window.removeEventListener('grnSaved', handleGRNSaved as EventListener);
   }, []);
 
   // Filter GRNs based on search term

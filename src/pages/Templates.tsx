@@ -35,7 +35,8 @@ import {
   MessageCircle,
   RotateCcw,
   HandCoins,
-  CreditCard
+  CreditCard,
+  FolderOpen
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -49,6 +50,7 @@ import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettleme
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
+import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 
 interface Template {
   id: string;
@@ -1015,7 +1017,7 @@ Thank you for your business!`,
         try {
           const { getSavedGRNs } = await import('@/utils/grnUtils');
           const savedGRNsData = await getSavedGRNs();
-          setSavedGRNs(savedGRNsData);
+          setSavedGRNs(savedGRNsData as any);
         } catch (error) {
           console.error('Error loading saved GRNs:', error);
         }
@@ -1220,12 +1222,11 @@ Thank you for your business!`,
         
         // Update local state
         const updatedGRNs = savedGRNs.filter(g => g.id !== grnId);
-        setSavedGRNs(updatedGRNs);
+        setSavedGRNs(updatedGRNs as any);
         
-        // Trigger storage event to notify other components
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: 'savedGRNs',
-          newValue: JSON.stringify(updatedGRNs)
+        // Trigger custom event to notify other components
+        window.dispatchEvent(new CustomEvent('grnSaved', {
+          detail: { grns: updatedGRNs }
         }));
       } catch (error) {
         console.error('Error deleting GRN:', error);
@@ -1235,37 +1236,90 @@ Thank you for your business!`,
   };
   
   const handleSaveGRN = async () => {
+    console.log('=== STARTING HANDLE SAVE GRN ===');
     if (!grnData.grnNumber.trim()) {
       alert('Please enter a GRN number');
       return;
     }
     
+    console.log('GRN Data:', grnData);
+    
+    // Convert Templates GRN data to grnUtils format
+    const convertedGRNData: any = {
+      grnNumber: grnData.grnNumber,
+      date: grnData.date,
+      time: grnData.time,
+      supplierName: grnData.supplierName,
+      supplierId: grnData.supplierId,
+      supplierPhone: grnData.supplierPhone,
+      supplierEmail: grnData.supplierEmail,
+      supplierAddress: grnData.supplierAddress,
+      businessName: grnData.businessName,
+      businessAddress: grnData.businessAddress,
+      businessPhone: grnData.businessPhone,
+      businessEmail: grnData.businessEmail,
+      businessStockType: grnData.businessStockType || undefined,
+      isVatable: grnData.isVatable,
+      supplierTinNumber: grnData.supplierTinNumber,
+      poNumber: grnData.poNumber,
+      deliveryNoteNumber: grnData.deliveryNoteNumber,
+      vehicleNumber: grnData.vehicleNumber,
+      driverName: grnData.driverName,
+      receivedBy: grnData.receivedBy,
+      receivedLocation: grnData.receivedLocation,
+      items: grnData.items.map(item => ({
+        id: item.id,
+        description: item.description,
+        quantity: item.orderedQuantity,
+        delivered: item.receivedQuantity,
+        unit: item.unit,
+        unitCost: item.unitCost || 0,
+        total: item.totalWithReceivingCost || 0,
+        batchNumber: item.batchNumber,
+        expiryDate: item.expiryDate,
+        remarks: item.remarks,
+        receivingCostPerUnit: item.receivingCostPerUnit,
+        totalWithReceivingCost: item.totalWithReceivingCost
+      })),
+      qualityCheckNotes: grnData.qualityCheckNotes,
+      discrepancies: grnData.discrepancies,
+      preparedBy: grnData.preparedBy,
+      preparedDate: grnData.preparedDate,
+      checkedBy: grnData.checkedBy,
+      checkedDate: grnData.checkedDate,
+      approvedBy: grnData.approvedBy,
+      approvedDate: grnData.approvedDate,
+      receivedDate: grnData.receivedDate,
+      status: grnData.status === 'received' || grnData.status === 'checked' || grnData.status === 'approved' ? 'completed' : (grnData.status || 'completed'),
+      receivingCosts: grnData.receivingCosts
+    };
+    
     const newGRN: UtilsSavedGRN = {
       id: Date.now().toString(),
       name: `GRN-${grnData.grnNumber}`, // Use the actual GRN number for display
-      data: grnData,
+      data: convertedGRNData as any,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     
     try {
+      console.log('About to call saveGRN with:', newGRN);
       // Use the proper saveGRN utility function
       await saveGRN(newGRN);
       
       // Update local state
       const updatedGRNs = [...savedGRNs, newGRN];
-      setSavedGRNs(updatedGRNs);
+      setSavedGRNs(updatedGRNs as any);
       
-      // Trigger storage event to notify other components
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'savedGRNs',
-        newValue: JSON.stringify(updatedGRNs)
+      // Trigger custom event to notify other components
+      window.dispatchEvent(new CustomEvent('grnSaved', {
+        detail: { grns: updatedGRNs }
       }));
       
-      alert(`GRN ${grnData.grnNumber} saved successfully!`);
+      // Show GRN options dialog immediately after saving
+      showGRNOptionsDialog();
       
-      // Reset form
-      resetGRNData();
+      // Don't reset form here - let the user choose an option first
     } catch (error) {
       console.error('Error saving GRN:', error);
       alert('Error saving GRN. Please try again.');
@@ -1691,7 +1745,7 @@ Thank you for your business!`,
   
   const [grnData, setGrnData] = useState<GRNData>(initialGRNData);
   
-  const [savedGRNs, setSavedGRNs] = useState<SavedGRN[]>(() => {
+  const [savedGRNs, setSavedGRNs] = useState<any[]>(() => {
     const saved = localStorage.getItem('savedGRNs');
     return saved ? JSON.parse(saved) : [];
   });
@@ -4774,6 +4828,11 @@ Thank you for your business!`,
     resetSupplierSettlementData();
   };
   
+  // Show GRN options dialog
+  const showGRNOptionsDialog = () => {
+    setShowGRNOptions(true);
+  };
+  
   // Close GRN options dialog
   const closeGRNOptionsDialog = () => {
     setShowGRNOptions(false);
@@ -6026,6 +6085,14 @@ Thank you for your business!`,
                       <Truck className="h-4 w-4" />
                       Saved Supplier Settlements
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedGRNs')}
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Saved GRNs
+                    </Button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -6110,6 +6177,27 @@ Thank you for your business!`,
                   </Button>
                 </div>
                 <SavedSupplierSettlementsSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
+            ) : activeTab === "savedGRNs" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Saved Goods Received Notes</h3>
+                    <p className="text-sm text-muted-foreground">View and manage your saved GRNs</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <SavedGRNsSection 
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User" 
@@ -6376,46 +6464,8 @@ Thank you for your business!`,
                           alert('Error saving supplier settlement. Please try again.');
                         }
                       } else if (currentTemplate?.type === "goods-received-note") {
-                        try {
-                          // Validate required fields before saving
-                          if (!grnData.grnNumber || grnData.grnNumber.trim() === "") {
-                            alert("Please enter a valid GRN number.");
-                            return;
-                          }
-                          
-                          if (!grnData.supplierName || grnData.supplierName.trim() === "" || grnData.supplierName === "Supplier Name") {
-                            alert("Please enter a valid supplier name.");
-                            return;
-                          }
-                          
-                          // Prepare GRN data for saving
-                          const grnToSave: SavedGRN = {
-                            id: Date.now().toString(),
-                            name: `GRN-${grnData.grnNumber}`,
-                            data: grnData,
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                          };
-                          
-                          console.log("Saving GRN:", grnToSave);
-                          
-                          // Save to localStorage
-                          const updatedGRNs = [...savedGRNs, grnToSave];
-                          localStorage.setItem('savedGRNs', JSON.stringify(updatedGRNs));
-                          setSavedGRNs(updatedGRNs);
-                          
-                          // Trigger storage event
-                          window.dispatchEvent(new StorageEvent('storage', {
-                            key: 'savedGRNs',
-                            newValue: JSON.stringify(updatedGRNs)
-                          }));
-                          
-                          // Show the GRN options dialog after saving
-                          setShowGRNOptions(true);
-                        } catch (error) {
-                          console.error('Error saving GRN:', error);
-                          alert('Error saving GRN. Please try again.');
-                        }
+                        // Use the proper handleSaveGRN function for GRNs
+                        await handleSaveGRN();
                       } else {
                         handleSaveDeliveryNote();
                       }
@@ -10164,6 +10214,19 @@ Enter choice (1-3):`);
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Export GRN
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // View Saved GRNs functionality
+                  setActiveTab('savedGRNs');
+                  closeGRNOptionsDialog();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <FolderOpen className="h-4 w-4 mr-2" />
+                View Saved GRNs
               </Button>
               
               <Button 
