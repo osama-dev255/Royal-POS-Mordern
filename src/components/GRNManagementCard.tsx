@@ -24,7 +24,8 @@ interface GRNItem {
   quantity: number;
   delivered: number;
   unit: string;
-  unitCost: number;
+  originalUnitCost?: number;  // Original cost per unit (without receiving costs)
+  unitCost: number;  // Cost per unit (including receiving costs)
   total: number;
   batchNumber?: string;
   expiryDate?: string;
@@ -156,7 +157,7 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
     // Update each item with receiving cost per unit and total cost with receiving costs
     return items.map(item => {
       const receivingCostPerUnit = costPerUnit;
-      const unitCostWithReceiving = (item.unitCost || 0) + receivingCostPerUnit;
+      const unitCostWithReceiving = (item.originalUnitCost || item.unitCost || 0) + receivingCostPerUnit;
       const totalWithReceivingCost = unitCostWithReceiving * item.delivered;
       
       return {
@@ -430,7 +431,7 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                   <TableCell className="text-right">{item.quantity}</TableCell>
                                   <TableCell className="text-right">{item.delivered}</TableCell>
                                   <TableCell>{item.unit}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(item.unitCost - (item.receivingCostPerUnit || 0))}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0)))}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.receivingCostPerUnit || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.unitCost)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.totalWithReceivingCost || (item.delivered * (item.unitCost || 0)))}</TableCell>
@@ -487,7 +488,7 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                       
                       try {
                         // Create updated GRN with new rates
-                        const updatedItems = distributeReceivingCosts(selectedGRN.data.items, selectedGRN.data.receivingCosts).map(item => {
+                        const updatedItems = selectedGRN.data.items.map(item => {
                           const itemId = item.id || item.description;
                           const editedRate = editedRates[itemId];
                           
@@ -495,18 +496,25 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                           if (editedRate !== undefined && editedRate > 0) {
                             return {
                               ...item,
-                              rate: editedRate
+                              rate: editedRate,
+                              originalUnitCost: item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0))
                             };
                           }
-                          return item;
+                          return {
+                            ...item,
+                            originalUnitCost: item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0))
+                          };
                         });
+                        
+                        // Apply receiving cost distribution
+                        const itemsWithCosts = distributeReceivingCosts(updatedItems, selectedGRN.data.receivingCosts);
                         
                         // Update the GRN data with new items
                         const updatedGRN: SavedGRN = {
                           ...selectedGRN,
                           data: {
                             ...selectedGRN.data,
-                            items: updatedItems
+                            items: itemsWithCosts
                           },
                           updatedAt: new Date().toISOString()
                         };
