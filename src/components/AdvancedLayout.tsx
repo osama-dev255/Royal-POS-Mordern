@@ -60,7 +60,7 @@ export const AdvancedLayout = ({
       id: "inventory",
       title: "Inventory",
       icon: <Package className="h-5 w-5" />,
-      view: "products",
+      view: "inventory",
       roles: ["admin", "manager", "staff"]
     },
     {

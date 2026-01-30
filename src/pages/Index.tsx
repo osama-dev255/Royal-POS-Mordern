@@ -10,6 +10,7 @@ import { TestSalesOrders } from "@/pages/TestSalesOrders";
 import { ProductManagement } from "@/pages/ProductManagement";
 import { CustomerManagement } from "@/pages/CustomerManagement";
 import { TransactionHistory } from "@/pages/TransactionHistory";
+import { InventoryManagement } from "@/pages/InventoryManagement";
 import { SalesAnalytics } from "@/pages/SalesAnalytics";
 import { SpendingAnalytics } from "@/pages/SpendingAnalytics";
 import { EmployeeManagement } from "@/pages/EmployeeManagement";
@@ -194,6 +195,9 @@ export const Index = () => {
       case "products":
         setCurrentView("inventory");
         break;
+      case "inventory":
+        setCurrentView("comprehensive");
+        break;
       case "customers":
         setCurrentView("comprehensive");
         break;
@@ -352,7 +356,8 @@ export const Index = () => {
     "expenses", "returns", "debts", "customer-settlements", "supplier-settlements",
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
-    "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements"
+    "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
+    "inventory"
   ];
 
   if (!authorizedViews.includes(currentView)) {
@@ -431,6 +436,15 @@ export const Index = () => {
               console.log("Rendering ProductManagement");
               return (
                 <ProductManagement
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "inventory":
+              console.log("Rendering InventoryManagement");
+              return (
+                <InventoryManagement
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
