@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Truck, Package, Calendar, CheckCircle, AlertTriangle, Plus, Edit, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
-import { getSavedGRNs, SavedGRN } from "@/utils/grnUtils";
+import { getSavedGRNs, updateGRN, SavedGRN } from "@/utils/grnUtils";
 
 interface GRNManagementCardProps {
   searchTerm: string;
@@ -482,12 +482,55 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                   </Button>
                   <Button 
                     variant="secondary"
-                    onClick={() => {
-                      // Save rates logic can be implemented here
-                      toast({
-                        title: "Success",
-                        description: "Rates updated successfully"
-                      });
+                    onClick={async () => {
+                      if (!selectedGRN) return;
+                      
+                      try {
+                        // Create updated GRN with new rates
+                        const updatedItems = distributeReceivingCosts(selectedGRN.data.items, selectedGRN.data.receivingCosts).map(item => {
+                          const itemId = item.id || item.description;
+                          const editedRate = editedRates[itemId];
+                          
+                          // If there's an edited rate, update the item
+                          if (editedRate !== undefined && editedRate > 0) {
+                            return {
+                              ...item,
+                              rate: editedRate
+                            };
+                          }
+                          return item;
+                        });
+                        
+                        // Update the GRN data with new items
+                        const updatedGRN: SavedGRN = {
+                          ...selectedGRN,
+                          data: {
+                            ...selectedGRN.data,
+                            items: updatedItems
+                          },
+                          updatedAt: new Date().toISOString()
+                        };
+                        
+                        // Save to database and localStorage
+                        await updateGRN(updatedGRN);
+                        
+                        // Update local state
+                        setGrns(prev => prev.map(grn => 
+                          grn.id === selectedGRN.id ? updatedGRN : grn
+                        ));
+                        
+                        toast({
+                          title: "Success",
+                          description: "Rates updated successfully"
+                        });
+                      } catch (error) {
+                        console.error("Error saving rates:", error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to save rates",
+                          variant: "destructive"
+                        });
+                      }
                     }}
                   >
                     Save Rates

@@ -360,13 +360,14 @@ interface GRNItem {
   orderedQuantity: number;
   receivedQuantity: number;
   unit: string;
-  unitCost?: number;  // Cost per unit
+  originalUnitCost?: number;  // Original cost per unit (without receiving costs)
+  unitCost?: number;  // Cost per unit (including receiving costs)
   totalCost?: number;  // Total cost without receiving costs
   receivingCostPerUnit?: number;  // Receiving cost per unit
   totalWithReceivingCost?: number;  // Total cost including receiving costs
   batchNumber?: string;
   expiryDate?: string;
-  remarks: string;
+  remarks?: string;
 }
 
 interface GRNReceivingCost {
@@ -1157,9 +1158,9 @@ Thank you for your business!`,
       receivedBy: "Warehouse Staff",
       receivedLocation: "Main Warehouse",
       items: [
-        { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
-        { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
-        { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+        { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
+        { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
+        { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
       ],
       receivingCosts: [
         { id: "1", description: "Transport Charges", amount: 0 },
@@ -1513,7 +1514,7 @@ Thank you for your business!`,
                     <td>${item.orderedQuantity}</td>
                     <td>${item.receivedQuantity}</td>
                     <td>${item.unit}</td>
-                    <td>${formatCurrency(item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}</td>
+                    <td>${formatCurrency(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0))}</td>
                     <td>${formatCurrency(item.receivingCostPerUnit || 0)}</td>
                     <td>${formatCurrency(item.unitCost || 0)}</td>
                     <td>${formatCurrency(item.totalWithReceivingCost || 0)}</td>
@@ -1677,6 +1678,7 @@ Thank you for your business!`,
           orderedQuantity: 0,
           receivedQuantity: 0,
           unit: "",
+          originalUnitCost: 0,
           unitCost: 0,
           totalCost: 0,
           receivingCostPerUnit: 0,
@@ -2215,7 +2217,7 @@ Thank you for your business!`,
         'Ordered': item.orderedQuantity,
         'Received': item.receivedQuantity,
         'Unit': item.unit,
-        'Original Unit Cost': item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0,
+        'Original Unit Cost': item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0),
         'Receiving Cost Per Unit': item.receivingCostPerUnit || 0,
         'New Unit Cost': item.unitCost || 0,
         'Total Cost with Receiving': item.totalWithReceivingCost || 0,
@@ -2654,7 +2656,7 @@ Thank you for your business!`,
     // Update each item with receiving cost per unit and total cost with receiving costs
     return items.map(item => {
       const receivingCostPerUnit = costPerUnit;
-      const unitCostWithReceiving = (item.unitCost || 0) + receivingCostPerUnit;
+      const unitCostWithReceiving = (item.originalUnitCost || item.unitCost || 0) + receivingCostPerUnit;
       const totalWithReceivingCost = unitCostWithReceiving * item.receivedQuantity;
       
       return {
@@ -3502,7 +3504,7 @@ Thank you for your business!`,
                   <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
                   <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
                   <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -8405,12 +8407,13 @@ Thank you for your business!`,
                                       <Input
                                         type="number"
                                         step="0.01"
-                                        value={item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0}
+                                        value={item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}
                                         onChange={(e) => setGrnData(prev => ({
                                           ...prev,
                                           items: prev.items.map(i => 
                                             i.id === item.id ? { 
                                               ...i, 
+                                              originalUnitCost: parseFloat(e.target.value) || 0,
                                               unitCost: (parseFloat(e.target.value) || 0) + (item.receivingCostPerUnit || 0)
                                             } : i
                                           )
