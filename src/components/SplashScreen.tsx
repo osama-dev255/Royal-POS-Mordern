@@ -1,179 +1,276 @@
-import { useState, useEffect } from "react";
-import { ShoppingCart, Package, TrendingUp, Users, Zap, Shield, BarChart3 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { 
+  TrendingUp, 
+  DollarSign, 
+  ShoppingCart, 
+  Users, 
+  BarChart3, 
+  Building, 
+  Globe, 
+  CreditCard, 
+  PieChart, 
+  Target,
+  Activity,
+  Briefcase
+} from "lucide-react";
 import "../App.css";
 
 export const SplashScreen = () => {
   const [isVisible, setIsVisible] = useState(true);
-  const [animationStage, setAnimationStage] = useState(0);
-  const [particles, setParticles] = useState<Array<{id: number, x: number, y: number, size: number}>>([]);
+  const [businessMetrics, setBusinessMetrics] = useState({
+    revenue: 0,
+    customers: 0,
+    orders: 0,
+    growth: 0
+  });
+  const [activeChart, setActiveChart] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Simulate business metrics loading
+    const metricInterval = setInterval(() => {
+      setBusinessMetrics(prev => ({
+        revenue: Math.min(1000000, prev.revenue + 5000),
+        customers: Math.min(10000, prev.customers + 5),
+        orders: Math.min(50000, prev.orders + 10),
+        growth: Math.min(98, prev.growth + 0.5)
+      }));
+    }, 50);
+
+    // Set up business analytics canvas
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const drawBusinessChart = () => {
+          if (!ctx) return;
+          
+          // Create subtle business analytics background
+          const width = canvas.width;
+          const height = canvas.height;
+          const time = Date.now() * 0.001;
+          
+          // Clear with business-themed background
+          ctx.fillStyle = 'rgba(249, 250, 251, 0.05)';
+          ctx.fillRect(0, 0, width, height);
+          
+          // Draw subtle business activity points
+          for (let i = 0; i < 20; i++) {
+            const x = (i / 20) * width;
+            const y = height / 2 + Math.sin(time + i * 0.5) * 20;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(34, 197, 94, ${0.1 + Math.sin(time + i) * 0.05})`;
+            ctx.fill();
+          }
+          
+          animationFrameRef.current = requestAnimationFrame(drawBusinessChart);
+        };
+        
+        drawBusinessChart();
+      }
+    }
+
+    // Auto-hide after 4 seconds
     const timer = setTimeout(() => {
       setIsVisible(false);
-    }, 5000); // Hide splash screen after 5 seconds
-
-    // Staggered animations
-    const stage1 = setTimeout(() => setAnimationStage(1), 200);
-    const stage2 = setTimeout(() => setAnimationStage(2), 500);
-    const stage3 = setTimeout(() => setAnimationStage(3), 800);
-    const stage4 = setTimeout(() => setAnimationStage(4), 1100);
-    const stage5 = setTimeout(() => setAnimationStage(5), 1400);
-
-    // Generate particles for background animation
-    const generateParticles = () => {
-      const newParticles = [];
-      for (let i = 0; i < 30; i++) {
-        newParticles.push({
-          id: i,
-          x: Math.random() * 100,
-          y: Math.random() * 100,
-          size: Math.random() * 4 + 1
-        });
-      }
-      setParticles(newParticles);
-    };
-
-    generateParticles();
+    }, 4000);
 
     return () => {
+      clearInterval(metricInterval);
       clearTimeout(timer);
-      clearTimeout(stage1);
-      clearTimeout(stage2);
-      clearTimeout(stage3);
-      clearTimeout(stage4);
-      clearTimeout(stage5);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, []);
+
+  // Business chart data for visualization
+  const businessCharts = [
+    { label: "Revenue Growth", value: businessMetrics.growth, color: "from-green-500 to-emerald-500" },
+    { label: "Customer Base", value: (businessMetrics.customers / 100), color: "from-blue-500 to-cyan-500" },
+    { label: "Order Volume", value: (businessMetrics.orders / 500), color: "from-purple-500 to-violet-500" },
+    { label: "Profit Margin", value: businessMetrics.growth * 0.8, color: "from-amber-500 to-orange-500" }
+  ];
 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-background via-primary/5 to-secondary/10 flex items-center justify-center splash-screen overflow-hidden">
-      {/* Animated particle background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {particles.map((particle) => (
-          <div
-            key={particle.id}
-            className="absolute rounded-full bg-primary/10"
-            style={{
-              width: `${particle.size}px`,
-              height: `${particle.size}px`,
-              top: `${particle.y}%`,
-              left: `${particle.x}%`,
-              animation: `particle-float ${Math.random() * 6 + 4}s infinite ease-in-out`,
-              animationDelay: `${Math.random() * 2}s`,
-              opacity: Math.random() * 0.5 + 0.1
-            }}
-          ></div>
-        ))}
-      </div>
-
-      {/* Geometric background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 border border-primary/10 rounded-full animate-spin-slow"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-48 h-48 border border-secondary/10 rotate-45 animate-pulse"></div>
-        <div className="absolute top-1/3 right-1/4 w-32 h-32 bg-primary/5 rounded-lg transform rotate-12 animate-float"></div>
-      </div>
-
-      <div className="text-center relative z-10 max-w-4xl mx-auto px-4">
-        {/* Advanced logo animation */}
-        <div className="mb-10 relative">
-          {/* Outer ring with rotation */}
-          <div className={`absolute inset-0 rounded-full border-2 border-primary/20 animate-spin-slow ${animationStage >= 1 ? 'opacity-100' : 'opacity-0'}`}></div>
-          
-          {/* Inner pulsing ring */}
-          <div className={`absolute inset-4 rounded-full border border-primary/30 animate-ping ${animationStage >= 1 ? 'opacity-70' : 'opacity-0'}`}></div>
-          
-          {/* Main logo container with 3D effect */}
-          <div className={`relative bg-gradient-to-br from-primary to-primary/80 rounded-3xl p-8 shadow-2xl backdrop-blur-sm transform transition-all duration-700 ${animationStage >= 2 ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}>
-            <div className="relative z-10">
-              <ShoppingCart className="h-20 w-20 text-white mx-auto" />
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50/20 to-emerald-50/30 flex items-center justify-center splash-screen overflow-hidden">
+      {/* Business Analytics Canvas */}
+      <canvas 
+        ref={canvasRef} 
+        className="absolute inset-0 w-full h-full"
+      />
+      
+      {/* Business Growth Timeline */}
+      <div className="absolute top-0 bottom-0 left-1/4 flex items-center justify-center opacity-20">
+        <div className="flex flex-col items-center space-y-8">
+          {['Q1', 'Q2', 'Q3', 'Q4'].map((quarter, index) => (
+            <div 
+              key={quarter}
+              className="text-2xl font-bold text-slate-600"
+              style={{
+                animation: `float 3s ease-in-out infinite`,
+                animationDelay: `${index * 0.3}s`
+              }}
+            >
+              {quarter}
             </div>
+          ))}
+        </div>
+        <div className="ml-16 flex flex-col items-center space-y-8">
+          {businessCharts.map((chart, index) => (
+            <div 
+              key={index}
+              className="w-2 h-16 rounded-full bg-gradient-to-t from-emerald-500 to-green-400"
+              style={{
+                height: `${Math.min(64, chart.value)}px`,
+                animation: `pulse 2s infinite`,
+                animationDelay: `${index * 0.2}s`
+              }}
+            ></div>
+          ))}
+        </div>
+      </div>
+
+      {/* Market Intelligence Dashboard */}
+      <div className="absolute top-0 bottom-0 right-1/4 flex items-center justify-center opacity-30">
+        <div className="relative w-64 h-64">
+          {/* Revenue pie chart segments */}
+          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 rotate-90"></div>
+          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-gradient-to-r from-purple-400 to-violet-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 rotate-180"></div>
+          
+          {/* Market indicators */}
+          <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+          <div className="absolute top-1/4 right-1/4 w-4 h-4 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+          <div className="absolute bottom-1/4 left-1/4 w-4 h-4 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute bottom-1/4 right-1/4 w-4 h-4 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+        </div>
+      </div>
+
+      {/* Central Business Hub */}
+      <div className="relative z-20 text-center max-w-4xl px-4">
+        {/* Business Growth Animation */}
+        <div className="mb-10 relative flex justify-center">
+          <div className="relative w-72 h-72 flex items-center justify-center">
+            {/* Business ecosystem ring */}
+            <div className="absolute w-full h-full rounded-full bg-gradient-to-r from-green-500/10 via-blue-500/10 to-emerald-500/10 animate-spin-slower"></div>
             
-            {/* Floating corner icons */}
-            <div className={`absolute -top-4 -left-4 transition-all duration-500 ${animationStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <Package className="h-8 w-8 text-white/80" />
-            </div>
-            <div className={`absolute -bottom-4 -right-4 transition-all duration-500 delay-100 ${animationStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <TrendingUp className="h-8 w-8 text-white/80" />
-            </div>
-            <div className={`absolute -top-4 -right-4 transition-all duration-500 delay-200 ${animationStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <Users className="h-8 w-8 text-white/80" />
-            </div>
-            <div className={`absolute -bottom-4 -left-4 transition-all duration-500 delay-300 ${animationStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <BarChart3 className="h-8 w-8 text-white/80" />
+            {/* Market expansion rings */}
+            <div className="absolute w-5/6 h-5/6 rounded-full border-2 border-green-400/30 animate-spin-slow"></div>
+            <div className="absolute w-4/6 h-4/6 rounded-full border-2 border-blue-400/30 animate-pulse-slow"></div>
+            <div className="absolute w-3/6 h-3/6 rounded-full border-2 border-emerald-400/30 animate-spin"></div>
+            
+            {/* Central business hub */}
+            <div className="relative w-32 h-32 flex items-center justify-center">
+              <div className="relative">
+                <Building className="h-20 w-20 text-green-600 animate-pulse" />
+                
+                {/* Market growth indicators */}
+                {[0, 1, 2, 3].map(i => (
+                  <div
+                    key={i}
+                    className="absolute w-2 h-2 bg-green-500 rounded-full"
+                    style={{
+                      transform: `rotate(${i * 90 + businessMetrics.growth}deg) translate(50px) rotate(${-i * 90 - businessMetrics.growth}deg)`,
+                      boxShadow: '0 0 8px rgba(34, 197, 94, 0.8)'
+                    }}
+                  />
+                ))}
+                
+                {/* Global reach */}
+                <div className="absolute -inset-4 rounded-full border border-green-400/20 animate-pulse"></div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Brand name with advanced typography */}
-        <div className={`mb-6 transition-all duration-700 delay-300 ${animationStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-black mb-4">
-            <span className="bg-gradient-to-r from-primary via-primary/90 to-primary bg-clip-text text-transparent">
+        {/* Business Branding */}
+        <div className="mb-8 relative">
+          <h1 className="text-7xl md:text-8xl lg:text-9xl font-black mb-4 relative">
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-green-600 via-blue-600 to-emerald-600 animate-text-shine">
               KILANGO
             </span>
-            <span className="block text-2xl md:text-3xl font-light text-muted-foreground mt-2">
-              Group Food Suppliers & General
-            </span>
+            <div className="absolute -inset-2 bg-gradient-to-r from-green-500 to-emerald-500 blur-xl opacity-20 animate-pulse"></div>
           </h1>
-        </div>
-
-        {/* Advanced tagline with animated underline */}
-        <div className={`mb-10 transition-all duration-700 delay-500 ${animationStage >= 4 ? 'opacity-100' : 'opacity-0'}`}>
-          <p className="text-xl md:text-2xl font-medium text-foreground/90 mb-4">
-            Digital Business Solutions for Modern Enterprises
+          <p className="text-2xl md:text-3xl text-slate-700/90 tracking-widest font-light">
+            BUSINESS INTELLIGENCE PLATFORM
           </p>
-          
-          {/* Animated underline */}
-          <div className="w-32 h-1 bg-gradient-to-r from-primary via-secondary to-primary mx-auto rounded-full relative overflow-hidden">
-            <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
+        </div>
+
+        {/* Business Metrics Dashboard */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          {[
+            { icon: DollarSign, label: "REVENUE", value: `$${Math.floor(businessMetrics.revenue).toLocaleString()}`, color: "text-green-600" },
+            { icon: Users, label: "CUSTOMERS", value: Math.floor(businessMetrics.customers).toLocaleString(), color: "text-blue-600" },
+            { icon: ShoppingCart, label: "ORDERS", value: Math.floor(businessMetrics.orders).toLocaleString(), color: "text-purple-600" },
+            { icon: TrendingUp, label: "GROWTH", value: `${Math.floor(businessMetrics.growth)}%`, color: "text-amber-600" }
+          ].map((metric, index) => (
+            <div 
+              key={index}
+              className="bg-white/60 backdrop-blur-sm border border-green-500/30 rounded-xl p-4 transition-all duration-700 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-green-500/20"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
+              <metric.icon className={`h-10 w-10 ${metric.color} mx-auto mb-2 animate-pulse`} />
+              <div className="text-xs text-slate-600/80 uppercase tracking-wider">{metric.label}</div>
+              <div className={`text-xl font-bold ${metric.color}`}>{metric.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Business Performance Bar */}
+        <div className="relative w-full max-w-2xl mx-auto mb-8">
+          <div className="h-4 bg-slate-200 rounded-full overflow-hidden border border-green-500/30">
+            <div 
+              className="h-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+              style={{ width: `${businessMetrics.growth}%` }}
+            ></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent animate-shimmer"></div>
+          </div>
+          <div className="text-sm text-slate-700/90 mt-2 uppercase tracking-wider flex justify-between">
+            <span>BUSINESS PERFORMANCE</span>
+            <span>{Math.round(businessMetrics.growth)}%</span>
           </div>
         </div>
 
-        {/* Feature showcase with advanced animations */}
-        <div className={`mb-12 transition-all duration-700 delay-700 ${animationStage >= 5 ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-            {[
-              { icon: Zap, label: "Lightning Fast" },
-              { icon: Shield, label: "Secure" },
-              { icon: BarChart3, label: "Analytics" },
-              { icon: Package, label: "Inventory" }
-            ].map((item, index) => (
-              <div 
-                key={index}
-                className="flex flex-col items-center p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all duration-300 group"
-                style={{ 
-                  animationDelay: `${0.1 * index}s`,
-                  transform: animationStage >= 5 ? 'translateY(0)' : 'translateY(20px)',
-                  opacity: animationStage >= 5 ? 1 : 0
-                }}
-              >
-                <item.icon className="h-6 w-6 text-primary mb-2 group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-sm font-medium text-foreground/80">{item.label}</span>
-              </div>
-            ))}
+        {/* Business Capabilities */}
+        <div className="flex items-center justify-center space-x-10 text-slate-700/70">
+          <div className="flex items-center space-x-2">
+            <PieChart className="h-5 w-5 text-green-600" />
+            <span className="text-sm uppercase tracking-wider">ANALYTICS</span>
           </div>
-        </div>
-
-        {/* Advanced loading indicator */}
-        <div className={`flex flex-col items-center transition-all duration-700 delay-1000 ${animationStage >= 5 ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex space-x-2 mb-3">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-2 w-2 bg-primary rounded-full"
-                style={{
-                  animation: `pulse 1.4s infinite`,
-                  animationDelay: `${0.15 * i}s`
-                }}
-              ></div>
-            ))}
+          <div className="flex items-center space-x-2">
+            <Globe className="h-5 w-5 text-blue-600" />
+            <span className="text-sm uppercase tracking-wider">GLOBAL REACH</span>
           </div>
-          <span className="text-sm text-muted-foreground font-medium tracking-wider uppercase">
-            Initializing System
-          </span>
+          <div className="flex items-center space-x-2">
+            <Activity className="h-5 w-5 text-purple-600" />
+            <span className="text-sm uppercase tracking-wider">REAL-TIME</span>
+          </div>
         </div>
       </div>
+
+      {/* Business Nodes */}
+      {[...Array(15)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-2 h-2 bg-green-500 rounded-full opacity-40"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animation: `particle-drift ${4 + Math.random() * 3}s infinite linear`,
+            animationDelay: `${Math.random() * 2}s`,
+            boxShadow: '0 0 5px rgba(34, 197, 94, 0.5)'
+          }}
+        />
+      ))}
     </div>
   );
 };

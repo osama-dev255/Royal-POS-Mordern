@@ -73,6 +73,24 @@
   animation-fill-mode: both;
 }
 
+/* Enhanced splash screen animations */
+.splash-screen {
+  perspective: 1000px;
+}
+
+.splash-screen::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(120, 119, 198, 0.1) 0%, transparent 70%);
+  z-index: 1000;
+  animation: float 15s ease-in-out infinite;
+}
+
 /* Professional Splash Screen Styles */
 @keyframes pulse {
   0%, 100% {
@@ -131,6 +149,69 @@
   }
 }
 
+@keyframes text-shine {
+  0% {
+    background-position: -200% 0%;
+  }
+  100% {
+    background-position: 200% 0%;
+  }
+}
+
+@keyframes grow-width {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes grow-width-reverse {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin-slower {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes particle-drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(5px, 5px);
+  }
+  50% {
+    transform: translate(0, 10px);
+  }
+  75% {
+    transform: translate(-5px, 5px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
@@ -143,12 +224,37 @@
   animation: spin-slow 20s linear infinite;
 }
 
+.animate-spin-slower {
+  animation: spin-slower 30s linear infinite;
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
+}
+
+.animate-text-shine {
+  background-size: 200% auto;
+  animation: text-shine 3s linear infinite;
+}
+
+.animate-grow-width {
+  animation: grow-width 1.5s ease-in-out forwards;
+}
+
+.animate-grow-width-reverse {
+  animation: grow-width-reverse 2s ease-in-out forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-particle-drift {
+  animation: particle-drift 6s ease-in-out infinite;
 }
 
 /* Responsive Utilities */
