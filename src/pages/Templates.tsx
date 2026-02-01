@@ -45,7 +45,7 @@ import WhatsAppUtils from '@/utils/whatsappUtils';
 import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUtils';
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
-import { saveGRN, SavedGRN as UtilsSavedGRN } from '@/utils/grnUtils';
+import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
@@ -4753,11 +4753,25 @@ Thank you for your business!`,
           
           // If quantity or rate changes, update amount
           if (field === 'quantity' || field === 'rate') {
+            // Apply discount validation: if quantity > 20, deduct 200 from rate
+            let effectiveRate = updatedItem.rate;
             if (field === 'quantity') {
-              updatedItem.amount = Number(value) * updatedItem.rate;
+              const newQuantity = Number(value);
+              if (newQuantity >= 20) {
+                effectiveRate = Math.max(0, updatedItem.rate - 200); // Ensure rate doesn't go below 0
+              }
+              updatedItem.amount = newQuantity * effectiveRate;
             } else if (field === 'rate') {
-              updatedItem.amount = updatedItem.quantity * Number(value);
+              const newRate = Number(value);
+              if (updatedItem.quantity >= 20) {
+                effectiveRate = Math.max(0, newRate - 200); // Ensure rate doesn't go below 0
+              } else {
+                effectiveRate = newRate;
+              }
+              updatedItem.amount = updatedItem.quantity * effectiveRate;
             }
+            // Update the rate in the item to reflect the discounted rate
+            updatedItem.rate = effectiveRate;
           }
           
           return updatedItem;
@@ -4779,6 +4793,69 @@ Thank you for your business!`,
       };
     });
   };
+  
+  // Fetch all GRN items for the searchable dropdown with rates and units
+  const getAllGRNItems = async () => {
+    try {
+      const savedGRNs = await getSavedGRNs();
+      const itemsMap = new Map<string, { rate: number, unit: string }>(); // description -> { rate, unit }
+      
+      savedGRNs.forEach(grn => {
+        if (grn.data && grn.data.items) {
+          grn.data.items.forEach(item => {
+            if (item.description) {
+              // Type assertion to handle different GRNItem interfaces
+              const itemAny = item as any;
+              
+              // Use the dedicated 'rate' field if available, otherwise fall back to 0 (empty)
+              // Do NOT calculate original unit cost as fallback
+              const rateValue = (itemAny.rate !== undefined && itemAny.rate !== null) ? 
+                             itemAny.rate : 
+                             0;
+              
+              // Store the latest occurrence of each description
+              itemsMap.set(item.description, { 
+                rate: rateValue, 
+                unit: item.unit || ''
+              });
+            }
+          });
+        }
+      });
+      
+      return itemsMap;
+    } catch (error) {
+      console.error('Error fetching GRN items:', error);
+      return new Map<string, { rate: number, unit: string }>();
+    }
+  };
+  
+  // Fetch all GRN descriptions for the searchable dropdown
+  const getAllGRNDescriptions = async (): Promise<string[]> => {
+    try {
+      const itemsMap = await getAllGRNItems();
+      return Array.from(itemsMap.keys());
+    } catch (error) {
+      console.error('Error fetching GRN descriptions:', error);
+      return [];
+    }
+  };
+  
+  // State for GRN descriptions
+  const [grnDescriptions, setGrnDescriptions] = useState<string[]>([]);
+  const [grnItemsMap, setGrnItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  
+  // Load GRN descriptions and items map on component mount
+  useEffect(() => {
+    const loadGRNData = async () => {
+      const itemsMap = await getAllGRNItems();
+      setGrnItemsMap(itemsMap);
+      setGrnDescriptions(Array.from(itemsMap.keys()));
+    };
+    
+    loadGRNData();
+  }, []);
   
   // Show invoice options dialog
   const showInvoiceOptionsDialog = () => {
@@ -7084,11 +7161,63 @@ Thank you for your business!`,
                                       {String(index + 1).padStart(3, '0')}
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.description}
-                                        onChange={(e) => handleInvoiceItemChange(item.id, 'description', e.target.value)}
-                                        className="p-1 h-8 text-sm"
-                                      />
+                                      <div className="relative">
+                                        <Input
+                                          value={item.description}
+                                          onChange={(e) => {
+                                            handleInvoiceItemChange(item.id, 'description', e.target.value);
+                                          }}
+                                          onFocus={async (e) => {
+                                            // Load GRN items map when the input is focused
+                                            const itemsMap = await getAllGRNItems();
+                                            setGrnItemsMap(itemsMap);
+                                            setGrnDescriptions(Array.from(itemsMap.keys()));
+                                            setShowDropdown(true);
+                                          }}
+                                          onBlur={() => {
+                                            // Delay hiding the dropdown to allow click events to register
+                                            setTimeout(() => setShowDropdown(false), 150);
+                                          }}
+                                          className="p-1 h-8 text-sm w-full"
+                                          placeholder="Select or enter description..."
+                                        />
+                                        {grnDescriptions.length > 0 && showDropdown && (
+                                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                            {grnDescriptions
+                                              .filter(desc => 
+                                                item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
+                                              )
+                                              .map((desc, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                  onMouseDown={() => {
+                                                    handleInvoiceItemChange(item.id, 'description', desc);
+                                                    // Set the rate and unit from the GRN if available
+                                                    const itemDataFromGRN = grnItemsMap.get(desc);
+                                                    if (itemDataFromGRN) {
+                                                      // Apply discount validation: if quantity > 20, deduct 200 from rate
+                                                      let effectiveRate = itemDataFromGRN.rate;
+                                                      if (item.quantity >= 20) {
+                                                        effectiveRate = Math.max(0, itemDataFromGRN.rate - 200);
+                                                      }
+                                                      
+                                                      handleInvoiceItemChange(item.id, 'rate', effectiveRate);
+                                                      handleInvoiceItemChange(item.id, 'unit', itemDataFromGRN.unit);
+                                                      // Also update the amount based on the effective rate and existing quantity
+                                                      const newAmount = item.quantity * effectiveRate;
+                                                      handleInvoiceItemChange(item.id, 'amount', newAmount);
+                                                    }
+                                                    setShowDropdown(false);
+                                                  }}
+                                                >
+                                                  {desc}
+                                                </div>
+                                              ))
+                                            }
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
@@ -7097,8 +7226,7 @@ Thank you for your business!`,
                                         onChange={(e) => {
                                           const newQuantity = parseFloat(e.target.value);
                                           handleInvoiceItemChange(item.id, 'quantity', newQuantity);
-                                          // Update amount when quantity changes
-                                          handleInvoiceItemChange(item.id, 'amount', newQuantity * item.rate);
+                                          // The handleInvoiceItemChange function now handles the discount validation automatically
                                         }}
                                         className="p-1 h-8 text-sm"
                                       />
@@ -7118,8 +7246,7 @@ Thank you for your business!`,
                                         onChange={(e) => {
                                           const newRate = parseFloat(e.target.value);
                                           handleInvoiceItemChange(item.id, 'rate', newRate);
-                                          // Update amount when rate changes
-                                          handleInvoiceItemChange(item.id, 'amount', item.quantity * newRate);
+                                          // The handleInvoiceItemChange function now handles the discount validation automatically
                                         }}
                                         className="p-1 h-8 text-sm"
                                       />
