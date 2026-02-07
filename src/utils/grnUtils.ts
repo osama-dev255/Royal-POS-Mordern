@@ -57,6 +57,7 @@ export interface SavedGRN {
   id: string;
   name: string;
   data: GRNData;
+  total: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,6 +94,11 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       
       console.log('Required fields:', requiredFields);
       
+      // Calculate total from items
+      const totalAmount = grn.data.items?.reduce((sum, item) => {
+        return sum + Number(item.totalWithReceivingCost || item.total || 0);
+      }, 0) || 0;
+      
       // Prepare full data object
       const insertData = {
         user_id: user.id,
@@ -127,6 +133,7 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
         approved_date: grn.data.approvedDate ? new Date(grn.data.approvedDate).toISOString().split('T')[0] : null,
         received_date: grn.data.receivedDate ? new Date(grn.data.receivedDate).toISOString().split('T')[0] : null,
         status: grn.data.status || 'completed',
+        total_amount: totalAmount,
         created_at: grn.createdAt,
         updated_at: grn.updatedAt
       };
@@ -215,7 +222,19 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
         // Fallback to localStorage
         console.log('Falling back to localStorage');
         const saved = localStorage.getItem(SAVED_GRNS_KEY);
-        const result = saved ? JSON.parse(saved) : [];
+        let result = saved ? JSON.parse(saved) : [];
+        
+        // Ensure each GRN has a total property calculated from items if not present
+        result = result.map(grn => {
+          if (typeof grn.total === 'undefined' && grn.data && grn.data.items) {
+            const total = grn.data.items.reduce((sum, item) => {
+              return sum + Number(item.totalWithReceivingCost || item.total || 0);
+            }, 0);
+            return { ...grn, total };
+          }
+          return grn;
+        });
+        
         console.log('LocalStorage result:', result);
         return result;
       }
@@ -224,6 +243,7 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
       const result = data.map(dbGRN => ({
         id: dbGRN.id,
         name: dbGRN.name,
+        total: dbGRN.total_amount || 0, // Include the total from database
         data: {
           grnNumber: dbGRN.grn_number,
           date: dbGRN.received_date || dbGRN.created_at.split('T')[0],
@@ -269,7 +289,19 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
       // If not authenticated, use localStorage
       console.log('Not authenticated, using localStorage');
       const saved = localStorage.getItem(SAVED_GRNS_KEY);
-      const result = saved ? JSON.parse(saved) : [];
+      let result = saved ? JSON.parse(saved) : [];
+      
+      // Ensure each GRN has a total property calculated from items if not present
+      result = result.map(grn => {
+        if (typeof grn.total === 'undefined' && grn.data && grn.data.items) {
+          const total = grn.data.items.reduce((sum, item) => {
+            return sum + Number(item.totalWithReceivingCost || item.total || 0);
+          }, 0);
+          return { ...grn, total };
+        }
+        return grn;
+      });
+      
       console.log('LocalStorage result (unauthenticated):', result);
       return result;
     }
@@ -314,6 +346,11 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
     );
     localStorage.setItem(SAVED_GRNS_KEY, JSON.stringify(updatedGRNs));
     
+    // Calculate total from items
+    const totalAmount = updatedGRN.data.items?.reduce((sum, item) => {
+      return sum + Number(item.totalWithReceivingCost || item.total || 0);
+    }, 0) || 0;
+    
     // Also update in database
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -324,6 +361,7 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
           supplier_name: updatedGRN.data.supplierName,
           po_number: updatedGRN.data.poNumber,
           items: updatedGRN.data.items,
+          total_amount: totalAmount,
           status: updatedGRN.data.status,
           updated_at: updatedGRN.updatedAt
         })

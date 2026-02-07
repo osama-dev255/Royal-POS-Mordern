@@ -323,7 +323,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectio
                       date: grn.data.date,
                       supplier: grn.data.supplierName,
                       items: grn.data.items.length,
-                      total: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
+                      total: grn.total,
                       poNumber: grn.data.poNumber,
                       status: grn.data.status === "pending" || grn.data.status === "cancelled" ? "received" : (grn.data.status || "received")
                     }}
