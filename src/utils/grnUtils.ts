@@ -8,6 +8,7 @@ export interface GRNItem {
   quantity: number;
   delivered: number;
   unit: string;
+  originalUnitCost?: number;  // Original cost per unit (without receiving costs)
   unitCost: number;
   total: number;
   batchNumber?: string;
@@ -15,6 +16,7 @@ export interface GRNItem {
   remarks?: string;
   receivingCostPerUnit?: number;
   totalWithReceivingCost?: number;
+  rate?: number;
 }
 
 export interface GRNData {

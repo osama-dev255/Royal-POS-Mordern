@@ -530,11 +530,16 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
     }
   };
 
-  // Print receipt
+  // Print receipt or invoice based on payment method
   const printReceipt = () => {
     // Use the completed transaction if available, otherwise create a mock transaction
     if (completedTransaction) {
-      PrintUtils.printReceipt(completedTransaction);
+      // For Debt payments, print invoice format instead of receipt
+      if (completedTransaction.paymentMethod === "debt") {
+        PrintUtils.printDebtInvoice(completedTransaction);
+      } else {
+        PrintUtils.printReceipt(completedTransaction);
+      }
     } else {
       // In a real app, this would fetch the transaction details
       const mockTransaction = {
@@ -549,7 +554,13 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
         amountReceived: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) : (parseFloat(amountReceived) || totalWithTax),
         change: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) - totalWithTax : change
       };
-      PrintUtils.printReceipt(mockTransaction);
+      
+      // For Debt payments, print invoice format instead of receipt
+      if (paymentMethod === "debt") {
+        PrintUtils.printDebtInvoice(mockTransaction);
+      } else {
+        PrintUtils.printReceipt(mockTransaction);
+      }
     }
   };
 
@@ -1193,9 +1204,13 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
               Quit Cart
             </Button>
             <Button onClick={() => {
-              // Print receipt and then close
+              // Print receipt/invoice and then close
               if (completedTransaction) {
-                PrintUtils.printReceipt(completedTransaction);
+                if (completedTransaction.paymentMethod === "debt") {
+                  PrintUtils.printDebtInvoice(completedTransaction);
+                } else {
+                  PrintUtils.printReceipt(completedTransaction);
+                }
               }
               setIsTransactionCompleteDialogOpen(false);
               toast({
@@ -1204,7 +1219,7 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
               });
             }}>
               <Printer className="h-4 w-4 mr-2" />
-              Print Receipt
+              {completedTransaction?.paymentMethod === "debt" ? "Print Invoice" : "Print Receipt"}
             </Button>
           </div>
         </DialogContent>

@@ -12,6 +12,7 @@ import { Truck, Package, Calendar, CheckCircle, AlertTriangle, Plus, Edit, Eye }
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { getSavedGRNs, updateGRN, SavedGRN } from "@/utils/grnUtils";
+import { GRNCreateDialog } from "./GRNCreateDialog";
 
 interface GRNManagementCardProps {
   searchTerm: string;
@@ -81,6 +82,8 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
   const [editedRates, setEditedRates] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
   // Load data on mount and when refresh trigger changes
   useEffect(() => {
     loadData();
@@ -89,17 +92,17 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
   useEffect(() => {
     // Listen for add GRN dialog event
     const handleOpenDialog = () => {
-      // This would typically open a form to create a new GRN
-      // For now, we'll just show a message
-      toast({
-        title: "Feature Coming Soon",
-        description: "GRN creation form will be implemented in the next update"
-      });
+      setIsCreateDialogOpen(true);
     };
     
     window.addEventListener('openAddGRNDialog', handleOpenDialog);
     return () => window.removeEventListener('openAddGRNDialog', handleOpenDialog);
   }, []);
+
+  const handleGRNCreated = () => {
+    loadData(); // Refresh the data
+    setIsCreateDialogOpen(false);
+  };
 
   const loadData = async () => {
     try {
@@ -553,6 +556,12 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
           </DialogContent>
         </Dialog>
       </CardContent>
+      
+      <GRNCreateDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={setIsCreateDialogOpen}
+        onGRNCreated={handleGRNCreated}
+      />
     </Card>
   );
 };

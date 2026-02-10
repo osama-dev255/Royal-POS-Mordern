@@ -67,6 +67,8 @@ interface DeliveryNoteItem {
   description: string;
   quantity: number;
   unit: string;
+  rate: number;
+  amount: number;
   delivered: number;
   remarks: string;
 }
@@ -127,9 +129,9 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   vehicle: "",
   driver: "",
   items: [
-    { id: "1", description: "Sample Product 1", quantity: 10, unit: "pcs", delivered: 10, remarks: "Good condition" },
-    { id: "2", description: "Sample Product 2", quantity: 5, unit: "boxes", delivered: 5, remarks: "Fragile" },
-    { id: "3", description: "Sample Product 3", quantity: 2, unit: "units", delivered: 2, remarks: "" }
+    { id: "1", description: "Sample Product 1", quantity: 10, unit: "pcs", rate: 100, amount: 1000, delivered: 10, remarks: "Good condition" },
+    { id: "2", description: "Sample Product 2", quantity: 5, unit: "boxes", rate: 250, amount: 1250, delivered: 5, remarks: "Fragile" },
+    { id: "3", description: "Sample Product 3", quantity: 2, unit: "units", rate: 500, amount: 1000, delivered: 2, remarks: "" }
   ],
   deliveryNotes: "Please handle with care. Fragile items included.\nSignature required upon delivery.",
   totalItems: 3,
@@ -932,9 +934,9 @@ Thank you for your business!`,
     vehicle: "",
     driver: "",
     items: [
-      { id: "1", description: "Sample Product 1", quantity: 10, unit: "pcs", delivered: 10, remarks: "Good condition" },
-      { id: "2", description: "Sample Product 2", quantity: 5, unit: "boxes", delivered: 5, remarks: "Fragile" },
-      { id: "3", description: "Sample Product 3", quantity: 2, unit: "units", delivered: 2, remarks: "" }
+      { id: "1", description: "Sample Product 1", quantity: 10, unit: "pcs", rate: 100, amount: 1000, delivered: 10, remarks: "Good condition" },
+      { id: "2", description: "Sample Product 2", quantity: 5, unit: "boxes", rate: 250, amount: 1250, delivered: 5, remarks: "Fragile" },
+      { id: "3", description: "Sample Product 3", quantity: 2, unit: "units", rate: 500, amount: 1000, delivered: 2, remarks: "" }
     ],
     deliveryNotes: ".\nSignature required upon delivery.",
     totalItems: 3,
@@ -1037,6 +1039,10 @@ Thank you for your business!`,
   }, []);
 
   const [deliveryNoteName, setDeliveryNoteName] = useState<string>("");
+  // GRN search states for delivery note
+  const [deliveryNoteGRNItemsMap, setDeliveryNoteGRNItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  const [deliveryNoteGRNDescriptions, setDeliveryNoteGRNDescriptions] = useState<string[]>([]);
+  const [showDeliveryNoteDropdown, setShowDeliveryNoteDropdown] = useState<boolean>(false);
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
     
@@ -1300,15 +1306,9 @@ Thank you for your business!`,
     
     const newGRN: UtilsSavedGRN = {
       id: Date.now().toString(),
-      name: `GRN-${grnData.grnNumber}`, // Use the actual GRN number for display
-      grnNumber: grnData.grnNumber,
-      date: grnData.date,
-      supplier: grnData.supplierName,
-      items: grnData.items.length,
-      total: totalAmount, // This is the key fix - include the calculated total
-      poNumber: grnData.poNumber,
-      status: grnData.status === 'received' || grnData.status === 'checked' || grnData.status === 'approved' ? 'completed' : (grnData.status || 'completed'),
+      name: `GRN-${grnData.grnNumber}`,
       data: convertedGRNData as any,
+      total: totalAmount,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -2436,6 +2436,8 @@ Thank you for your business!`,
         'Item Description': item.description,
         'Quantity': item.quantity,
         'Unit': item.unit,
+        'Rate': item.rate,
+        'Amount': item.amount,
         'Delivered': item.delivered,
         'Remarks': item.remarks,
       }))
@@ -2756,6 +2758,8 @@ Thank you for your business!`,
         'Item Description': item.description,
         'Quantity': item.quantity,
         'Unit': item.unit,
+        'Rate': item.rate,
+        'Amount': item.amount,
         'Delivered': item.delivered,
         'Remarks': item.remarks,
       }))
@@ -2794,7 +2798,7 @@ Thank you for your business!`,
     csvRows.push(['', '']);
     
     // Add items header
-    csvRows.push(['Item Description', 'Quantity', 'Unit', 'Delivered', 'Remarks']);
+    csvRows.push(['Item Description', 'Quantity', 'Unit', 'Rate', 'Amount', 'Delivered', 'Remarks']);
     
     // Add each item
     exportData.items.forEach(item => {
@@ -2802,6 +2806,8 @@ Thank you for your business!`,
         item['Item Description'],
         item['Quantity'],
         item['Unit'],
+        item['Rate'],
+        item['Amount'],
         item['Delivered'],
         item['Remarks']
       ]);
@@ -3933,6 +3939,8 @@ Thank you for your business!`,
           description: "",
           quantity: 0,
           unit: "",
+          rate: 0,
+          amount: 0,
           delivered: 0,
           remarks: ""
         }
@@ -3988,10 +3996,12 @@ Thank you for your business!`,
             name: item.description,
             quantity: item.quantity,
             unit: item.unit,
+            rate: item.rate,
+            amount: item.amount,
             delivered: item.delivered,
             remarks: item.remarks,
-            price: 0, // Delivery notes don't have prices
-            total: 0  // Delivery notes don't have totals
+            price: item.rate, // For backward compatibility
+            total: item.amount  // For backward compatibility
           })),
           subtotal: totalAmount, // For delivery notes, subtotal is same as total
           tax: 0,
@@ -4596,6 +4606,8 @@ Thank you for your business!`,
                 <th>Item Description</th>
                 <th>Quantity</th>
                 <th>Unit</th>
+                <th>Rate</th>
+                <th>Amount</th>
                 <th>Delivered</th>
                 <th>Remarks</th>
               </tr>
@@ -4606,6 +4618,8 @@ Thank you for your business!`,
                   <td>${item.description}</td>
                   <td>${item.quantity}</td>
                   <td>${item.unit}</td>
+                  <td>${item.rate}</td>
+                  <td>${item.amount}</td>
                   <td>${item.delivered}</td>
                   <td>${item.remarks}</td>
                 </tr>
@@ -5193,6 +5207,8 @@ Thank you for your business!`,
                   <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Description</th>
                   <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Quantity</th>
                   <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Unit</th>
+                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Rate</th>
+                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Amount</th>
                   <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Delivered</th>
                   <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Remarks</th>
                 </tr>
@@ -5204,6 +5220,8 @@ Thank you for your business!`,
                     <td style="border: 1px solid #ccc; padding: 8px;">${item.description}</td>
                     <td style="border: 1px solid #ccc; padding: 8px;">${item.quantity}</td>
                     <td style="border: 1px solid #ccc; padding: 8px;">${item.unit}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${item.rate}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px;">${item.amount}</td>
                     <td style="border: 1px solid #ccc; padding: 8px;">${item.delivered}</td>
                     <td style="border: 1px solid #ccc; padding: 8px;">${item.remarks}</td>
                   </tr>
@@ -9055,6 +9073,8 @@ Thank you for your business!`,
                                   <th className="border border-gray-300 p-2 text-left">Item Description</th>
                                   <th className="border border-gray-300 p-2 text-left">Quantity</th>
                                   <th className="border border-gray-300 p-2 text-left">Unit</th>
+                                  <th className="border border-gray-300 p-2 text-left">Rate</th>
+                                  <th className="border border-gray-300 p-2 text-left">Amount</th>
                                   <th className="border border-gray-300 p-2 text-left">Delivered</th>
                                   <th className="border border-gray-300 p-2 text-left">Remarks</th>
                                   <th className="border border-gray-300 p-2 text-left">Actions</th>
@@ -9064,11 +9084,57 @@ Thank you for your business!`,
                                 {deliveryNoteData.items.map((item) => (
                                   <tr key={item.id}>
                                     <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.description}
-                                        onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
+                                      <div className="relative">
+                                        <Input
+                                          value={item.description}
+                                          onChange={(e) => {
+                                            handleItemChange(item.id, 'description', e.target.value);
+                                          }}
+                                          onFocus={async (e) => {
+                                            // Load GRN items map when the input is focused
+                                            const itemsMap = await getAllGRNItems();
+                                            setDeliveryNoteGRNItemsMap(itemsMap);
+                                            setDeliveryNoteGRNDescriptions(Array.from(itemsMap.keys()));
+                                            setShowDeliveryNoteDropdown(true);
+                                          }}
+                                          onBlur={() => {
+                                            // Delay hiding the dropdown to allow click events to register
+                                            setTimeout(() => setShowDeliveryNoteDropdown(false), 150);
+                                          }}
+                                          className="p-1 h-8 text-sm w-full"
+                                          placeholder="Select or enter description..."
+                                        />
+                                        {deliveryNoteGRNDescriptions.length > 0 && showDeliveryNoteDropdown && (
+                                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                            {deliveryNoteGRNDescriptions
+                                              .filter(desc => 
+                                                item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
+                                              )
+                                              .map((desc, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                  onMouseDown={() => {
+                                                    handleItemChange(item.id, 'description', desc);
+                                                    // Set the rate and unit from the GRN if available
+                                                    const itemDataFromGRN = deliveryNoteGRNItemsMap.get(desc);
+                                                    if (itemDataFromGRN) {
+                                                      handleItemChange(item.id, 'rate', itemDataFromGRN.rate);
+                                                      handleItemChange(item.id, 'unit', itemDataFromGRN.unit);
+                                                      // Also update the amount based on the rate and existing quantity
+                                                      const newAmount = itemDataFromGRN.rate * item.quantity;
+                                                      handleItemChange(item.id, 'amount', newAmount);
+                                                    }
+                                                    setShowDeliveryNoteDropdown(false);
+                                                  }}
+                                                >
+                                                  {desc}
+                                                </div>
+                                              ))
+                                            }
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
@@ -9082,6 +9148,30 @@ Thank you for your business!`,
                                       <Input
                                         value={item.unit}
                                         onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={item.rate}
+                                        onChange={(e) => {
+                                          const newRate = parseFloat(e.target.value) || 0;
+                                          handleItemChange(item.id, 'rate', newRate);
+                                          // Auto-calculate amount when rate changes
+                                          const newAmount = newRate * item.quantity;
+                                          handleItemChange(item.id, 'amount', newAmount);
+                                        }}
+                                        className="p-1 h-8 text-sm w-full"
+                                      />
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={item.amount}
+                                        onChange={(e) => handleItemChange(item.id, 'amount', parseFloat(e.target.value) || 0)}
                                         className="p-1 h-8 text-sm w-full"
                                       />
                                     </td>

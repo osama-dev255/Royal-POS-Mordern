@@ -3295,6 +3295,44 @@ export class PrintUtils {
     }, 250);
   }
 
+  // Print invoice for Debt payment transactions
+  static printDebtInvoice(transaction: any) {
+    // Convert transaction to invoice-like format for consistent printing
+    const invoiceLike = {
+      id: transaction.id,
+      invoiceNumber: transaction.receiptNumber,
+      date: transaction.date || new Date().toISOString(),
+      customer: transaction.customer?.name || 'Walk-in Customer',
+      items: transaction.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
+      total: transaction.total,
+      paymentMethod: 'debt',
+      status: 'pending',
+      itemsList: transaction.items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: '',
+        quantity: item.quantity,
+        rate: item.price,
+        amount: item.price * item.quantity,
+        unit: 'unit'
+      })),
+      subtotal: transaction.subtotal,
+      tax: transaction.tax,
+      discount: transaction.discount,
+      amountReceived: transaction.amountReceived || 0,
+      change: transaction.change || 0,
+      businessName: localStorage.getItem('businessName'),
+      businessAddress: localStorage.getItem('businessAddress'),
+      businessPhone: localStorage.getItem('businessPhone'),
+      amountPaid: 0, // For debt transactions, amount paid is 0
+      creditBroughtForward: 0,
+      amountDue: transaction.total // For debt transactions, amount due equals total
+    };
+    
+    // Use the same printSavedInvoice function for consistent formatting
+    this.printSavedInvoice(invoiceLike);
+  }
+
   // Print purchase order
   static printPurchaseOrder(poData: any) {
     const reportWindow = window.open('', '_blank');
