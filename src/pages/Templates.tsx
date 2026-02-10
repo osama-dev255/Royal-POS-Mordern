@@ -99,6 +99,14 @@ interface DeliveryNoteData {
   driverDate: string;
   receivedByName: string;
   receivedByDate: string;
+  // Financial fields
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  amountPaid: number;
+  creditBroughtForward: number;
+  amountDue: number;
   timestamp?: string;
 }
 
@@ -142,7 +150,15 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   driverName: "",
   driverDate: "",
   receivedByName: "",
-  receivedByDate: ""
+  receivedByDate: "",
+  // Financial fields
+  subtotal: 3250,
+  tax: 0,
+  discount: 0,
+  total: 3250,
+  amountPaid: 0,
+  creditBroughtForward: 0,
+  amountDue: 3250
 };
 
 // Purchase Order Item interface with unit field
@@ -947,7 +963,15 @@ Thank you for your business!`,
     driverName: "",
     driverDate: "",
     receivedByName: "",
-    receivedByDate: ""
+    receivedByDate: "",
+    // Financial fields
+    subtotal: 3250,
+    tax: 0,
+    discount: 0,
+    total: 3250,
+    amountPaid: 0,
+    creditBroughtForward: 0,
+    amountDue: 3250
   };
   
   const [deliveryNoteData, setDeliveryNoteData] = useState<DeliveryNoteData>(initialDeliveryNoteData);
@@ -2177,6 +2201,26 @@ Thank you for your business!`,
       date: new Date().toISOString().split('T')[0], // Set to current date
     });
   };
+
+  // Calculate delivery note totals
+  const calculateDeliveryNoteTotals = () => {
+    const subtotal = deliveryNoteData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const total = subtotal + Number(deliveryNoteData.tax || 0) - Number(deliveryNoteData.discount || 0);
+    const amountDue = total - Number(deliveryNoteData.amountPaid || 0) + Number(deliveryNoteData.creditBroughtForward || 0);
+    
+    return { subtotal, total, amountDue };
+  };
+
+  // Update delivery note totals when items change
+  useEffect(() => {
+    const totals = calculateDeliveryNoteTotals();
+    setDeliveryNoteData(prev => ({
+      ...prev,
+      subtotal: totals.subtotal,
+      total: totals.total,
+      amountDue: totals.amountDue
+    }));
+  }, [deliveryNoteData.items, deliveryNoteData.tax, deliveryNoteData.discount, deliveryNoteData.amountPaid, deliveryNoteData.creditBroughtForward]);
   
   // Function to export GRN as PDF
   const exportGRNAsPDF = () => {
@@ -2440,7 +2484,13 @@ Thank you for your business!`,
         'Amount': item.amount,
         'Delivered': item.delivered,
         'Remarks': item.remarks,
-      }))
+      })),
+      financialSummary: {
+        'Total': deliveryNoteData.total,
+        'Amount Paid': deliveryNoteData.amountPaid,
+        'Credit Brought Forward': deliveryNoteData.creditBroughtForward,
+        'Amount Due': deliveryNoteData.amountDue
+      }
     };
     
     // Create a simpler array structure for export
@@ -5199,7 +5249,26 @@ Thank you for your business!`,
             <div><strong>Total Packages:</strong> ${deliveryNoteData.totalPackages}</div>
           </div>
           
-          <div class="items-table">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+          <table style="width: 300px; font-size: 14px;">
+            <tr>
+              <td style="padding: 5px;"><strong>Total:</strong></td>
+              <td style="padding: 5px; text-align: right;">${formatCurrency(calculateDeliveryNoteTotals().total)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px;"><strong>Amount Paid:</strong></td>
+              <td style="padding: 5px; text-align: right;">${formatCurrency(deliveryNoteData.amountPaid)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px;"><strong>Credit Brought Forward from previous:</strong></td>
+              <td style="padding: 5px; text-align: right;">${formatCurrency(deliveryNoteData.creditBroughtForward)}</td>
+            </tr>
+            <tr style="border-top: 2px solid #000; padding-top: 5px;">
+              <td style="padding: 5px;"><strong>AMOUNT DUE:</strong></td>
+              <td style="padding: 5px; text-align: right; color: #dc2626;"><strong>${formatCurrency(calculateDeliveryNoteTotals().amountDue)}</strong></td>
+            </tr>
+          </table>
+        </div>
             <table style="width: 100%; border-collapse: collapse;">
               <thead>
                 <tr>
@@ -9213,6 +9282,38 @@ Thank you for your business!`,
                           <Plus className="h-4 w-4 mr-1" />
                           Add Item
                         </Button>
+                        
+                        {/* Financial Summary */}
+                        <div className="grid grid-cols-1 gap-2 max-w-xs ml-auto">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Total:</span>
+                            <span>{formatCurrency(calculateDeliveryNoteTotals().total)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Amount Paid:</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={deliveryNoteData.amountPaid}
+                              onChange={(e) => handleDeliveryNoteChange('amountPaid', parseFloat(e.target.value) || 0)}
+                              className="w-24 inline-block p-1 h-8 text-right"
+                            />
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Credit Brought Forward from previous:</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={deliveryNoteData.creditBroughtForward}
+                              onChange={(e) => handleDeliveryNoteChange('creditBroughtForward', parseFloat(e.target.value) || 0)}
+                              className="w-24 inline-block p-1 h-8 text-right"
+                            />
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                            <span className="font-bold">AMOUNT DUE:</span>
+                            <span className="font-bold text-red-600">{formatCurrency(calculateDeliveryNoteTotals().amountDue)}</span>
+                          </div>
+                        </div>
                         
                         {/* Document Notes */}
                         <div>
