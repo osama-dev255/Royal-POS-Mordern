@@ -12,6 +12,7 @@ export interface GRNItem {
   rejectionIn: number;
   damaged: number;
   complimentary: number;
+  physicalStock: number;
   available: number;
   unit: string;
   originalUnitCost?: number;  // Original cost per unit (without receiving costs)

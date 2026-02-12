@@ -404,6 +404,7 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                 <TableHead className="text-right">Rejection In</TableHead>
                                 <TableHead className="text-right">Damaged</TableHead>
                                 <TableHead className="text-right">Complimentary</TableHead>
+                                <TableHead className="text-right">Physical Stock</TableHead>
                                 <TableHead className="text-right">Available</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead className="text-right">Original Unit Cost</TableHead>
@@ -667,6 +668,54 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                       min="0"
                                     />
                                   </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      value={item.physicalStock || 0}
+                                      onChange={async (e) => {
+                                        const physicalStockValue = parseInt(e.target.value) || 0;
+                                        const updatedItems = grnData.items.map(i => 
+                                          i.id === item.id ? { 
+                                            ...i, 
+                                            physicalStock: physicalStockValue
+                                          } : i
+                                        );
+                                        
+                                        // Update the selected GRN data
+                                        const updatedGRN = {
+                                          ...selectedGRN,
+                                          data: {
+                                            ...selectedGRN!.data,
+                                            items: updatedItems
+                                          },
+                                          updatedAt: new Date().toISOString()
+                                        };
+                                        
+                                        setSelectedGRN(updatedGRN);
+                                        
+                                        // Save to database and localStorage
+                                        try {
+                                          await updateGRN(updatedGRN);
+                                          
+                                          // Update local state
+                                          setGrns(prev => prev.map(grn => 
+                                            grn.id === selectedGRN.id ? updatedGRN : grn
+                                          ));
+                                        } catch (error) {
+                                          console.error("Error saving physical stock value:", error);
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to save physical stock value",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }}
+                                      className="w-20 text-right"
+                                      placeholder="0"
+                                      step="1"
+                                      min="0"
+                                    />
+                                  </TableCell>
                                   <TableCell className="text-right">{item.available || (item.delivered - (item.soldout || 0) - (item.rejectedOut || 0) + (item.rejectionIn || 0) - (item.damaged || 0) - (item.complimentary || 0))}</TableCell>
                                   <TableCell>{item.unit}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0)))}</TableCell>
@@ -761,6 +810,7 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                             rejectionIn: originalItem?.rejectionIn || 0,
                             damaged: originalItem?.damaged || 0,
                             complimentary: originalItem?.complimentary || 0,
+                            physicalStock: originalItem?.physicalStock || 0,
                             available: originalItem?.available || (originalItem?.delivered || 0) - (originalItem?.soldout || 0) - (originalItem?.rejectedOut || 0) + (originalItem?.rejectionIn || 0) - (originalItem?.damaged || 0) - (originalItem?.complimentary || 0)
                           };
                         });

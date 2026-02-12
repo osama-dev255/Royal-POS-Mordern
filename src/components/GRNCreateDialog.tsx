@@ -59,6 +59,7 @@ const initialGRNData: GRNData = {
       rejectionIn: 0,
       damaged: 0,
       complimentary: 0,
+      physicalStock: 0,
       available: 0,
       unit: "",
       unitCost: 0,
@@ -116,6 +117,7 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
           rejectionIn: 0,
           damaged: 0,
           complimentary: 0,
+          physicalStock: 0,
           available: 0,
           unit: "",
           unitCost: 0,
@@ -149,6 +151,9 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
             const unitCost = field === 'unitCost' ? Number(value) : item.unitCost;
             updatedItem.total = quantity * unitCost;
           }
+          
+          // Ensure physicalStock exists for backward compatibility
+          updatedItem.physicalStock = item.physicalStock || 0;
           
           // Recalculate available when delivered, soldout, rejectedOut, rejectionIn, damaged, or complimentary changes
           if (field === 'delivered' || field === 'soldout' || field === 'rejectedOut' || field === 'rejectionIn' || field === 'damaged' || field === 'complimentary') {
