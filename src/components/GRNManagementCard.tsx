@@ -11,29 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Truck, Package, Calendar, CheckCircle, AlertTriangle, Plus, Edit, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
-import { getSavedGRNs, updateGRN, SavedGRN } from "@/utils/grnUtils";
+import { getSavedGRNs, updateGRN, SavedGRN, GRNItem } from "@/utils/grnUtils";
 import { GRNCreateDialog } from "./GRNCreateDialog";
 
 interface GRNManagementCardProps {
   searchTerm: string;
   refreshTrigger: number;
-}
-
-interface GRNItem {
-  id: string;
-  description: string;
-  quantity: number;
-  delivered: number;
-  unit: string;
-  originalUnitCost?: number;  // Original cost per unit (without receiving costs)
-  unitCost: number;  // Cost per unit (including receiving costs)
-  total: number;
-  batchNumber?: string;
-  expiryDate?: string;
-  remarks?: string;
-  receivingCostPerUnit?: number;
-  totalWithReceivingCost?: number;
-  rate?: number;
 }
 
 interface GRNData {
@@ -416,6 +399,12 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                 <TableHead>Description</TableHead>
                                 <TableHead className="text-right">Ordered</TableHead>
                                 <TableHead className="text-right">Received</TableHead>
+                                <TableHead className="text-right">Soldout</TableHead>
+                                <TableHead className="text-right">Rejected Out</TableHead>
+                                <TableHead className="text-right">Rejection In</TableHead>
+                                <TableHead className="text-right">Damaged</TableHead>
+                                <TableHead className="text-right">Complimentary</TableHead>
+                                <TableHead className="text-right">Available</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead className="text-right">Original Unit Cost</TableHead>
                                 <TableHead className="text-right">Receiving Cost Per Unit</TableHead>
@@ -433,6 +422,252 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                   <TableCell className="font-medium">{item.description}</TableCell>
                                   <TableCell className="text-right">{item.quantity}</TableCell>
                                   <TableCell className="text-right">{item.delivered}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      value={item.soldout || 0}
+                                      onChange={async (e) => {
+                                        const soldoutValue = parseInt(e.target.value) || 0;
+                                        const updatedItems = grnData.items.map(i => 
+                                          i.id === item.id ? { 
+                                            ...i, 
+                                            soldout: soldoutValue, 
+                                            available: (i.delivered || 0) - soldoutValue - (i.rejectedOut || 0) + (i.rejectionIn || 0) - (i.damaged || 0) - (i.complimentary || 0)
+                                          } : i
+                                        );
+                                        
+                                        // Update the selected GRN data
+                                        const updatedGRN = {
+                                          ...selectedGRN,
+                                          data: {
+                                            ...selectedGRN!.data,
+                                            items: updatedItems
+                                          },
+                                          updatedAt: new Date().toISOString()
+                                        };
+                                        
+                                        setSelectedGRN(updatedGRN);
+                                        
+                                        // Save to database and localStorage
+                                        try {
+                                          await updateGRN(updatedGRN);
+                                          
+                                          // Update local state
+                                          setGrns(prev => prev.map(grn => 
+                                            grn.id === selectedGRN.id ? updatedGRN : grn
+                                          ));
+                                        } catch (error) {
+                                          console.error("Error saving soldout value:", error);
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to save soldout value",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }}
+                                      className="w-20 text-right"
+                                      placeholder="0"
+                                      step="1"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      value={item.rejectedOut || 0}
+                                      onChange={async (e) => {
+                                        const rejectedOutValue = parseInt(e.target.value) || 0;
+                                        const updatedItems = grnData.items.map(i => 
+                                          i.id === item.id ? { 
+                                            ...i, 
+                                            rejectedOut: rejectedOutValue, 
+                                            available: (i.delivered || 0) - (i.soldout || 0) - rejectedOutValue + (i.rejectionIn || 0) - (i.damaged || 0) - (i.complimentary || 0)
+                                          } : i
+                                        );
+                                        
+                                        // Update the selected GRN data
+                                        const updatedGRN = {
+                                          ...selectedGRN,
+                                          data: {
+                                            ...selectedGRN!.data,
+                                            items: updatedItems
+                                          },
+                                          updatedAt: new Date().toISOString()
+                                        };
+                                        
+                                        setSelectedGRN(updatedGRN);
+                                        
+                                        // Save to database and localStorage
+                                        try {
+                                          await updateGRN(updatedGRN);
+                                          
+                                          // Update local state
+                                          setGrns(prev => prev.map(grn => 
+                                            grn.id === selectedGRN.id ? updatedGRN : grn
+                                          ));
+                                        } catch (error) {
+                                          console.error("Error saving rejected out value:", error);
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to save rejected out value",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }}
+                                      className="w-20 text-right"
+                                      placeholder="0"
+                                      step="1"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      value={item.rejectionIn || 0}
+                                      onChange={async (e) => {
+                                        const rejectionInValue = parseInt(e.target.value) || 0;
+                                        const updatedItems = grnData.items.map(i => 
+                                          i.id === item.id ? { 
+                                            ...i, 
+                                            rejectionIn: rejectionInValue, 
+                                            available: (i.delivered || 0) - (i.soldout || 0) - (i.rejectedOut || 0) + rejectionInValue - (i.damaged || 0) - (i.complimentary || 0)
+                                          } : i
+                                        );
+                                        
+                                        // Update the selected GRN data
+                                        const updatedGRN = {
+                                          ...selectedGRN,
+                                          data: {
+                                            ...selectedGRN!.data,
+                                            items: updatedItems
+                                          },
+                                          updatedAt: new Date().toISOString()
+                                        };
+                                        
+                                        setSelectedGRN(updatedGRN);
+                                        
+                                        // Save to database and localStorage
+                                        try {
+                                          await updateGRN(updatedGRN);
+                                          
+                                          // Update local state
+                                          setGrns(prev => prev.map(grn => 
+                                            grn.id === selectedGRN.id ? updatedGRN : grn
+                                          ));
+                                        } catch (error) {
+                                          console.error("Error saving rejection in value:", error);
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to save rejection in value",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }}
+                                      className="w-20 text-right"
+                                      placeholder="0"
+                                      step="1"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      value={item.damaged || 0}
+                                      onChange={async (e) => {
+                                        const damagedValue = parseInt(e.target.value) || 0;
+                                        const updatedItems = grnData.items.map(i => 
+                                          i.id === item.id ? { 
+                                            ...i, 
+                                            damaged: damagedValue, 
+                                            available: (i.delivered || 0) - (i.soldout || 0) - (i.rejectedOut || 0) + (i.rejectionIn || 0) - damagedValue - (i.complimentary || 0)
+                                          } : i
+                                        );
+                                        
+                                        // Update the selected GRN data
+                                        const updatedGRN = {
+                                          ...selectedGRN,
+                                          data: {
+                                            ...selectedGRN!.data,
+                                            items: updatedItems
+                                          },
+                                          updatedAt: new Date().toISOString()
+                                        };
+                                        
+                                        setSelectedGRN(updatedGRN);
+                                        
+                                        // Save to database and localStorage
+                                        try {
+                                          await updateGRN(updatedGRN);
+                                          
+                                          // Update local state
+                                          setGrns(prev => prev.map(grn => 
+                                            grn.id === selectedGRN.id ? updatedGRN : grn
+                                          ));
+                                        } catch (error) {
+                                          console.error("Error saving damaged value:", error);
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to save damaged value",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }}
+                                      className="w-20 text-right"
+                                      placeholder="0"
+                                      step="1"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Input
+                                      type="number"
+                                      value={item.complimentary || 0}
+                                      onChange={async (e) => {
+                                        const complimentaryValue = parseInt(e.target.value) || 0;
+                                        const updatedItems = grnData.items.map(i => 
+                                          i.id === item.id ? { 
+                                            ...i, 
+                                            complimentary: complimentaryValue, 
+                                            available: (i.delivered || 0) - (i.soldout || 0) - (i.rejectedOut || 0) + (i.rejectionIn || 0) - (i.damaged || 0) - complimentaryValue
+                                          } : i
+                                        );
+                                        
+                                        // Update the selected GRN data
+                                        const updatedGRN = {
+                                          ...selectedGRN,
+                                          data: {
+                                            ...selectedGRN!.data,
+                                            items: updatedItems
+                                          },
+                                          updatedAt: new Date().toISOString()
+                                        };
+                                        
+                                        setSelectedGRN(updatedGRN);
+                                        
+                                        // Save to database and localStorage
+                                        try {
+                                          await updateGRN(updatedGRN);
+                                          
+                                          // Update local state
+                                          setGrns(prev => prev.map(grn => 
+                                            grn.id === selectedGRN.id ? updatedGRN : grn
+                                          ));
+                                        } catch (error) {
+                                          console.error("Error saving complimentary value:", error);
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to save complimentary value",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }}
+                                      className="w-20 text-right"
+                                      placeholder="0"
+                                      step="1"
+                                      min="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">{item.available || (item.delivered - (item.soldout || 0) - (item.rejectedOut || 0) + (item.rejectionIn || 0) - (item.damaged || 0) - (item.complimentary || 0))}</TableCell>
                                   <TableCell>{item.unit}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0)))}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.receivingCostPerUnit || 0)}</TableCell>
@@ -490,8 +725,11 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                       if (!selectedGRN) return;
                       
                       try {
-                        // Create updated GRN with new rates
-                        const updatedItems = selectedGRN.data.items.map(item => {
+                        // Create updated GRN with new rates and preserve soldout/available values
+                        // Get the current items from the selectedGRN state (which includes updated soldout/available values)
+                        const currentItems = selectedGRN.data.items;
+                        
+                        const updatedItems = currentItems.map(item => {
                           const itemId = item.id || item.description;
                           const editedRate = editedRates[itemId];
                           
@@ -512,12 +750,27 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                         // Apply receiving cost distribution
                         const itemsWithCosts = distributeReceivingCosts(updatedItems, selectedGRN.data.receivingCosts);
                         
+                        // Update the GRN data with new items, preserving all new field values
+                        const finalItems = itemsWithCosts.map((itemWithCosts, index) => {
+                          // Preserve all the new field values from the current selectedGRN state
+                          const originalItem = selectedGRN.data.items[index];
+                          return {
+                            ...itemWithCosts,
+                            soldout: originalItem?.soldout || 0,
+                            rejectedOut: originalItem?.rejectedOut || 0,
+                            rejectionIn: originalItem?.rejectionIn || 0,
+                            damaged: originalItem?.damaged || 0,
+                            complimentary: originalItem?.complimentary || 0,
+                            available: originalItem?.available || (originalItem?.delivered || 0) - (originalItem?.soldout || 0) - (originalItem?.rejectedOut || 0) + (originalItem?.rejectionIn || 0) - (originalItem?.damaged || 0) - (originalItem?.complimentary || 0)
+                          };
+                        });
+                        
                         // Update the GRN data with new items
                         const updatedGRN: SavedGRN = {
                           ...selectedGRN,
                           data: {
                             ...selectedGRN.data,
-                            items: itemsWithCosts
+                            items: finalItems
                           },
                           updatedAt: new Date().toISOString()
                         };

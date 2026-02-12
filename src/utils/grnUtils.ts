@@ -7,6 +7,12 @@ export interface GRNItem {
   description: string;
   quantity: number;
   delivered: number;
+  soldout: number;
+  rejectedOut: number;
+  rejectionIn: number;
+  damaged: number;
+  complimentary: number;
+  available: number;
   unit: string;
   originalUnitCost?: number;  // Original cost per unit (without receiving costs)
   unitCost: number;

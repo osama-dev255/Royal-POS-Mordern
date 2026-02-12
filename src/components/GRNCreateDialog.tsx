@@ -54,6 +54,12 @@ const initialGRNData: GRNData = {
       description: "",
       quantity: 0,
       delivered: 0,
+      soldout: 0,
+      rejectedOut: 0,
+      rejectionIn: 0,
+      damaged: 0,
+      complimentary: 0,
+      available: 0,
       unit: "",
       unitCost: 0,
       total: 0,
@@ -105,6 +111,12 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
           description: "",
           quantity: 0,
           delivered: 0,
+          soldout: 0,
+          rejectedOut: 0,
+          rejectionIn: 0,
+          damaged: 0,
+          complimentary: 0,
+          available: 0,
           unit: "",
           unitCost: 0,
           total: 0,
@@ -136,6 +148,17 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
             const quantity = field === 'delivered' ? Number(value) : item.delivered;
             const unitCost = field === 'unitCost' ? Number(value) : item.unitCost;
             updatedItem.total = quantity * unitCost;
+          }
+          
+          // Recalculate available when delivered, soldout, rejectedOut, rejectionIn, damaged, or complimentary changes
+          if (field === 'delivered' || field === 'soldout' || field === 'rejectedOut' || field === 'rejectionIn' || field === 'damaged' || field === 'complimentary') {
+            const delivered = field === 'delivered' ? Number(value) : item.delivered;
+            const soldout = field === 'soldout' ? Number(value) : item.soldout || 0;
+            const rejectedOut = field === 'rejectedOut' ? Number(value) : item.rejectedOut || 0;
+            const rejectionIn = field === 'rejectionIn' ? Number(value) : item.rejectionIn || 0;
+            const damaged = field === 'damaged' ? Number(value) : item.damaged || 0;
+            const complimentary = field === 'complimentary' ? Number(value) : item.complimentary || 0;
+            updatedItem.available = delivered - soldout - rejectedOut + rejectionIn - damaged - complimentary;
           }
           
           return updatedItem;
