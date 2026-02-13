@@ -46,7 +46,7 @@ import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUti
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
-import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote } from '@/utils/consumptionUtils';
+import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, checkItemAvailability } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
@@ -3970,7 +3970,21 @@ Thank you for your business!`,
   };
 
   // Handle item changes
-  const handleItemChange = (itemId: string, field: keyof DeliveryNoteItem, value: string | number) => {
+  const handleItemChange = async (itemId: string, field: keyof DeliveryNoteItem, value: string | number) => {
+    // If changing quantity, validate against available stock in GRN
+    if (field === 'quantity') {
+      const item = deliveryNoteData.items.find(item => item.id === itemId);
+      if (item && item.description) {
+        const requestedQuantity = Number(value);
+        const availability = await checkItemAvailability(item.description, requestedQuantity);
+        
+        if (!availability.available) {
+          alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+          return; // Don't update the item
+        }
+      }
+    }
+    
     setDeliveryNoteData(prev => ({
       ...prev,
       items: prev.items.map(item => {
@@ -4039,6 +4053,23 @@ Thank you for your business!`,
     if (currentTemplate?.type === "delivery-note") {
       // For delivery note templates, automatically save to saved deliveries
       try {
+        // Validate that all quantities are available before saving
+        let hasUnavailableItems = false;
+        for (const item of deliveryNoteData.items) {
+          if (item.description && item.quantity > 0) {
+            const availability = await checkItemAvailability(item.description, item.quantity);
+            if (!availability.available) {
+              alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+              hasUnavailableItems = true;
+              break;
+            }
+          }
+        }
+        
+        if (hasUnavailableItems) {
+          return; // Don't save if there are unavailable items
+        }
+
         // Calculate total items
         const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + item.quantity, 0);
         
@@ -4829,7 +4860,21 @@ Thank you for your business!`,
   };
   
   // Handle invoice item changes
-  const handleInvoiceItemChange = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
+  const handleInvoiceItemChange = async (itemId: string, field: keyof InvoiceItem, value: string | number) => {
+    // If changing quantity, validate against available stock in GRN
+    if (field === 'quantity') {
+      const item = invoiceData.items.find(item => item.id === itemId);
+      if (item && item.description) {
+        const requestedQuantity = Number(value);
+        const availability = await checkItemAvailability(item.description, requestedQuantity);
+        
+        if (!availability.available) {
+          alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+          return; // Don't update the item
+        }
+      }
+    }
+    
     setInvoiceData(prev => {
       const updatedItems = prev.items.map(item => {
         if (item.id === itemId) {
@@ -5731,6 +5776,23 @@ Thank you for your business!`,
   // Handle save invoice to saved invoices section
   const handleSaveInvoice = async () => {
     try {
+      // Validate that all quantities are available before saving
+      let hasUnavailableItems = false;
+      for (const item of invoiceData.items) {
+        if (item.description && item.quantity > 0) {
+          const availability = await checkItemAvailability(item.description, item.quantity);
+          if (!availability.available) {
+            alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+            hasUnavailableItems = true;
+            break;
+          }
+        }
+      }
+      
+      if (hasUnavailableItems) {
+        return; // Don't save if there are unavailable items
+      }
+
       // Create invoice data for saving
       const invoiceToSave: SavedInvoiceData = {
         id: invoiceData.invoiceNumber, // Use invoice number as ID
@@ -6492,6 +6554,23 @@ Thank you for your business!`,
                       } else if (currentTemplate?.type === "invoice") {
                         // Automatically save invoice to saved invoices
                         try {
+                          // Validate that all quantities are available before saving
+                          let hasUnavailableItems = false;
+                          for (const item of invoiceData.items) {
+                            if (item.description && item.quantity > 0) {
+                              const availability = await checkItemAvailability(item.description, item.quantity);
+                              if (!availability.available) {
+                                alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+                                hasUnavailableItems = true;
+                                break;
+                              }
+                            }
+                          }
+                          
+                          if (hasUnavailableItems) {
+                            return; // Don't save if there are unavailable items
+                          }
+
                           // Create invoice data for saving
                           const invoiceToSave: SavedInvoiceData = {
                             id: invoiceData.invoiceNumber, // Use invoice number as ID
@@ -7344,9 +7423,9 @@ Thank you for your business!`,
                                       <Input
                                         type="number"
                                         value={item.quantity}
-                                        onChange={(e) => {
+                                        onChange={async (e) => {
                                           const newQuantity = parseFloat(e.target.value);
-                                          handleInvoiceItemChange(item.id, 'quantity', newQuantity);
+                                          await handleInvoiceItemChange(item.id, 'quantity', newQuantity);
                                           // The handleInvoiceItemChange function now handles the discount validation automatically
                                         }}
                                         className="p-1 h-8 text-sm"
@@ -9241,7 +9320,7 @@ Thank you for your business!`,
                                       <Input
                                         type="number"
                                         value={item.quantity}
-                                        onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                        onChange={async (e) => await handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 0)}
                                         className="p-1 h-8 text-sm w-full"
                                       />
                                     </td>

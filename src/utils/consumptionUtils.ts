@@ -107,3 +107,46 @@ export const updateGRNQuantitiesFromDeliveryNote = async (deliveryItems: Array<{
 }>) => {
   await updateGRNQuantitiesOnConsumption(deliveryItems);
 };
+
+/**
+ * Checks if the requested quantity is available in GRN
+ * @param itemDescription - Description of the item to check
+ * @param requestedQuantity - Quantity requested
+ * @returns Object with availability status and available quantity
+ */
+export const checkItemAvailability = async (itemDescription: string, requestedQuantity: number) => {
+  try {
+    // Get all saved GRNs
+    const savedGRNs = await getSavedGRNs();
+    
+    // Find GRN that contains this item
+    for (const grn of savedGRNs) {
+      const grnItem = grn.data.items.find(
+        item => item.description.toLowerCase().trim() === itemDescription.toLowerCase().trim()
+      );
+      
+      if (grnItem) {
+        const availableQuantity = grnItem.available || 0;
+        return {
+          available: availableQuantity >= requestedQuantity,
+          availableQuantity,
+          grnNumber: grn.data.grnNumber
+        };
+      }
+    }
+
+    // If item not found in any GRN, return 0 available
+    return {
+      available: false,
+      availableQuantity: 0,
+      grnNumber: null
+    };
+  } catch (error) {
+    console.error('Error checking item availability:', error);
+    return {
+      available: false,
+      availableQuantity: 0,
+      grnNumber: null
+    };
+  }
+};
