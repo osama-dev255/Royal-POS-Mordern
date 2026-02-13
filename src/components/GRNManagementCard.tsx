@@ -62,7 +62,6 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
   const [selectedGRN, setSelectedGRN] = useState<SavedGRN | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [editedRates, setEditedRates] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -109,17 +108,9 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
   const openViewDialog = (grn: SavedGRN) => {
     setSelectedGRN(grn);
     setIsViewDialogOpen(true);
-    // Reset edited rates when opening a new GRN
-    setEditedRates({});
   };
 
-  const handleRateChange = (itemId: string, value: string) => {
-    const rate = parseFloat(value) || 0;
-    setEditedRates(prev => ({
-      ...prev,
-      [itemId]: rate
-    }));
-  };
+  
 
   // Function to distribute receiving costs among items based on quantity
   const distributeReceivingCosts = (items: GRNItem[], receivingCosts: Array<{ description: string; amount: number }>) => {
@@ -423,299 +414,12 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                   <TableCell className="font-medium">{item.description}</TableCell>
                                   <TableCell className="text-right">{item.quantity}</TableCell>
                                   <TableCell className="text-right">{item.delivered}</TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={item.soldout || 0}
-                                      onChange={async (e) => {
-                                        const soldoutValue = parseInt(e.target.value) || 0;
-                                        const updatedItems = grnData.items.map(i => 
-                                          i.id === item.id ? { 
-                                            ...i, 
-                                            soldout: soldoutValue, 
-                                            available: (i.delivered || 0) - soldoutValue - (i.rejectedOut || 0) + (i.rejectionIn || 0) - (i.damaged || 0) - (i.complimentary || 0)
-                                          } : i
-                                        );
-                                        
-                                        // Update the selected GRN data
-                                        const updatedGRN = {
-                                          ...selectedGRN,
-                                          data: {
-                                            ...selectedGRN!.data,
-                                            items: updatedItems
-                                          },
-                                          updatedAt: new Date().toISOString()
-                                        };
-                                        
-                                        setSelectedGRN(updatedGRN);
-                                        
-                                        // Save to database and localStorage
-                                        try {
-                                          await updateGRN(updatedGRN);
-                                          
-                                          // Update local state
-                                          setGrns(prev => prev.map(grn => 
-                                            grn.id === selectedGRN.id ? updatedGRN : grn
-                                          ));
-                                        } catch (error) {
-                                          console.error("Error saving soldout value:", error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to save soldout value",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="w-20 text-right"
-                                      placeholder="0"
-                                      step="1"
-                                      min="0"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={item.rejectedOut || 0}
-                                      onChange={async (e) => {
-                                        const rejectedOutValue = parseInt(e.target.value) || 0;
-                                        const updatedItems = grnData.items.map(i => 
-                                          i.id === item.id ? { 
-                                            ...i, 
-                                            rejectedOut: rejectedOutValue, 
-                                            available: (i.delivered || 0) - (i.soldout || 0) - rejectedOutValue + (i.rejectionIn || 0) - (i.damaged || 0) - (i.complimentary || 0)
-                                          } : i
-                                        );
-                                        
-                                        // Update the selected GRN data
-                                        const updatedGRN = {
-                                          ...selectedGRN,
-                                          data: {
-                                            ...selectedGRN!.data,
-                                            items: updatedItems
-                                          },
-                                          updatedAt: new Date().toISOString()
-                                        };
-                                        
-                                        setSelectedGRN(updatedGRN);
-                                        
-                                        // Save to database and localStorage
-                                        try {
-                                          await updateGRN(updatedGRN);
-                                          
-                                          // Update local state
-                                          setGrns(prev => prev.map(grn => 
-                                            grn.id === selectedGRN.id ? updatedGRN : grn
-                                          ));
-                                        } catch (error) {
-                                          console.error("Error saving rejected out value:", error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to save rejected out value",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="w-20 text-right"
-                                      placeholder="0"
-                                      step="1"
-                                      min="0"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={item.rejectionIn || 0}
-                                      onChange={async (e) => {
-                                        const rejectionInValue = parseInt(e.target.value) || 0;
-                                        const updatedItems = grnData.items.map(i => 
-                                          i.id === item.id ? { 
-                                            ...i, 
-                                            rejectionIn: rejectionInValue, 
-                                            available: (i.delivered || 0) - (i.soldout || 0) - (i.rejectedOut || 0) + rejectionInValue - (i.damaged || 0) - (i.complimentary || 0)
-                                          } : i
-                                        );
-                                        
-                                        // Update the selected GRN data
-                                        const updatedGRN = {
-                                          ...selectedGRN,
-                                          data: {
-                                            ...selectedGRN!.data,
-                                            items: updatedItems
-                                          },
-                                          updatedAt: new Date().toISOString()
-                                        };
-                                        
-                                        setSelectedGRN(updatedGRN);
-                                        
-                                        // Save to database and localStorage
-                                        try {
-                                          await updateGRN(updatedGRN);
-                                          
-                                          // Update local state
-                                          setGrns(prev => prev.map(grn => 
-                                            grn.id === selectedGRN.id ? updatedGRN : grn
-                                          ));
-                                        } catch (error) {
-                                          console.error("Error saving rejection in value:", error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to save rejection in value",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="w-20 text-right"
-                                      placeholder="0"
-                                      step="1"
-                                      min="0"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={item.damaged || 0}
-                                      onChange={async (e) => {
-                                        const damagedValue = parseInt(e.target.value) || 0;
-                                        const updatedItems = grnData.items.map(i => 
-                                          i.id === item.id ? { 
-                                            ...i, 
-                                            damaged: damagedValue, 
-                                            available: (i.delivered || 0) - (i.soldout || 0) - (i.rejectedOut || 0) + (i.rejectionIn || 0) - damagedValue - (i.complimentary || 0)
-                                          } : i
-                                        );
-                                        
-                                        // Update the selected GRN data
-                                        const updatedGRN = {
-                                          ...selectedGRN,
-                                          data: {
-                                            ...selectedGRN!.data,
-                                            items: updatedItems
-                                          },
-                                          updatedAt: new Date().toISOString()
-                                        };
-                                        
-                                        setSelectedGRN(updatedGRN);
-                                        
-                                        // Save to database and localStorage
-                                        try {
-                                          await updateGRN(updatedGRN);
-                                          
-                                          // Update local state
-                                          setGrns(prev => prev.map(grn => 
-                                            grn.id === selectedGRN.id ? updatedGRN : grn
-                                          ));
-                                        } catch (error) {
-                                          console.error("Error saving damaged value:", error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to save damaged value",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="w-20 text-right"
-                                      placeholder="0"
-                                      step="1"
-                                      min="0"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={item.complimentary || 0}
-                                      onChange={async (e) => {
-                                        const complimentaryValue = parseInt(e.target.value) || 0;
-                                        const updatedItems = grnData.items.map(i => 
-                                          i.id === item.id ? { 
-                                            ...i, 
-                                            complimentary: complimentaryValue, 
-                                            available: (i.delivered || 0) - (i.soldout || 0) - (i.rejectedOut || 0) + (i.rejectionIn || 0) - (i.damaged || 0) - complimentaryValue
-                                          } : i
-                                        );
-                                        
-                                        // Update the selected GRN data
-                                        const updatedGRN = {
-                                          ...selectedGRN,
-                                          data: {
-                                            ...selectedGRN!.data,
-                                            items: updatedItems
-                                          },
-                                          updatedAt: new Date().toISOString()
-                                        };
-                                        
-                                        setSelectedGRN(updatedGRN);
-                                        
-                                        // Save to database and localStorage
-                                        try {
-                                          await updateGRN(updatedGRN);
-                                          
-                                          // Update local state
-                                          setGrns(prev => prev.map(grn => 
-                                            grn.id === selectedGRN.id ? updatedGRN : grn
-                                          ));
-                                        } catch (error) {
-                                          console.error("Error saving complimentary value:", error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to save complimentary value",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="w-20 text-right"
-                                      placeholder="0"
-                                      step="1"
-                                      min="0"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={item.physicalStock || 0}
-                                      onChange={async (e) => {
-                                        const physicalStockValue = parseInt(e.target.value) || 0;
-                                        const updatedItems = grnData.items.map(i => 
-                                          i.id === item.id ? { 
-                                            ...i, 
-                                            physicalStock: physicalStockValue
-                                          } : i
-                                        );
-                                        
-                                        // Update the selected GRN data
-                                        const updatedGRN = {
-                                          ...selectedGRN,
-                                          data: {
-                                            ...selectedGRN!.data,
-                                            items: updatedItems
-                                          },
-                                          updatedAt: new Date().toISOString()
-                                        };
-                                        
-                                        setSelectedGRN(updatedGRN);
-                                        
-                                        // Save to database and localStorage
-                                        try {
-                                          await updateGRN(updatedGRN);
-                                          
-                                          // Update local state
-                                          setGrns(prev => prev.map(grn => 
-                                            grn.id === selectedGRN.id ? updatedGRN : grn
-                                          ));
-                                        } catch (error) {
-                                          console.error("Error saving physical stock value:", error);
-                                          toast({
-                                            title: "Error",
-                                            description: "Failed to save physical stock value",
-                                            variant: "destructive"
-                                          });
-                                        }
-                                      }}
-                                      className="w-20 text-right"
-                                      placeholder="0"
-                                      step="1"
-                                      min="0"
-                                    />
-                                  </TableCell>
+                                  <TableCell className="text-right">{item.soldout || 0}</TableCell>
+                                  <TableCell className="text-right">{item.rejectedOut || 0}</TableCell>
+                                  <TableCell className="text-right">{item.rejectionIn || 0}</TableCell>
+                                  <TableCell className="text-right">{item.damaged || 0}</TableCell>
+                                  <TableCell className="text-right">{item.complimentary || 0}</TableCell>
+                                  <TableCell className="text-right">{item.physicalStock || 0}</TableCell>
                                   <TableCell className="text-right">{item.available || (item.delivered - (item.soldout || 0) - (item.rejectedOut || 0) + (item.rejectionIn || 0) - (item.damaged || 0) - (item.complimentary || 0))}</TableCell>
                                   <TableCell>{item.unit}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0)))}</TableCell>
@@ -725,17 +429,7 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                                   <TableCell className="text-right">{item.batchNumber || ''}</TableCell>
                                   <TableCell className="text-right">{item.expiryDate || ''}</TableCell>
                                   <TableCell>{item.remarks || ''}</TableCell>
-                                  <TableCell className="text-right">
-                                    <Input
-                                      type="number"
-                                      value={editedRates[item.id || item.description] || item.rate || ''}
-                                      onChange={(e) => handleRateChange(item.id || item.description, e.target.value)}
-                                      className="w-24 text-right"
-                                      placeholder="0.00"
-                                      step="0.01"
-                                      min="0"
-                                    />
-                                  </TableCell>
+                                  <TableCell className="text-right">{item.rate || 0}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -779,17 +473,6 @@ export const GRNManagementCard = ({ searchTerm, refreshTrigger }: GRNManagementC
                         const currentItems = selectedGRN.data.items;
                         
                         const updatedItems = currentItems.map(item => {
-                          const itemId = item.id || item.description;
-                          const editedRate = editedRates[itemId];
-                          
-                          // If there's an edited rate, update the item
-                          if (editedRate !== undefined && editedRate > 0) {
-                            return {
-                              ...item,
-                              rate: editedRate,
-                              originalUnitCost: item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0))
-                            };
-                          }
                           return {
                             ...item,
                             originalUnitCost: item.originalUnitCost || (item.unitCost - (item.receivingCostPerUnit || 0))
