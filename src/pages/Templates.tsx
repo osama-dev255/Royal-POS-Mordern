@@ -46,6 +46,7 @@ import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUti
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
+import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
@@ -3972,9 +3973,21 @@ Thank you for your business!`,
   const handleItemChange = (itemId: string, field: keyof DeliveryNoteItem, value: string | number) => {
     setDeliveryNoteData(prev => ({
       ...prev,
-      items: prev.items.map(item => 
-        item.id === itemId ? { ...item, [field]: value } : item
-      )
+      items: prev.items.map(item => {
+        if (item.id === itemId) {
+          const updatedItem = { ...item, [field]: value };
+          
+          // If quantity or rate changes, update amount
+          if (field === 'quantity' || field === 'rate') {
+            const newQuantity = field === 'quantity' ? Number(value) : item.quantity;
+            const newRate = field === 'rate' ? Number(value) : item.rate;
+            updatedItem.amount = newQuantity * newRate;
+          }
+          
+          return updatedItem;
+        }
+        return item;
+      })
     }));
   };
 
@@ -4065,7 +4078,14 @@ Thank you for your business!`,
         
         await saveDelivery(deliveryToSave);
         
-        alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!`);
+        // Update GRN quantities for consumed items
+        const consumedItems = deliveryNoteData.items.map(item => ({
+          description: item.description,
+          quantity: item.quantity
+        }));
+        await updateGRNQuantitiesFromDeliveryNote(consumedItems);
+        
+        alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN quantities updated for consumed items.`);
         
         // Show the delivery note options dialog after saving
         showDeliveryNoteOptionsDialog();
@@ -5734,9 +5754,16 @@ Thank you for your business!`,
       
       await saveInvoice(invoiceToSave);
       
+      // Update GRN quantities for consumed items
+      const consumedItems = invoiceData.items.map(item => ({
+        description: item.description,
+        quantity: item.quantity
+      }));
+      await updateGRNQuantitiesFromInvoice(consumedItems);
+      
       // Close the dialog and show success message
       setShowInvoiceOptions(false);
-      alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+      alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!\nGRN quantities updated for consumed items.`);
       
       // Reset the invoice data for new input
       resetInvoiceData();
@@ -6493,7 +6520,14 @@ Thank you for your business!`,
                           
                           await saveInvoice(invoiceToSave);
                           
-                          alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!`);
+                          // Update GRN quantities for consumed items
+                          const consumedItems = invoiceData.items.map(item => ({
+                            description: item.description,
+                            quantity: item.quantity
+                          }));
+                          await updateGRNQuantitiesFromInvoice(consumedItems);
+                          
+                          alert(`Invoice ${invoiceData.invoiceNumber} saved successfully to Saved Invoices!\nGRN quantities updated for consumed items.`);
                           
                           // Show the invoice options dialog after saving
                           showInvoiceOptionsDialog();
@@ -9190,9 +9224,7 @@ Thank you for your business!`,
                                                     if (itemDataFromGRN) {
                                                       handleItemChange(item.id, 'rate', itemDataFromGRN.rate);
                                                       handleItemChange(item.id, 'unit', itemDataFromGRN.unit);
-                                                      // Also update the amount based on the rate and existing quantity
-                                                      const newAmount = itemDataFromGRN.rate * item.quantity;
-                                                      handleItemChange(item.id, 'amount', newAmount);
+
                                                     }
                                                     setShowDeliveryNoteDropdown(false);
                                                   }}
@@ -9228,9 +9260,6 @@ Thank you for your business!`,
                                         onChange={(e) => {
                                           const newRate = parseFloat(e.target.value) || 0;
                                           handleItemChange(item.id, 'rate', newRate);
-                                          // Auto-calculate amount when rate changes
-                                          const newAmount = newRate * item.quantity;
-                                          handleItemChange(item.id, 'amount', newAmount);
                                         }}
                                         className="p-1 h-8 text-sm w-full"
                                       />
