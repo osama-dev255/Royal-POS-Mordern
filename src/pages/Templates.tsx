@@ -6077,6 +6077,10 @@ Thank you for your business!`,
     return { subtotal, total, amountDue };
   };
   
+  const calculateInvoiceTotalQuantity = () => {
+    return invoiceData.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  };
+  
   // Update totals when invoice data changes
   useEffect(() => {
     // Recalculate totals when items, tax, or discount change
@@ -7505,6 +7509,10 @@ Thank you for your business!`,
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Subtotal:</span>
                             <span>{formatCurrency(calculateInvoiceTotals().subtotal)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="font-bold">Total Quantity:</span>
+                            <span>{calculateInvoiceTotalQuantity()}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="font-bold">Discount:</span>
