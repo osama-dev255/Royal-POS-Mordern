@@ -407,6 +407,20 @@ interface SupplierInfo {
   tinNumber?: string;
 }
 
+interface LogisticDetails {
+  vehicleNumber: string;
+  driverName: string;
+  driverPhone: string;
+  transportCompany: string;
+  estimatedArrival: string;
+  actualArrival: string;
+  departureTime: string;
+  deliveryLocation: string;
+  specialInstructions: string;
+  shippingMethod: string;
+  trackingNumber: string;
+}
+
 interface GRNData {
   grnNumber: string;
   date: string;
@@ -418,6 +432,7 @@ interface GRNData {
   supplierPhone: string; // Kept for backward compatibility
   supplierEmail: string; // Kept for backward compatibility
   supplierAddress: string; // Kept for backward compatibility
+  logisticDetails: LogisticDetails; // New logistic details field
   businessName: string;
   businessAddress: string;
   businessPhone: string;
@@ -1196,6 +1211,19 @@ Thank you for your business!`,
       supplierPhone: "(555) 987-6543",
       supplierEmail: "supplier@example.com",
       supplierAddress: "123 Supplier Street, City, Country",
+      logisticDetails: {
+        vehicleNumber: "TRUCK-001",
+        driverName: "John Driver",
+        driverPhone: "(555) 123-4567",
+        transportCompany: "Express Logistics",
+        estimatedArrival: "",
+        actualArrival: "",
+        departureTime: "",
+        deliveryLocation: "Main Warehouse",
+        specialInstructions: "Handle with care",
+        shippingMethod: "Ground",
+        trackingNumber: "TRK-001"
+      },
       businessName: "YOUR BUSINESS NAME",
       businessAddress: "123 Business Street, City, Country",
       businessPhone: "+1234567890",
@@ -1778,6 +1806,19 @@ Thank you for your business!`,
     supplierPhone: "(555) 987-6543",
     supplierEmail: "supplier@example.com",
     supplierAddress: "123 Supplier Street, City, Country",
+    logisticDetails: {
+      vehicleNumber: "TRUCK-001",
+      driverName: "John Driver",
+      driverPhone: "(555) 123-4567",
+      transportCompany: "Express Logistics",
+      estimatedArrival: "",
+      actualArrival: "",
+      departureTime: "",
+      deliveryLocation: "Main Warehouse",
+      specialInstructions: "Handle with care",
+      shippingMethod: "Ground",
+      trackingNumber: "TRK-001"
+    },
     businessName: "YOUR BUSINESS NAME",
     businessAddress: "123 Business Street, City, Country",
     businessPhone: "+1234567890",
@@ -8516,6 +8557,190 @@ Thank you for your business!`,
                                 }}
                                 className="w-full p-1 text-sm mt-1"
                               />
+                            </div>
+                            
+                            {/* Logistic Details Section */}
+                            <div className="border border-gray-300 rounded-lg p-4 mt-4 bg-blue-50">
+                              <div className="font-bold text-lg mb-3 text-blue-800">
+                                LOGISTIC DETAILS INFORMATION
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Vehicle Number:</div>
+                                  <Input
+                                    value={grnData.logisticDetails.vehicleNumber}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        vehicleNumber: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                    placeholder="Enter vehicle number"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Driver Name:</div>
+                                  <Input
+                                    value={grnData.logisticDetails.driverName}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        driverName: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                    placeholder="Enter driver name"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Driver Phone:</div>
+                                  <Input
+                                    value={grnData.logisticDetails.driverPhone}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        driverPhone: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                    placeholder="Enter driver phone"
+                                    type="tel"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Transport Company:</div>
+                                  <Input
+                                    value={grnData.logisticDetails.transportCompany}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        transportCompany: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                    placeholder="Enter transport company"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Estimated Arrival:</div>
+                                  <Input
+                                    type="datetime-local"
+                                    value={grnData.logisticDetails.estimatedArrival}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        estimatedArrival: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Actual Arrival:</div>
+                                  <Input
+                                    type="datetime-local"
+                                    value={grnData.logisticDetails.actualArrival}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        actualArrival: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Departure Time:</div>
+                                  <Input
+                                    type="datetime-local"
+                                    value={grnData.logisticDetails.departureTime}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        departureTime: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Delivery Location:</div>
+                                  <Input
+                                    value={grnData.logisticDetails.deliveryLocation}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        deliveryLocation: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                    placeholder="Enter delivery location"
+                                  />
+                                </div>
+                                <div className="md:col-span-2">
+                                  <div className="text-sm font-medium text-gray-700">Special Instructions:</div>
+                                  <Textarea
+                                    value={grnData.logisticDetails.specialInstructions}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        specialInstructions: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1 min-h-[60px]"
+                                    placeholder="Enter special handling instructions"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Shipping Method:</div>
+                                  <Select
+                                    value={grnData.logisticDetails.shippingMethod}
+                                    onValueChange={(value) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        shippingMethod: value
+                                      }
+                                    }))}
+                                  >
+                                    <SelectTrigger className="w-full mt-1">
+                                      <SelectValue placeholder="Select shipping method" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="ground">Ground</SelectItem>
+                                      <SelectItem value="air">Air</SelectItem>
+                                      <SelectItem value="sea">Sea</SelectItem>
+                                      <SelectItem value="rail">Rail</SelectItem>
+                                      <SelectItem value="express">Express</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Tracking Number:</div>
+                                  <Input
+                                    value={grnData.logisticDetails.trackingNumber}
+                                    onChange={(e) => setGrnData(prev => ({
+                                      ...prev,
+                                      logisticDetails: {
+                                        ...prev.logisticDetails,
+                                        trackingNumber: e.target.value
+                                      }
+                                    }))}
+                                    className="p-2 text-sm w-full mt-1"
+                                    placeholder="Enter tracking number"
+                                  />
+                                </div>
+                              </div>
                             </div>
                             
                             {/* Display first supplier info for backward compatibility */}
