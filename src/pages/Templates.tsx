@@ -205,6 +205,7 @@ interface PurchaseOrderData {
   businessAddress: string;
   businessPhone: string;
   businessEmail: string;
+  numberOfSuppliers: number;
   supplierName: string;
   supplierAddress: string;
   supplierPhone: string;
@@ -387,6 +388,7 @@ interface GRNItem {
   batchNumber?: string;
   expiryDate?: string;
   remarks?: string;
+  supplierId?: string;  // To track which supplier this item belongs to
 }
 
 interface GRNReceivingCost {
@@ -399,6 +401,7 @@ interface GRNData {
   grnNumber: string;
   date: string;
   time: string;
+  numberOfSuppliers: number;
   supplierName: string;
   supplierId: string;
   supplierPhone: string;
@@ -858,6 +861,7 @@ Date: [DATE]
 Time: [TIME]
 
 Supplier Information:
+Number of suppliers: [NUMBER_OF_SUPPLIERS]
 Name: [SUPPLIER_NAME]
 ID: [SUPPLIER_ID]
 Phone: [SUPPLIER_PHONE]
@@ -893,13 +897,6 @@ We appreciate working with you.`,
 Document #[GRN_NUMBER]
 Date: [DATE]
 Time: [TIME]
-
-Supplier Information:
-Name: [SUPPLIER_NAME]
-ID: [SUPPLIER_ID]
-Phone: [SUPPLIER_PHONE]
-Email: [SUPPLIER_EMAIL]
-Address: [SUPPLIER_ADDRESS]
 
 Receiving Business:
 Name: [BUSINESS_NAME]
@@ -1136,6 +1133,7 @@ Thank you for your business!`,
       businessAddress: "123 Business Street",
       businessPhone: "(555) 987-6543",
       businessEmail: "info@yourbusiness.com",
+      numberOfSuppliers: 1,
       supplierName: "Supplier Company Name",
       supplierAddress: "123 Supplier Street",
       supplierPhone: "(555) 123-4567",
@@ -1170,6 +1168,7 @@ Thank you for your business!`,
       grnNumber: generateGRNNumber(),
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString(),
+      numberOfSuppliers: 1,
       supplierName: "Supplier Name",
       supplierId: generateSupplierId(),
       supplierPhone: "(555) 987-6543",
@@ -1189,9 +1188,9 @@ Thank you for your business!`,
       receivedBy: "Warehouse Staff",
       receivedLocation: "Main Warehouse",
       items: [
-        { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
-        { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
-        { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+        { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition", supplierId: "supplier-1" },
+        { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged", supplierId: "supplier-1" },
+        { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", originalUnitCost: 0, unitCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "", supplierId: "supplier-2" }
       ],
       receivingCosts: [
         { id: "1", description: "Transport Charges", amount: 0 },
@@ -1720,7 +1719,8 @@ Thank you for your business!`,
           totalWithReceivingCost: 0,
           batchNumber: "",
           expiryDate: "",
-          remarks: ""
+          remarks: "",
+          supplierId: "supplier-1"  // Default to first supplier
         }
       ]
     }));
@@ -1739,6 +1739,7 @@ Thank you for your business!`,
     grnNumber: generateGRNNumber(),
     date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString(),
+    numberOfSuppliers: 1,
     supplierName: "Supplier Name",
     supplierId: generateSupplierId(),
     supplierPhone: "(555) 987-6543",
@@ -1795,6 +1796,7 @@ Thank you for your business!`,
     businessAddress: "123 Business Street",
     businessPhone: "(555) 987-6543",
     businessEmail: "info@yourbusiness.com",
+    numberOfSuppliers: 1,
     supplierName: "Supplier Company Name",
     supplierAddress: "123 Supplier Street",
     supplierPhone: "(555) 123-4567",
@@ -6980,6 +6982,16 @@ Thank you for your business!`,
                             <div className="h-8 mb-4"></div>
                             
                             <div className="font-bold mb-1">TO (Supplier):</div>
+                            <div className="text-sm mb-1">
+                              <span className="font-medium">Number of Suppliers:</span>
+                              <Input 
+                                type="number"
+                                min="1"
+                                value={purchaseOrderData.numberOfSuppliers}
+                                onChange={(e) => handlePurchaseOrderChange("numberOfSuppliers", parseInt(e.target.value) || 1)}
+                                className="w-full p-1 text-sm mt-1"
+                              />
+                            </div>
                             <Input
                               value={purchaseOrderData.supplierName}
                               onChange={(e) => handlePurchaseOrderChange("supplierName", e.target.value)}
@@ -8436,6 +8448,16 @@ Thank you for your business!`,
                           <div>
                             <div className="font-bold mb-1">SUPPLIER INFORMATION:</div>
                             <div className="text-sm mb-1">
+                              <span className="font-medium">Number of Suppliers:</span>
+                              <Input 
+                                type="number"
+                                min="1"
+                                value={grnData.numberOfSuppliers}
+                                onChange={(e) => setGrnData(prev => ({ ...prev, numberOfSuppliers: parseInt(e.target.value) || 1 }))}
+                                className="w-full p-1 text-sm mt-1"
+                              />
+                            </div>
+                            <div className="text-sm mb-1">
                               <span className="font-medium">Name:</span>
                               <Input 
                                 value={grnData.supplierName}
@@ -8674,169 +8696,219 @@ Thank you for your business!`,
                           </div>
                         </div>
                         
-                        {/* Items Table */}
+                        {/* Dynamic Items Tables based on Number of Suppliers */}
                         <div>
-                          <div className="font-bold mb-2">ITEMS RECEIVED WITH UPDATED PRICES:</div>
-                          <div className="overflow-x-auto">
-                            <table className="w-full border-collapse border border-gray-300 text-sm">
-                              <thead>
-                                <tr className="bg-gray-100">
-                                  <th className="border border-gray-300 p-2 text-left">Description</th>
-                                  <th className="border border-gray-300 p-2 text-left">Ordered</th>
-                                  <th className="border border-gray-300 p-2 text-left">Received</th>
-                                  <th className="border border-gray-300 p-2 text-left">Unit</th>
-                                  <th className="border border-gray-300 p-2 text-left">Original Unit Cost</th>
-                                  <th className="border border-gray-300 p-2 text-left">Receiving Cost Per Unit</th>
-                                  <th className="border border-gray-300 p-2 text-left">New Unit Cost</th>
-                                  <th className="border border-gray-300 p-2 text-left">Total Cost with Receiving</th>
-                                  <th className="border border-gray-300 p-2 text-left">Batch #</th>
-                                  <th className="border border-gray-300 p-2 text-left">Expiry</th>
-                                  <th className="border border-gray-300 p-2 text-left">Remarks</th>
-                                  <th className="border border-gray-300 p-2 text-left">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {distributeReceivingCosts(grnData.items, grnData.receivingCosts).map((item) => (
-                                  <tr key={item.id}>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.description}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, description: e.target.value } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        type="number"
-                                        value={item.orderedQuantity}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, orderedQuantity: parseInt(e.target.value) || 0 } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        type="number"
-                                        value={item.receivedQuantity}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, receivedQuantity: parseInt(e.target.value) || 0 } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.unit}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, unit: e.target.value } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { 
-                                              ...i, 
-                                              originalUnitCost: parseFloat(e.target.value) || 0,
-                                              unitCost: (parseFloat(e.target.value) || 0) + (item.receivingCostPerUnit || 0)
-                                            } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      {formatCurrency(item.receivingCostPerUnit || 0)}
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      {formatCurrency(item.unitCost || 0)}
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      {formatCurrency(item.totalWithReceivingCost || 0)}
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.batchNumber || ""}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, batchNumber: e.target.value } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        type="date"
-                                        value={item.expiryDate || ""}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, expiryDate: e.target.value } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.remarks}
-                                        onChange={(e) => setGrnData(prev => ({
-                                          ...prev,
-                                          items: prev.items.map(i => 
-                                            i.id === item.id ? { ...i, remarks: e.target.value } : i
-                                          )
-                                        }))}
-                                        className="p-1 h-8 text-sm w-full"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Button
-                                        onClick={() => handleRemoveGRNItem(item.id)}
-                                        variant="outline"
-                                        size="sm"
-                                        className="p-1 h-8"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                          <div className="flex justify-between items-center mt-2">
+                          {[...Array(Math.max(1, grnData.numberOfSuppliers))].map((_, supplierIndex) => {
+                            const supplierId = `supplier-${supplierIndex + 1}`;
+                            const supplierItems = distributeReceivingCosts(grnData.items, grnData.receivingCosts).filter(item => 
+                              item.supplierId === supplierId || (!item.supplierId && supplierIndex === 0)
+                            );
+                            
+                            return (
+                              <div key={supplierIndex} className="mb-8">
+                                <div className="font-bold mb-2">
+                                  ITEMS RECEIVED WITH UPDATED PRICES{grnData.numberOfSuppliers > 1 ? ` - SUPPLIER ${supplierIndex + 1}` : ':'}
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full border-collapse border border-gray-300 text-sm">
+                                    <thead>
+                                      <tr className="bg-gray-100">
+                                        <th className="border border-gray-300 p-2 text-left">Description</th>
+                                        <th className="border border-gray-300 p-2 text-left">Ordered</th>
+                                        <th className="border border-gray-300 p-2 text-left">Received</th>
+                                        <th className="border border-gray-300 p-2 text-left">Unit</th>
+                                        <th className="border border-gray-300 p-2 text-left">Original Unit Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left">Receiving Cost Per Unit</th>
+                                        <th className="border border-gray-300 p-2 text-left">New Unit Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left">Total Cost with Receiving</th>
+                                        <th className="border border-gray-300 p-2 text-left">Batch #</th>
+                                        <th className="border border-gray-300 p-2 text-left">Expiry</th>
+                                        <th className="border border-gray-300 p-2 text-left">Remarks</th>
+                                        <th className="border border-gray-300 p-2 text-left">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {supplierItems.map((item) => (
+                                        <tr key={`${item.id}-${supplierIndex}`}>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              value={item.description}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, description: e.target.value } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              type="number"
+                                              value={item.orderedQuantity}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, orderedQuantity: parseInt(e.target.value) || 0 } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              type="number"
+                                              value={item.receivedQuantity}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, receivedQuantity: parseInt(e.target.value) || 0 } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              value={item.unit}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, unit: e.target.value } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              type="number"
+                                              step="0.01"
+                                              value={item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { 
+                                                    ...i, 
+                                                    originalUnitCost: parseFloat(e.target.value) || 0,
+                                                    unitCost: (parseFloat(e.target.value) || 0) + (item.receivingCostPerUnit || 0)
+                                                  } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            {formatCurrency(item.receivingCostPerUnit || 0)}
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            {formatCurrency(item.unitCost || 0)}
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            {formatCurrency(item.totalWithReceivingCost || 0)}
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              value={item.batchNumber || ""}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, batchNumber: e.target.value } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              type="date"
+                                              value={item.expiryDate || ""}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, expiryDate: e.target.value } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Input
+                                              value={item.remarks}
+                                              onChange={(e) => setGrnData(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(i => 
+                                                  i.id === item.id ? { ...i, remarks: e.target.value } : i
+                                                )
+                                              }))}
+                                              className="p-1 h-8 text-sm w-full"
+                                            />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <Button
+                                              onClick={() => handleRemoveGRNItem(item.id)}
+                                              variant="outline"
+                                              size="sm"
+                                              className="p-1 h-8"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                                
+                                {/* Add Item button for each supplier table */}
+                                <div className="flex justify-between items-center mt-2">
+                                  <Button 
+                                    onClick={() => {
+                                      const newItemId = Date.now().toString();
+                                      setGrnData(prev => ({
+                                        ...prev,
+                                        items: [...prev.items, {
+                                          id: newItemId,
+                                          description: "",
+                                          orderedQuantity: 0,
+                                          receivedQuantity: 0,
+                                          unit: "",
+                                          originalUnitCost: 0,
+                                          unitCost: 0,
+                                          receivingCostPerUnit: 0,
+                                          totalWithReceivingCost: 0,
+                                          batchNumber: "",
+                                          expiryDate: "",
+                                          remarks: "",
+                                          supplierId: supplierId
+                                        }]
+                                      }));
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2"
+                                  >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add Item for Supplier {supplierIndex + 1}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          
+                          {/* Global Add Item button */}
+                          <div className="flex justify-between items-center mt-4 pt-4 border-t">
                             <Button 
                               onClick={handleAddGRNItem}
                               variant="outline"
                               size="sm"
-                              className="mt-2"
                             >
                               <Plus className="h-4 w-4 mr-1" />
-                              Add Item
+                              Add Item (Global)
                             </Button>
+                            <div className="text-sm text-gray-600">
+                              Total Suppliers: {grnData.numberOfSuppliers} | Total Items: {grnData.items.length}
+                            </div>
                           </div>
                         </div>
                         
