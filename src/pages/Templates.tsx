@@ -9000,7 +9000,7 @@ Thank you for your business!`,
                                       />
                                     </div>
                                     <div>
-                                      <div className="text-sm font-medium text-gray-700">TIN Number:</div>
+                                      <div className="text-sm font-medium text-gray-700">Supplier Tin:</div>
                                       <Input
                                         value={supplierInfo.tinNumber || ""}
                                         onChange={(e) => {
@@ -9012,7 +9012,7 @@ Thank you for your business!`,
                                           setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                                         }}
                                         className="p-2 text-sm w-full mt-1"
-                                        placeholder="Enter TIN number"
+                                        placeholder="Enter supplier TIN number"
                                       />
                                     </div>
                                     <div>
@@ -9097,7 +9097,7 @@ Thank you for your business!`,
                                     </div>
                                     {supplierInfo.tinNumber && (
                                       <div className="md:col-span-2">
-                                        <div className="text-sm font-medium text-gray-700">TIN Number:</div>
+                                        <div className="text-sm font-medium text-gray-700">Business Tin:</div>
                                         <Input
                                           value={supplierInfo.tinNumber}
                                           onChange={(e) => {
@@ -9110,7 +9110,7 @@ Thank you for your business!`,
                                             setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                                           }}
                                           className="p-2 text-sm w-full mt-1"
-                                          placeholder="Enter TIN number"
+                                          placeholder="Enter business TIN number"
                                         />
                                       </div>
                                     )}
