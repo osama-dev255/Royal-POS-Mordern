@@ -405,6 +405,7 @@ interface SupplierInfo {
   email: string;
   address: string;
   tinNumber?: string;
+  stockType: 'exempt' | 'vatable' | '';  // Stock type specific to each supplier
 }
 
 interface LogisticDetails {
@@ -427,17 +428,17 @@ interface GRNData {
   time: string;
   numberOfSuppliers: number;
   suppliers: SupplierInfo[]; // Array to hold multiple supplier information
-  supplierName: string; // Kept for backward compatibility
-  supplierId: string;   // Kept for backward compatibility
-  supplierPhone: string; // Kept for backward compatibility
-  supplierEmail: string; // Kept for backward compatibility
-  supplierAddress: string; // Kept for backward compatibility
+ // supplierName: string; // Kept for backward compatibility
+  //supplierId: string;   // Kept for backward compatibility
+  //supplierPhone: string; // Kept for backward compatibility
+ // supplierEmail: string; // Kept for backward compatibility
+  //supplierAddress: string; // Kept for backward compatibility
   logisticDetails: LogisticDetails; // New logistic details field
   businessName: string;
   businessAddress: string;
   businessPhone: string;
   businessEmail: string;
-  businessStockType: 'exempt' | 'vatable' | '';
+  // businessStockType field removed - now supplier-specific
   isVatable: boolean;
   supplierTinNumber: string;
   poNumber: string;
@@ -1203,7 +1204,8 @@ Thank you for your business!`,
           phone: "(555) 987-6543",
           email: "supplier@example.com",
           address: "123 Supplier Street, City, Country",
-          tinNumber: ""
+          tinNumber: "",
+          stockType: ""  // Default to empty, user can select
         }
       ],
       supplierName: "Supplier Name",
@@ -1228,7 +1230,6 @@ Thank you for your business!`,
       businessAddress: "123 Business Street, City, Country",
       businessPhone: "+1234567890",
       businessEmail: "info@yourbusiness.com",
-      businessStockType: "",
       isVatable: false,
       supplierTinNumber: "",
       poNumber: "PO-2024-001",
@@ -1267,7 +1268,6 @@ Thank you for your business!`,
     if (grn) {
       setGrnData({
         ...grn.data,
-        businessStockType: grn.data.businessStockType || "",
         isVatable: grn.data.isVatable ?? false,
         supplierTinNumber: grn.data.supplierTinNumber || "",
         receivingCosts: grn.data.receivingCosts || [],
@@ -1342,7 +1342,6 @@ Thank you for your business!`,
       businessAddress: grnData.businessAddress,
       businessPhone: grnData.businessPhone,
       businessEmail: grnData.businessEmail,
-      businessStockType: grnData.businessStockType || undefined,
       isVatable: grnData.isVatable,
       supplierTinNumber: grnData.supplierTinNumber,
       poNumber: grnData.poNumber,
@@ -1523,7 +1522,7 @@ Thank you for your business!`,
               <p><strong>Address:</strong> ${grnData.businessAddress}</p>
               <p><strong>Phone:</strong> ${grnData.businessPhone}</p>
               <p><strong>Email:</strong> ${grnData.businessEmail}</p>
-              <p><strong>Stock Type:</strong> ${grnData.businessStockType || 'Not specified'}</p>
+              <p><strong>Stock Type:</strong> ${grnData.suppliers[0]?.stockType || 'Not specified'}</p>
               <p><strong>Is Vatable:</strong> ${grnData.isVatable ? 'Yes' : 'No'}</p>
               ${grnData.isVatable ? `<p><strong>Supplier TIN Number:</strong> ${grnData.supplierTinNumber || 'Not provided'}</p>` : ''}
             </div>
@@ -1798,7 +1797,8 @@ Thank you for your business!`,
         phone: "(555) 987-6543",
         email: "supplier@example.com",
         address: "123 Supplier Street, City, Country",
-        tinNumber: ""
+        tinNumber: "",
+        stockType: ""  // Default to empty, user can select
       }
     ],
     supplierName: "Supplier Name",
@@ -1823,7 +1823,6 @@ Thank you for your business!`,
     businessAddress: "123 Business Street, City, Country",
     businessPhone: "+1234567890",
     businessEmail: "info@yourbusiness.com",
-    businessStockType: "",
     isVatable: false,
     supplierTinNumber: "",
     poNumber: "PO-2024-001",
@@ -2318,7 +2317,7 @@ Thank you for your business!`,
         'Business Address': grnData.businessAddress,
         'Business Phone': grnData.businessPhone,
         'Business Email': grnData.businessEmail,
-        'Business Stock Type': grnData.businessStockType || 'Not specified',
+        'Business Stock Type': grnData.suppliers[0]?.stockType || 'Not specified',
         'Is Vatable': grnData.isVatable ? 'Yes' : 'No',
         'Supplier TIN Number': grnData.supplierTinNumber || '',
         'PO Number': grnData.poNumber,
@@ -2650,7 +2649,7 @@ Thank you for your business!`,
         'Business Address': grnData.businessAddress,
         'Business Phone': grnData.businessPhone,
         'Business Email': grnData.businessEmail,
-        'Business Stock Type': grnData.businessStockType || 'Not specified',
+        'Business Stock Type': grnData.suppliers[0]?.stockType || 'Not specified',
         'Is Vatable': grnData.isVatable ? 'Yes' : 'No',
         'Supplier TIN Number': grnData.supplierTinNumber || '',
         'PO Number': grnData.poNumber,
@@ -2823,7 +2822,6 @@ Thank you for your business!`,
         businessAddress: grnData.businessAddress,
         businessPhone: grnData.businessPhone,
         businessEmail: grnData.businessEmail,
-        businessStockType: grnData.businessStockType || 'Not specified',
         isVatable: grnData.isVatable ? 'Yes' : 'No',
         supplierTinNumber: grnData.supplierTinNumber || '',
         poNumber: grnData.poNumber,
@@ -3559,7 +3557,7 @@ Thank you for your business!`,
               <span class="font-medium">Email:</span> ${grnData.businessEmail || 'N/A'}
             </div>
             <div class="text-sm mb-1">
-              <span class="font-medium">Stock Type:</span> ${grnData.businessStockType || 'N/A'}
+              <span class="font-medium">Stock Type:</span> ${grnData.suppliers[0]?.stockType || 'N/A'}
             </div>
             <div class="text-sm mb-1">
               <span class="font-medium">VAT Status:</span> ${grnData.isVatable ? 'Vatable' : 'Exempt'}
@@ -8540,7 +8538,8 @@ Thank you for your business!`,
                                       phone: "",
                                       email: "",
                                       address: "",
-                                      tinNumber: ""
+                                      tinNumber: "",
+                                      stockType: ""  // Add the stockType field
                                     });
                                   }
                                   
@@ -8865,53 +8864,6 @@ Thank you for your business!`,
                                 className="w-full p-1 text-sm mt-1"
                               />
                             </div>
-                            <div className="text-sm mb-1">
-                              <span className="font-medium">Stock Type:</span>
-                              <Select 
-                                value={grnData.businessStockType}
-                                onValueChange={(value) => setGrnData(prev => ({ ...prev, businessStockType: value as 'exempt' | 'vatable' | '' }))}
-                              >
-                                <SelectTrigger className="w-full mt-1">
-                                  <SelectValue placeholder="Select stock type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="exempt">Exempt Stock</SelectItem>
-                                  <SelectItem value="vatable">Vatable Stock</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="text-sm mb-1">
-                              <span className="font-medium">Is Tin Implimented ?:</span>
-                              <div className="flex space-x-2 mt-1">
-                                <Button
-                                  type="button"
-                                  variant={grnData.isVatable ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setGrnData(prev => ({ ...prev, isVatable: true }))}
-                                >
-                                  Yes
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant={!grnData.isVatable ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setGrnData(prev => ({ ...prev, isVatable: false }))}
-                                >
-                                  No
-                                </Button>
-                              </div>
-                            </div>
-                            {grnData.isVatable && (
-                              <div className="text-sm mb-1">
-                                <span className="font-medium">Implimented TIN Number:</span>
-                                <Input
-                                  value={grnData.supplierTinNumber}
-                                  onChange={(e) => setGrnData(prev => ({ ...prev, supplierTinNumber: e.target.value }))}
-                                  className="mt-1"
-                                  placeholder="Enter Implimented TIN number"
-                                />
-                              </div>
-                            )}
                           </div>
                         </div>
                         
@@ -9069,7 +9021,8 @@ Thank you for your business!`,
                                               phone: "",
                                               email: "",
                                               address: "",
-                                              tinNumber: ""
+                                              tinNumber: "",
+                                              stockType: ""  // Add the stockType field
                                             });
                                           }
                                           setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
@@ -9095,7 +9048,8 @@ Thank you for your business!`,
                                               phone: "",
                                               email: "",
                                               address: "",
-                                              tinNumber: ""
+                                              tinNumber: "",
+                                              stockType: ""  // Add the stockType field
                                             });
                                           }
                                           setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
@@ -9169,6 +9123,103 @@ Thank you for your business!`,
                                         placeholder="Enter TIN number"
                                       />
                                     </div>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-700">Stock Type:</div>
+                                      <Select
+                                        value={supplierInfo.stockType}
+                                        onValueChange={(value) => {
+                                          const updatedSuppliers = [...grnData.suppliers];
+                                          const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                          if (supplierIndex >= 0) {
+                                            updatedSuppliers[supplierIndex].stockType = value as 'exempt' | 'vatable' | '';
+                                          } else {
+                                            updatedSuppliers.push({
+                                              id: supplierId,
+                                              name: `Supplier ${supplierIndex + 1}`,
+                                              supplierId: `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
+                                              phone: "",
+                                              email: "",
+                                              address: "",
+                                              tinNumber: "",
+                                              stockType: value as 'exempt' | 'vatable' | ''
+                                            });
+                                          }
+                                          setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-full mt-1">
+                                          <SelectValue placeholder="Select stock type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="exempt">Exempt Stock</SelectItem>
+                                          <SelectItem value="vatable">Vatable Stock</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-700">Is Tin Implemented ?:</div>
+                                      <div className="flex space-x-2 mt-1">
+                                        <Button
+                                          type="button"
+                                          variant={supplierInfo.tinNumber ? "default" : "outline"}
+                                          size="sm"
+                                          onClick={() => {
+                                            const updatedSuppliers = [...grnData.suppliers];
+                                            const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                            if (supplierIndex >= 0) {
+                                              updatedSuppliers[supplierIndex].tinNumber = updatedSuppliers[supplierIndex].tinNumber || "TIN-" + Date.now().toString();
+                                            } else {
+                                              updatedSuppliers.push({
+                                                id: supplierId,
+                                                name: `Supplier ${supplierIndex + 1}`,
+                                                supplierId: `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
+                                                phone: "",
+                                                email: "",
+                                                address: "",
+                                                tinNumber: "TIN-" + Date.now().toString(), // Set a default TIN number
+                                                stockType: ""
+                                              });
+                                            }
+                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                          }}
+                                        >
+                                          Yes
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant={!supplierInfo.tinNumber ? "default" : "outline"}
+                                          size="sm"
+                                          onClick={() => {
+                                            const updatedSuppliers = [...grnData.suppliers];
+                                            const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                            if (supplierIndex >= 0) {
+                                              updatedSuppliers[supplierIndex].tinNumber = "";
+                                            }
+                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                          }}
+                                        >
+                                          No
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    {supplierInfo.tinNumber && (
+                                      <div className="md:col-span-2">
+                                        <div className="text-sm font-medium text-gray-700">TIN Number:</div>
+                                        <Input
+                                          value={supplierInfo.tinNumber}
+                                          onChange={(e) => {
+                                            const updatedSuppliers = [...grnData.suppliers];
+                                            const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                            if (supplierIndex >= 0) {
+                                              updatedSuppliers[supplierIndex].tinNumber = e.target.value;
+                                            }
+                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                          }}
+                                          className="p-2 text-sm w-full mt-1"
+                                          placeholder="Enter TIN number"
+                                        />
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 
