@@ -8800,30 +8800,6 @@ Thank you for your business!`,
                               className="text-sm p-1 h-8"
                             />
                           </div>
-                          <div>
-                            <div className="text-sm font-medium">Vehicle #:</div>
-                            <Input
-                              value={grnData.vehicleNumber || ""}
-                              onChange={(e) => setGrnData(prev => ({ ...prev, vehicleNumber: e.target.value }))}
-                              className="text-sm p-1 h-8"
-                            />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">Driver:</div>
-                            <Input
-                              value={grnData.driverName || ""}
-                              onChange={(e) => setGrnData(prev => ({ ...prev, driverName: e.target.value }))}
-                              className="text-sm p-1 h-8"
-                            />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">Received By:</div>
-                            <Input
-                              value={grnData.receivedBy || ""}
-                              onChange={(e) => setGrnData(prev => ({ ...prev, receivedBy: e.target.value }))}
-                              className="text-sm p-1 h-8"
-                            />
-                          </div>
                         </div>
                         
                         {/* Receiving Costs Section */}
