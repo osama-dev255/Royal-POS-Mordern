@@ -428,11 +428,11 @@ interface GRNData {
   time: string;
   numberOfSuppliers: number;
   suppliers: SupplierInfo[]; // Array to hold multiple supplier information
- // supplierName: string; // Kept for backward compatibility
-  //supplierId: string;   // Kept for backward compatibility
-  //supplierPhone: string; // Kept for backward compatibility
- // supplierEmail: string; // Kept for backward compatibility
-  //supplierAddress: string; // Kept for backward compatibility
+  supplierName: string; // Kept for backward compatibility
+  supplierId: string;   // Kept for backward compatibility
+  supplierPhone: string; // Kept for backward compatibility
+  supplierEmail: string; // Kept for backward compatibility
+  supplierAddress: string; // Kept for backward compatibility
   logisticDetails: LogisticDetails; // New logistic details field
   businessName: string;
   businessAddress: string;
@@ -8742,92 +8742,7 @@ Thank you for your business!`,
                               </div>
                             </div>
                             
-                            {/* Display first supplier info for backward compatibility */}
-                            {grnData.suppliers.length > 0 && (
-                              <>
-                                <div className="text-sm mb-1">
-                                  <span className="font-medium">Name:</span>
-                                  <Input 
-                                    value={grnData.suppliers[0].name}
-                                    onChange={(e) => {
-                                      const updatedSuppliers = [...grnData.suppliers];
-                                      updatedSuppliers[0].name = e.target.value;
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        suppliers: updatedSuppliers,
-                                        supplierName: e.target.value // Maintain backward compatibility
-                                      }));
-                                    }}
-                                    className="w-full p-1 text-sm mt-1"
-                                  />
-                                </div>
-                                <div className="text-sm mb-1">
-                                  <span className="font-medium">ID:</span>
-                                  <Input 
-                                    value={grnData.suppliers[0].supplierId}
-                                    onChange={(e) => {
-                                      const updatedSuppliers = [...grnData.suppliers];
-                                      updatedSuppliers[0].supplierId = e.target.value;
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        suppliers: updatedSuppliers,
-                                        supplierId: e.target.value // Maintain backward compatibility
-                                      }));
-                                    }}
-                                    className="w-full p-1 text-sm mt-1"
-                                    readOnly
-                                  />
-                                </div>
-                                <div className="text-sm mb-1">
-                                  <span className="font-medium">Phone:</span>
-                                  <Input 
-                                    value={grnData.suppliers[0].phone}
-                                    onChange={(e) => {
-                                      const updatedSuppliers = [...grnData.suppliers];
-                                      updatedSuppliers[0].phone = e.target.value;
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        suppliers: updatedSuppliers,
-                                        supplierPhone: e.target.value // Maintain backward compatibility
-                                      }));
-                                    }}
-                                    className="w-full p-1 text-sm mt-1"
-                                  />
-                                </div>
-                                <div className="text-sm mb-1">
-                                  <span className="font-medium">Email:</span>
-                                  <Input 
-                                    value={grnData.suppliers[0].email}
-                                    onChange={(e) => {
-                                      const updatedSuppliers = [...grnData.suppliers];
-                                      updatedSuppliers[0].email = e.target.value;
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        suppliers: updatedSuppliers,
-                                        supplierEmail: e.target.value // Maintain backward compatibility
-                                      }));
-                                    }}
-                                    className="w-full p-1 text-sm mt-1"
-                                  />
-                                </div>
-                                <div className="text-sm mb-1">
-                                  <span className="font-medium">Address:</span>
-                                  <Textarea 
-                                    value={grnData.suppliers[0].address}
-                                    onChange={(e) => {
-                                      const updatedSuppliers = [...grnData.suppliers];
-                                      updatedSuppliers[0].address = e.target.value;
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        suppliers: updatedSuppliers,
-                                        supplierAddress: e.target.value // Maintain backward compatibility
-                                      }));
-                                    }}
-                                    className="w-full p-1 text-sm mt-1 min-h-[60px]"
-                                  />
-                                </div>
-                              </>
-                            )}
+
                           </div>
                           
                           <div>
@@ -8990,7 +8905,8 @@ Thank you for your business!`,
                               phone: "",
                               email: "",
                               address: "",
-                              tinNumber: ""
+                              tinNumber: "",
+                              stockType: ""  // Add the stockType field
                             };
                             const supplierItems = distributeReceivingCosts(grnData.items, grnData.receivingCosts).filter(item => 
                               item.supplierId === supplierId || (!item.supplierId && supplierIndex === 0)
@@ -9126,12 +9042,13 @@ Thank you for your business!`,
                                     <div>
                                       <div className="text-sm font-medium text-gray-700">Stock Type:</div>
                                       <Select
-                                        value={supplierInfo.stockType}
+                                        value={(supplierInfo as SupplierInfo).stockType}
                                         onValueChange={(value) => {
                                           const updatedSuppliers = [...grnData.suppliers];
                                           const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                           if (supplierIndex >= 0) {
-                                            updatedSuppliers[supplierIndex].stockType = value as 'exempt' | 'vatable' | '';
+                                            const supplier = updatedSuppliers[supplierIndex] as SupplierInfo;
+                                            supplier.stockType = value as 'exempt' | 'vatable' | '';
                                           } else {
                                             updatedSuppliers.push({
                                               id: supplierId,
@@ -9211,7 +9128,8 @@ Thank you for your business!`,
                                             const updatedSuppliers = [...grnData.suppliers];
                                             const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                             if (supplierIndex >= 0) {
-                                              updatedSuppliers[supplierIndex].tinNumber = e.target.value;
+                                              const supplier = updatedSuppliers[supplierIndex] as SupplierInfo;
+                                              supplier.tinNumber = e.target.value;
                                             }
                                             setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                                           }}
