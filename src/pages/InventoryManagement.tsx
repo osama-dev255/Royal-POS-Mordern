@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, Truck, Plus, Search, Filter } from "lucide-react";
+import { Package, Truck, Plus, Search, Filter, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProductManagementCard } from "@/components/ProductManagementCard";
 import { GRNManagementCard } from "@/components/GRNManagementCard";

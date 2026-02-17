@@ -147,6 +147,13 @@ export const Dashboard = ({ username, onNavigate, onLogout }: DashboardProps) =>
       description: "View automated business insights and recommendations",
       icon: Bot,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "grn-inventory-dashboard",
+      title: "GRN Inventory Dashboard",
+      description: "View and manage your Goods Received Notes inventory",
+      icon: Package,
+      color: "bg-white border border-gray-200"
     }
   ];
 

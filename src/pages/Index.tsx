@@ -53,6 +53,7 @@ import { MonetaryAssets } from "@/pages/MonetaryAssets";
 import { Templates } from "@/pages/Templates";
 import { SavedGRNsSection } from "@/components/SavedGRNsSection";
 import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettlementsSection";
+import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -1698,6 +1699,15 @@ export const Index = () => {
               console.log("Rendering SavedGRNsSection");
               return (
                 <SavedGRNsSection
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "grn-inventory-dashboard":
+              console.log("Rendering GRNInventoryDashboard");
+              return (
+                <GRNInventoryDashboard
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}

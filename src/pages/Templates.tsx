@@ -405,6 +405,7 @@ interface SupplierInfo {
   email: string;
   address: string;
   tinNumber?: string;
+  businessTin?: string;  // Business TIN number separate from supplier TIN
   stockType: 'exempt' | 'vatable' | '';  // Stock type specific to each supplier
 }
 
@@ -8539,6 +8540,7 @@ Thank you for your business!`,
                                       email: "",
                                       address: "",
                                       tinNumber: "",
+                                      businessTin: "",  // Add the businessTin field
                                       stockType: ""  // Add the stockType field
                                     });
                                   }
@@ -8882,6 +8884,7 @@ Thank you for your business!`,
                               email: "",
                               address: "",
                               tinNumber: "",
+                              businessTin: "",  // Add the businessTin field
                               stockType: ""  // Add the stockType field
                             };
                             const supplierItems = distributeReceivingCosts(grnData.items, grnData.receivingCosts).filter(item => 
@@ -9008,6 +9011,18 @@ Thank you for your business!`,
                                           const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                           if (supplierIndex >= 0) {
                                             updatedSuppliers[supplierIndex].tinNumber = e.target.value;
+                                          } else {
+                                            updatedSuppliers.push({
+                                              id: supplierId,
+                                              name: `Supplier ${supplierIndex + 1}`,
+                                              supplierId: `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
+                                              phone: "",
+                                              email: "",
+                                              address: "",
+                                              tinNumber: e.target.value,
+                                              businessTin: "",
+                                              stockType: ""
+                                            });
                                           }
                                           setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                                         }}
@@ -9034,6 +9049,7 @@ Thank you for your business!`,
                                               email: "",
                                               address: "",
                                               tinNumber: "",
+                                              businessTin: "",  // Add the businessTin field
                                               stockType: value as 'exempt' | 'vatable' | ''
                                             });
                                           }
@@ -9057,11 +9073,19 @@ Thank you for your business!`,
                                           variant={supplierInfo.tinNumber ? "default" : "outline"}
                                           size="sm"
                                           onClick={() => {
+                                            // This button should just indicate that TIN is implemented
+                                            // We don't need to change anything in the supplierInfo.tinNumber field
+                                            // since the user enters it directly in the Supplier Tin field
+                                            // The Business Tin field visibility depends on whether supplier has TIN
                                             const updatedSuppliers = [...grnData.suppliers];
                                             const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                             if (supplierIndex >= 0) {
-                                              updatedSuppliers[supplierIndex].tinNumber = updatedSuppliers[supplierIndex].tinNumber || "TIN-" + Date.now().toString();
+                                              // Ensure businessTin exists so the Business Tin field appears
+                                              if (!updatedSuppliers[supplierIndex].businessTin) {
+                                                updatedSuppliers[supplierIndex].businessTin = "";
+                                              }
                                             } else {
+                                              // Create supplier entry with empty businessTin to show the field
                                               updatedSuppliers.push({
                                                 id: supplierId,
                                                 name: `Supplier ${supplierIndex + 1}`,
@@ -9069,7 +9093,8 @@ Thank you for your business!`,
                                                 phone: "",
                                                 email: "",
                                                 address: "",
-                                                tinNumber: "TIN-" + Date.now().toString(), // Set a default TIN number
+                                                tinNumber: supplierInfo.tinNumber || "",  // Keep existing supplier tin
+                                                businessTin: "",
                                                 stockType: ""
                                               });
                                             }
@@ -9083,10 +9108,12 @@ Thank you for your business!`,
                                           variant={!supplierInfo.tinNumber ? "default" : "outline"}
                                           size="sm"
                                           onClick={() => {
+                                            // This button should indicate that TIN is not implemented
+                                            // Clear the businessTin to hide the Business Tin field
                                             const updatedSuppliers = [...grnData.suppliers];
                                             const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                             if (supplierIndex >= 0) {
-                                              updatedSuppliers[supplierIndex].tinNumber = "";
+                                              updatedSuppliers[supplierIndex].businessTin = undefined;
                                             }
                                             setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                                           }}
@@ -9099,13 +9126,13 @@ Thank you for your business!`,
                                       <div className="md:col-span-2">
                                         <div className="text-sm font-medium text-gray-700">Business Tin:</div>
                                         <Input
-                                          value={supplierInfo.tinNumber}
+                                          value={supplierInfo.businessTin || ""}
                                           onChange={(e) => {
                                             const updatedSuppliers = [...grnData.suppliers];
                                             const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                             if (supplierIndex >= 0) {
                                               const supplier = updatedSuppliers[supplierIndex] as SupplierInfo;
-                                              supplier.tinNumber = e.target.value;
+                                              supplier.businessTin = e.target.value;
                                             }
                                             setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                                           }}
