@@ -358,7 +358,7 @@ export const Index = () => {
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
-    "inventory"
+    "inventory", "grn-inventory-dashboard"
   ];
 
   if (!authorizedViews.includes(currentView)) {

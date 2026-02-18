@@ -17,8 +17,11 @@ export const DashboardCard = ({
   onClick, 
   className 
 }: DashboardCardProps) => {
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log("DashboardCard clicked:", title);
+    console.log("onClick function:", onClick);
     onClick();
   };
   

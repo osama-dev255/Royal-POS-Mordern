@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { GRNInventoryCards } from "@/components/GRNInventoryCards";
+import { GRNDetailsModal } from "@/components/GRNDetailsModal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { getSavedGRNs, SavedGRN } from "@/utils/grnUtils";
+import { getSavedGRNs, SavedGRN, deleteGRN } from "@/utils/grnUtils";
+import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 
 export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
   const [grns, setGrns] = useState<SavedGRN[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedGRN, setSelectedGRN] = useState<SavedGRN | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -22,7 +29,7 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
       console.error("Error loading GRNs:", error);
       toast({
         title: "Error",
-        description: "Failed to load GRNs",
+        description: "Failed to load GRNs. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -30,39 +37,44 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
     }
   };
 
+  // Calculate dashboard metrics
+  const totalGRNs = grns.length;
+  const totalValue = grns.reduce((sum, grn) => sum + (grn.total || 0), 0);
+  const pendingGRNs = grns.filter(grn => grn.data?.status === "pending" || grn.data?.status === "draft").length;
+  const completedGRNs = grns.filter(grn => grn.data?.status === "completed" || grn.data?.status === "approved").length;
+  const recentGRNs = grns.slice(0, 5); // Last 5 GRNs
+
   const handleGRNView = (grn: SavedGRN) => {
-    console.log("View GRN:", grn);
-    toast({
-      title: "GRN View",
-      description: `Viewing GRN: ${grn.name}`
-    });
+    setSelectedGRN(grn);
+    setShowDetailsModal(true);
   };
 
   const handleGRNPrint = (grn: SavedGRN) => {
-    console.log("Print GRN:", grn);
+    // Implement print functionality
     toast({
-      title: "GRN Print",
-      description: `Printing GRN: ${grn.name}`
+      title: "Print GRN",
+      description: `Printing GRN: ${grn.data.grnNumber || grn.name}`
     });
+    // TODO: Implement actual print functionality
   };
 
   const handleGRNDownload = (grn: SavedGRN) => {
-    console.log("Download GRN:", grn);
+    // Implement download functionality
     toast({
-      title: "GRN Download",
-      description: `Downloading GRN: ${grn.name}`
+      title: "Download GRN",
+      description: `Downloading GRN: ${grn.data.grnNumber || grn.name}`
     });
+    // TODO: Implement actual download functionality (PDF/Excel)
   };
 
   const handleGRNDelete = async (grn: SavedGRN) => {
-    if (window.confirm(`Are you sure you want to delete GRN: ${grn.name}?`)) {
+    if (window.confirm(`Are you sure you want to delete GRN: ${grn.data.grnNumber || grn.name}?`)) {
       try {
-        // In a real implementation, you would call the delete function
-        // await deleteGRN(grn.id);
+        await deleteGRN(grn.id);
         setGrns(prev => prev.filter(g => g.id !== grn.id));
         toast({
           title: "Success",
-          description: `GRN deleted: ${grn.name}`
+          description: `GRN deleted: ${grn.data.grnNumber || grn.name}`
         });
       } catch (error) {
         console.error("Error deleting GRN:", error);
@@ -73,6 +85,24 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
         });
       }
     }
+  };
+
+  const handleExportAll = () => {
+    // Implement export all functionality
+    toast({
+      title: "Export All GRNs",
+      description: "Exporting all GRNs to Excel format"
+    });
+    // TODO: Implement actual export functionality
+  };
+
+  const handlePrintAll = () => {
+    // Implement print all functionality
+    toast({
+      title: "Print All GRNs",
+      description: "Generating printable report of all GRNs"
+    });
+    // TODO: Implement actual print functionality
   };
 
   if (loading) {
@@ -86,7 +116,7 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
         />
         <main className="container mx-auto p-6">
           <div className="flex justify-center items-center h-64">
-            <p>Loading GRNs...</p>
+            <p className="text-lg">Loading GRN inventory data...</p>
           </div>
         </main>
       </div>
@@ -104,10 +134,101 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
       
       <main className="container mx-auto p-6">
         <div className="mb-6">
-          <h2 className="text-3xl font-bold">GRN Inventory Dashboard</h2>
-          <p className="text-muted-foreground">View and manage your Goods Received Notes inventory</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-3xl font-bold">GRN Inventory Dashboard</h2>
+              <p className="text-muted-foreground">View and manage your Goods Received Notes inventory</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handlePrintAll}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print All
+              </Button>
+              <Button onClick={handleExportAll}>
+                <Download className="h-4 w-4 mr-2" />
+                Export All
+              </Button>
+            </div>
+          </div>
         </div>
-        
+
+        {/* Dashboard Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total GRNs</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalGRNs}</div>
+              <p className="text-xs text-muted-foreground">All received notes</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+              <p className="text-xs text-muted-foreground">Total inventory value</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending GRNs</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{pendingGRNs}</div>
+              <p className="text-xs text-muted-foreground">Awaiting processing</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed GRNs</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{completedGRNs}</div>
+              <p className="text-xs text-muted-foreground">Fully processed</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent GRNs Summary */}
+        {recentGRNs.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Recent GRNs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentGRNs.map((grn) => (
+                  <div key={grn.id} className="flex justify-between items-center p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium">{grn.data.grnNumber || grn.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {grn.data.supplierName || "Unknown Supplier"} • {new Date(grn.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{formatCurrency(grn.total || 0)}</p>
+                      <Button size="sm" variant="outline" onClick={() => handleGRNView(grn)}>
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main GRN Grid */}
         <GRNInventoryCards
           grns={grns}
           onGRNView={handleGRNView}
@@ -115,6 +236,17 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
           onGRNDownload={handleGRNDownload}
           onGRNDelete={handleGRNDelete}
         />
+
+        {/* GRN Details Modal */}
+        {showDetailsModal && selectedGRN && (
+          <GRNDetailsModal
+            grn={selectedGRN}
+            open={showDetailsModal}
+            onOpenChange={setShowDetailsModal}
+            onPrint={handleGRNPrint}
+            onDownload={handleGRNDownload}
+          />
+        )}
       </main>
     </div>
   );

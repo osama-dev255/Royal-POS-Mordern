@@ -36,12 +36,16 @@ interface ComprehensiveDashboardProps {
 }
 
 export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: ComprehensiveDashboardProps) => {
+  console.log("=== ComprehensiveDashboard RENDERING ===");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
+  console.log("Initial state - userRole:", userRole, "isRoleLoading:", isRoleLoading);
   
   useEffect(() => {
+    console.log("useEffect triggered");
     const fetchUserRole = async () => {
       try {
+        console.log("Fetching user role...");
         const role = await getCurrentUserRole();
         console.log("Fetched user role:", role);
         setUserRole(role);
@@ -49,6 +53,7 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
         console.error("Error fetching user role:", error);
         setUserRole(null);
       } finally {
+        console.log("Setting isRoleLoading to false");
         setIsRoleLoading(false);
       }
     };
@@ -189,27 +194,36 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
       description: "Professional templates for your business documents",
       icon: LayoutTemplate,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "grn-inventory-dashboard",
+      title: "GRN Inventory Dashboard",
+      description: "View and manage your Goods Received Notes inventory",
+      icon: Package,
+      color: "bg-white border border-gray-200"
     }
   ];
 
-  // Filter modules based on user role
-  const modules = allModules.filter(module => {
-    // While role is loading, show all modules to avoid empty state
-    if (isRoleLoading) {
-      return true;
-    }
-    
-    return hasModuleAccess(userRole, module.id);
-  });
+  // TEMPORARY FIX: Always show all modules including GRN
+  const modules = allModules;
+  console.log("=== MODULES BEING RENDERED ===");
+  console.log("Total modules:", modules.length);
+  console.log("Module IDs:", modules.map(m => m.id));
+  console.log("GRN module present:", modules.some(m => m.id === "grn-inventory-dashboard"));
+  console.log("GRN module details:", modules.find(m => m.id === "grn-inventory-dashboard"));
 
   const handleNavigate = async (moduleId: string) => {
+    console.log("handleNavigate called with moduleId:", moduleId);
+    
     // Special handling for reports module
     if (moduleId === "reports") {
+      console.log("Navigating to statements-reports");
       onNavigate("statements-reports");
       return;
     }
     // Special handling for financial statements module
     if (moduleId === "financial-statements") {
+      console.log("Navigating to financial-reports");
       onNavigate("financial-reports");
       return;
     }
@@ -217,63 +231,87 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
     // Navigate to specific modules
     switch (moduleId) {
       case "inventory":
+        console.log("Navigating to products");
         onNavigate("products");
         break;
       case "sales":
+        console.log("Navigating to sales");
         onNavigate("sales");
         break;
       case "purchase":
+        console.log("Navigating to purchase");
         onNavigate("purchase");
         break;
       case "finance":
+        console.log("Navigating to finance");
         onNavigate("finance");
         break;
       case "assets":
+        console.log("Navigating to assets");
         onNavigate("assets");
         break;
       case "employees":
+        console.log("Navigating to employees");
         onNavigate("employees");
         break;
       case "customers":
+        console.log("Navigating to customers");
         onNavigate("customers");
         break;
       case "suppliers":
+        console.log("Navigating to suppliers");
         onNavigate("suppliers");
         break;
       case "expenses":
+        console.log("Navigating to expenses");
         onNavigate("expenses");
         break;
       case "returns":
+        console.log("Navigating to returns");
         onNavigate("returns");
         break;
       case "debts":
+        console.log("Navigating to debts");
         onNavigate("debts");
         break;
       case "customer-settlements":
+        console.log("Navigating to customer-settlements");
         onNavigate("customer-settlements");
         break;
       case "supplier-settlements":
+        console.log("Navigating to supplier-settlements");
         onNavigate("supplier-settlements");
         break;
       case "access-logs":
+        console.log("Navigating to access-logs");
         onNavigate("access-logs");
         break;
       case "settings":
+        console.log("Navigating to settings");
         onNavigate("settings");
         break;
       case "scanner":
+        console.log("Navigating to scanner");
         onNavigate("scanner");
         break;
       case "automated":
+        console.log("Navigating to automated");
         onNavigate("automated");
         break;
       case "capital":
+        console.log("Navigating to capital");
         onNavigate("capital");
         break;
       case "templates":
+        console.log("Navigating to templates");
         onNavigate("templates");
         break;
+      case "grn-inventory-dashboard":
+        console.log("Navigating to grn-inventory-dashboard");
+        onNavigate("grn-inventory-dashboard");
+        break;
       default:
+        console.log("Navigating to default:", moduleId);
         onNavigate(moduleId);
     }
   };
@@ -296,8 +334,8 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
                   title={module.title}
                   description={module.description}
                   icon={module.icon}
-                  onClick={() => {}}
-                  className={`${module.color} opacity-50`}
+                  onClick={() => handleNavigate(module.id)}
+                  className={module.color}
                 />
               </div>
             ))}
@@ -319,17 +357,20 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
         
         {modules.length > 0 ? (
           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4 sm:gap-5 auto-rows-fr">
-            {modules.map((module) => (
-              <div key={module.id} className="flex">
-                <DashboardCard
-                  title={module.title}
-                  description={module.description}
-                  icon={module.icon}
-                  onClick={() => handleNavigate(module.id)}
-                  className={module.color}
-                />
-              </div>
-            ))}
+            {modules.map((module) => {
+              console.log("Rendering module:", module.id, module.title);
+              return (
+                <div key={module.id} className="flex">
+                  <DashboardCard
+                    title={module.title}
+                    description={module.description}
+                    icon={module.icon}
+                    onClick={() => handleNavigate(module.id)}
+                    className={module.color}
+                  />
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12">
