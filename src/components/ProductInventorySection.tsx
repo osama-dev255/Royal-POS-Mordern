@@ -291,10 +291,10 @@ export const ProductInventorySection = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU/Barcode</TableHead>
+                    <TableHead>Description</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="text-right">Min Level</TableHead>
+                    <TableHead className="text-right">New Unit Cost</TableHead>
                     <TableHead className="text-right">Unit Price</TableHead>
                     <TableHead className="text-right">Total Value</TableHead>
                     <TableHead>Status</TableHead>
@@ -322,12 +322,6 @@ export const ProductInventorySection = ({
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {product.sku && <div>SKU: {product.sku}</div>}
-                            {product.barcode && <div>Barcode: {product.barcode}</div>}
-                          </div>
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className={`font-medium ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-yellow-600' : 'text-green-600'}`}>
                             {stockLevel}
@@ -335,6 +329,9 @@ export const ProductInventorySection = ({
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {minLevel}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(product.cost_price)}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(product.selling_price)}
