@@ -32,27 +32,10 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
       });
     };
     
-    // Listen for navigation to add product event
-    const handleNavigateToAddProduct = () => {
-      // If onNavigate function is available, use it to navigate to products page
-      if (onNavigate) {
-        onNavigate('products');
-      } else {
-        // Fallback: show a toast notification with instructions
-        toast({
-          title: "Navigate to Add Product",
-          description: "Please go to the main Product Management section to add new products.",
-          duration: 5000
-        });
-      }
-    };
-    
     window.addEventListener('openAddProductDialog', handleOpenAddProductDialog);
-    window.addEventListener('navigateToAddProduct', handleNavigateToAddProduct);
     
     return () => {
       window.removeEventListener('openAddProductDialog', handleOpenAddProductDialog);
-      window.removeEventListener('navigateToAddProduct', handleNavigateToAddProduct);
     };
   }, []);
 

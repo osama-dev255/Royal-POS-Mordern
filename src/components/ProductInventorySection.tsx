@@ -9,6 +9,7 @@ import { Search, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Plus 
 import { getProducts, Product } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
+import { AddProductDialog } from "./AddProductDialog";
 
 interface ProductInventorySectionProps {
   searchTerm?: string;
@@ -26,6 +27,7 @@ export const ProductInventorySection = ({
   const [stockFilter, setStockFilter] = useState<"all" | "in-stock" | "low-stock" | "out-of-stock">("all");
   const [sortBy, setSortBy] = useState<"name" | "stock" | "value" | "category">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -116,6 +118,15 @@ export const ProductInventorySection = ({
     });
   };
 
+  const handleProductAdded = () => {
+    // Refresh the product list after adding a new product
+    loadProducts();
+    toast({
+      title: "Success",
+      description: "Product added successfully"
+    });
+  };
+
   if (loading) {
     return (
       <Card>
@@ -192,13 +203,7 @@ export const ProductInventorySection = ({
               </Button>
               <Button 
                 className="flex items-center gap-2"
-                onClick={() => {
-                  // Navigate to the main product management page to add a new product
-                  window.location.hash = '#/products';
-                  // If hash routing isn't available, we'll dispatch an event for the parent to handle
-                  const event = new CustomEvent('navigateToAddProduct', { bubbles: true, cancelable: true });
-                  window.dispatchEvent(event);
-                }}
+                onClick={() => setIsAddDialogOpen(true)}
               >
                 <Plus className="h-4 w-4" />
                 Add Product
@@ -367,6 +372,13 @@ export const ProductInventorySection = ({
       <div className="text-sm text-muted-foreground text-center">
         Showing {filteredAndSortedProducts.length} of {totalProducts} products
       </div>
+
+      {/* Add Product Dialog */}
+      <AddProductDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onProductAdded={handleProductAdded}
+      />
     </div>
   );
 };
