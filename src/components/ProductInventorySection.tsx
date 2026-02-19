@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Package, AlertTriangle, TrendingUp, TrendingDown, Filter } from "lucide-react";
+import { Search, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Plus } from "lucide-react";
 import { getProducts, Product } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
@@ -175,15 +175,31 @@ export const ProductInventorySection = ({
         </Card>
       </div>
 
-      {/* Search and Filter Controls */}
+      {/* Search, Actions, and Filter Controls */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Product Inventory</span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                <Filter className="h-4 w-4 mr-2" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRefresh}
+                className="flex items-center gap-2"
+              >
+                <Filter className="h-4 w-4" />
                 Refresh
+              </Button>
+              <Button 
+                className="flex items-center gap-2"
+                onClick={() => {
+                  // Dispatch event to open add product dialog in parent component
+                  const event = new CustomEvent('openAddProductDialog');
+                  window.dispatchEvent(event);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Add Product
               </Button>
             </div>
           </CardTitle>

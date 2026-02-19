@@ -20,6 +20,23 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
 
   useEffect(() => {
     loadGRNs();
+    
+    // Listen for add product dialog event
+    const handleOpenAddProductDialog = () => {
+      // Since we don't have a direct product management dialog here,
+      // we'll show a toast notification suggesting the user navigates to the product management page
+      toast({
+        title: "Add Product",
+        description: "Please navigate to the main Product Management section to add new products.",
+        duration: 5000
+      });
+    };
+    
+    window.addEventListener('openAddProductDialog', handleOpenAddProductDialog);
+    
+    return () => {
+      window.removeEventListener('openAddProductDialog', handleOpenAddProductDialog);
+    };
   }, []);
 
   const loadGRNs = async () => {
@@ -270,6 +287,9 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
           /* Product Inventory Section */
           <ProductInventorySection />
         )}
+
+        {/* Add Product Dialog - Will be triggered by ProductInventorySection */}
+        <div id="add-product-dialog-container" />
 
         {/* GRN Details Modal */}
         {showDetailsModal && selectedGRN && activeTab === "grn" && (
