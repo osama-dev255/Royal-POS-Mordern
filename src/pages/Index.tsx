@@ -1711,6 +1711,7 @@ export const Index = () => {
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
+                  onNavigate={handleNavigate}
                 />
               );
             case "saved-supplier-settlements":

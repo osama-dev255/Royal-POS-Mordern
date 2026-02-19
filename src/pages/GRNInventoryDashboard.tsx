@@ -10,7 +10,7 @@ import { getSavedGRNs, SavedGRN, deleteGRN } from "@/utils/grnUtils";
 import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer, Truck } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 
-export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
+export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }: { username: string; onBack: () => void; onLogout: () => void; onNavigate?: (page: string) => void }) => {
   const [grns, setGrns] = useState<SavedGRN[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGRN, setSelectedGRN] = useState<SavedGRN | null>(null);
@@ -32,10 +32,27 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout }: { username
       });
     };
     
+    // Listen for navigation to add product event
+    const handleNavigateToAddProduct = () => {
+      // If onNavigate function is available, use it to navigate to products page
+      if (onNavigate) {
+        onNavigate('products');
+      } else {
+        // Fallback: show a toast notification with instructions
+        toast({
+          title: "Navigate to Add Product",
+          description: "Please go to the main Product Management section to add new products.",
+          duration: 5000
+        });
+      }
+    };
+    
     window.addEventListener('openAddProductDialog', handleOpenAddProductDialog);
+    window.addEventListener('navigateToAddProduct', handleNavigateToAddProduct);
     
     return () => {
       window.removeEventListener('openAddProductDialog', handleOpenAddProductDialog);
+      window.removeEventListener('navigateToAddProduct', handleNavigateToAddProduct);
     };
   }, []);
 

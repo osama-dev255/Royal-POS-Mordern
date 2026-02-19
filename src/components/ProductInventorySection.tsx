@@ -193,8 +193,10 @@ export const ProductInventorySection = ({
               <Button 
                 className="flex items-center gap-2"
                 onClick={() => {
-                  // Dispatch event to open add product dialog in parent component
-                  const event = new CustomEvent('openAddProductDialog');
+                  // Navigate to the main product management page to add a new product
+                  window.location.hash = '#/products';
+                  // If hash routing isn't available, we'll dispatch an event for the parent to handle
+                  const event = new CustomEvent('navigateToAddProduct', { bubbles: true, cancelable: true });
                   window.dispatchEvent(event);
                 }}
               >
