@@ -86,7 +86,13 @@ export const RegisteredOutlets = () => {
 
   const handleAddOutlet = async () => {
     try {
-      const createdOutlet = await createOutlet(newOutlet);
+      // Handle empty date field
+      const outletToCreate = {
+        ...newOutlet,
+        opening_date: newOutlet.opening_date || null
+      };
+      
+      const createdOutlet = await createOutlet(outletToCreate);
       if (createdOutlet) {
         setOutlets([...outlets, createdOutlet]);
         setNewOutlet({
@@ -395,6 +401,15 @@ export const RegisteredOutlets = () => {
                   onChange={(e) => setNewOutlet({...newOutlet, product_count: parseInt(e.target.value) || 0})}
                   placeholder="Enter product count"
                   type="number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Opening Date</label>
+                <Input
+                  value={newOutlet.opening_date || ""}
+                  onChange={(e) => setNewOutlet({...newOutlet, opening_date: e.target.value})}
+                  placeholder="YYYY-MM-DD"
+                  type="date"
                 />
               </div>
             </div>

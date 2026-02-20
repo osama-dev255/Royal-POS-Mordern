@@ -1252,9 +1252,25 @@ export const getOutletById = async (id: string): Promise<Outlet | null> => {
 
 export const createOutlet = async (outlet: Omit<Outlet, 'id'>): Promise<Outlet | null> => {
   try {
+    // Handle null values for optional fields
+    const outletData = {
+      ...outlet,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      opening_date: outlet.opening_date || null,
+      phone: outlet.phone || null,
+      email: outlet.email || null,
+      manager: outlet.manager || null,
+      address: outlet.address || null,
+      city: outlet.city || null,
+      state: outlet.state || null,
+      zip_code: outlet.zip_code || null,
+      country: outlet.country || null
+    };
+    
     const { data, error } = await supabase
       .from('outlets')
-      .insert([{ ...outlet, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+      .insert([outletData])
       .select()
       .single();
       
@@ -1268,9 +1284,24 @@ export const createOutlet = async (outlet: Omit<Outlet, 'id'>): Promise<Outlet |
 
 export const updateOutlet = async (id: string, outlet: Partial<Outlet>): Promise<Outlet | null> => {
   try {
+    // Handle null values for optional fields
+    const outletData = {
+      ...outlet,
+      updated_at: new Date().toISOString(),
+      opening_date: outlet.opening_date !== undefined ? (outlet.opening_date || null) : undefined,
+      phone: outlet.phone !== undefined ? (outlet.phone || null) : undefined,
+      email: outlet.email !== undefined ? (outlet.email || null) : undefined,
+      manager: outlet.manager !== undefined ? (outlet.manager || null) : undefined,
+      address: outlet.address !== undefined ? (outlet.address || null) : undefined,
+      city: outlet.city !== undefined ? (outlet.city || null) : undefined,
+      state: outlet.state !== undefined ? (outlet.state || null) : undefined,
+      zip_code: outlet.zip_code !== undefined ? (outlet.zip_code || null) : undefined,
+      country: outlet.country !== undefined ? (outlet.country || null) : undefined
+    };
+    
     const { data, error } = await supabase
       .from('outlets')
-      .update({ ...outlet, updated_at: new Date().toISOString() })
+      .update(outletData)
       .eq('id', id)
       .select()
       .single();
