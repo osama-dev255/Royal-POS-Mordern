@@ -5071,6 +5071,9 @@ Thank you for your business!`,
   // State for GRN descriptions
   const [grnDescriptions, setGrnDescriptions] = useState<string[]>([]);
   const [grnItemsMap, setGrnItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  // State for Product Inventory descriptions (for invoices)
+  const [invoiceProductDescriptions, setInvoiceProductDescriptions] = useState<string[]>([]);
+  const [invoiceProductItemsMap, setInvoiceProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
   
   // Load GRN descriptions and items map on component mount
@@ -7480,10 +7483,10 @@ Thank you for your business!`,
                                             handleInvoiceItemChange(item.id, 'description', e.target.value);
                                           }}
                                           onFocus={async (e) => {
-                                            // Load GRN items map when the input is focused
-                                            const itemsMap = await getAllGRNItems();
-                                            setGrnItemsMap(itemsMap);
-                                            setGrnDescriptions(Array.from(itemsMap.keys()));
+                                            // Load product items map when the input is focused
+                                            const itemsMap = await getAllProductItems();
+                                            setInvoiceProductItemsMap(itemsMap);
+                                            setInvoiceProductDescriptions(Array.from(itemsMap.keys()));
                                             setShowDropdown(true);
                                           }}
                                           onBlur={() => {
@@ -7493,9 +7496,9 @@ Thank you for your business!`,
                                           className="p-1 h-8 text-sm w-full"
                                           placeholder="Select or enter description..."
                                         />
-                                        {grnDescriptions.length > 0 && showDropdown && (
+                                        {invoiceProductDescriptions.length > 0 && showDropdown && (
                                           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                                            {grnDescriptions
+                                            {invoiceProductDescriptions
                                               .filter(desc => 
                                                 item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
                                               )
@@ -7505,17 +7508,17 @@ Thank you for your business!`,
                                                   className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
                                                   onMouseDown={() => {
                                                     handleInvoiceItemChange(item.id, 'description', desc);
-                                                    // Set the rate and unit from the GRN if available
-                                                    const itemDataFromGRN = grnItemsMap.get(desc);
-                                                    if (itemDataFromGRN) {
+                                                    // Set the rate and unit from the product inventory if available
+                                                    const itemDataFromProduct = invoiceProductItemsMap.get(desc);
+                                                    if (itemDataFromProduct) {
                                                       // Apply discount validation: if quantity > 20, deduct 200 from rate
-                                                      let effectiveRate = itemDataFromGRN.rate;
+                                                      let effectiveRate = itemDataFromProduct.rate;
                                                       if (item.quantity >= 20) {
-                                                        effectiveRate = Math.max(0, itemDataFromGRN.rate - 200);
+                                                        effectiveRate = Math.max(0, itemDataFromProduct.rate - 200);
                                                       }
                                                       
                                                       handleInvoiceItemChange(item.id, 'rate', effectiveRate);
-                                                      handleInvoiceItemChange(item.id, 'unit', itemDataFromGRN.unit);
+                                                      handleInvoiceItemChange(item.id, 'unit', itemDataFromProduct.unit);
                                                       // Also update the amount based on the effective rate and existing quantity
                                                       const newAmount = item.quantity * effectiveRate;
                                                       handleInvoiceItemChange(item.id, 'amount', newAmount);
