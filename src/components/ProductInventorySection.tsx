@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Plus, Eye, Edit3 } from "lucide-react";
-import { getProducts, Product } from "@/services/databaseService";
+import { getProducts, getCategories, Product, Category } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { AddProductDialog } from "./AddProductDialog";
@@ -33,10 +33,15 @@ export const ProductInventorySection = ({
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     loadProducts();
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
   }, []);
 
   useEffect(() => {
@@ -66,6 +71,15 @@ export const ProductInventorySection = ({
       window.removeEventListener('editProductRequested', handleEditProductRequested as EventListener);
     };
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const categoryData = await getCategories();
+      setCategories(categoryData);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -332,6 +346,7 @@ export const ProductInventorySection = ({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Description</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="text-right">Min Level</TableHead>
                     <TableHead className="text-right">New Unit Cost</TableHead>
@@ -367,6 +382,11 @@ export const ProductInventorySection = ({
                               {product.description?.substring(0, 50)}{product.description && product.description.length > 50 ? '...' : ''}
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {categories.length > 0 ? 
+                            (categories.find(cat => cat.id === product.category_id)?.name || '-') 
+                            : (product.category_id || '-')}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className={`font-medium ${isOutOfStock ? 'text-red-600' : isLowStock ? 'text-yellow-600' : 'text-green-600'}`}>
