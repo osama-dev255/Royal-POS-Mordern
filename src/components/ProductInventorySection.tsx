@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Plus } from "lucide-react";
+import { Search, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Plus, Eye, Edit3 } from "lucide-react";
 import { getProducts, Product } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { AddProductDialog } from "./AddProductDialog";
+import { ProductDetailsDialog } from "./ProductDetailsDialog";
+import { EditProductDialog } from "./EditProductDialog";
 
 interface ProductInventorySectionProps {
   searchTerm?: string;
@@ -28,10 +30,41 @@ export const ProductInventorySection = ({
   const [sortBy, setSortBy] = useState<"name" | "stock" | "value" | "category">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     loadProducts();
+  }, []);
+
+  useEffect(() => {
+    // Listen for add product dialog event
+    const handleOpenAddProductDialog = () => {
+      // Since we don't have a direct product management dialog here,
+      // we'll show a toast notification suggesting the user navigates to the product management page
+      toast({
+        title: "Add Product",
+        description: "Please navigate to the main Product Management section to add new products.",
+        duration: 5000
+      });
+    };
+    
+    // Listen for edit product event
+    const handleEditProductRequested = (event: any) => {
+      const product = event.detail.product;
+      setSelectedProduct(product);
+      setIsEditDialogOpen(true);
+    };
+    
+    window.addEventListener('openAddProductDialog', handleOpenAddProductDialog);
+    window.addEventListener('editProductRequested', handleEditProductRequested as EventListener);
+    
+    return () => {
+      window.removeEventListener('openAddProductDialog', handleOpenAddProductDialog);
+      window.removeEventListener('editProductRequested', handleEditProductRequested as EventListener);
+    };
   }, []);
 
   const loadProducts = async () => {
@@ -305,6 +338,7 @@ export const ProductInventorySection = ({
                     <TableHead className="text-right">Unit Price</TableHead>
                     <TableHead className="text-right">Total Value</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -319,7 +353,12 @@ export const ProductInventorySection = ({
                       <TableRow 
                         key={product.id} 
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => onProductSelect?.(product)}
+                        onClick={() => {
+                          onProductSelect?.(product);
+                          // Optionally also open the details dialog when row is clicked
+                          setSelectedProduct(product);
+                          setIsDetailsDialogOpen(true);
+                        }}
                       >
                         <TableCell className="font-medium">
                           <div>
@@ -358,6 +397,20 @@ export const ProductInventorySection = ({
                             <Badge variant="default">In Stock</Badge>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click event
+                              setSelectedProduct(product);
+                              setIsDetailsDialogOpen(true);
+                            }}
+                            className="p-0 h-auto"
+                          >
+                            <Eye className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -378,6 +431,28 @@ export const ProductInventorySection = ({
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onProductAdded={handleProductAdded}
+      />
+
+      {/* Product Details Dialog */}
+      <ProductDetailsDialog
+        product={selectedProduct}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+      />
+
+      {/* Edit Product Dialog */}
+      <EditProductDialog
+        product={selectedProduct}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onProductUpdated={() => {
+          // Refresh the product list after updating
+          loadProducts();
+          toast({
+            title: "Success",
+            description: "Product updated successfully"
+          });
+        }}
       />
     </div>
   );
