@@ -52,6 +52,7 @@ import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
+import { getProducts, Product } from '@/services/databaseService';
 
 interface Template {
   id: string;
@@ -1089,9 +1090,9 @@ Thank you for your business!`,
   }, []);
 
   const [deliveryNoteName, setDeliveryNoteName] = useState<string>("");
-  // GRN search states for delivery note
-  const [deliveryNoteGRNItemsMap, setDeliveryNoteGRNItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
-  const [deliveryNoteGRNDescriptions, setDeliveryNoteGRNDescriptions] = useState<string[]>([]);
+  // Product inventory search states for delivery note
+  const [deliveryNoteProductItemsMap, setDeliveryNoteProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  const [deliveryNoteProductDescriptions, setDeliveryNoteProductDescriptions] = useState<string[]>([]);
   const [showDeliveryNoteDropdown, setShowDeliveryNoteDropdown] = useState<boolean>(false);
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
@@ -5030,6 +5031,28 @@ Thank you for your business!`,
       return itemsMap;
     } catch (error) {
       console.error('Error fetching GRN items:', error);
+      return new Map<string, { rate: number, unit: string }>();
+    }
+  };
+  
+  const getAllProductItems = async () => {
+    try {
+      const products = await getProducts();
+      const itemsMap = new Map<string, { rate: number, unit: string }>(); // description -> { rate, unit }
+      
+      products.forEach(product => {
+        if (product.name) {
+          // Use the selling price as the rate and unit of measure as the unit
+          itemsMap.set(product.name, { 
+            rate: product.selling_price || 0, 
+            unit: product.unit_of_measure || 'piece'
+          });
+        }
+      });
+      
+      return itemsMap;
+    } catch (error) {
+      console.error('Error fetching product items:', error);
       return new Map<string, { rate: number, unit: string }>();
     }
   };
@@ -9792,10 +9815,10 @@ Thank you for your business!`,
                                             handleItemChange(item.id, 'description', e.target.value);
                                           }}
                                           onFocus={async (e) => {
-                                            // Load GRN items map when the input is focused
-                                            const itemsMap = await getAllGRNItems();
-                                            setDeliveryNoteGRNItemsMap(itemsMap);
-                                            setDeliveryNoteGRNDescriptions(Array.from(itemsMap.keys()));
+                                            // Load product items map when the input is focused
+                                            const itemsMap = await getAllProductItems();
+                                            setDeliveryNoteProductItemsMap(itemsMap);
+                                            setDeliveryNoteProductDescriptions(Array.from(itemsMap.keys()));
                                             setShowDeliveryNoteDropdown(true);
                                           }}
                                           onBlur={() => {
@@ -9805,9 +9828,9 @@ Thank you for your business!`,
                                           className="p-1 h-8 text-sm w-full"
                                           placeholder="Select or enter description..."
                                         />
-                                        {deliveryNoteGRNDescriptions.length > 0 && showDeliveryNoteDropdown && (
+                                        {deliveryNoteProductDescriptions.length > 0 && showDeliveryNoteDropdown && (
                                           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                                            {deliveryNoteGRNDescriptions
+                                            {deliveryNoteProductDescriptions
                                               .filter(desc => 
                                                 item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
                                               )
@@ -9817,11 +9840,11 @@ Thank you for your business!`,
                                                   className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
                                                   onMouseDown={() => {
                                                     handleItemChange(item.id, 'description', desc);
-                                                    // Set the rate and unit from the GRN if available
-                                                    const itemDataFromGRN = deliveryNoteGRNItemsMap.get(desc);
-                                                    if (itemDataFromGRN) {
-                                                      handleItemChange(item.id, 'rate', itemDataFromGRN.rate);
-                                                      handleItemChange(item.id, 'unit', itemDataFromGRN.unit);
+                                                    // Set the rate and unit from the product inventory if available
+                                                    const itemDataFromProduct = deliveryNoteProductItemsMap.get(desc);
+                                                    if (itemDataFromProduct) {
+                                                      handleItemChange(item.id, 'rate', itemDataFromProduct.rate);
+                                                      handleItemChange(item.id, 'unit', itemDataFromProduct.unit);
 
                                                     }
                                                     setShowDeliveryNoteDropdown(false);
