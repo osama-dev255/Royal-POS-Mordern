@@ -79,6 +79,26 @@ export interface Supplier {
   updated_at?: string;
 }
 
+export interface Outlet {
+  id?: string;
+  name: string;
+  location: string;
+  phone?: string;
+  email?: string;
+  manager?: string;
+  employee_count?: number;
+  product_count?: number;
+  status: "active" | "inactive" | "maintenance";
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
+  opening_date?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Sale {
   id?: string;
   customer_id?: string;
@@ -1194,6 +1214,86 @@ export const deleteSupplier = async (id: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error deleting supplier:', error);
+    return false;
+  }
+};
+
+// Outlet CRUD operations
+export const getOutlets = async (): Promise<Outlet[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlets')
+      .select('*')
+      .order('name');
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlets:', error);
+    return [];
+  }
+};
+
+export const getOutletById = async (id: string): Promise<Outlet | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlets')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error fetching outlet:', error);
+    return null;
+  }
+};
+
+export const createOutlet = async (outlet: Omit<Outlet, 'id'>): Promise<Outlet | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlets')
+      .insert([{ ...outlet, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating outlet:', error);
+    return null;
+  }
+};
+
+export const updateOutlet = async (id: string, outlet: Partial<Outlet>): Promise<Outlet | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlets')
+      .update({ ...outlet, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet:', error);
+    return null;
+  }
+};
+
+export const deleteOutlet = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlets')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet:', error);
     return false;
   }
 };

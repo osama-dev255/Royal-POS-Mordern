@@ -317,6 +317,10 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
         console.log("Navigating to grn-inventory-dashboard");
         onNavigate("grn-inventory-dashboard");
         break;
+      case "registered-outlets":
+        console.log("Navigating to registered-outlets");
+        onNavigate("registered-outlets");
+        break;
       default:
         console.log("Navigating to default:", moduleId);
         onNavigate(moduleId);
