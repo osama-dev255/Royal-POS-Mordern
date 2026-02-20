@@ -54,6 +54,7 @@ import { Templates } from "@/pages/Templates";
 import { SavedGRNsSection } from "@/components/SavedGRNsSection";
 import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettlementsSection";
 import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
+import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -1722,6 +1723,16 @@ export const Index = () => {
                   onBack={handleBack}
                   onLogout={handleLogout}
                 />
+              );
+            case "registered-outlets":
+              console.log("Rendering RegisteredOutlets");
+              return (
+                <AdvancedLayout
+                  username={user?.email || "admin"}
+                  onLogout={handleLogout}
+                >
+                  <RegisteredOutlets />
+                </AdvancedLayout>
               );
             default:
               console.log("Rendering default fallback for:", currentView);

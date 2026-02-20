@@ -201,6 +201,13 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
       description: "View and manage your Goods Received Notes inventory",
       icon: Package,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "registered-outlets",
+      title: "Registered Outlets",
+      description: "Manage and monitor your registered business outlets",
+      icon: Building,
+      color: "bg-white border border-gray-200"
     }
   ];
 
