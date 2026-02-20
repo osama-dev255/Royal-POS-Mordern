@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { formatCurrency } from "@/lib/currency";
 import { 
   FileText, 
@@ -52,7 +53,7 @@ import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
-import { getProducts, Product } from '@/services/databaseService';
+import { getProducts, Product, getOutlets, Outlet } from '@/services/databaseService';
 
 interface Template {
   id: string;
@@ -1002,6 +1003,10 @@ Thank you for your business!`,
   };
   
   const [deliveryNoteData, setDeliveryNoteData] = useState<DeliveryNoteData>(initialDeliveryNoteData);
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
+  const [filteredOutlets, setFilteredOutlets] = useState<Outlet[]>([]);
+  const [showOutletDropdown, setShowOutletDropdown] = useState<boolean>(false);
+  const [loadingOutlets, setLoadingOutlets] = useState<boolean>(true);
   
   const [savedDeliveryNotes, setSavedDeliveryNotes] = useState<SavedDeliveryNote[]>(() => {
     const saved = localStorage.getItem('savedDeliveryNotes');
@@ -1022,6 +1027,45 @@ Thank you for your business!`,
     const saved = localStorage.getItem('savedPurchaseOrders');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Load outlets on component mount
+  useEffect(() => {
+    const loadOutlets = async () => {
+      setLoadingOutlets(true);
+      try {
+        const loadedOutlets = await getOutlets();
+        setOutlets(loadedOutlets);
+        // Don't set filteredOutlets here - let the filter function handle it
+      } catch (error) {
+        console.error('Error loading outlets:', error);
+        setOutlets([]); // Clear outlets on error
+        setFilteredOutlets([]); // Ensure filtered outlets is empty if there's an error
+      } finally {
+        setLoadingOutlets(false);
+      }
+    };
+
+    loadOutlets();
+  }, []);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Check if the click is outside the command component
+      const commandElement = document.querySelector('[cmdk-root]');
+      if (showOutletDropdown && 
+          commandElement && 
+          !commandElement.contains(target)) {
+        setShowOutletDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showOutletDropdown]);
 
   // Effect to update savedDeliveryNotes when localStorage changes
   useEffect(() => {
@@ -4043,6 +4087,38 @@ Thank you for your business!`,
       ...prev,
       [field]: value
     }));
+  };
+
+  // Handle outlet selection from dropdown
+  const handleOutletSelect = (outlet: Outlet) => {
+    setDeliveryNoteData(prev => ({
+      ...prev,
+      customerName: outlet.name,
+      customerAddress1: outlet.location || '',
+      customerPhone: outlet.phone || '',
+      customerEmail: outlet.email || ''
+    }));
+    setFilteredOutlets([]);
+    setShowOutletDropdown(false);
+  };
+
+  // Filter outlets based on customer name input
+  const filterOutlets = (searchTerm: string) => {
+    // Don't filter if outlets are still loading
+    if (loadingOutlets) {
+      return;
+    }
+    
+    if (!searchTerm.trim()) {
+      // When search term is empty, show all outlets
+      setFilteredOutlets(outlets);
+    } else {
+      // When searching, show filtered results
+      const filtered = outlets.filter(outlet =>
+        outlet.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredOutlets(filtered);
+    }
   };
 
   // Handle item changes
@@ -9716,11 +9792,47 @@ Thank you for your business!`,
                           
                           <div>
                             <h4 className="font-bold">TO:</h4>
-                            <Input 
-                              value={deliveryNoteData.customerName}
-                              onChange={(e) => handleDeliveryNoteChange("customerName", e.target.value)}
-                              className="w-full h-6 p-1 text-sm mb-1"
-                            />
+                            <div className="relative command-autocomplete">
+                              <Command className="rounded-lg border" cmdk-root="">
+                                <CommandInput
+                                  placeholder="Search outlet name..."
+                                  value={deliveryNoteData.customerName}
+                                  onValueChange={(value) => {
+                                    handleDeliveryNoteChange("customerName", value);
+                                    filterOutlets(value);
+                                  }}
+                                  onFocus={() => {
+                                    // When focusing, show all outlets to allow selection
+                                    setFilteredOutlets(outlets);
+                                    setShowOutletDropdown(outlets.length > 0);
+                                  }}
+                                  onBlur={() => {
+                                    // Dropdown will be closed by click outside handler
+                                  }}
+                                />
+                                {showOutletDropdown && (
+                                  <CommandList className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+                                    {loadingOutlets ? (
+                                      <CommandEmpty>Loading outlets...</CommandEmpty>
+                                    ) : filteredOutlets.length > 0 ? (
+                                      <CommandGroup>
+                                        {filteredOutlets.map((outlet) => (
+                                          <CommandItem
+                                            key={outlet.id}
+                                            onSelect={() => handleOutletSelect(outlet)}
+                                            className="cursor-pointer hover:bg-gray-100 p-2"
+                                          >
+                                            {outlet.name}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    ) : (
+                                      <CommandEmpty>No outlets found.</CommandEmpty>
+                                    )}
+                                  </CommandList>
+                                )}
+                              </Command>
+                            </div>
                             <Input 
                               value={deliveryNoteData.customerAddress1}
                               onChange={(e) => handleDeliveryNoteChange("customerAddress1", e.target.value)}

@@ -9,11 +9,15 @@ import { resolve } from 'path';
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Configuration
+// Configuration - Use SERVICE_ROLE_KEY for DDL operations
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://tymfrdglmbnmzureeien.supabase.co';
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key-here';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'your-service-role-key-here';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    persistSession: false
+  }
+});
 
 async function runMigration(sqlFilePath) {
   try {
@@ -34,32 +38,46 @@ async function runMigration(sqlFilePath) {
       
       console.log('Executing:', statement.substring(0, 50) + '...');
       
-      // For CREATE TABLE and other DDL statements, we need to use a different approach
-      // Let's try to execute the statement directly
       try {
-        // This is a simplified approach - in a real production environment,
-        // you'd want to use a proper database connection with admin privileges
-        const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseAnonKey,
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
-            query: statement
-          })
+        // Use Supabase's rpc functionality to execute raw SQL
+        const { data, error } = await supabase.rpc('execute_sql', { 
+          sql_command: statement 
+        }, {
+          count: null
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Error executing statement:', errorText);
+        if (error) {
+          // If rpc doesn't work, try using the raw PostgREST endpoint with admin rights
+          console.log('Trying alternative method...');
+          
+          const response = await fetch(`${supabaseUrl}/rest/v1/rpc/execute_sql`, {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseServiceRoleKey,
+              'Authorization': `Bearer ${supabaseServiceRoleKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+              sql_command: statement
+            })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error executing statement:', errorText);
+            // Continue with the next statement instead of stopping
+          } else {
+            console.log('Statement executed successfully');
+          }
         } else {
           console.log('Statement executed successfully');
         }
       } catch (err) {
-        console.error('Error executing statement:', err);
+        // If the above methods don't work, we might need to execute the SQL differently
+        // For now, let's log the error and continue
+        console.error('Error executing statement:', err.message);
+        console.log('Trying to continue with next statement...');
       }
     }
     
