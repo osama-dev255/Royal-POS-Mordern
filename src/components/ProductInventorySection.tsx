@@ -349,7 +349,7 @@ export const ProductInventorySection = ({
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="text-right">Min Level</TableHead>
-                    <TableHead className="text-right">New Unit Cost</TableHead>
+                    <TableHead className="text-right">Original Unit Cost</TableHead>
                     <TableHead className="text-right">Unit Price</TableHead>
                     <TableHead className="text-right">Total Value</TableHead>
                     <TableHead>Status</TableHead>
