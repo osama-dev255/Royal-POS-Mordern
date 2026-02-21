@@ -47,7 +47,7 @@ import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUti
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
-import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, checkItemAvailability } from '@/utils/consumptionUtils';
+import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
@@ -125,7 +125,7 @@ interface SavedDeliveryNote {
 
 // Initial delivery note data
 const initialDeliveryNoteData: DeliveryNoteData = {
-  businessName: "YOUR BUSINESS NAME",
+  businessName: "KILANGO INVESTMENT LTD",
   businessAddress: "123 Business Street, City, Country",
   businessPhone: "+1234567890",
   businessEmail: "info@yourbusiness.com",
@@ -4137,6 +4137,12 @@ Thank you for your business!`,
       }
     }
     
+    // Check if business name is "KILANGO INVESTMENT LTD" and customer name is from registered outlets
+    const isKilangoInvestment = deliveryNoteData.businessName === "KILANGO INVESTMENT LTD";
+    const isCustomerFromOutlets = outlets.some(outlet => 
+      outlet.name.toLowerCase().trim() === deliveryNoteData.customerName.toLowerCase().trim()
+    );
+    
     setDeliveryNoteData(prev => ({
       ...prev,
       items: prev.items.map(item => {
@@ -4148,6 +4154,51 @@ Thank you for your business!`,
             const newQuantity = field === 'quantity' ? Number(value) : item.quantity;
             const newRate = field === 'rate' ? Number(value) : item.rate;
             updatedItem.amount = newQuantity * newRate;
+          }
+          
+          // If delivered field changes and conditions are met, update GRN quantities immediately
+          if (field === 'delivered' && isKilangoInvestment && isCustomerFromOutlets) {
+            const newDelivered = Number(value);
+            
+            // For immediate validation, we'll schedule the check after state update
+            setTimeout(async () => {
+              // Validate against available stock in GRN
+              const availability = await checkItemAvailability(item.description, newDelivered);
+              if (!availability.available && newDelivered > 0) {
+                alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the delivered quantity.`);
+                
+                // Reset the delivered value to the previous value
+                setDeliveryNoteData(prev => ({
+                  ...prev,
+                  items: prev.items.map(i => {
+                    if (i.id === itemId) {
+                      return { ...i, delivered: item.delivered || 0 };
+                    }
+                    return i;
+                  })
+                }));
+                return;
+              }
+              
+              const deliveredDifference = newDelivered - (item.delivered || 0);
+              
+              if (Math.abs(deliveredDifference) > 0) { // Only update if there's a change
+                // Update GRN quantities based on the delivered difference
+                const deliveredItems = [{
+                  description: item.description,
+                  delivered: deliveredDifference  // Use the difference to adjust inventory
+                }];
+                
+                try {
+                  // Update both GRN and product database stock
+                  await updateGRNQuantitiesBasedOnDelivered(deliveredItems);
+                  await updateProductStockBasedOnDelivered(deliveredItems);
+                  console.log(`GRN and product database quantities updated for delivered change: ${deliveredDifference} for item: ${item.description}`);
+                } catch (error) {
+                  console.error('Error updating GRN and product database quantities for delivered change:', error);
+                }
+              }
+            }, 0);
           }
           
           return updatedItem;
@@ -4205,6 +4256,12 @@ Thank you for your business!`,
     if (currentTemplate?.type === "delivery-note") {
       // For delivery note templates, automatically save to saved deliveries
       try {
+        // Check if business name is "KILANGO INVESTMENT LTD" and customer name is from registered outlets
+        const isKilangoInvestment = deliveryNoteData.businessName === "KILANGO INVESTMENT LTD";
+        const isCustomerFromOutlets = outlets.some(outlet => 
+          outlet.name.toLowerCase().trim() === deliveryNoteData.customerName.toLowerCase().trim()
+        );
+        
         // Validate that all quantities are available before saving
         let hasUnavailableItems = false;
         for (const item of deliveryNoteData.items) {
@@ -4261,14 +4318,19 @@ Thank you for your business!`,
         
         await saveDelivery(deliveryToSave);
         
-        // Update GRN quantities for consumed items
-        const consumedItems = deliveryNoteData.items.map(item => ({
+        // Update GRN quantities for consumed items based on quantity field
+        const quantityItems = deliveryNoteData.items.map(item => ({
           description: item.description,
-          quantity: item.quantity
+          delivered: item.quantity || 0  // Use quantity field for inventory reduction
         }));
-        await updateGRNQuantitiesFromDeliveryNote(consumedItems);
+        await updateGRNQuantitiesBasedOnDelivered(quantityItems);
+        await updateProductStockBasedOnDelivered(quantityItems);
         
-        alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN quantities updated for consumed items.`);
+        if (isKilangoInvestment && isCustomerFromOutlets) {
+          alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity for KILANGO INVESTMENT LTD.`);
+        } else {
+          alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity.`);
+        }
         
         // Show the delivery note options dialog after saving
         showDeliveryNoteOptionsDialog();
