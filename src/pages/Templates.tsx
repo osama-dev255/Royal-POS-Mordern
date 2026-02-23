@@ -53,7 +53,7 @@ import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
-import { getProducts, Product, getOutlets, Outlet } from '@/services/databaseService';
+import { getProducts, Product, getOutlets, Outlet, incrementProductStock } from '@/services/databaseService';
 
 interface Template {
   id: string;
@@ -391,6 +391,7 @@ interface GRNItem {
   expiryDate?: string;
   remarks?: string;
   supplierId?: string;  // To track which supplier this item belongs to
+  productId?: string;  // To track which product this item corresponds to
 }
 
 interface GRNReceivingCost {
@@ -1466,6 +1467,33 @@ Thank you for your business!`,
       // Use the proper saveGRN utility function
       await saveGRN(newGRN);
       
+      // Update Product Inventory to reflect received quantities
+      try {
+        // Process each item in the GRN to update product stock
+        for (const item of newGRN.data.items) {
+          if (item.description && item.delivered > 0) {
+            // Find the corresponding product in the database
+            const { getProducts, updateProduct } = await import('@/services/databaseService');
+            const allProducts = await getProducts();
+            const product = allProducts.find(p => 
+              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+            );
+            
+            if (product) {
+              // Increment the product stock by the delivered quantity
+              const currentStock = product.stock_quantity || 0;
+              const newStock = currentStock + item.delivered;
+              const updatedProduct = { ...product, stock_quantity: newStock };
+              await updateProduct(product.id!, updatedProduct);
+              console.log(`Product ${product.name} stock updated from ${currentStock} to ${newStock}`);
+            }
+          }
+        }
+      } catch (inventoryError) {
+        console.error('Error updating product inventory after GRN save:', inventoryError);
+        // Don't prevent GRN save if inventory update fails
+      }
+      
       // Update local state
       const updatedGRNs = [...savedGRNs, newGRN];
       setSavedGRNs(updatedGRNs as any);
@@ -1907,9 +1935,9 @@ Thank you for your business!`,
     receivedBy: "Warehouse Staff",
     receivedLocation: "Main Warehouse",
     items: [
-      { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", unitCost: 10, totalCost: 1000, receivingCostPerUnit: 0, totalWithReceivingCost: 1000, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition" },
-      { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", unitCost: 15, totalCost: 750, receivingCostPerUnit: 0, totalWithReceivingCost: 750, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged" },
-      { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", unitCost: 20, totalCost: 500, receivingCostPerUnit: 0, totalWithReceivingCost: 500, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "" }
+      { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", unitCost: 10, totalCost: 1000, receivingCostPerUnit: 0, totalWithReceivingCost: 1000, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition", productId: undefined },
+      { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", unitCost: 15, totalCost: 750, receivingCostPerUnit: 0, totalWithReceivingCost: 750, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged", productId: undefined },
+      { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", unitCost: 20, totalCost: 500, receivingCostPerUnit: 0, totalWithReceivingCost: 500, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "", productId: undefined }
     ],
     receivingCosts: [
       { id: "1", description: "Transport Charges", amount: 0 },
@@ -4142,12 +4170,53 @@ Thank you for your business!`,
             ...item, 
             description: productName,
             unit: selectedProduct.unit_of_measure || item.unit,
-            unitCost: selectedProduct.cost_price || item.unitCost
+            unitCost: selectedProduct.cost_price || item.unitCost,
+            productId: selectedProduct.id // Store the product ID for stock updates
           } : item
         )
       }));
     }
     setShowGrnDropdown(false);
+  };
+
+  // Handle received quantity changes and update product stock
+  const handleReceivedQuantityChange = async (itemId: string, newQuantity: number) => {
+    // First update the GRN data
+    setGrnData(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        item.id === itemId ? { ...item, receivedQuantity: newQuantity } : item
+      )
+    }));
+    
+    // Find the item and its associated product
+    const item = grnData.items.find(i => i.id === itemId);
+    if (item && item.productId && item.description) {
+      // Find the product in our loaded products
+      const product = grnProductItems.find(p => p.id === item.productId);
+      if (product) {
+        try {
+          // Calculate the difference in received quantity
+          const oldReceived = item.receivedQuantity || 0;
+          const quantityDifference = newQuantity - oldReceived;
+          
+          if (quantityDifference !== 0) {
+            // Update the product stock in the database
+            const updatedProduct = await incrementProductStock(product.id!, quantityDifference);
+            if (updatedProduct) {
+              console.log(`Product stock updated for ${product.name}: ${product.stock_quantity} -> ${updatedProduct.stock_quantity}`);
+              
+              // Update our local product list to reflect the change
+              setGrnProductItems(prev => 
+                prev.map(p => p.id === product.id ? updatedProduct : p)
+              );
+            }
+          }
+        } catch (error) {
+          console.error('Error updating product stock:', error);
+        }
+      }
+    }
   };
 
   // Filter outlets based on customer name input
@@ -4171,16 +4240,23 @@ Thank you for your business!`,
 
   // Handle item changes
   const handleItemChange = async (itemId: string, field: keyof DeliveryNoteItem, value: string | number) => {
-    // If changing quantity, validate against available stock in GRN
-    if (field === 'quantity') {
+    // Only validate against available stock when delivered field is changed, not when quantity is changed
+    // Quantity field in delivery note is for planning purposes, validation should happen when delivered is set
+    if (field === 'delivered') {
       const item = deliveryNoteData.items.find(item => item.id === itemId);
       if (item && item.description) {
-        const requestedQuantity = Number(value);
-        const availability = await checkItemAvailability(item.description, requestedQuantity);
+        const oldValue = item.delivered || 0;
+        const newValue = Number(value);
         
-        if (!availability.available) {
-          alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
-          return; // Don't update the item
+        // Only validate if the user is trying to increase the delivered quantity
+        if (newValue > oldValue) {
+          const quantityIncrease = newValue - oldValue;
+          const availability = await checkItemAvailability(item.description, quantityIncrease);
+          
+          if (!availability.available) {
+            alert(`Insufficient stock for "${item.description}". Need ${quantityIncrease} more, but only ${availability.availableQuantity} available in GRN: ${availability.grnNumber || 'N/A'}.`);
+            return; // Don't update the item
+          }
         }
       }
     }
@@ -4210,22 +4286,27 @@ Thank you for your business!`,
             
             // For immediate validation, we'll schedule the check after state update
             setTimeout(async () => {
-              // Validate against available stock in GRN
-              const availability = await checkItemAvailability(item.description, newDelivered);
-              if (!availability.available && newDelivered > 0) {
-                alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the delivered quantity.`);
-                
-                // Reset the delivered value to the previous value
-                setDeliveryNoteData(prev => ({
-                  ...prev,
-                  items: prev.items.map(i => {
-                    if (i.id === itemId) {
-                      return { ...i, delivered: item.delivered || 0 };
-                    }
-                    return i;
-                  })
-                }));
-                return;
+              const oldValue = item.delivered || 0;
+              
+              // Only validate if the user is trying to increase the delivered quantity
+              if (newDelivered > oldValue) {
+                const quantityIncrease = newDelivered - oldValue;
+                const availability = await checkItemAvailability(item.description, quantityIncrease);
+                if (!availability.available && quantityIncrease > 0) {
+                  alert(`Insufficient stock for "${item.description}". Need ${quantityIncrease} more, but only ${availability.availableQuantity} available in GRN: ${availability.grnNumber || 'N/A'}.`);
+                  
+                  // Reset the delivered value to the previous value
+                  setDeliveryNoteData(prev => ({
+                    ...prev,
+                    items: prev.items.map(i => {
+                      if (i.id === itemId) {
+                        return { ...i, delivered: item.delivered || 0 };
+                      }
+                      return i;
+                    })
+                  }));
+                  return;
+                }
               }
               
               const deliveredDifference = newDelivered - (item.delivered || 0);
@@ -4310,13 +4391,13 @@ Thank you for your business!`,
           outlet.name.toLowerCase().trim() === deliveryNoteData.customerName.toLowerCase().trim()
         );
         
-        // Validate that all quantities are available before saving
+        // Validate that all delivered quantities are available before saving
         let hasUnavailableItems = false;
         for (const item of deliveryNoteData.items) {
-          if (item.description && item.quantity > 0) {
-            const availability = await checkItemAvailability(item.description, item.quantity);
+          if (item.description && item.delivered > 0) {
+            const availability = await checkItemAvailability(item.description, item.delivered);
             if (!availability.available) {
-              alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+              alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the delivered quantity.`);
               hasUnavailableItems = true;
               break;
             }
@@ -4328,10 +4409,10 @@ Thank you for your business!`,
         }
 
         // Calculate total items
-        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + item.quantity, 0);
+        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + item.delivered, 0);
         
-        // For delivery notes, we don't have rates, so total is based on quantity
-        const totalAmount = totalItems; // Just using quantity as a simple total
+        // For delivery notes, we don't have rates, so total is based on delivered quantity
+        const totalAmount = totalItems; // Just using delivered quantity as a simple total
         
         // Create delivery data for saving
         const deliveryToSave: DeliveryData = {
@@ -4345,7 +4426,7 @@ Thank you for your business!`,
           status: 'completed', // For templates, mark as completed
           itemsList: deliveryNoteData.items.map(item => ({
             name: item.description,
-            quantity: item.quantity,
+            quantity: item.delivered, // Use delivered quantity for the saved record
             unit: item.unit,
             rate: item.rate,
             amount: item.amount,
@@ -9441,12 +9522,10 @@ Thank you for your business!`,
                                             <Input
                                               type="number"
                                               value={item.receivedQuantity}
-                                              onChange={(e) => setGrnData(prev => ({
-                                                ...prev,
-                                                items: prev.items.map(i => 
-                                                  i.id === item.id ? { ...i, receivedQuantity: parseInt(e.target.value) || 0 } : i
-                                                )
-                                              }))}
+                                              onChange={(e) => {
+                                                const newQuantity = parseInt(e.target.value) || 0;
+                                                handleReceivedQuantityChange(item.id, newQuantity);
+                                              }}
                                               className="p-1 h-8 text-sm w-full"
                                             />
                                           </td>

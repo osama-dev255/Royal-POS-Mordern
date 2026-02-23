@@ -590,6 +590,40 @@ export const createProduct = async (product: Omit<Product, 'id'>): Promise<Produ
   }
 };
 
+// Increment product stock quantity
+export const incrementProductStock = async (productId: string, incrementAmount: number): Promise<Product | null> => {
+  try {
+    // First get the current product to get the current stock
+    const { data: currentProduct, error: selectError } = await supabase
+      .from('products')
+      .select('stock_quantity')
+      .eq('id', productId)
+      .single();
+    
+    if (selectError) throw selectError;
+    
+    // Calculate new stock quantity
+    const newStock = (currentProduct?.stock_quantity || 0) + incrementAmount;
+    
+    // Update the stock quantity
+    const { data, error } = await supabase
+      .from('products')
+      .update({ 
+        stock_quantity: newStock, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', productId)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error incrementing product stock:', error);
+    return null;
+  }
+};
+
 // Enhanced updateProduct with better validation
 export const updateProduct = async (id: string, product: Partial<Product>): Promise<Product | null> => {
   try {

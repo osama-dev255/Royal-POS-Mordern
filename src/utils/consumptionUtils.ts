@@ -250,6 +250,29 @@ export const updateProductStockBasedOnDelivered = async (deliveryItems: Array<{
  */
 export const checkItemAvailability = async (itemDescription: string, requestedQuantity: number) => {
   try {
+    // First, check the product database as the primary source of truth
+    try {
+      const { getProducts } = await import('@/services/databaseService');
+      const allProducts = await getProducts();
+      
+      // Look for a product that matches the description
+      const product = allProducts.find(p => 
+        p.name.toLowerCase().trim() === itemDescription.toLowerCase().trim()
+      );
+      
+      if (product) {
+        const availableQuantity = product.stock_quantity || 0;
+        return {
+          available: availableQuantity >= requestedQuantity,
+          availableQuantity,
+          grnNumber: null // Indicate that this comes from product database
+        };
+      }
+    } catch (dbError) {
+      console.error('Error checking product database:', dbError);
+    }
+
+    // If not found in product database, fall back to GRN system
     // Get all saved GRNs
     const savedGRNs = await getSavedGRNs();
     
@@ -267,29 +290,6 @@ export const checkItemAvailability = async (itemDescription: string, requestedQu
           grnNumber: grn.data.grnNumber
         };
       }
-    }
-
-    // If item not found in GRN, check the product database as fallback
-    try {
-      const { getProducts } = await import('@/services/databaseService');
-      const allProducts = await getProducts();
-      
-      // Look for a product that matches the description
-      const product = allProducts.find(p => 
-        p.name.toLowerCase().trim() === itemDescription.toLowerCase().trim()
-      );
-      
-      if (product) {
-        const availableQuantity = product.stock_quantity || 0;
-        return {
-          available: availableQuantity >= requestedQuantity,
-          availableQuantity,
-          grnNumber: null
-        };
-      }
-    } catch (dbError) {
-      console.error('Error checking product database:', dbError);
-      // Continue to return not available if database check fails
     }
 
     // If item not found in any GRN or product database, return 0 available
