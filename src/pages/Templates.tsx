@@ -1061,6 +1061,40 @@ Thank you for your business!`,
     loadOutlets();
   }, []);
 
+  // Effect to handle delivery note dropdown positioning
+  useEffect(() => {
+    if (showDeliveryNoteDropdown) {
+      const updateDropdownPosition = () => {
+        const activeInput = document.activeElement;
+        if (activeInput instanceof HTMLInputElement) {
+          const rect = activeInput.getBoundingClientRect();
+          const dropdowns = document.querySelectorAll('[id^="delivery-note-dropdown-"]');
+          dropdowns.forEach(dropdown => {
+            const element = dropdown as HTMLElement;
+            element.style.position = 'fixed';
+            element.style.top = `${rect.bottom + window.scrollY}px`;
+            element.style.left = `${rect.left + window.scrollX}px`;
+            element.style.minWidth = `${Math.max(rect.width, 400)}px`;
+            element.style.zIndex = '1000';
+          });
+        }
+      };
+      
+      // Update position immediately and on scroll/resize
+      updateDropdownPosition();
+      const scrollHandler = () => updateDropdownPosition();
+      const resizeHandler = () => updateDropdownPosition();
+      
+      window.addEventListener('scroll', scrollHandler, true);
+      window.addEventListener('resize', resizeHandler);
+      
+      return () => {
+        window.removeEventListener('scroll', scrollHandler, true);
+        window.removeEventListener('resize', resizeHandler);
+      };
+    }
+  }, [showDeliveryNoteDropdown]);
+
   // Load products for GRN dropdown on component mount
   useEffect(() => {
     const loadProducts = async () => {
@@ -7369,7 +7403,7 @@ Thank you for your business!`,
                 
 
                 
-                <div className="border rounded-lg p-6 max-w-4xl mx-auto" id="template-preview-content">
+                <div className="border rounded-lg p-6 max-w-6xl mx-auto" id="template-preview-content">
                   <div className="space-y-6">
                     {/* Header */}
                     {currentTemplate?.type === "order-form" ? (
@@ -10203,7 +10237,7 @@ Thank you for your business!`,
                         {/* Items Table */}
                         <div>
                           <h4 className="font-bold mb-2">ITEMS DELIVERED:</h4>
-                          <div className="overflow-x-auto">
+                          <div className="overflow-x-auto relative">
                             <table className="w-full border-collapse border border-gray-300 text-sm">
                               <thead>
                                 <tr className="bg-gray-100">
@@ -10220,7 +10254,7 @@ Thank you for your business!`,
                               <tbody>
                                 {deliveryNoteData.items.map((item) => (
                                   <tr key={item.id}>
-                                    <td className="border border-gray-300 p-2">
+                                    <td className="border border-gray-300 p-2 relative">
                                       <div className="relative">
                                         <Input
                                           value={item.description}
@@ -10242,7 +10276,10 @@ Thank you for your business!`,
                                           placeholder="Select or enter description..."
                                         />
                                         {deliveryNoteProductDescriptions.length > 0 && showDeliveryNoteDropdown && (
-                                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                          <div 
+                                            id={`delivery-note-dropdown-${item.id}`}
+                                            className="bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+                                          >
                                             {deliveryNoteProductDescriptions
                                               .filter(desc => 
                                                 item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
