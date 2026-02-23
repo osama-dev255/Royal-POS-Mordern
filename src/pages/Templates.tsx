@@ -5395,9 +5395,9 @@ Thank you for your business!`,
   const [invoiceProductItemsMap, setInvoiceProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
   
-  // Effect to handle dropdown positioning for both delivery note and invoice
+  // Effect to handle dropdown positioning for delivery note, invoice, and GRN
   useEffect(() => {
-    if (showDeliveryNoteDropdown || showDropdown) {
+    if (showDeliveryNoteDropdown || showDropdown || showGrnDropdown) {
       const updateDropdownPosition = () => {
         const activeInput = document.activeElement;
         if (activeInput instanceof HTMLInputElement) {
@@ -5428,6 +5428,19 @@ Thank you for your business!`,
               element.style.zIndex = '1000';
             });
           }
+          
+          // Handle GRN dropdowns
+          if (showGrnDropdown) {
+            const grnDropdowns = document.querySelectorAll('[id^="grn-dropdown-"]');
+            grnDropdowns.forEach(dropdown => {
+              const element = dropdown as HTMLElement;
+              element.style.position = 'fixed';
+              element.style.top = `${rect.bottom + window.scrollY}px`;
+              element.style.left = `${rect.left + window.scrollX}px`;
+              element.style.minWidth = `${Math.max(rect.width, 400)}px`;
+              element.style.zIndex = '1000';
+            });
+          }
         }
       };
       
@@ -5444,7 +5457,7 @@ Thank you for your business!`,
         window.removeEventListener('resize', resizeHandler);
       };
     }
-  }, [showDeliveryNoteDropdown, showDropdown]);
+  }, [showDeliveryNoteDropdown, showDropdown, showGrnDropdown]);
   
   // Load GRN descriptions and items map on component mount
   useEffect(() => {
@@ -9574,7 +9587,7 @@ Thank you for your business!`,
                                 <div className="font-bold mb-2">
                                   ITEMS RECEIVED WITH UPDATED PRICES{grnData.numberOfSuppliers > 1 ? ` - SUPPLIER ${supplierIndex + 1}` : ':'}
                                 </div>
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto relative">
                                   <table className="w-full border-collapse border border-gray-300 text-sm">
                                     <thead>
                                       <tr className="bg-gray-100">
@@ -9617,7 +9630,11 @@ Thank you for your business!`,
                                                 placeholder="Select or enter product..."
                                               />
                                               {showGrnDropdown && grnProductDescriptions.length > 0 && (
-                                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                                <div 
+                                                  id={`grn-dropdown-${item.id}-${supplierIndex}`}
+                                                  className="fixed z-50 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+                                                  style={{ minWidth: '400px' }}
+                                                >
                                                   {grnProductDescriptions
                                                     .filter(desc => 
                                                       item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
