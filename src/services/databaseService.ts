@@ -624,6 +624,41 @@ export const incrementProductStock = async (productId: string, incrementAmount: 
   }
 };
 
+// Decrement product stock quantity
+export const decrementProductStock = async (productId: string, decrementAmount: number): Promise<Product | null> => {
+  try {
+    // First get the current product to get the current stock
+    const { data: currentProduct, error: selectError } = await supabase
+      .from('products')
+      .select('stock_quantity')
+      .eq('id', productId)
+      .single();
+    
+    if (selectError) throw selectError;
+    
+    // Calculate new stock quantity (ensure it doesn't go below 0)
+    const currentStock = currentProduct?.stock_quantity || 0;
+    const newStock = Math.max(0, currentStock - decrementAmount);
+    
+    // Update the stock quantity
+    const { data, error } = await supabase
+      .from('products')
+      .update({ 
+        stock_quantity: newStock, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', productId)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error decrementing product stock:', error);
+    return null;
+  }
+};
+
 // Enhanced updateProduct with better validation
 export const updateProduct = async (id: string, product: Partial<Product>): Promise<Product | null> => {
   try {

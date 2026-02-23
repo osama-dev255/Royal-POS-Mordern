@@ -53,7 +53,7 @@ import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
-import { getProducts, Product, getOutlets, Outlet, incrementProductStock } from '@/services/databaseService';
+import { getProducts, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
 
 interface Template {
   id: string;
@@ -5218,6 +5218,9 @@ Thank you for your business!`,
       }
     }
     
+    // Check if business name is "KILANGO INVESTMENT LTD" to handle stock decrement
+    const isKilangoInvestment = invoiceData.businessName === "KILANGO INVESTMENT LTD";
+    
     setInvoiceData(prev => {
       const updatedItems = prev.items.map(item => {
         if (item.id === itemId) {
@@ -5264,6 +5267,63 @@ Thank you for your business!`,
         amountDue
       };
     });
+    
+    // If business name is "KILANGO INVESTMENT LTD" and quantity field is changed, decrement stock
+    if (isKilangoInvestment && field === 'quantity') {
+      const item = invoiceData.items.find(i => i.id === itemId);
+      if (item && item.description) {
+        setTimeout(async () => {
+          try {
+            // Get the updated item value after state update
+            const updatedItem = invoiceData.items.find(i => i.id === itemId);
+            if (!updatedItem) return;
+            
+            const oldValue = item.quantity || 0;
+            const newValue = Number(value);
+            
+            // Only decrement stock if the user is increasing the quantity
+            if (newValue > oldValue) {
+              const quantityIncrease = newValue - oldValue;
+              
+              // Find the product in the database to decrement stock
+              const { getProducts } = await import('@/services/databaseService');
+              const allProducts = await getProducts();
+              const product = allProducts.find(p => 
+                p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+              );
+              
+              if (product) {
+                // Decrement the product stock by the quantity increase
+                const updatedProduct = await decrementProductStock(product.id!, quantityIncrease);
+                if (updatedProduct) {
+                  console.log(`Product stock decremented for ${product.name}: ${(product.stock_quantity || 0)} -> ${updatedProduct.stock_quantity}`);
+                }
+              }
+            } else if (newValue < oldValue) {
+              // If the user is decreasing the quantity, increment stock (reverse the transaction)
+              const quantityDecrease = oldValue - newValue;
+              
+              // Find the product in the database to increment stock
+              const { getProducts } = await import('@/services/databaseService');
+              const allProducts = await getProducts();
+              const product = allProducts.find(p => 
+                p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+              );
+              
+              if (product) {
+                // Increment the product stock by the quantity decrease
+                const updatedProduct = await incrementProductStock(product.id!, quantityDecrease);
+                if (updatedProduct) {
+                  console.log(`Product stock incremented for ${product.name}: ${(product.stock_quantity || 0)} -> ${updatedProduct.stock_quantity} (quantity decreased in invoice)`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error updating product stock for invoice:', error);
+          }
+        }, 0);
+      }
+    }
   };
   
   // Fetch all GRN items for the searchable dropdown with rates and units
@@ -6183,6 +6243,36 @@ Thank you for your business!`,
       };
       
       await saveInvoice(invoiceToSave);
+      
+      // Check if business name is "KILANGO INVESTMENT LTD" to handle stock decrement in Product Inventory
+      const isKilangoInvestment = invoiceData.businessName === "KILANGO INVESTMENT LTD";
+      
+      if (isKilangoInvestment) {
+        // Update Product Inventory for consumed items
+        for (const item of invoiceData.items) {
+          if (item.description && item.quantity > 0) {
+            try {
+              // Find the product in the database to decrement stock
+              const { getProducts, updateProduct } = await import('@/services/databaseService');
+              const allProducts = await getProducts();
+              const product = allProducts.find(p => 
+                p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+              );
+              
+              if (product) {
+                // Decrement the product stock by the quantity
+                const currentStock = product.stock_quantity || 0;
+                const newStock = Math.max(0, currentStock - item.quantity);
+                const updatedProduct = { ...product, stock_quantity: newStock };
+                await updateProduct(product.id!, updatedProduct);
+                console.log(`Product ${product.name} stock updated from ${currentStock} to ${newStock} after invoice save`);
+              }
+            } catch (error) {
+              console.error('Error updating product inventory after invoice save:', error);
+            }
+          }
+        }
+      }
       
       // Update GRN quantities for consumed items
       const consumedItems = invoiceData.items.map(item => ({
