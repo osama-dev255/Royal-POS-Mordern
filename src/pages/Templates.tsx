@@ -3590,213 +3590,325 @@ Thank you for your business!`,
   
   // Function to generate clean GRN HTML for printing
   const generateCleanGRNHTML = (): string => {
-    return `
-      <div class="grn-container" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
-        <style>
-          body { margin: 0; padding: 20px; }
-          .grn-container { border: 1px solid #ccc; }
-          .text-center { text-align: center; }
-          .border-b-2 { border-bottom: 2px solid #000; }
-          .pb-2 { padding-bottom: 0.5rem; }
-          .font-bold { font-weight: bold; }
-          .text-2xl { font-size: 1.5rem; }
-          .text-sm { font-size: 0.875rem; }
-          .mb-1 { margin-bottom: 0.25rem; }
-          .mb-2 { margin-bottom: 0.5rem; }
-          .mt-4 { margin-top: 1rem; }
-          .mt-8 { margin-top: 2rem; }
-          .pt-4 { padding-top: 1rem; }
-          .border-t { border-top: 1px solid #ccc; }
-          .grid { display: grid; }
-          .gap-8 { gap: 2rem; }
-          .gap-4 { gap: 1rem; }
-          .grid-cols-1 { grid-template-columns: 1fr; }
-          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-          .border { border: 1px solid #e5e7eb; }
-          .p-3 { padding: 0.75rem; }
-          .rounded { border-radius: 0.25rem; }
-          .font-medium { font-weight: 500; }
-        </style>
-        <div class="text-center border-b-2 pb-2">
-          <h2 class="text-2xl font-bold">GOODS RECEIVED NOTE</h2>
-          <p class="text-sm">GRN #: ${grnData.grnNumber || 'GRN_NUMBER'}</p>
-          <p class="text-sm">Date: ${new Date().toLocaleDateString()}</p>
-          <p class="text-sm">Time: ${new Date().toLocaleTimeString()}</p>
-        </div>
+    try {
+      // Validate that we have GRN data
+      if (!grnData) {
+        console.error('No GRN data available');
+        return '';
+      }
+      
+      // Validate required fields
+      if (!grnData.grnNumber) {
+        console.warn('GRN number is missing');
+      }
+      
+      return `
+        <div class="grn-container" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+          <style>
+            body { margin: 0; padding: 20px; }
+            .grn-container { border: 1px solid #ccc; }
+            .text-center { text-align: center; }
+            .border-b-2 { border-bottom: 2px solid #000; }
+            .pb-2 { padding-bottom: 0.5rem; }
+            .font-bold { font-weight: bold; }
+            .text-2xl { font-size: 1.5rem; }
+            .text-sm { font-size: 0.875rem; }
+            .mb-1 { margin-bottom: 0.25rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mt-4 { margin-top: 1rem; }
+            .mt-8 { margin-top: 2rem; }
+            .pt-4 { padding-top: 1rem; }
+            .border-t { border-top: 1px solid #ccc; }
+            .grid { display: grid; }
+            .gap-8 { gap: 2rem; }
+            .gap-4 { gap: 1rem; }
+            .grid-cols-1 { grid-template-columns: 1fr; }
+            .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+            .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+            .border { border: 1px solid #e5e7eb; }
+            .p-3 { padding: 0.75rem; }
+            .rounded { border-radius: 0.25rem; }
+            .font-medium { font-weight: 500; }
+          </style>
+          <div class="text-center border-b-2 pb-2">
+            <h2 class="text-2xl font-bold">GOODS RECEIVED NOTE</h2>
+            <p class="text-sm">GRN #: ${grnData.grnNumber || 'N/A'}</p>
+            <p class="text-sm">Date: ${new Date().toLocaleDateString()}</p>
+            <p class="text-sm">Time: ${new Date().toLocaleTimeString()}</p>
+          </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-          <div>
-            <div class="font-bold mb-1">SUPPLIER INFORMATION:</div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Name:</span> ${grnData.supplierName}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+            <div>
+              <div class="font-bold mb-2">SUPPLIER INFORMATION:</div>
+              ${(grnData.suppliers || []).map(supplier => `
+                <div class="border p-3 rounded mb-3" style="background-color: #f8f9fa;">
+                  <div class="font-medium mb-1">${supplier.name || 'N/A'}</div>
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">ID:</span> ${supplier.supplierId || 'N/A'}
+                  </div>
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">Phone:</span> ${supplier.phone || 'N/A'}
+                  </div>
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">Email:</span> ${supplier.email || 'N/A'}
+                  </div>
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">Address:</span> ${supplier.address || 'N/A'}
+                  </div>
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">TIN Number:</span> ${supplier.tinNumber || 'N/A'}
+                  </div>
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">Stock Type:</span> ${supplier.stockType || 'N/A'}
+                  </div>
+                </div>
+              `).join('')}
+              
+              ${grnData.suppliers?.length === 0 ? `
+                <div class="text-sm text-gray-500">
+                  <span class="font-medium">Primary Supplier:</span> ${grnData.supplierName || 'N/A'}<br>
+                  <span class="font-medium">ID:</span> ${grnData.supplierId || 'N/A'}<br>
+                  <span class="font-medium">Phone:</span> ${grnData.supplierPhone || 'N/A'}<br>
+                  <span class="font-medium">Email:</span> ${grnData.supplierEmail || 'N/A'}<br>
+                  <span class="font-medium">Address:</span> ${grnData.supplierAddress || 'N/A'}
+                </div>
+              ` : ''}
             </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">ID:</span> ${grnData.supplierId || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Phone:</span> ${grnData.supplierPhone || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Email:</span> ${grnData.supplierEmail || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Address:</span> ${grnData.supplierAddress || 'N/A'}
+            
+            <div>
+              <div class="font-bold mb-1">RECEIVING BUSINESS:</div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Business Name:</span> ${grnData.businessName || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Address:</span> ${grnData.businessAddress || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Phone:</span> ${grnData.businessPhone || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Email:</span> ${grnData.businessEmail || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Stock Type:</span> ${grnData.suppliers?.[0]?.stockType || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">VAT Status:</span> ${grnData.isVatable ? 'Vatable' : 'Exempt'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">TIN Number:</span> ${grnData.supplierTinNumber || 'N/A'}
+              </div>
             </div>
           </div>
           
-          <div>
-            <div class="font-bold mb-1">RECEIVING BUSINESS:</div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Business Name:</span> ${grnData.businessName || 'N/A'}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+            <div>
+              <div class="font-bold mb-1">DELIVERY DETAILS:</div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">PO Number:</span> ${grnData.poNumber || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Delivery Note Number:</span> ${grnData.deliveryNoteNumber || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Vehicle Number:</span> ${grnData.vehicleNumber || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Driver Name:</span> ${grnData.driverName || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Received By:</span> ${grnData.receivedBy || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Received Location:</span> ${grnData.receivedLocation || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Received Date:</span> ${grnData.receivedDate || 'N/A'}
+              </div>
             </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Address:</span> ${grnData.businessAddress || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Phone:</span> ${grnData.businessPhone || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Email:</span> ${grnData.businessEmail || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Stock Type:</span> ${grnData.suppliers[0]?.stockType || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">VAT Status:</span> ${grnData.isVatable ? 'Vatable' : 'Exempt'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">TIN Number:</span> ${grnData.supplierTinNumber || 'N/A'}
-            </div>
-          </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-          <div>
-            <div class="font-bold mb-1">DELIVERY DETAILS:</div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">PO Number:</span> ${grnData.poNumber || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Delivery Note Number:</span> ${grnData.deliveryNoteNumber || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Vehicle Number:</span> ${grnData.vehicleNumber || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Driver Name:</span> ${grnData.driverName || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Received By:</span> ${grnData.receivedBy || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Received Location:</span> ${grnData.receivedLocation || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Received Date:</span> ${grnData.receivedDate || 'N/A'}
+            
+            <div>
+              <div class="font-bold mb-1">APPROVAL DETAILS:</div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Prepared By:</span> ${grnData.preparedBy || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Prepared Date:</span> ${grnData.preparedDate || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Checked By:</span> ${grnData.checkedBy || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Checked Date:</span> ${grnData.checkedDate || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Approved By:</span> ${grnData.approvedBy || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Approved Date:</span> ${grnData.approvedDate || 'N/A'}
+              </div>
+              <div class="text-sm mb-1">
+                <span class="font-medium">Status:</span> ${grnData.status || 'N/A'}
+              </div>
             </div>
           </div>
           
-          <div>
-            <div class="font-bold mb-1">APPROVAL DETAILS:</div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Prepared By:</span> ${grnData.preparedBy || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Prepared Date:</span> ${grnData.preparedDate || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Checked By:</span> ${grnData.checkedBy || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Checked Date:</span> ${grnData.checkedDate || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Approved By:</span> ${grnData.approvedBy || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Approved Date:</span> ${grnData.approvedDate || 'N/A'}
-            </div>
-            <div class="text-sm mb-1">
-              <span class="font-medium">Status:</span> ${grnData.status || 'N/A'}
-            </div>
+          <div class="mt-4">
+            <div class="font-bold mb-2">ITEMS RECEIVED BY SUPPLIER:</div>
+            
+            ${(function() {
+              // Group items by supplier
+              const itemsBySupplier = new Map();
+              const unassignedItems = [];
+              
+              (grnData.items || []).forEach(item => {
+                if (item.supplierId) {
+                  if (!itemsBySupplier.has(item.supplierId)) {
+                    itemsBySupplier.set(item.supplierId, []);
+                  }
+                  itemsBySupplier.get(item.supplierId).push(item);
+                } else {
+                  unassignedItems.push(item);
+                }
+              });
+              
+              let html = '';
+              
+              // Display items for each supplier
+              itemsBySupplier.forEach((items, supplierId) => {
+                const supplier = grnData.suppliers?.find(s => s.id === supplierId);
+                html += `
+                  <div class="mb-6">
+                    <div class="font-bold mb-2" style="background-color: #f0f0f0; padding: 8px; border-radius: 4px;">
+                      Supplier: ${supplier?.name || supplierId || 'Unknown Supplier'}
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+                      <thead>
+                        <tr style="background-color: #f3f4f6;">
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: left;">Description</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Ordered</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Received</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Unit</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Original Unit Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Receiving Cost Per Unit</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Unit Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total Cost with Receiving</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Batch #</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Expiry</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${items.map(item => `
+                          <tr>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px;">${item.description || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.batchNumber || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.expiryDate || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.remarks || ''}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `;
+              });
+              
+              // Display unassigned items if any
+              if (unassignedItems.length > 0) {
+                html += `
+                  <div class="mb-6">
+                    <div class="font-bold mb-2" style="background-color: #fff3cd; padding: 8px; border-radius: 4px; border: 1px solid #ffeaa7;">
+                      Unassigned Items (No Supplier Specified)
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+                      <thead>
+                        <tr style="background-color: #f3f4f6;">
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: left;">Description</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Ordered</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Received</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Unit</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Original Unit Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Receiving Cost Per Unit</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Unit Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total Cost with Receiving</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Batch #</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Expiry</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${unassignedItems.map(item => `
+                          <tr>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px;">${item.description || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.batchNumber || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.expiryDate || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.remarks || ''}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `;
+              }
+              
+              return html;
+            })()}
+          </div>
+          
+          <div class="mt-4">
+            <div class="font-bold mb-2">RECEIVING COSTS:</div>
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background-color: #f3f4f6;">
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Cost Description</th>
+                  <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(grnData.receivingCosts || []).map(cost => `
+                  <tr>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px;">${cost.description || ''}</td>
+                    <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">${cost.amount || 0}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="mt-4">
+            <div class="font-bold mb-1">QUALITY CHECK NOTES:</div>
+            <div class="text-sm">${grnData.qualityCheckNotes || 'N/A'}</div>
+          </div>
+          
+          <div class="mt-4">
+            <div class="font-bold mb-1">DISCREPANCIES:</div>
+            <div class="text-sm">${grnData.discrepancies || 'N/A'}</div>
+          </div>
+          
+          <div class="text-center mt-8 pt-4 border-t">
+            <div class="text-sm font-bold">Thank you for your delivery!</div>
+            <div class="text-sm">Goods received and verified.</div>
           </div>
         </div>
-        
-        <div class="mt-4">
-          <div class="font-bold mb-2">ITEMS RECEIVED:</div>
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-            <thead>
-              <tr style="background-color: #f3f4f6;">
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: left;">Description</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Ordered</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Received</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Unit</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Original Unit Cost</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Receiving Cost Per Unit</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Unit Cost</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total Cost with Receiving</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Batch #</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Expiry</th>
-                <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(distributeReceivingCosts(grnData.items, grnData.receivingCosts) || []).map(item => `
-                <tr>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px;">${item.description || ''}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.batchNumber || ''}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.expiryDate || ''}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.remarks || ''}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="mt-4">
-          <div class="font-bold mb-2">RECEIVING COSTS:</div>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background-color: #f3f4f6;">
-                <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Cost Description</th>
-                <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(grnData.receivingCosts || []).map(cost => `
-                <tr>
-                  <td style="border: 1px solid #e5e7eb; padding: 8px;">${cost.description || ''}</td>
-                  <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">${cost.amount || 0}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="mt-4">
-          <div class="font-bold mb-1">QUALITY CHECK NOTES:</div>
-          <div class="text-sm">${grnData.qualityCheckNotes || 'N/A'}</div>
-        </div>
-        
-        <div class="mt-4">
-          <div class="font-bold mb-1">DISCREPANCIES:</div>
-          <div class="text-sm">${grnData.discrepancies || 'N/A'}</div>
-        </div>
-        
-        <div class="text-center mt-8 pt-4 border-t">
-          <div class="text-sm font-bold">Thank you for your delivery!</div>
-          <div class="text-sm">Goods received and verified.</div>
-        </div>
-      </div>
-    `;
+      `;
+    } catch (error) {
+      console.error('Error generating GRN HTML:', error);
+      return `<div class="error">Error generating GRN content: ${error.message}</div>`;
+    }
   };
   
   // Function to generate clean purchase order HTML for printing
@@ -11511,57 +11623,156 @@ Enter choice (1-3):`);
                   // Create a print-friendly version of the GRN
                   const grnContent = generateCleanGRNHTML();
                   
-                  // Create a temporary window for printing
-                  const printWindow = window.open('', '_blank', 'width=800,height=600');
-                  if (printWindow) {
-                    printWindow.document.write(`
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Goods Received Note</title>
-                        <style>
-                          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-                          .grn-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
-                          .text-center { text-align: center; }
-                          .border-b-2 { border-bottom: 2px solid #000; }
-                          .pb-2 { padding-bottom: 0.5rem; }
-                          .font-bold { font-weight: bold; }
-                          .text-2xl { font-size: 1.5rem; }
-                          .text-sm { font-size: 0.875rem; }
-                          .mb-1 { margin-bottom: 0.25rem; }
-                          .mb-2 { margin-bottom: 0.5rem; }
-                          .mt-4 { margin-top: 1rem; }
-                          .mt-8 { margin-top: 2rem; }
-                          .pt-4 { padding-top: 1rem; }
-                          .border-t { border-top: 1px solid #ccc; }
-                          .grid { display: grid; }
-                          .gap-8 { gap: 2rem; }
-                          .gap-4 { gap: 1rem; }
-                          .grid-cols-1 { grid-template-columns: 1fr; }
-                          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-                          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-                          .border { border: 1px solid #e5e7eb; }
-                          .p-3 { padding: 0.75rem; }
-                          .rounded { border-radius: 0.25rem; }
-                          .font-medium { font-weight: 500; }
-                        </style>
-                      </head>
-                      <body>
-                        ${grnContent}
-                      </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                    
-                    // Wait a bit for content to render before printing
-                    setTimeout(() => {
+                  // Validate that we have content to print
+                  if (!grnContent || grnContent.trim() === '') {
+                    alert('No GRN data available to print. Please make sure the GRN is properly filled out.');
+                    return;
+                  }
+                  
+                  try {
+                    // Create a temporary window for printing
+                    const printWindow = window.open('', '_blank', 'width=800,height=600');
+                    if (printWindow) {
+                      printWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                          <title>Goods Received Note - ${grnData.grnNumber || 'GRN'}</title>
+                          <style>
+                            body { 
+                              margin: 0; 
+                              padding: 20px; 
+                              font-family: Arial, sans-serif; 
+                              background: white;
+                            }
+                            .grn-container { 
+                              max-width: 800px; 
+                              margin: 0 auto; 
+                              padding: 20px; 
+                              border: 1px solid #ccc; 
+                              background: white;
+                            }
+                            .text-center { text-align: center; }
+                            .border-b-2 { border-bottom: 2px solid #000; }
+                            .pb-2 { padding-bottom: 0.5rem; }
+                            .font-bold { font-weight: bold; }
+                            .text-2xl { font-size: 1.5rem; }
+                            .text-sm { font-size: 0.875rem; }
+                            .mb-1 { margin-bottom: 0.25rem; }
+                            .mb-2 { margin-bottom: 0.5rem; }
+                            .mt-4 { margin-top: 1rem; }
+                            .mt-8 { margin-top: 2rem; }
+                            .pt-4 { padding-top: 1rem; }
+                            .border-t { border-top: 1px solid #ccc; }
+                            .grid { display: grid; }
+                            .gap-8 { gap: 2rem; }
+                            .gap-4 { gap: 1rem; }
+                            .grid-cols-1 { grid-template-columns: 1fr; }
+                            .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+                            .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+                            .border { border: 1px solid #e5e7eb; }
+                            .p-3 { padding: 0.75rem; }
+                            .rounded { border-radius: 0.25rem; }
+                            .font-medium { font-weight: 500; }
+                            table { 
+                              width: 100%; 
+                              border-collapse: collapse; 
+                              font-size: 12px;
+                              margin: 10px 0;
+                            }
+                            th, td {
+                              border: 1px solid #e5e7eb;
+                              padding: 6px;
+                            }
+                            th {
+                              background-color: #f3f4f6;
+                              text-align: left;
+                            }
+                            .text-right {
+                              text-align: right;
+                            }
+                          </style>
+                        </head>
+                        <body>
+                          <div class="no-print" style="margin-bottom: 20px; text-align: center;">
+                            <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                              Print GRN
+                            </button>
+                            <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; margin-left: 10px; cursor: pointer;">
+                              Close
+                            </button>
+                          </div>
+                          ${grnContent}
+                        </body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                      
+                      // Focus the window and optionally print
                       printWindow.focus();
-                      printWindow.print();
-                      printWindow.close();
-                    }, 500);
-                  } else {
-                    // Fallback: Alert user to allow popups
-                    alert('Please enable popups for this site to print the GRN');
+                      
+                      // Wait for content to fully load before printing
+                      setTimeout(() => {
+                        // Remove the print/close buttons from the print output
+                        const printStyle = printWindow.document.createElement('style');
+                        printStyle.textContent = '@media print { .no-print { display: none; } }';
+                        printWindow.document.head.appendChild(printStyle);
+                      }, 1000);
+                    } else {
+                      // Fallback: Direct print or clipboard method
+                      console.log('Popup blocked, falling back to alternative printing method');
+                      const blob = new Blob([`<html><head><title>Goods Received Note</title><style>
+                        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+                        .grn-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
+                        .text-center { text-align: center; }
+                        .border-b-2 { border-bottom: 2px solid #000; }
+                        .pb-2 { padding-bottom: 0.5rem; }
+                        .font-bold { font-weight: bold; }
+                        .text-2xl { font-size: 1.5rem; }
+                        .text-sm { font-size: 0.875rem; }
+                        .mb-1 { margin-bottom: 0.25rem; }
+                        .mb-2 { margin-bottom: 0.5rem; }
+                        .mt-4 { margin-top: 1rem; }
+                        .mt-8 { margin-top: 2rem; }
+                        .pt-4 { padding-top: 1rem; }
+                        .border-t { border-top: 1px solid #ccc; }
+                        .grid { display: grid; }
+                        .gap-8 { gap: 2rem; }
+                        .gap-4 { gap: 1rem; }
+                        .grid-cols-1 { grid-template-columns: 1fr; }
+                        .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+                        .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+                        .border { border: 1px solid #e5e7eb; }
+                        .p-3 { padding: 0.75rem; }
+                        .rounded { border-radius: 0.25rem; }
+                        .font-medium { font-weight: 500; }
+                        table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0; }
+                        th, td { border: 1px solid #e5e7eb; padding: 6px; }
+                        th { background-color: #f3f4f6; text-align: left; }
+                        .text-right { text-align: right; }
+                      </style></head><body>${grnContent}</body></html>`], {
+                        type: 'text/html'
+                      });
+                      
+                      const newWindow = window.open(URL.createObjectURL(blob));
+                      if (newWindow) {
+                        newWindow.onload = () => {
+                          setTimeout(() => {
+                            newWindow.print();
+                          }, 1000);
+                        };
+                      } else {
+                        // Final fallback: Copy to clipboard and show message
+                        navigator.clipboard.writeText(grnContent).then(() => {
+                          alert('GRN content copied to clipboard. You can paste it into a document or email.');
+                        }).catch(() => {
+                          alert('Unable to print or copy. Please manually copy the GRN information below:\n\n' + grnContent.substring(0, 1000) + '...');
+                        });
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error during GRN printing:', error);
+                    alert('Error occurred while trying to print the GRN. Please try again or use the Download option.');
                   }
                   closeGRNOptionsDialog();
                 }}
