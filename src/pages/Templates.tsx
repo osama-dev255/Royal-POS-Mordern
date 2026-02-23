@@ -5228,21 +5228,13 @@ Thank you for your business!`,
           
           // If quantity or rate changes, update amount
           if (field === 'quantity' || field === 'rate') {
-            // Apply discount validation: if quantity > 20, deduct 200 from rate
             let effectiveRate = updatedItem.rate;
             if (field === 'quantity') {
               const newQuantity = Number(value);
-              if (newQuantity >= 20) {
-                effectiveRate = Math.max(0, updatedItem.rate - 200); // Ensure rate doesn't go below 0
-              }
               updatedItem.amount = newQuantity * effectiveRate;
             } else if (field === 'rate') {
               const newRate = Number(value);
-              if (updatedItem.quantity >= 20) {
-                effectiveRate = Math.max(0, newRate - 200); // Ensure rate doesn't go below 0
-              } else {
-                effectiveRate = newRate;
-              }
+              effectiveRate = newRate;
               updatedItem.amount = updatedItem.quantity * effectiveRate;
             }
             // Update the rate in the item to reflect the discounted rate
@@ -7868,11 +7860,7 @@ Thank you for your business!`,
                                                     // Set the rate and unit from the product inventory if available
                                                     const itemDataFromProduct = invoiceProductItemsMap.get(desc);
                                                     if (itemDataFromProduct) {
-                                                      // Apply discount validation: if quantity > 20, deduct 200 from rate
                                                       let effectiveRate = itemDataFromProduct.rate;
-                                                      if (item.quantity >= 20) {
-                                                        effectiveRate = Math.max(0, itemDataFromProduct.rate - 200);
-                                                      }
                                                       
                                                       handleInvoiceItemChange(item.id, 'rate', effectiveRate);
                                                       handleInvoiceItemChange(item.id, 'unit', itemDataFromProduct.unit);
@@ -7898,7 +7886,7 @@ Thank you for your business!`,
                                         onChange={async (e) => {
                                           const newQuantity = parseFloat(e.target.value);
                                           await handleInvoiceItemChange(item.id, 'quantity', newQuantity);
-                                          // The handleInvoiceItemChange function now handles the discount validation automatically
+                                          // The handleInvoiceItemChange function now handles the rate and amount calculations automatically
                                         }}
                                         className="p-1 h-8 text-sm"
                                       />
@@ -7918,7 +7906,7 @@ Thank you for your business!`,
                                         onChange={(e) => {
                                           const newRate = parseFloat(e.target.value);
                                           handleInvoiceItemChange(item.id, 'rate', newRate);
-                                          // The handleInvoiceItemChange function now handles the discount validation automatically
+                                          // The handleInvoiceItemChange function now handles the rate and amount calculations automatically
                                         }}
                                         className="p-1 h-8 text-sm"
                                       />
