@@ -791,6 +791,88 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
             </div>
           </div>
         );
+      case "saved-deliveries":
+        if (loadingSavedDeliveries) {
+          return (
+            <div className="flex justify-center items-center h-64">
+              <p>Loading saved deliveries...</p>
+            </div>
+          );
+        }
+        
+        // Apply date filtering to saved deliveries
+        const filteredSavedDeliveries = filterDataByDateRange(savedDeliveries, 'date');
+        
+        if (filteredSavedDeliveries.length === 0) {
+          return (
+            <div className="text-center py-12">
+              <TruckIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No Saved Deliveries Found</h3>
+              <p className="text-muted-foreground mb-4">
+                No deliveries found for the selected date range.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Try selecting a different date range or check if you have saved deliveries.
+              </p>
+            </div>
+          );
+        }
+        
+        const totalFilteredDeliveries = filteredSavedDeliveries.reduce((sum, delivery) => sum + (delivery.total || 0), 0);
+        return (
+          <div>
+            <div className="mb-4 p-4 bg-muted rounded-lg">
+              <div className="flex justify-between">
+                <span>Total Deliveries ({dateRange}):</span>
+                <span className="font-bold">{filteredSavedDeliveries.length}</span>
+              </div>
+              <div className="flex justify-between mt-2">
+                <span>Total Amount:</span>
+                <span className="font-bold">{formatCurrency(totalFilteredDeliveries)}</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b">
+                    <th className="pb-2">Delivery Note #</th>
+                    <th className="pb-2">Date</th>
+                    <th className="pb-2">Customer</th>
+                    <th className="pb-2">Items</th>
+                    <th className="pb-2 text-right">Total</th>
+                    <th className="pb-2">Vehicle</th>
+                    <th className="pb-2">Driver</th>
+                    <th className="pb-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSavedDeliveries.map((delivery) => (
+                    <tr key={delivery.id} className="border-b">
+                      <td className="py-2">{delivery.deliveryNoteNumber}</td>
+                      <td className="py-2">{formatDate(delivery.date)}</td>
+                      <td className="py-2">{delivery.customer}</td>
+                      <td className="py-2">{delivery.items || 0} items</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(delivery.total || 0)}</td>
+                      <td className="py-2">{delivery.vehicle || 'N/A'}</td>
+                      <td className="py-2">{delivery.driver || 'N/A'}</td>
+                      <td className="py-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          delivery.status === 'completed' || delivery.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                          delivery.status === 'in-transit' ? 'bg-blue-100 text-blue-800' :
+                          delivery.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          delivery.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {delivery.status || 'completed'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
     }
   };
 
