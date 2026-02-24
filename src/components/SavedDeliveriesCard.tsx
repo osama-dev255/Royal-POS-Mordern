@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { Truck, Calendar, User, Package, Eye, Download, Trash2, Printer } from "lucide-react";
+import { Truck, Calendar, User, Package, Eye, Download, Printer } from "lucide-react";
 
 interface SavedDelivery {
   id: string;
@@ -151,15 +151,6 @@ export const SavedDeliveriesCard = ({
             >
               <Download className="h-4 w-4 mr-1" />
               Download
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1"
-              onClick={onDeleteDelivery}
-              title="Delete Delivery"
-            >
-              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
