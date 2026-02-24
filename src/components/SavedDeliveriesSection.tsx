@@ -2,12 +2,21 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Truck, Download, Printer, Eye, Calendar } from "lucide-react";
+import { Search, Truck, Download, Printer, Eye, Calendar, Edit } from "lucide-react";
 import { SavedDeliveriesCard } from "./SavedDeliveriesCard";
-import { getSavedDeliveries, deleteDelivery, DeliveryData } from "@/utils/deliveryUtils";
+import { getSavedDeliveries, deleteDelivery, DeliveryData, updateDelivery } from "@/utils/deliveryUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { DeliveryDetails } from "./DeliveryDetails";
 import { ExportUtils } from "@/utils/exportUtils";
+import { formatCurrency } from "@/lib/currency";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SavedDeliveriesSectionProps {
   onBack: () => void;
@@ -21,6 +30,9 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
   const [dateSearchTerm, setDateSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryData | null>(null);
+  const [editingDelivery, setEditingDelivery] = useState<DeliveryData | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editableItems, setEditableItems] = useState<any[]>([]);
 
   // Load saved deliveries from database
   useEffect(() => {
@@ -138,6 +150,44 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
     ExportUtils.exportReceiptAsPDF(transaction, `delivery-${delivery.deliveryNoteNumber}`);
   };
 
+  const handleEditDelivery = (delivery: DeliveryData) => {
+    // Open the edit modal with the delivery data
+    setEditingDelivery(delivery);
+    // Initialize editable items from the delivery
+    setEditableItems([...(delivery.itemsList || [])]);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditedDelivery = async () => {
+    if (!editingDelivery) return;
+    
+    try {
+      // Update the delivery with edited data
+      const updatedDelivery: DeliveryData = {
+        ...editingDelivery,
+        itemsList: editableItems,
+        items: editableItems.length,
+        subtotal: editableItems.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0),
+        total: editableItems.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0)
+      };
+      
+      await updateDelivery(updatedDelivery);
+      
+      // Update the state to reflect the changes
+      setDeliveries(prev => prev.map(d => d.id === updatedDelivery.id ? updatedDelivery : d));
+      
+      // Close the edit modal
+      setIsEditModalOpen(false);
+      setEditingDelivery(null);
+      setEditableItems([]);
+      
+      alert('Delivery updated successfully!');
+    } catch (error) {
+      console.error('Error updating delivery:', error);
+      alert('Error updating delivery. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {selectedDelivery ? (
@@ -146,6 +196,7 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
           onBack={() => setSelectedDelivery(null)}
           onPrint={() => handlePrintDelivery(selectedDelivery)}
           onDownload={() => handleDownloadDelivery(selectedDelivery)}
+          onEdit={() => handleEditDelivery(selectedDelivery)}
         />
       ) : (
         <>
@@ -246,6 +297,149 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
             )}
           </main>
         </>
+      )}
+      
+      {/* Edit Delivery Modal */}
+      {isEditModalOpen && editingDelivery && (
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Delivery #{editingDelivery.deliveryNoteNumber}</DialogTitle>
+              <DialogDescription>
+                Modify the delivery details below and save the changes
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Customer Name</label>
+                  <Input 
+                    value={editingDelivery.customer}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Delivery Note Number</label>
+                  <Input 
+                    value={editingDelivery.deliveryNoteNumber}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vehicle</label>
+                  <Input 
+                    value={editingDelivery.vehicle || ''}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, vehicle: e.target.value} : null)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Driver</label>
+                  <Input 
+                    value={editingDelivery.driver || ''}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, driver: e.target.value} : null)}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Delivery Notes</label>
+                <Input
+                  value={editingDelivery.deliveryNotes || ''}
+                  onChange={(e) => setEditingDelivery(prev => prev ? {...prev, deliveryNotes: e.target.value} : null)}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Items</label>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left p-2">Item</th>
+                        <th className="text-left p-2">Quantity</th>
+                        <th className="text-right p-2">Price</th>
+                        <th className="text-right p-2">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editableItems.map((item, index) => (
+                        <tr key={index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
+                          <td className="p-2">{item.name || item.productName}</td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const newItems = [...editableItems];
+                                newItems[index] = {
+                                  ...item,
+                                  quantity: parseFloat(e.target.value) || 0
+                                };
+                                setEditableItems(newItems);
+                              }}
+                              className="w-20"
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.price || item.unitPrice || 0}
+                              onChange={(e) => {
+                                const newItems = [...editableItems];
+                                const price = parseFloat(e.target.value) || 0;
+                                newItems[index] = {
+                                  ...item,
+                                  price: price,
+                                  unitPrice: price,
+                                  total: price * (item.quantity || 0)
+                                };
+                                setEditableItems(newItems);
+                              }}
+                              className="w-24"
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            {formatCurrency((item.price || item.unitPrice || 0) * (item.quantity || 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-4 pt-4 border-t">
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Total:</div>
+                  <div className="text-xl font-bold">
+                    {formatCurrency(editableItems.reduce((sum, item) => sum + ((item.price || item.unitPrice || 0) * (item.quantity || 0)), 0))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveEditedDelivery}
+              >
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

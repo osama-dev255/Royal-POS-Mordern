@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Calendar, User, Package, MapPin, Phone, Mail, FileText, Printer, Download } from "lucide-react";
+import { Truck, Calendar, User, Package, MapPin, Phone, Mail, FileText, Printer, Download, Edit } from "lucide-react";
 import { DeliveryData } from "@/utils/deliveryUtils";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -12,13 +12,15 @@ interface DeliveryDetailsProps {
   onView?: () => void;
   onPrint?: () => void;
   onDownload?: () => void;
+  onEdit?: () => void;
 }
 
 export const DeliveryDetails = ({ 
   delivery, 
   onBack,
   onPrint,
-  onDownload
+  onDownload,
+  onEdit
 }: DeliveryDetailsProps) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -81,6 +83,15 @@ export const DeliveryDetails = ({
     }
   };
 
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit();
+    } else {
+      // For now, just alert that edit would happen
+      alert('Edit functionality would be implemented here');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -95,13 +106,20 @@ export const DeliveryDetails = ({
             <h1 className="text-xl font-bold">Delivery Details</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onBack}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m12 19-7-7 7-7"/>
+                <path d="M19 12H5"/>
+              </svg>
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleEdit}>
+              <Edit className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
+              <Printer className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </div>
