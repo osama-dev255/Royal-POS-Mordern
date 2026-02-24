@@ -3,6 +3,9 @@ import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   FileText, 
   Printer, 
@@ -58,6 +61,9 @@ const mockTransactions = [
 
 export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
   const [dateRange, setDateRange] = useState("this-month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [useCustomDates, setUseCustomDates] = useState(false);
   const [reportType, setReportType] = useState("sales");
   const [savedInvoices, setSavedInvoices] = useState<any[]>([]);
   const [savedSettlements, setSavedSettlements] = useState<any[]>([]);
@@ -85,6 +91,15 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      // If using custom dates, check against custom range
+      if (useCustomDates && customStartDate && customEndDate) {
+        const startDate = new Date(customStartDate);
+        const endDate = new Date(customEndDate);
+        // Set end date to end of day
+        endDate.setHours(23, 59, 59, 999);
+        return date >= startDate && date <= endDate;
+      }
       
       switch (dateRange) {
         case "today":
@@ -816,7 +831,12 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Date Range</label>
-                  <Select value={dateRange} onValueChange={setDateRange}>
+                  <Select value={dateRange} onValueChange={(value) => {
+                    setDateRange(value);
+                    if (value !== "custom") {
+                      setUseCustomDates(false);
+                    }
+                  }}>
                     <SelectTrigger>
                       <Calendar className="h-4 w-4 mr-2" />
                       <SelectValue />
@@ -829,8 +849,65 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                       <SelectItem value="last-month">Last Month</SelectItem>
                       <SelectItem value="this-year">This Year</SelectItem>
                       <SelectItem value="all-time">All Time</SelectItem>
+                      <SelectItem value="custom">Custom Date Range</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  {dateRange === "custom" && (
+                    <div className="mt-4 space-y-4 p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="useCustomDates"
+                          checked={useCustomDates}
+                          onCheckedChange={(checked) => setUseCustomDates(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="useCustomDates"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Enable custom date range
+                        </label>
+                      </div>
+                      
+                      {useCustomDates && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="startDate" className="text-sm font-medium">
+                              Start Date
+                            </Label>
+                            <div className="relative">
+                              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="startDate"
+                                type="date"
+                                className="pl-10"
+                                value={customStartDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                max={customEndDate || new Date().toISOString().split('T')[0]}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="endDate" className="text-sm font-medium">
+                              End Date
+                            </Label>
+                            <div className="relative">
+                              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="endDate"
+                                type="date"
+                                className="pl-10"
+                                value={customEndDate}
+                                onChange={(e) => setCustomEndDate(e.target.value)}
+                                min={customStartDate}
+                                max={new Date().toISOString().split('T')[0]}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="pt-4">
