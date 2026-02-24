@@ -11,6 +11,11 @@ interface SavedDelivery {
   customer: string;
   items: number;
   total: number;
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
+  amountReceived?: number;
+  change?: number;
   vehicle: string;
   driver: string;
   status: "completed" | "in-transit" | "pending" | "delivered" | "cancelled";
@@ -87,6 +92,27 @@ export const SavedDeliveriesCard = ({
             </div>
             <div className="font-bold">{formatCurrency(delivery.total)}</div>
           </div>
+          
+          {delivery.subtotal !== undefined && delivery.subtotal !== 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Subtotal:</span>
+              <span>{formatCurrency(delivery.subtotal)}</span>
+            </div>
+          )}
+          
+          {delivery.tax !== undefined && delivery.tax !== 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Tax:</span>
+              <span>{formatCurrency(delivery.tax)}</span>
+            </div>
+          )}
+          
+          {delivery.discount !== undefined && delivery.discount !== 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Discount:</span>
+              <span>-{formatCurrency(delivery.discount)}</span>
+            </div>
+          )}
           
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Vehicle:</span>

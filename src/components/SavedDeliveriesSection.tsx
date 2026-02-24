@@ -162,13 +162,24 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
     if (!editingDelivery) return;
     
     try {
+      // Calculate subtotal from items - sum of (quantity * price) for each item
+      const calculatedSubtotal = editableItems.reduce((sum, item) => {
+        const itemTotal = (item.price || 0) * (item.quantity || 0);
+        return sum + itemTotal;
+      }, 0);
+      
+      // Calculate total based on subtotal, tax, and discount
+      const calculatedTotal = calculatedSubtotal + (editingDelivery.tax || 0) - (editingDelivery.discount || 0);
+      
       // Update the delivery with edited data
       const updatedDelivery: DeliveryData = {
         ...editingDelivery,
         itemsList: editableItems,
-        items: editableItems.length,
-        subtotal: editableItems.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0),
-        total: editableItems.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0)
+        items: editableItems.reduce((sum, item) => sum + (item.quantity || 0), 0), // Total quantity of items
+        subtotal: calculatedSubtotal, // Use calculated subtotal (quantity * price)
+        total: calculatedTotal,
+        amountReceived: editingDelivery.amountReceived || 0,
+        change: editingDelivery.change || 0
       };
       
       await updateDelivery(updatedDelivery);
@@ -283,6 +294,11 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                       customer: delivery.customer,
                       items: delivery.items,
                       total: delivery.total,
+                      subtotal: delivery.subtotal,
+                      tax: delivery.tax,
+                      discount: delivery.discount,
+                      amountReceived: delivery.amountReceived,
+                      change: delivery.change,
                       vehicle: delivery.vehicle,
                       driver: delivery.driver,
                       status: delivery.status
@@ -355,6 +371,59 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                 />
               </div>
               
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Subtotal</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingDelivery.subtotal || 0}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, subtotal: parseFloat(e.target.value) || 0} : null)}
+                    className="bg-gray-100"
+                    readOnly
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tax</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingDelivery.tax || 0}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, tax: parseFloat(e.target.value) || 0} : null)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Discount</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingDelivery.discount || 0}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, discount: parseFloat(e.target.value) || 0} : null)}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Amount Received</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingDelivery.amountReceived || 0}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, amountReceived: parseFloat(e.target.value) || 0} : null)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Change</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingDelivery.change || 0}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, change: parseFloat(e.target.value) || 0} : null)}
+                  />
+                </div>
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium mb-2">Items</label>
                 <div className="border rounded-lg overflow-hidden">
@@ -417,9 +486,27 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
               
               <div className="flex justify-end gap-4 pt-4 border-t">
                 <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Subtotal:</div>
+                  <div className="text-sm text-muted-foreground">Tax:</div>
+                  <div className="text-sm text-muted-foreground">Discount:</div>
                   <div className="text-sm text-muted-foreground">Total:</div>
-                  <div className="text-xl font-bold">
+                </div>
+                <div className="text-right">
+                  <div className="text-sm">
                     {formatCurrency(editableItems.reduce((sum, item) => sum + ((item.price || item.unitPrice || 0) * (item.quantity || 0)), 0))}
+                  </div>
+                  <div className="text-sm">
+                    {formatCurrency(editingDelivery.tax || 0)}
+                  </div>
+                  <div className="text-sm">
+                    -{formatCurrency(editingDelivery.discount || 0)}
+                  </div>
+                  <div className="text-xl font-bold">
+                    {formatCurrency(
+                      (editableItems.reduce((sum, item) => sum + ((item.price || item.unitPrice || 0) * (item.quantity || 0)), 0)) + 
+                      (editingDelivery.tax || 0) - 
+                      (editingDelivery.discount || 0)
+                    )}
                   </div>
                 </div>
               </div>

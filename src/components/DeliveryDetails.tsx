@@ -176,6 +176,36 @@ export const DeliveryDetails = ({
                     <span className="text-muted-foreground">Total:</span>
                     <span className="font-semibold">{formatCurrency(delivery.total)}</span>
                   </div>
+                  {delivery.subtotal !== undefined && delivery.subtotal !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span>{formatCurrency(delivery.subtotal)}</span>
+                    </div>
+                  )}
+                  {delivery.tax !== undefined && delivery.tax !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tax:</span>
+                      <span>{formatCurrency(delivery.tax)}</span>
+                    </div>
+                  )}
+                  {delivery.discount !== undefined && delivery.discount !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Discount:</span>
+                      <span>-{formatCurrency(delivery.discount)}</span>
+                    </div>
+                  )}
+                  {delivery.amountReceived !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Amount Received:</span>
+                      <span>{formatCurrency(delivery.amountReceived)}</span>
+                    </div>
+                  )}
+                  {delivery.change !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Change:</span>
+                      <span>{formatCurrency(delivery.change)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -261,6 +291,18 @@ export const DeliveryDetails = ({
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Discount:</span>
                         <span>-{formatCurrency(delivery.discount)}</span>
+                      </div>
+                    )}
+                    {delivery.amountReceived !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Amount Received:</span>
+                        <span>{formatCurrency(delivery.amountReceived)}</span>
+                      </div>
+                    )}
+                    {delivery.change !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Change:</span>
+                        <span>{formatCurrency(delivery.change)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold pt-2 border-t">

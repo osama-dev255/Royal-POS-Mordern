@@ -2270,14 +2270,14 @@ Thank you for your business!`,
             unit: item.unit,
             delivered: item.delivered,
             remarks: item.remarks,
-            price: 0, // Delivery notes don't have prices
-            total: 0  // Delivery notes don't have totals
+            price: item.rate, // Use rate as the price for delivery items
+            total: item.amount // Use amount as the total for delivery items
           })),
-          subtotal: totalAmount, // For delivery notes, subtotal is same as total
-          tax: 0,
-          discount: 0,
-          amountReceived: 0,
-          change: 0,
+          subtotal: deliveryNoteData.subtotal, // Use the calculated subtotal from deliveryNoteData
+          tax: deliveryNoteData.tax,
+          discount: deliveryNoteData.discount,
+          amountReceived: deliveryNoteData.amountPaid,
+          change: deliveryNoteData.amountPaid ? deliveryNoteData.amountPaid - totalAmount : 0,
           vehicle: deliveryNoteData.vehicle,
           driver: deliveryNoteData.driver,
           deliveryNotes: deliveryNoteData.deliveryNotes
@@ -4521,11 +4521,11 @@ Thank you for your business!`,
           return; // Don't save if there are unavailable items
         }
 
-        // Calculate total items
-        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + item.delivered, 0);
+        // Calculate total items (sum of all delivered quantities)
+        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + (item.delivered || 0), 0);
         
-        // For delivery notes, we don't have rates, so total is based on delivered quantity
-        const totalAmount = totalItems; // Just using delivered quantity as a simple total
+        // Calculate total amount based on rates and quantities
+        const totalAmount = deliveryNoteData.items.reduce((sum, item) => sum + (item.rate * item.delivered), 0);
         
         // Create delivery data for saving
         const deliveryToSave: DeliveryData = {
@@ -4545,14 +4545,14 @@ Thank you for your business!`,
             amount: item.amount,
             delivered: item.delivered,
             remarks: item.remarks,
-            price: item.rate, // For backward compatibility
-            total: item.amount  // For backward compatibility
+            price: item.rate, // Use rate as the price for delivery items
+            total: item.amount // Use amount as the total for delivery items
           })),
-          subtotal: totalAmount, // For delivery notes, subtotal is same as total
-          tax: 0,
-          discount: 0,
-          amountReceived: 0,
-          change: 0,
+          subtotal: deliveryNoteData.subtotal || totalAmount, // Use the calculated subtotal from deliveryNoteData
+          tax: deliveryNoteData.tax,
+          discount: deliveryNoteData.discount,
+          amountReceived: deliveryNoteData.amountPaid,
+          change: deliveryNoteData.amountPaid ? deliveryNoteData.amountPaid - totalAmount : 0,
           vehicle: deliveryNoteData.vehicle,
           driver: deliveryNoteData.driver,
           deliveryNotes: deliveryNoteData.deliveryNotes
