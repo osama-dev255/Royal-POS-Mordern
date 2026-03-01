@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -10,8 +10,7 @@ import {
   CreditCard, 
   PieChart, 
   Target,
-  Activity,
-  Briefcase
+  Activity
 } from "lucide-react";
 import "../App.css";
 
@@ -24,8 +23,6 @@ export const SplashScreen = () => {
     growth: 0
   });
   const [activeChart, setActiveChart] = useState(0);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Simulate business metrics loading
@@ -38,44 +35,6 @@ export const SplashScreen = () => {
       }));
     }, 50);
 
-    // Set up business analytics canvas
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        
-        const drawBusinessChart = () => {
-          if (!ctx) return;
-          
-          // Create subtle business analytics background
-          const width = canvas.width;
-          const height = canvas.height;
-          const time = Date.now() * 0.001;
-          
-          // Clear with business-themed background
-          ctx.fillStyle = 'rgba(249, 250, 251, 0.05)';
-          ctx.fillRect(0, 0, width, height);
-          
-          // Draw subtle business activity points
-          for (let i = 0; i < 20; i++) {
-            const x = (i / 20) * width;
-            const y = height / 2 + Math.sin(time + i * 0.5) * 20;
-            
-            ctx.beginPath();
-            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(34, 197, 94, ${0.1 + Math.sin(time + i) * 0.05})`;
-            ctx.fill();
-          }
-          
-          animationFrameRef.current = requestAnimationFrame(drawBusinessChart);
-        };
-        
-        drawBusinessChart();
-      }
-    }
-
     // Auto-hide after 4 seconds
     const timer = setTimeout(() => {
       setIsVisible(false);
@@ -84,76 +43,18 @@ export const SplashScreen = () => {
     return () => {
       clearInterval(metricInterval);
       clearTimeout(timer);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     };
   }, []);
 
-  // Business chart data for visualization
-  const businessCharts = [
-    { label: "Revenue Growth", value: businessMetrics.growth, color: "from-green-500 to-emerald-500" },
-    { label: "Customer Base", value: (businessMetrics.customers / 100), color: "from-blue-500 to-cyan-500" },
-    { label: "Order Volume", value: (businessMetrics.orders / 500), color: "from-purple-500 to-violet-500" },
-    { label: "Profit Margin", value: businessMetrics.growth * 0.8, color: "from-amber-500 to-orange-500" }
-  ];
+
 
   if (!isVisible) return null;
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50/20 to-emerald-50/30 flex items-center justify-center splash-screen overflow-hidden">
-      {/* Business Analytics Canvas */}
-      <canvas 
-        ref={canvasRef} 
-        className="absolute inset-0 w-full h-full"
-      />
-      
-      {/* Business Growth Timeline */}
-      <div className="absolute top-0 bottom-0 left-1/4 flex items-center justify-center opacity-20">
-        <div className="flex flex-col items-center space-y-8">
-          {['Q1', 'Q2', 'Q3', 'Q4'].map((quarter, index) => (
-            <div 
-              key={quarter}
-              className="text-2xl font-bold text-slate-600"
-              style={{
-                animation: `float 3s ease-in-out infinite`,
-                animationDelay: `${index * 0.3}s`
-              }}
-            >
-              {quarter}
-            </div>
-          ))}
-        </div>
-        <div className="ml-16 flex flex-col items-center space-y-8">
-          {businessCharts.map((chart, index) => (
-            <div 
-              key={index}
-              className="w-2 h-16 rounded-full bg-gradient-to-t from-emerald-500 to-green-400"
-              style={{
-                height: `${Math.min(64, chart.value)}px`,
-                animation: `pulse 2s infinite`,
-                animationDelay: `${index * 0.2}s`
-              }}
-            ></div>
-          ))}
-        </div>
-      </div>
 
-      {/* Market Intelligence Dashboard */}
-      <div className="absolute top-0 bottom-0 right-1/4 flex items-center justify-center opacity-30">
-        <div className="relative w-64 h-64">
-          {/* Revenue pie chart segments */}
-          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 rotate-90"></div>
-          <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-gradient-to-r from-purple-400 to-violet-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 rotate-180"></div>
-          
-          {/* Market indicators */}
-          <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
-          <div className="absolute top-1/4 right-1/4 w-4 h-4 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-          <div className="absolute bottom-1/4 left-1/4 w-4 h-4 bg-purple-500 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute bottom-1/4 right-1/4 w-4 h-4 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '1.5s' }}></div>
-        </div>
-      </div>
+      
+
 
       {/* Central Business Hub */}
       <div className="relative z-20 text-center max-w-4xl px-4">
@@ -201,7 +102,7 @@ export const SplashScreen = () => {
             <div className="absolute -inset-2 bg-gradient-to-r from-green-500 to-emerald-500 blur-xl opacity-20 animate-pulse"></div>
           </h1>
           <p className="text-2xl md:text-3xl text-slate-700/90 tracking-widest font-light">
-            BUSINESS INTELLIGENCE PLATFORM
+            INVESTMENT LTD
           </p>
         </div>
 
