@@ -320,10 +320,22 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         else if (format === "pdf") ExportUtils.exportToPDF(filteredSavedSettlements, filename, "Saved Customer Settlements Report");
         break;
       case "saved-deliveries":
-        const filteredSavedDeliveries = filterDataByDateRange(savedDeliveries, 'date');
-        if (format === "csv") ExportUtils.exportToCSV(filteredSavedDeliveries, filename);
-        else if (format === "excel") ExcelUtils.exportToExcel(filteredSavedDeliveries, filename);
-        else if (format === "pdf") ExportUtils.exportToPDF(filteredSavedDeliveries, filename, "Saved Deliveries Report");
+        const filteredSavedDeliveriesForExport = filterDataByDateRange(savedDeliveries, 'date');
+        // Transform data for export to ensure consistent field names
+        const exportData = filteredSavedDeliveriesForExport.map((delivery: any) => ({
+          deliveryNoteNumber: delivery.deliveryNoteNumber || 'N/A',
+          date: formatDate(delivery.date),
+          customer: delivery.customer || 'N/A',
+          items: delivery.items || 0,
+          total: delivery.total || 0,
+          vehicle: delivery.vehicle || 'N/A',
+          driver: delivery.driver || 'N/A',
+          status: delivery.status || 'N/A',
+          paymentMethod: delivery.paymentMethod || 'N/A'
+        }));
+        if (format === "csv") ExportUtils.exportToCSV(exportData, filename);
+        else if (format === "excel") ExcelUtils.exportToExcel(exportData, filename);
+        else if (format === "pdf") ExportUtils.exportToPDF(exportData, filename, "Saved Deliveries Report");
         break;
     }
   };
@@ -463,11 +475,12 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
           };
           break;
         case "saved-deliveries":
-          const filteredSavedDeliveries = filterDataByDateRange(savedDeliveries, 'date');
+          const filteredSavedDeliveriesForPrint = filterDataByDateRange(savedDeliveries, 'date');
+          console.log('Saved Deliveries Data for Print:', filteredSavedDeliveriesForPrint);
           reportData = {
             title: "Saved Deliveries Report",
             period: `${dateRange} (${new Date().toLocaleDateString()})`,
-            data: filteredSavedDeliveries.map((delivery: any) => ({
+            data: filteredSavedDeliveriesForPrint.map((delivery: any) => ({
               deliveryNoteNumber: delivery.deliveryNoteNumber || 'N/A',
               date: formatDate(delivery.date),
               customer: delivery.customer || 'N/A',
@@ -476,9 +489,11 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
               totalRaw: delivery.total || 0, // Raw value for calculations
               vehicle: delivery.vehicle || 'N/A',
               driver: delivery.driver || 'N/A',
-              status: delivery.status || 'N/A'
+              status: delivery.status || 'N/A',
+              paymentMethod: delivery.paymentMethod || 'N/A'
             }))
           };
+          console.log('Formatted Saved Deliveries Report Data:', reportData);
           break;
       }
         
@@ -997,9 +1012,9 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         }
         
         // Apply date filtering to saved deliveries
-        const filteredSavedDeliveries = filterDataByDateRange(savedDeliveries, 'date');
+        const filteredSavedDeliveriesPreview = filterDataByDateRange(savedDeliveries, 'date');
         
-        if (filteredSavedDeliveries.length === 0) {
+        if (filteredSavedDeliveriesPreview.length === 0) {
           return (
             <div className="text-center py-12">
               <TruckIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -1014,13 +1029,13 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
           );
         }
         
-        const totalFilteredDeliveries = filteredSavedDeliveries.reduce((sum, delivery) => sum + (delivery.total || 0), 0);
+        const totalFilteredDeliveries = filteredSavedDeliveriesPreview.reduce((sum, delivery) => sum + (delivery.total || 0), 0);
         return (
           <div>
             <div className="mb-4 p-4 bg-muted rounded-lg">
               <div className="flex justify-between">
                 <span>Total Deliveries ({dateRange}):</span>
-                <span className="font-bold">{filteredSavedDeliveries.length}</span>
+                <span className="font-bold">{filteredSavedDeliveriesPreview.length}</span>
               </div>
               <div className="flex justify-between mt-2">
                 <span>Total Amount:</span>
@@ -1038,19 +1053,25 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                     <th className="pb-2 text-right">Total</th>
                     <th className="pb-2">Vehicle</th>
                     <th className="pb-2">Driver</th>
+                    <th className="pb-2">Payment Method</th>
                     <th className="pb-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSavedDeliveries.map((delivery) => (
+                  {filteredSavedDeliveriesPreview.map((delivery) => (
                     <tr key={delivery.id} className="border-b">
-                      <td className="py-2">{delivery.deliveryNoteNumber}</td>
+                      <td className="py-2 font-medium">{delivery.deliveryNoteNumber || 'N/A'}</td>
                       <td className="py-2">{formatDate(delivery.date)}</td>
-                      <td className="py-2">{delivery.customer}</td>
+                      <td className="py-2">{delivery.customer || 'N/A'}</td>
                       <td className="py-2">{delivery.items || 0} items</td>
-                      <td className="py-2 text-right font-medium">{formatCurrency(delivery.total || 0)}</td>
+                      <td className="py-2 text-right font-bold">{formatCurrency(delivery.total || 0)}</td>
                       <td className="py-2">{delivery.vehicle || 'N/A'}</td>
                       <td className="py-2">{delivery.driver || 'N/A'}</td>
+                      <td className="py-2">
+                        <span className="px-2 py-1 rounded-full text-xs bg-secondary text-secondary-foreground">
+                          {delivery.paymentMethod || 'N/A'}
+                        </span>
+                      </td>
                       <td className="py-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           delivery.status === 'completed' || delivery.status === 'delivered' ? 'bg-green-100 text-green-800' :
