@@ -100,12 +100,26 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
 
   // Helper function to check if a date falls within the selected date range
   const isDateInRange = (dateValue: string | Date | undefined): boolean => {
-    if (!dateValue) return false;
+    if (!dateValue) {
+      console.log('isDateInRange: No date value provided');
+      return false;
+    }
     
     try {
       const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      console.log('isDateInRange check:', {
+        dateValue,
+        dateType: typeof dateValue,
+        parsedDate: date,
+        parsedDateISO: date.toISOString(),
+        dateRange,
+        useCustomDates,
+        customStartDate,
+        customEndDate
+      });
       
       // If using custom dates, check against custom range
       if (useCustomDates && customStartDate && customEndDate) {
@@ -113,45 +127,69 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         const endDate = new Date(customEndDate);
         // Set end date to end of day
         endDate.setHours(23, 59, 59, 999);
-        return date >= startDate && date <= endDate;
+        const inRange = date >= startDate && date <= endDate;
+        console.log('Custom date range check:', { 
+          startDate: startDate.toISOString(), 
+          endDate: endDate.toISOString(),
+          inRange 
+        });
+        return inRange;
       }
       
+      let result = false;
       switch (dateRange) {
         case "today":
           const tomorrow = new Date(today);
           tomorrow.setDate(tomorrow.getDate() + 1);
-          return date >= today && date < tomorrow;
+          result = date >= today && date < tomorrow;
+          console.log('Today check:', { today: today.toISOString(), result });
+          break;
           
         case "yesterday":
           const yesterdayStart = new Date(today);
           yesterdayStart.setDate(yesterdayStart.getDate() - 1);
           const todayStart = new Date(today);
-          return date >= yesterdayStart && date < todayStart;
+          result = date >= yesterdayStart && date < todayStart;
+          console.log('Yesterday check:', { yesterdayStart: yesterdayStart.toISOString(), todayStart: todayStart.toISOString(), result });
+          break;
           
         case "this-week":
           const weekAgo = new Date(today);
           weekAgo.setDate(weekAgo.getDate() - 7);
-          return date >= weekAgo && date <= today;
+          result = date >= weekAgo && date <= today;
+          console.log('This week check:', { weekAgo: weekAgo.toISOString(), today: today.toISOString(), result });
+          break;
           
         case "this-month":
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          return date >= monthStart && date <= today;
+          result = date >= monthStart && date <= today;
+          console.log('This month check:', { monthStart: monthStart.toISOString(), today: today.toISOString(), result });
+          break;
           
         case "last-month":
           const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          return date >= lastMonthStart && date < thisMonthStart;
+          result = date >= lastMonthStart && date < thisMonthStart;
+          console.log('Last month check:', { lastMonthStart: lastMonthStart.toISOString(), thisMonthStart: thisMonthStart.toISOString(), result });
+          break;
           
         case "this-year":
           const yearStart = new Date(now.getFullYear(), 0, 1);
-          return date >= yearStart && date <= today;
+          result = date >= yearStart && date <= today;
+          console.log('This year check:', { yearStart: yearStart.toISOString(), today: today.toISOString(), result });
+          break;
           
         case "all-time":
-          return true;
+          result = true;
+          break;
           
         default:
-          return true;
+          result = true;
+          break;
       }
+      
+      console.log('isDateInRange result:', result);
+      return result;
     } catch (error) {
       console.error('Error parsing date:', error);
       return false;
@@ -160,8 +198,31 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
 
   // Filter data based on date range
   const filterDataByDateRange = (data: any[], dateField: string = 'date'): any[] => {
-    if (dateRange === "all-time") return data;
-    return data.filter(item => isDateInRange(item[dateField]));
+    console.log('=== FILTERING DATA BY DATE RANGE ===');
+    console.log('Date range:', dateRange);
+    console.log('Total items before filter:', data.length);
+    if (dateRange === "all-time") {
+      console.log('All-time selected, returning all data');
+      return data;
+    }
+    
+    const filtered = data.filter(item => {
+      const dateValue = item[dateField];
+      const isInRange = isDateInRange(dateValue);
+      if (!isInRange && dateValue) {
+        console.log('Item filtered out:', { 
+          id: item.id, 
+          deliveryNoteNumber: item.deliveryNoteNumber, 
+          dateValue,
+          dateFieldType: typeof dateValue 
+        });
+      }
+      return isInRange;
+    });
+    
+    console.log('Total items after filter:', filtered.length);
+    console.log('Filtered items:', filtered);
+    return filtered;
   };
 
   // Load saved data when report type is changed
@@ -201,6 +262,13 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       const loadDeliveries = async () => {
         try {
           const deliveries = await getSavedDeliveries();
+          console.log('=== LOADED SAVED DELIVERIES ===');
+          console.log('Total deliveries loaded:', deliveries.length);
+          console.log('Deliveries data:', deliveries);
+          if (deliveries.length > 0) {
+            console.log('First delivery date field:', deliveries[0].date);
+            console.log('First delivery date type:', typeof deliveries[0].date);
+          }
           setSavedDeliveries(deliveries);
         } catch (error) {
           console.error('Error loading saved deliveries:', error);
