@@ -158,6 +158,50 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
     setIsEditModalOpen(true);
   };
 
+  // Handle changes to an item in the editable items list
+  const handleItemChange = (index: number, field: string, value: any) => {
+    const updatedItems = [...editableItems];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    
+    // If price or quantity changes, recalculate the total
+    if ((field === 'price' || field === 'quantity') && updatedItems[index]) {
+      const item = updatedItems[index];
+      const price = field === 'price' ? value : (item.price || item.unitPrice || 0);
+      const quantity = field === 'quantity' ? value : (item.quantity || 0);
+      updatedItems[index] = { 
+        ...item, 
+        price: price,
+        unitPrice: price,
+        total: price * quantity 
+      };
+    }
+    
+    setEditableItems(updatedItems);
+  };
+
+  // Add a new empty item row
+  const addItemRow = () => {
+    const newItem = {
+      name: '',
+      productName: '',
+      description: '',
+      quantity: 1,
+      price: 0,
+      unitPrice: 0,
+      total: 0,
+      unit: ''
+    };
+    const updatedItems = [...editableItems, newItem];
+    setEditableItems(updatedItems);
+  };
+
+  // Remove an item by index
+  const removeItem = (index: number) => {
+    const updatedItems = [...editableItems];
+    updatedItems.splice(index, 1);
+    setEditableItems(updatedItems);
+  };
+
   const handleSaveEditedDelivery = async () => {
     if (!editingDelivery) return;
     
@@ -427,60 +471,86 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">Items</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium">Items</label>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={addItemRow}
+                    className="text-xs"
+                  >
+                    + Add Item
+                  </Button>
+                </div>
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left p-2">Item</th>
-                        <th className="text-left p-2">Quantity</th>
+                        <th className="text-left p-2">#</th>
+                        <th className="text-left p-2">Item Name</th>
+                        <th className="text-right p-2">Quantity</th>
+                        <th className="text-left p-2">Unit</th>
                         <th className="text-right p-2">Price</th>
                         <th className="text-right p-2">Total</th>
+                        <th className="text-center p-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {editableItems.map((item, index) => (
-                        <tr key={index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
-                          <td className="p-2">{item.name || item.productName}</td>
-                          <td className="p-2">
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const newItems = [...editableItems];
-                                newItems[index] = {
-                                  ...item,
-                                  quantity: parseFloat(e.target.value) || 0
-                                };
-                                setEditableItems(newItems);
-                              }}
-                              className="w-20"
-                            />
-                          </td>
-                          <td className="p-2 text-right">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={item.price || item.unitPrice || 0}
-                              onChange={(e) => {
-                                const newItems = [...editableItems];
-                                const price = parseFloat(e.target.value) || 0;
-                                newItems[index] = {
-                                  ...item,
-                                  price: price,
-                                  unitPrice: price,
-                                  total: price * (item.quantity || 0)
-                                };
-                                setEditableItems(newItems);
-                              }}
-                              className="w-24"
-                            />
-                          </td>
-                          <td className="p-2 text-right">
-                            {formatCurrency((item.price || item.unitPrice || 0) * (item.quantity || 0))}
-                          </td>
+                      {editableItems && editableItems.length > 0 ? (
+                        editableItems.map((item, index) => (
+                          <tr key={index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
+                            <td className="p-2 text-sm">{index + 1}</td>
+                            <td className="p-2">
+                              <Input
+                                value={item.name || item.productName || ''}
+                                onChange={(e) => handleItemChange(index, 'name', e.target.value)}
+                                className="p-1 h-8 text-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.quantity || 0}
+                                onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                className="w-20 p-1 h-8 text-sm"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                value={item.unit || ''}
+                                onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                                className="p-1 h-8 text-sm"
+                              />
+                            </td>
+                            <td className="p-2 text-right">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.price || item.unitPrice || 0}
+                                onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
+                                className="w-24 p-1 h-8 text-sm"
+                              />
+                            </td>
+                            <td className="p-2 text-right font-medium">
+                              {formatCurrency((item.price || item.unitPrice || 0) * (item.quantity || 0))}
+                            </td>
+                            <td className="p-2 text-center">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => removeItem(index)}
+                                className="p-1 h-7 w-7 flex items-center justify-center text-destructive hover:text-destructive"
+                              >
+                                <span className="text-lg font-bold">×</span>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="p-2 text-center text-sm text-muted-foreground">No items in this delivery</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
