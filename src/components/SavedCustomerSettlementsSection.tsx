@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, HandCoins, Download, Printer, Edit } from "lucide-react";
+import { Search, HandCoins, Download, Printer, Edit, Calendar } from "lucide-react";
 import { SavedCustomerSettlementsCard } from "./SavedCustomerSettlementsCard";
 import { 
   getSavedSettlements, 
@@ -30,6 +30,7 @@ interface SavedCustomerSettlementsSectionProps {
 export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: SavedCustomerSettlementsSectionProps) => {
   const [settlements, setSettlements] = useState<SavedCustomerSettlementData[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateSearchTerm, setDateSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [viewingSettlement, setViewingSettlement] = useState<SavedCustomerSettlementData | null>(null);
   const [editingSettlement, setEditingSettlement] = useState<SavedCustomerSettlementData | null>(null);
@@ -73,13 +74,35 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
     };
   }, []);
 
-  // Filter settlements based on search term
+  // Filter settlements based on search term and date
   const filteredSettlements = settlements.filter(settlement => {
-    const matchesSearch = 
+    // Text search (reference number, customer name, ID)
+    const matchesText = 
       settlement.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       settlement.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       settlement.id?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+    
+    // Date search
+    let matchesDate = true;
+    if (dateSearchTerm) {
+      try {
+        // Parse the settlement date
+        const settlementDate = new Date(settlement.date);
+        // Parse the search date (supporting various formats)
+        const searchDate = new Date(dateSearchTerm);
+        
+        // Check if dates match (same day)
+        matchesDate = 
+          settlementDate.getDate() === searchDate.getDate() &&
+          settlementDate.getMonth() === searchDate.getMonth() &&
+          settlementDate.getFullYear() === searchDate.getFullYear();
+      } catch (error) {
+        // If date parsing fails, don't filter by date
+        matchesDate = true;
+      }
+    }
+    
+    return matchesText && matchesDate;
   });
 
   const handleDeleteSettlement = (settlementId: string) => {
@@ -273,7 +296,7 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
                     View and manage your saved customer settlements from completed transactions
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -281,6 +304,16 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
                       className="pl-10 py-5 text-responsive-base w-64"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      placeholder="Search by date..."
+                      className="pl-10 py-5 text-responsive-base w-48"
+                      value={dateSearchTerm}
+                      onChange={(e) => setDateSearchTerm(e.target.value)}
                     />
                   </div>
                 </div>
