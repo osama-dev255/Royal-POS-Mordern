@@ -25,13 +25,10 @@ export interface DeliveryData {
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
   try {
-    // First, save to localStorage for immediate availability
-    const savedDeliveries = await getSavedDeliveries();
-    const updatedDeliveries = [...savedDeliveries, delivery];
-    localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(updatedDeliveries));
-    
-    // Then save to database with user context
+    // Save to database first (source of truth)
+    let dbSaveSuccessful = false;
     const { data: { user } } = await supabase.auth.getUser();
+    
     if (user) {
       const { error } = await supabase
         .from('saved_delivery_notes')
@@ -58,9 +55,67 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
         
       if (error) {
         console.error('Error saving delivery to database:', error);
-        // Don't throw error - still have local storage backup
+      } else {
+        dbSaveSuccessful = true;
       }
     }
+    
+    // Update localStorage ONLY with current user's deliveries to avoid duplicates
+    // Get fresh list from database if DB save was successful, otherwise use existing localStorage
+    let deliveriesToStore: DeliveryData[];
+    
+    if (dbSaveSuccessful && user) {
+      // Fetch fresh data from database to ensure consistency
+      const { data: dbDeliveries } = await supabase
+        .from('saved_delivery_notes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (dbDeliveries) {
+        deliveriesToStore = dbDeliveries.map(dbDelivery => ({
+          id: dbDelivery.id,
+          deliveryNoteNumber: dbDelivery.delivery_note_number,
+          date: dbDelivery.date,
+          customer: dbDelivery.customer,
+          items: dbDelivery.items,
+          total: dbDelivery.total,
+          paymentMethod: dbDelivery.payment_method,
+          status: dbDelivery.status,
+          itemsList: dbDelivery.items_list,
+          subtotal: dbDelivery.subtotal,
+          tax: dbDelivery.tax,
+          discount: dbDelivery.discount,
+          amountReceived: dbDelivery.amount_received,
+          change: dbDelivery.change,
+          vehicle: dbDelivery.vehicle,
+          driver: dbDelivery.driver,
+          deliveryNotes: dbDelivery.delivery_notes,
+          outletId: dbDelivery.outlet_id
+        }));
+      } else {
+        deliveriesToStore = [];
+      }
+    } else {
+      // Fallback: add to existing localStorage (offline mode)
+      const existingStored = localStorage.getItem(SAVED_DELIVERIES_KEY);
+      const existingDeliveries = existingStored ? JSON.parse(existingStored) : [];
+      
+      // Check for duplicates before adding
+      const exists = existingDeliveries.some(
+        d => d.deliveryNoteNumber === delivery.deliveryNoteNumber
+      );
+      
+      if (!exists) {
+        deliveriesToStore = [...existingDeliveries, delivery];
+      } else {
+        deliveriesToStore = existingDeliveries;
+      }
+    }
+    
+    // Store consolidated list in localStorage
+    localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(deliveriesToStore));
+    
   } catch (error) {
     console.error('Error saving delivery:', error);
     throw new Error('Failed to save delivery');
@@ -69,14 +124,24 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
 
 export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
   try {
-    // First, try to get from database
     const { data: { user } } = await supabase.auth.getUser();
+    
     if (user) {
-      const { data, error } = await supabase
-        .from('saved_delivery_notes')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // Check if user is admin to determine query scope
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      let query = supabase.from('saved_delivery_notes').select('*');
+      
+      // Admins can see all deliveries, others see only their own
+      if (userData?.role !== 'admin') {
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
         
       if (error) {
         console.error('Error retrieving saved deliveries from database:', error);
@@ -86,7 +151,7 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
       }
       
       // Transform database records to DeliveryData format
-      return data.map(dbDelivery => ({
+      const deliveries = data.map(dbDelivery => ({
         id: dbDelivery.id,
         deliveryNoteNumber: dbDelivery.delivery_note_number,
         date: dbDelivery.date,
@@ -106,6 +171,8 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
         deliveryNotes: dbDelivery.delivery_notes,
         outletId: dbDelivery.outlet_id
       }));
+      
+      return deliveries;
     } else {
       // If not authenticated, use localStorage
       const saved = localStorage.getItem(SAVED_DELIVERIES_KEY);
@@ -119,22 +186,75 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
 
 export const deleteDelivery = async (deliveryId: string): Promise<void> => {
   try {
-    const savedDeliveries = await getSavedDeliveries();
-    const updatedDeliveries = savedDeliveries.filter(delivery => delivery.id !== deliveryId);
-    localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(updatedDeliveries));
-    
-    // Also delete from database
+    // Delete from database first (source of truth)
     const { data: { user } } = await supabase.auth.getUser();
+    let dbDeleteSuccessful = false;
+    
     if (user) {
-      const { error } = await supabase
-        .from('saved_delivery_notes')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('id', deliveryId);
+      // Check if user is admin to determine delete scope
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      let query = supabase.from('saved_delivery_notes').delete();
+      
+      // Admins can delete any delivery, others can only delete their own
+      if (userData?.role !== 'admin') {
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { error } = await query.eq('id', deliveryId);
         
       if (error) {
         console.error('Error deleting delivery from database:', error);
-        // Don't throw error - still have local storage backup
+      } else {
+        dbDeleteSuccessful = true;
+      }
+    }
+    
+    // Update localStorage after successful DB deletion or as fallback
+    if (dbDeleteSuccessful) {
+      // Refresh localStorage from database to ensure consistency
+      const { data: dbDeliveries } = await supabase
+        .from('saved_delivery_notes')
+        .select('*')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false });
+      
+      if (dbDeliveries) {
+        const deliveriesToStore = dbDeliveries.map(dbDelivery => ({
+          id: dbDelivery.id,
+          deliveryNoteNumber: dbDelivery.delivery_note_number,
+          date: dbDelivery.date,
+          customer: dbDelivery.customer,
+          items: dbDelivery.items,
+          total: dbDelivery.total,
+          paymentMethod: dbDelivery.payment_method,
+          status: dbDelivery.status,
+          itemsList: dbDelivery.items_list,
+          subtotal: dbDelivery.subtotal,
+          tax: dbDelivery.tax,
+          discount: dbDelivery.discount,
+          amountReceived: dbDelivery.amount_received,
+          change: dbDelivery.change,
+          vehicle: dbDelivery.vehicle,
+          driver: dbDelivery.driver,
+          deliveryNotes: dbDelivery.delivery_notes,
+          outletId: dbDelivery.outlet_id
+        }));
+        localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(deliveriesToStore));
+      }
+    } else {
+      // Fallback: remove from localStorage only
+      const existingStored = localStorage.getItem(SAVED_DELIVERIES_KEY);
+      if (existingStored) {
+        const existingDeliveries = JSON.parse(existingStored);
+        const updatedDeliveries = existingDeliveries.filter(
+          delivery => delivery.id !== deliveryId
+        );
+        localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(updatedDeliveries));
       }
     }
   } catch (error) {
@@ -145,42 +265,93 @@ export const deleteDelivery = async (deliveryId: string): Promise<void> => {
 
 export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<void> => {
   try {
-    const savedDeliveries = await getSavedDeliveries();
-    const updatedDeliveries = savedDeliveries.map(delivery => 
-      delivery.id === updatedDelivery.id ? updatedDelivery : delivery
-    );
-    localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(updatedDeliveries));
-    
-    // Also update in database
+    // Update database first (source of truth)
     const { data: { user } } = await supabase.auth.getUser();
+    let dbUpdateSuccessful = false;
+    
     if (user) {
-      const { error } = await supabase
-        .from('saved_delivery_notes')
-        .update({
-          delivery_note_number: updatedDelivery.deliveryNoteNumber,
-          date: updatedDelivery.date,
-          customer: updatedDelivery.customer,
-          items: updatedDelivery.items,
-          total: updatedDelivery.total,
-          payment_method: updatedDelivery.paymentMethod,
-          status: updatedDelivery.status,
-          items_list: updatedDelivery.itemsList,
-          subtotal: updatedDelivery.subtotal,
-          tax: updatedDelivery.tax,
-          discount: updatedDelivery.discount,
-          amount_received: updatedDelivery.amountReceived,
-          change: updatedDelivery.change,
-          vehicle: updatedDelivery.vehicle,
-          driver: updatedDelivery.driver,
-          delivery_notes: updatedDelivery.deliveryNotes,
-          outlet_id: updatedDelivery.outletId
-        })
-        .eq('user_id', user.id)
-        .eq('id', updatedDelivery.id);
+      // Check if user is admin to determine update scope
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      let query = supabase.from('saved_delivery_notes').update({
+        delivery_note_number: updatedDelivery.deliveryNoteNumber,
+        date: updatedDelivery.date,
+        customer: updatedDelivery.customer,
+        items: updatedDelivery.items,
+        total: updatedDelivery.total,
+        payment_method: updatedDelivery.paymentMethod,
+        status: updatedDelivery.status,
+        items_list: updatedDelivery.itemsList,
+        subtotal: updatedDelivery.subtotal,
+        tax: updatedDelivery.tax,
+        discount: updatedDelivery.discount,
+        amount_received: updatedDelivery.amountReceived,
+        change: updatedDelivery.change,
+        vehicle: updatedDelivery.vehicle,
+        driver: updatedDelivery.driver,
+        delivery_notes: updatedDelivery.deliveryNotes,
+        outlet_id: updatedDelivery.outletId
+      });
+      
+      // Admins can update any delivery, others can only update their own
+      if (userData?.role !== 'admin') {
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { error } = await query.eq('id', updatedDelivery.id);
         
       if (error) {
         console.error('Error updating delivery in database:', error);
-        // Don't throw error - still have local storage backup
+      } else {
+        dbUpdateSuccessful = true;
+      }
+    }
+    
+    // Update localStorage after successful DB update or as fallback
+    if (dbUpdateSuccessful && user) {
+      // Refresh localStorage from database to ensure consistency
+      const { data: dbDeliveries } = await supabase
+        .from('saved_delivery_notes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (dbDeliveries) {
+        const deliveriesToStore = dbDeliveries.map(dbDelivery => ({
+          id: dbDelivery.id,
+          deliveryNoteNumber: dbDelivery.delivery_note_number,
+          date: dbDelivery.date,
+          customer: dbDelivery.customer,
+          items: dbDelivery.items,
+          total: dbDelivery.total,
+          paymentMethod: dbDelivery.payment_method,
+          status: dbDelivery.status,
+          itemsList: dbDelivery.items_list,
+          subtotal: dbDelivery.subtotal,
+          tax: dbDelivery.tax,
+          discount: dbDelivery.discount,
+          amountReceived: dbDelivery.amount_received,
+          change: dbDelivery.change,
+          vehicle: dbDelivery.vehicle,
+          driver: dbDelivery.driver,
+          deliveryNotes: dbDelivery.delivery_notes,
+          outletId: dbDelivery.outlet_id
+        }));
+        localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(deliveriesToStore));
+      }
+    } else {
+      // Fallback: update localStorage only
+      const existingStored = localStorage.getItem(SAVED_DELIVERIES_KEY);
+      if (existingStored) {
+        const existingDeliveries = JSON.parse(existingStored);
+        const updatedDeliveries = existingDeliveries.map(delivery => 
+          delivery.id === updatedDelivery.id ? updatedDelivery : delivery
+        );
+        localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(updatedDeliveries));
       }
     }
   } catch (error) {
