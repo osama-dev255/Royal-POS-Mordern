@@ -2,15 +2,24 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, HandCoins, Download, Printer } from "lucide-react";
+import { Search, HandCoins, Download, Printer, Edit } from "lucide-react";
 import { SavedCustomerSettlementsCard } from "./SavedCustomerSettlementsCard";
 import { 
   getSavedSettlements, 
   deleteCustomerSettlement, 
+  updateCustomerSettlement,
   CustomerSettlementData as SavedCustomerSettlementData 
 } from "@/utils/customerSettlementUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SavedCustomerSettlementsSectionProps {
   onBack: () => void;
@@ -23,6 +32,8 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [viewingSettlement, setViewingSettlement] = useState<SavedCustomerSettlementData | null>(null);
+  const [editingSettlement, setEditingSettlement] = useState<SavedCustomerSettlementData | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Load saved settlements from database
   useEffect(() => {
@@ -132,6 +143,33 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
     setViewingSettlement(settlement);
   };
 
+  const handleEditSettlement = (settlement: SavedCustomerSettlementData) => {
+    setEditingSettlement(settlement);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditedSettlement = async () => {
+    if (!editingSettlement) return;
+    
+    try {
+      await updateCustomerSettlement(editingSettlement);
+      
+      // Update the local state
+      setSettlements(prev => 
+        prev.map(s => s.id === editingSettlement.id ? editingSettlement : s)
+      );
+      
+      // Close the modal
+      setIsEditModalOpen(false);
+      setEditingSettlement(null);
+      
+      alert('Settlement updated successfully!');
+    } catch (error) {
+      console.error('Error updating settlement:', error);
+      alert('Error updating settlement. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Render settlement details view if viewing a settlement */}
@@ -186,6 +224,10 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
             </div>
             
             <div className="flex gap-2 mt-6">
+              <Button variant="outline" onClick={() => handleEditSettlement(viewingSettlement)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
               <Button variant="outline" onClick={() => handlePrintSettlement(viewingSettlement)}>
                 <Printer className="h-4 w-4 mr-2" />
                 Print
@@ -301,6 +343,150 @@ export const SavedCustomerSettlementsSection = ({ onBack, onLogout, username }: 
             )}
           </main>
         </>
+      )}
+      
+      {/* Edit Settlement Modal */}
+      {isEditModalOpen && editingSettlement && (
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Settlement #{editingSettlement.referenceNumber}</DialogTitle>
+              <DialogDescription>
+                Modify the settlement details below and save the changes
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Customer Name</label>
+                  <Input 
+                    value={editingSettlement.customerName || ''}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, customerName: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Reference Number</label>
+                  <Input 
+                    value={editingSettlement.referenceNumber || ''}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date</label>
+                  <Input 
+                    type="date"
+                    value={editingSettlement.date?.split('T')[0] || ''}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, date: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Time</label>
+                  <Input 
+                    value={editingSettlement.time || ''}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, time: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Previous Balance</label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editingSettlement.previousBalance || 0}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, previousBalance: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Amount Paid</label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editingSettlement.amountPaid || 0}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, amountPaid: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">New Balance</label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editingSettlement.newBalance || 0}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, newBalance: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Settlement Amount</label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editingSettlement.settlementAmount || 0}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, settlementAmount: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Payment Method</label>
+                  <select
+                    value={editingSettlement.paymentMethod || 'cash'}
+                    onChange={(e) => setEditingSettlement({...editingSettlement, paymentMethod: e.target.value})}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="mpesa">M-Pesa</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  value={editingSettlement.notes || ''}
+                  onChange={(e) => setEditingSettlement({...editingSettlement, notes: e.target.value})}
+                  className="w-full p-2 border rounded-md min-h-[80px]"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Status</label>
+                <select
+                  value={editingSettlement.status || 'completed'}
+                  onChange={(e) => setEditingSettlement({...editingSettlement, status: e.target.value as any})}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+            
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveEditedSettlement}
+              >
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
