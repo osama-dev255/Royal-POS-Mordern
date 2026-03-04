@@ -7651,7 +7651,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
                       Back to Templates
                     </Button>
-                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement") && (
+                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order") && (
                       <>
                         <Button onClick={() => {
                           if (currentTemplate?.type === "order-form") {
