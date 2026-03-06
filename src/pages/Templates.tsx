@@ -4674,11 +4674,11 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           return; // Don't save if there are unavailable items
         }
 
-        // Calculate total items (sum of all delivered quantities)
-        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + (item.delivered || 0), 0);
+        // Calculate total items (count of items with non-zero quantities)
+        const totalItems = deliveryNoteData.items.filter(item => (item.quantity || 0) > 0).length;
         
         // Calculate total amount based on rates and quantities
-        const totalAmount = deliveryNoteData.items.reduce((sum, item) => sum + (item.rate * item.delivered), 0);
+        const totalAmount = deliveryNoteData.items.reduce((sum, item) => sum + (item.rate * (item.quantity || 0)), 0);
         
         // Find the outlet ID if the customer is from registered outlets
         let outletId: string | undefined;
@@ -4701,11 +4701,11 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           status: 'completed', // For templates, mark as completed
           itemsList: deliveryNoteData.items.map(item => ({
             name: item.description,
-            quantity: item.delivered, // Use delivered quantity for the saved record
+            quantity: item.quantity, // Use quantity field for the saved record
             unit: item.unit,
             rate: item.rate,
             amount: item.amount,
-            delivered: item.delivered,
+            delivered: item.quantity, // Also update delivered to match quantity
             remarks: item.remarks,
             price: item.rate, // Use rate as the price for delivery items
             total: item.amount // Use amount as the total for delivery items
@@ -6623,7 +6623,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         invoiceNumber: invoiceData.invoiceNumber,
         date: invoiceData.invoiceDate,
         customer: invoiceData.clientName,
-        items: invoiceData.items.reduce((sum, item) => sum + item.quantity, 0),
+        items: invoiceData.items.filter(item => item.quantity > 0).length,
         total: invoiceData.total,
         paymentMethod: 'N/A', // Templates don't have payment method
         status: 'completed', // For templates, mark as completed
