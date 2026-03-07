@@ -1539,12 +1539,17 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     // Calculate total amount from items
     const totalAmount = grnData.items.reduce((sum, item) => sum + Number(item.totalWithReceivingCost || 0), 0);
     
+    // For multi-supplier GRNs, combine supplier names or use the first supplier
+    const effectiveSupplierName = grnData.numberOfSuppliers > 1 
+      ? (grnData.suppliers?.map(s => s.name).join(', ') || grnData.supplierName)
+      : grnData.supplierName;
+    
     // Convert Templates GRN data to grnUtils format
     const convertedGRNData: any = {
       grnNumber: grnData.grnNumber,
       date: grnData.date,
       time: grnData.time,
-      supplierName: grnData.supplierName,
+      supplierName: effectiveSupplierName,
       supplierId: grnData.supplierId,
       supplierPhone: grnData.supplierPhone,
       supplierEmail: grnData.supplierEmail,
@@ -1561,20 +1566,38 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       driverName: grnData.driverName,
       receivedBy: grnData.receivedBy,
       receivedLocation: grnData.receivedLocation,
-      items: grnData.items.map(item => ({
-        id: item.id,
-        description: item.description,
-        quantity: item.orderedQuantity,
-        delivered: item.receivedQuantity,
-        unit: item.unit,
-        unitCost: item.unitCost || 0,
-        total: item.totalWithReceivingCost || 0,
-        batchNumber: item.batchNumber,
-        expiryDate: item.expiryDate,
-        remarks: item.remarks,
-        receivingCostPerUnit: item.receivingCostPerUnit,
-        totalWithReceivingCost: item.totalWithReceivingCost
-      })),
+      numberOfSuppliers: grnData.numberOfSuppliers,
+      suppliers: grnData.suppliers,
+      items: grnData.items.map(item => {
+        // Ensure receiving costs are distributed before saving
+        const itemWithCost = { ...item };
+        if (!itemWithCost.receivingCostPerUnit || itemWithCost.receivingCostPerUnit === 0) {
+          // Recalculate if not set
+          const totalReceivingCosts = grnData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+          const totalQuantity = grnData.items.reduce((sum, i) => sum + (i.receivedQuantity || 0), 0);
+          if (totalQuantity > 0) {
+            itemWithCost.receivingCostPerUnit = totalReceivingCosts / totalQuantity;
+            itemWithCost.originalUnitCost = item.originalUnitCost || item.unitCost || 0;
+            itemWithCost.unitCost = itemWithCost.originalUnitCost + itemWithCost.receivingCostPerUnit;
+            itemWithCost.totalWithReceivingCost = itemWithCost.unitCost * (item.receivedQuantity || 0);
+          }
+        }
+        return {
+          id: itemWithCost.id,
+          description: itemWithCost.description,
+          quantity: itemWithCost.orderedQuantity,
+          delivered: itemWithCost.receivedQuantity,
+          unit: itemWithCost.unit,
+          unitCost: itemWithCost.unitCost || 0,
+          total: itemWithCost.totalWithReceivingCost || 0,
+          batchNumber: itemWithCost.batchNumber,
+          expiryDate: itemWithCost.expiryDate,
+          remarks: itemWithCost.remarks,
+          receivingCostPerUnit: itemWithCost.receivingCostPerUnit,
+          totalWithReceivingCost: itemWithCost.totalWithReceivingCost,
+          originalUnitCost: itemWithCost.originalUnitCost
+        };
+      }),
       qualityCheckNotes: grnData.qualityCheckNotes,
       discrepancies: grnData.discrepancies,
       preparedBy: grnData.preparedBy,
