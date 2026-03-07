@@ -1849,7 +1849,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                     <td>${item.orderedQuantity}</td>
                     <td>${item.receivedQuantity}</td>
                     <td>${item.unit}</td>
-                    <td>${formatCurrency(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0))}</td>
+                    <td>${formatCurrency(item.originalUnitCost || 0)}</td>
                     <td>${formatCurrency(item.receivingCostPerUnit || 0)}</td>
                     <td>${formatCurrency(item.unitCost || 0)}</td>
                     <td>${formatCurrency(item.totalWithReceivingCost || 0)}</td>
@@ -3059,14 +3059,17 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     // Update each item with receiving cost per unit and total cost with receiving costs
     return items.map(item => {
       const receivingCostPerUnit = costPerUnit;
-      const unitCostWithReceiving = (item.originalUnitCost || item.unitCost || 0) + receivingCostPerUnit;
+      // Use originalUnitCost if available, otherwise assume current unitCost already includes receiving costs
+      const baseUnitCost = item.originalUnitCost || (item.unitCost && item.receivingCostPerUnit ? item.unitCost - item.receivingCostPerUnit : item.unitCost) || 0;
+      const unitCostWithReceiving = baseUnitCost + receivingCostPerUnit;
       const totalWithReceivingCost = unitCostWithReceiving * item.receivedQuantity;
       
       return {
         ...item,
         receivingCostPerUnit,
         totalWithReceivingCost,
-        unitCost: unitCostWithReceiving
+        unitCost: unitCostWithReceiving,
+        originalUnitCost: item.originalUnitCost || baseUnitCost
       };
     });
   };
@@ -3923,7 +3926,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               const itemsBySupplier = new Map();
               const unassignedItems = [];
               
-              (grnData.items || []).forEach(item => {
+              // First, distribute receiving costs across all items
+              const itemsWithCosts = distributeReceivingCosts([...(grnData.items || [])], grnData.receivingCosts);
+              
+              itemsWithCosts.forEach(item => {
                 if (item.supplierId) {
                   if (!itemsBySupplier.has(item.supplierId)) {
                     itemsBySupplier.set(item.supplierId, []);
@@ -3967,7 +3973,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
-                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -4012,7 +4018,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.orderedQuantity || 0}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.receivedQuantity || 0}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.unit || ''}</td>
-                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.originalUnitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
