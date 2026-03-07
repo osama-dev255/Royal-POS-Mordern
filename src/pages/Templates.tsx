@@ -1696,15 +1696,29 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               width: 100%;
               border-collapse: collapse;
               margin: 10px 0;
+              table-layout: fixed;
             }
             th, td {
               border: 1px solid #000;
               padding: 8px;
               text-align: left;
+              word-wrap: break-word;
             }
             th {
               background-color: #f0f0f0;
             }
+            /* Column widths for items table */
+            th:nth-child(1) { width: 25%; min-width: 150px; } /* Description */
+            th:nth-child(2) { width: 8%; } /* Ordered */
+            th:nth-child(3) { width: 8%; } /* Received */
+            th:nth-child(4) { width: 6%; } /* Unit */
+            th:nth-child(5) { width: 10%; } /* Original Unit Cost */
+            th:nth-child(6) { width: 12%; } /* Receiving Cost Per Unit */
+            th:nth-child(7) { width: 10%; } /* New Unit Cost */
+            th:nth-child(8) { width: 12%; } /* Total Cost with Receiving */
+            th:nth-child(9) { width: 8%; } /* Batch # */
+            th:nth-child(10) { width: 8%; } /* Expiry */
+            th:nth-child(11) { width: 8%; } /* Remarks */
             .text-right {
               text-align: right;
             }
@@ -10309,24 +10323,24 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                   <table className="w-full border-collapse border border-gray-300 text-sm">
                                     <thead>
                                       <tr className="bg-gray-100">
-                                        <th className="border border-gray-300 p-2 text-left">Description</th>
-                                        <th className="border border-gray-300 p-2 text-left">Ordered</th>
-                                        <th className="border border-gray-300 p-2 text-left">Received</th>
-                                        <th className="border border-gray-300 p-2 text-left">Unit</th>
-                                        <th className="border border-gray-300 p-2 text-left">Original Unit Cost</th>
-                                        <th className="border border-gray-300 p-2 text-left">Receiving Cost Per Unit</th>
-                                        <th className="border border-gray-300 p-2 text-left">New Unit Cost</th>
-                                        <th className="border border-gray-300 p-2 text-left">Total Cost with Receiving</th>
-                                        <th className="border border-gray-300 p-2 text-left">Batch #</th>
-                                        <th className="border border-gray-300 p-2 text-left">Expiry</th>
-                                        <th className="border border-gray-300 p-2 text-left">Remarks</th>
-                                        <th className="border border-gray-300 p-2 text-left">Actions</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '25%', minWidth: '200px' }}>Description</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Ordered</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Received</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Unit</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%' }}>Original Unit Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '12%' }}>Receiving Cost Per Unit</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%' }}>New Unit Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '12%' }}>Total Cost with Receiving</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Batch #</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Expiry</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Remarks</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Actions</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {supplierItems.map((item) => (
                                         <tr key={`${item.id}-${supplierIndex}`}>
-                                          <td className="border border-gray-300 p-2 relative">
+                                          <td className="border border-gray-300 p-2 relative" style={{ width: '25%', minWidth: '200px' }}>
                                             <div className="relative">
                                               <Input
                                                 value={item.description}
@@ -10346,6 +10360,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                                 }}
                                                 className="p-1 h-8 text-sm w-full"
                                                 placeholder="Select or enter product..."
+                                                style={{ minWidth: '180px' }}
                                               />
                                               {showGrnDropdown && grnProductDescriptions.length > 0 && (
                                                 <div 
