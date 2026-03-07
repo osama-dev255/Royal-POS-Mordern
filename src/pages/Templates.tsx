@@ -4674,8 +4674,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           return; // Don't save if there are unavailable items
         }
 
-        // Calculate total items (count of items with non-zero quantities)
-        const totalItems = deliveryNoteData.items.filter(item => (item.quantity || 0) > 0).length;
+        // Calculate total items (sum of all quantities)
+        const totalItems = deliveryNoteData.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
         
         // Calculate total amount based on rates and quantities
         const totalAmount = deliveryNoteData.items.reduce((sum, item) => sum + (item.rate * (item.quantity || 0)), 0);

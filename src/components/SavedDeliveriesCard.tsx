@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
 import { Truck, Calendar, User, Package, Eye, Download, Printer } from "lucide-react";
 
+interface DeliveryItem {
+  name?: string;
+  productName?: string;
+  quantity?: number;
+  price?: number;
+  unit?: string;
+}
+
 interface SavedDelivery {
   id: string;
   deliveryNoteNumber: string;
@@ -20,6 +28,7 @@ interface SavedDelivery {
   driver: string;
   status: "completed" | "in-transit" | "pending" | "delivered" | "cancelled";
   outletId?: string;
+  itemsList?: DeliveryItem[];
 }
 
 interface SavedDeliveriesCardProps {
@@ -93,6 +102,25 @@ export const SavedDeliveriesCard = ({
             </div>
             <div className="font-bold">{formatCurrency(delivery.total)}</div>
           </div>
+          
+          {/* Items List Display */}
+          {delivery.itemsList && delivery.itemsList.length > 0 && (
+            <div className="border-t pt-2 mt-2">
+              <div className="text-xs font-semibold text-muted-foreground mb-1">Products:</div>
+              <div className="space-y-1 max-h-32 overflow-y-auto text-sm">
+                {delivery.itemsList.map((item, index) => (
+                  <div key={index} className="flex justify-between items-start gap-2 py-1 border-b border-dashed last:border-0">
+                    <span className="text-xs flex-1 truncate font-medium text-gray-700">
+                      {item.name || item.productName || 'N/A'}
+                    </span>
+                    <span className="text-xs font-semibold whitespace-nowrap text-primary">
+                      {item.quantity || 0}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {delivery.subtotal !== undefined && delivery.subtotal !== 0 && (
             <div className="flex justify-between items-center text-sm">
