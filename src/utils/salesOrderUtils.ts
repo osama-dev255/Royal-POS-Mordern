@@ -201,30 +201,46 @@ export const getSavedSalesOrders = async (): Promise<SalesOrderData[]> => {
 };
 
 export const deleteSalesOrder = async (orderId: string): Promise<void> => {
+  console.log('=== deleteSalesOrder UTILITY CALLED ===');
+  console.log('Order ID:', orderId);
+  
   try {
     // Remove from localStorage
+    console.log('Removing from localStorage...');
     const savedOrders = await getSavedSalesOrders();
+    console.log('Orders before delete:', savedOrders.length);
+    
     const updatedOrders = savedOrders.filter(order => order.id !== orderId);
+    console.log('Orders after filter:', updatedOrders.length);
+    
     localStorage.setItem(SAVED_SALES_ORDERS_KEY, JSON.stringify(updatedOrders));
+    console.log('✅ localStorage updated');
     
     // Remove from database
+    console.log('Deleting from database...');
     const { error } = await supabase
       .from('sales')
       .delete()
       .eq('id', orderId);
       
     if (error) {
-      console.error('Error deleting sales order from database:', error);
+      console.error('❌ Database delete error:', error);
+    } else {
+      console.log('✅ Database delete successful');
     }
     
     // Also delete associated items (cascade should handle this, but being explicit)
+    console.log('Deleting sale items...');
     await supabase
       .from('sale_items')
       .delete()
       .eq('sale_id', orderId);
-      
+    
+    console.log('✅ Sale items deleted');
+    console.log('🎉 deleteSalesOrder completed successfully');
+    
   } catch (error) {
-    console.error('Error deleting sales order:', error);
+    console.error('❌ Error in deleteSalesOrder:', error);
     throw new Error('Failed to delete sales order');
   }
 };

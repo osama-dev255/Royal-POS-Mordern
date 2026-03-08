@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/currency";
-import { FileText, Calendar, User, Eye, Trash2, Lock } from "lucide-react";
+import { FileText, Calendar, User, Eye, Printer, Trash2, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -48,13 +48,15 @@ interface SavedSalesOrder {
 interface SavedSalesOrdersCardProps {
   salesOrder: SavedSalesOrder;
   onViewDetails: () => void;
-  onDeleteOrder: () => void;
+  onPrintOrder: () => void;
+  onDeleteOrder: () => Promise<void>;
   className?: string;
 }
 
 export const SavedSalesOrdersCard = ({ 
   salesOrder, 
   onViewDetails,
+  onPrintOrder,
   onDeleteOrder,
   className 
 }: SavedSalesOrdersCardProps) => {
@@ -67,8 +69,17 @@ export const SavedSalesOrdersCard = ({
   // Check user role on component mount
   useEffect(() => {
     const checkUserRole = async () => {
+      console.log('=== SavedSalesOrdersCard: Checking user role ===');
       const role = await getCurrentUserRole();
+      console.log('User role fetched:', role);
       setUserRole(role);
+      
+      // Debug: Log if delete button should appear
+      if (role === 'admin') {
+        console.log('✅ User is ADMIN - Delete button will be shown');
+      } else {
+        console.log('❌ User is NOT admin - Delete button will be HIDDEN');
+      }
     };
     
     checkUserRole();
@@ -87,32 +98,57 @@ export const SavedSalesOrdersCard = ({
     return new Date(dateString).toLocaleDateString();
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    console.log('=== HANDLE CONFIRM DELETE ===');
+    
     if (!password.trim()) {
       setPasswordError('Password is required');
       return;
     }
     
     try {
+      console.log('Authenticating user...');
       const currentUser = await getCurrentUser();
+      console.log('Current user:', currentUser?.email);
+      
       if (!currentUser || !currentUser.email) {
         setPasswordError('Authentication error. Please log in again.');
         return;
       }
       
+      console.log('Signing in with password...');
       const { error } = await signIn(currentUser.email, password);
       
       if (error) {
+        console.error('Authentication failed:', error);
         setPasswordError('Incorrect password. Please try again.');
         return;
       }
       
-      onDeleteOrder();
+      console.log('✅ Authentication successful!');
+      console.log('Calling parent delete handler...');
+      
+      // Call the parent's delete handler and wait for it
+      await onDeleteOrder();
+      
+      console.log('✅ Delete handler completed');
+      console.log('Closing dialog after delay...');
+      
+      // Add a small delay before closing to ensure smooth UX
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       setShowDeleteConfirmation(false);
       setPassword('');
       setPasswordError('');
+      console.log('✅ Dialog closed');
+      
     } catch (error) {
+      console.error('❌ Error in handleConfirmDelete:', error);
       setPasswordError('Authentication failed. Please try again.');
     }
   };
@@ -248,12 +284,33 @@ export const SavedSalesOrdersCard = ({
                 <Eye className="h-4 w-4 mr-1" />
                 View
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                onClick={onPrintOrder}
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print
+              </Button>
               {userRole === 'admin' && (
                 <Button 
                   variant="outline" 
                   size="sm" 
                   className="flex-1"
-                  onClick={() => setShowDeleteConfirmation(true)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('=== DELETE BUTTON CLICKED ===');
+                    console.log('Current userRole:', userRole);
+                    console.log('Setting dialog state to true...');
+                    // Force state update
+                    setShowDeleteConfirmation(prev => {
+                      console.log('Previous dialog state:', prev);
+                      return true;
+                    });
+                    console.log('Dialog state should now be true');
+                  }}
                   title="Delete Sales Order"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -297,6 +354,7 @@ export const SavedSalesOrdersCard = ({
           </div>
           <DialogFooter className="gap-2">
             <Button 
+              type="button"
               variant="outline" 
               onClick={() => {
                 setShowDeleteConfirmation(false);
@@ -307,6 +365,7 @@ export const SavedSalesOrdersCard = ({
               Cancel
             </Button>
             <Button 
+              type="button"
               variant="destructive" 
               onClick={handleConfirmDelete}
             >

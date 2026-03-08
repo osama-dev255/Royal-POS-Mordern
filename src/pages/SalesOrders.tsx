@@ -7,13 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Calendar, Receipt, Plus, Edit, Trash2, Eye, X } from "lucide-react";
+import { Search, Filter, Calendar, Receipt, Plus, Edit, Trash2, Eye, X, Lock } from "lucide-react";
 import { getSales, getCustomers, getSaleItemsWithProducts, createSale, updateSale, deleteSale, Customer, Sale, Product, getProducts, createSaleItem } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
+import { getCurrentUser, signIn } from "@/services/authService";
+import { getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
 interface SalesOrderItem {
   id: string;
@@ -59,6 +61,23 @@ export const SalesOrders = ({ username, onBack, onLogout }: { username: string; 
 
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [products, setProducts] = useState<{ id: string; name: string; price: number }[]>([]);
+  
+  // State for password confirmation dialog
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  
+  // Check user role on component mount
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const role = await getCurrentUserRole();
+      setUserRole(role);
+    };
+    
+    checkUserRole();
+  }, []);
 
   // Load sales orders, customers, and products from database
   useEffect(() => {
@@ -310,52 +329,116 @@ export const SalesOrders = ({ username, onBack, onLogout }: { username: string; 
     }
   };
 
-  const handleDeleteSO = async (id: string) => {
-    try {
-      const success = await deleteSale(id);
-      
-      if (!success) {
-        throw new Error("Failed to delete sales order");
-      }
-
-      // Refresh all data
-      const customerData = await getCustomers();
-      const formattedCustomers = customerData.map(customer => ({
-        id: customer.id || '',
-        name: `${customer.first_name} ${customer.last_name}`
-      }));
-      setCustomers(formattedCustomers);
-      
-      const productData = await getProducts();
-      const formattedProducts = productData.map(product => ({
-        id: product.id || '',
-        name: product.name || 'Unknown Product',
-        price: product.selling_price || 0
-      }));
-      setProducts(formattedProducts);
-      
-      const orders = await getSales();
-      // Convert database orders to component format
-      const formattedOrders = orders.map(order => ({
-        id: order.id || '',
-        orderNumber: order.invoice_number || `SO-${order.id?.substring(0, 8) || '001'}`,
-        customerId: order.customer_id || '',
-        customerName: customerData.find(c => c.id === order.customer_id) ? 
-          `${customerData.find(c => c.id === order.customer_id)?.first_name} ${customerData.find(c => c.id === order.customer_id)?.last_name}` : 
-          'Walk-in Customer',
-        orderDate: order.sale_date || new Date().toISOString(),
-        status: (order.sale_status as "pending" | "completed" | "cancelled") || "pending",
-        items: [], // Will be loaded when needed
-        subtotal: 0, // Will be calculated
-        tax: 0, // Will be calculated
-        total: order.total_amount || 0
-      }));
-      setSalesOrders(formattedOrders);
-      
+  const handleDeleteSO = (id: string) => {
+    console.log('=== DELETE CLICKED ===');
+    console.log('Order ID:', id);
+    console.log('Current user role:', userRole);
+    console.log('Component: SalesOrders.tsx (Main Sales Orders Page)');
+    alert(`DELETE DEBUG:\n- Order ID: ${id}\n- Your Role: ${userRole}\n- Component: SalesOrders.tsx\n\nCheck browser console for more details!`);
+    
+    // Only admins can delete with password confirmation
+    if (userRole !== 'admin') {
+      console.log('User is not admin, blocking delete');
       toast({
-        title: "Success",
-        description: "Sales order deleted successfully"
+        title: "Error",
+        description: "Only admins can delete sales orders",
+        variant: "destructive"
       });
+      return;
+    }
+    
+    console.log('Showing password confirmation dialog');
+    // Show password confirmation dialog
+    setOrderToDelete(id);
+    setShowDeleteConfirmation(true);
+    setDeletePassword('');
+    setPasswordError('');
+  };
+  
+  const handleConfirmDelete = async () => {
+    console.log('Confirm delete clicked');
+    
+    if (!deletePassword.trim()) {
+      setPasswordError('Password is required');
+      return;
+    }
+    
+    try {
+      console.log('Authenticating user...');
+      const currentUser = await getCurrentUser();
+      console.log('Current user:', currentUser?.email);
+      
+      if (!currentUser || !currentUser.email) {
+        setPasswordError('Authentication error. Please log in again.');
+        return;
+      }
+      
+      console.log('Signing in with provided password...');
+      const { error } = await signIn(currentUser.email, deletePassword);
+      
+      if (error) {
+        console.error('Authentication failed:', error);
+        setPasswordError('Incorrect password. Please try again.');
+        return;
+      }
+      
+      console.log('Authentication successful, proceeding with deletion...');
+      // Password verified, proceed with deletion
+      if (orderToDelete) {
+        console.log('Deleting order:', orderToDelete);
+        const success = await deleteSale(orderToDelete);
+        
+        if (!success) {
+          throw new Error("Failed to delete sales order");
+        }
+
+        console.log('Deletion successful, refreshing data...');
+        // Refresh all data
+        const customerData = await getCustomers();
+        const formattedCustomers = customerData.map(customer => ({
+          id: customer.id || '',
+          name: `${customer.first_name} ${customer.last_name}`
+        }));
+        setCustomers(formattedCustomers);
+        
+        const productData = await getProducts();
+        const formattedProducts = productData.map(product => ({
+          id: product.id || '',
+          name: product.name || 'Unknown Product',
+          price: product.selling_price || 0
+        }));
+        setProducts(formattedProducts);
+        
+        const orders = await getSales();
+        // Convert database orders to component format
+        const formattedOrders = orders.map(order => ({
+          id: order.id || '',
+          orderNumber: order.invoice_number || `SO-${order.id?.substring(0, 8) || '001'}`,
+          customerId: order.customer_id || '',
+          customerName: customerData.find(c => c.id === order.customer_id) ? 
+            `${customerData.find(c => c.id === order.customer_id)?.first_name} ${customerData.find(c => c.id === order.customer_id)?.last_name}` : 
+            'Walk-in Customer',
+          orderDate: order.sale_date || new Date().toISOString(),
+          status: (order.sale_status as "pending" | "completed" | "cancelled") || "pending",
+          items: [], // Will be loaded when needed
+          subtotal: 0, // Will be calculated
+          tax: 0, // Will be calculated
+          total: order.total_amount || 0
+        }));
+        setSalesOrders(formattedOrders);
+        
+        console.log('Data refreshed successfully');
+        toast({
+          title: "Success",
+          description: "Sales order deleted successfully"
+        });
+      }
+      
+      console.log('Closing dialog and resetting state');
+      setShowDeleteConfirmation(false);
+      setDeletePassword('');
+      setPasswordError('');
+      setOrderToDelete(null);
     } catch (error) {
       console.error("Error deleting sales order:", error);
       toast({
@@ -871,6 +954,64 @@ export const SalesOrders = ({ username, onBack, onLogout }: { username: string; 
             </Table>
           </CardContent>
         </Card>
+        
+        {/* Password Confirmation Dialog for Delete */}
+        <Dialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-destructive" />
+                Confirm Deletion
+              </DialogTitle>
+              <DialogDescription>
+                This action cannot be undone. Please enter your password to confirm deletion of this sales order.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="delete-password">Password</Label>
+                <Input 
+                  id="delete-password"
+                  type="password" 
+                  placeholder="Enter your password"
+                  value={deletePassword}
+                  onChange={(e) => {
+                    setDeletePassword(e.target.value);
+                    if (passwordError) setPasswordError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmDelete();
+                    }
+                  }}
+                  className={passwordError ? "border-destructive" : ""}
+                />
+                {passwordError && (
+                  <p className="text-sm text-destructive">{passwordError}</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeleteConfirmation(false);
+                  setDeletePassword('');
+                  setPasswordError('');
+                  setOrderToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleConfirmDelete}
+              >
+                Delete Order
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

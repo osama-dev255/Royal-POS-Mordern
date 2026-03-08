@@ -95,17 +95,105 @@ export const SavedSalesOrdersSection = ({ onBack, onLogout, username }: SavedSal
     return matchesText && matchesDate;
   });
 
-  const handleDeleteOrder = (orderId: string) => {
+  const handleDeleteOrder = async (orderId: string) => {
+    console.log('=== PARENT: handleDeleteOrder called ===');
+    console.log('Order ID to delete:', orderId);
+    
     try {
-      deleteSalesOrder(orderId);
-      setSalesOrders(prev => prev.filter(order => order.id !== orderId));
+      console.log('Calling deleteSalesOrder utility...');
+      // Wait for deletion to complete
+      await deleteSalesOrder(orderId);
+      
+      console.log('Updating local state to remove order from list...');
+      setSalesOrders(prev => {
+        const filtered = prev.filter(order => order.id !== orderId);
+        console.log('Previous orders count:', prev.length);
+        console.log('New orders count:', filtered.length);
+        return filtered;
+      });
+      
+      console.log('✅ Delete completed successfully - staying on this page');
+      console.log('Current page URL:', window.location.href);
+      
     } catch (error) {
-      console.error("Error deleting sales order:", error);
+      console.error('❌ Error in handleDeleteOrder:', error);
     }
   };
 
   const handleViewOrder = (order: SalesOrderData) => {
     setViewingOrder(order);
+  };
+
+  const handlePrintOrder = (order: SalesOrderData) => {
+    // Create a printable version of the sales order
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const itemsHtml = order.itemsList?.map((item, index) => `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${item.productName}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${item.quantity}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${item.unit || 'pcs'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(item.unitPrice ?? item.price ?? 0).toFixed(2)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(item.total ?? ((item.price ?? item.unitPrice ?? 0) * item.quantity)).toFixed(2)}</td>
+      </tr>
+    `).join('') || '';
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Sales Order - ${order.orderNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+            th { background-color: #f5f5f5; }
+            .text-right { text-align: right; }
+            .total-section { margin-top: 20px; text-align: right; }
+            @media print {
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Sales Order</h1>
+          <p><strong>Order Number:</strong> ${order.orderNumber}</p>
+          <p><strong>Date:</strong> ${new Date(order.date).toLocaleDateString()}</p>
+          <p><strong>Customer:</strong> ${order.customer}</p>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Rate</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          
+          <div class="total-section">
+            <p><strong>Subtotal:</strong> ${order.subtotal?.toFixed(2) || '0.00'}</p>
+            <p><strong>Tax:</strong> ${(order.tax || 0).toFixed(2)}</p>
+            <p><strong>Discount:</strong> ${(order.discount || 0).toFixed(2)}</p>
+            <p><strong>Total:</strong> ${order.total.toFixed(2)}</p>
+          </div>
+          
+          <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Print</button>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const handleEditOrder = (order: SalesOrderData) => {
@@ -320,6 +408,7 @@ export const SavedSalesOrdersSection = ({ onBack, onLogout, username }: SavedSal
                       amountDue: order.amountDue
                     }}
                     onViewDetails={() => handleViewOrder(order)}
+                    onPrintOrder={() => handlePrintOrder(order)}
                     onDeleteOrder={() => handleDeleteOrder(order.id)}
                   />
                 ))}
