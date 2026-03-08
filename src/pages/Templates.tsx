@@ -46,6 +46,7 @@ import { ExportUtils } from '@/utils/exportUtils';
 import WhatsAppUtils from '@/utils/whatsappUtils';
 import { saveInvoice, InvoiceData as SavedInvoiceData } from '@/utils/invoiceUtils';
 import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
+import { saveSalesOrder, SalesOrderData as SavedSalesOrderData } from '@/utils/salesOrderUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
 import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
@@ -54,6 +55,7 @@ import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
 import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettlementsSection';
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
+import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
 import { getProducts, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
 
 interface Template {
@@ -561,7 +563,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([
@@ -2214,6 +2216,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [showSupplierSettlementOptions, setShowSupplierSettlementOptions] = useState(false);
   const [showGRNOptions, setShowGRNOptions] = useState(false);
   const [showPurchaseOrderOptions, setShowPurchaseOrderOptions] = useState(false);
+  const [showSalesOrderOptions, setShowSalesOrderOptions] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
   
@@ -2563,6 +2566,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       ...initialDeliveryNoteData,
       deliveryNoteNumber: `DN-${new Date().getTime()}`, // Generate new delivery note number
       date: new Date().toISOString().split('T')[0], // Set to current date
+    });
+  };
+
+  // Function to reset sales order data to initial state
+  const resetSalesOrderData = () => {
+    setSalesOrderData({
+      ...initialSalesOrderData,
+      orderNumber: `SO-${new Date().getTime()}`, // Generate new order number
+      orderDate: new Date().toISOString().split('T')[0], // Set to current date
     });
   };
 
@@ -5924,6 +5936,18 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     // Reset form after closing dialog
     resetGRNData();
   };
+
+  // Show sales order options dialog
+  const showSalesOrderOptionsDialog = () => {
+    setShowSalesOrderOptions(true);
+  };
+  
+  // Close sales order options dialog
+  const closeSalesOrderOptionsDialog = () => {
+    setShowSalesOrderOptions(false);
+    // Reset form after closing dialog
+    resetSalesOrderData();
+  };
   
   // Close purchase order options dialog
   const closePurchaseOrderOptionsDialog = () => {
@@ -6736,6 +6760,91 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       alert('Error saving invoice. Please try again.');
     }
   };
+
+  const handleSaveSalesOrder = async () => {
+    try {
+      // Validate that all quantities are available before saving
+      let hasUnavailableItems = false;
+      for (const item of salesOrderData.items) {
+        if (item.description && item.quantity > 0) {
+          const availability = await checkItemAvailability(item.description, item.quantity);
+          if (!availability.available) {
+            alert(`Insufficient stock for "${item.description}". Available: ${availability.availableQuantity} in GRN: ${availability.grnNumber || 'N/A'}. Please reduce the quantity.`);
+            hasUnavailableItems = true;
+            break;
+          }
+        }
+      }
+      
+      if (hasUnavailableItems) {
+        return; // Don't save if there are unavailable items
+      }
+
+      // Generate a unique order number with higher precision timestamp and random suffix
+      const timestamp = new Date().getTime();
+      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      const uniqueOrderNumber = `SO-${timestamp}-${randomSuffix}`;
+
+      // Create sales order data for saving
+      const salesOrderToSave: SavedSalesOrderData = {
+        id: uniqueOrderNumber, // Use unique order number as ID
+        orderNumber: uniqueOrderNumber,
+        date: salesOrderData.orderDate,
+        customer: salesOrderData.customerName,
+        customerId: undefined, // Templates don't have customer ID linkage
+        items: salesOrderData.items.filter(item => item.quantity > 0).length,
+        total: salesOrderData.total,
+        status: 'pending', // Sales orders from templates are pending
+        itemsList: salesOrderData.items.map(item => ({
+          productId: undefined,
+          productName: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          price: item.unitPrice,
+          total: item.total,
+          unit: item.unit
+        })),
+        subtotal: salesOrderData.subtotal,
+        tax: salesOrderData.taxAmount,
+        discount: salesOrderData.discount,
+        amountPaid: 0, // Pending orders are unpaid
+        creditBroughtForward: 0,
+        amountDue: salesOrderData.total, // Full amount due for pending orders
+        notes: salesOrderData.specialInstructions
+      };
+      
+      await saveSalesOrder(salesOrderToSave);
+      
+      // Check if business name is "KILANGO INVESTMENT LTD" to handle inventory update
+      const isKilangoInvestment = salesOrderData.businessName === "KILANGO INVESTMENT LTD";
+      
+      // Note: We don't update GRN or product stock yet because this is just a sales order
+      // Stock will be updated when the order is fulfilled and converted to an invoice/delivery
+      
+      // Update the UI with the new order number for display purposes
+      setSalesOrderData(prev => ({
+        ...prev,
+        orderNumber: uniqueOrderNumber
+      }));
+      
+      // Show the sales order options dialog after saving
+      showSalesOrderOptionsDialog();
+      
+      // Don't reset here - let the user choose an option first
+    } catch (error: any) {
+      console.error('Error saving sales order:', error);
+      
+      // Check if it's a duplicate key error
+      if (error.code === '23505' || error.message?.includes('duplicate key')) {
+        // This is very unlikely with our unique generation, but handle it gracefully
+        alert('This order has already been saved. A new order number will be generated.');
+        // Generate a new order number for next attempt
+        resetSalesOrderData();
+      } else {
+        alert('Error saving sales order. Please try again.');
+      }
+    }
+  };
   
   // Handle share invoice - show share options dialog
   const handleShareInvoice = () => {
@@ -6889,6 +6998,297 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   };
   
   // Handle export invoice as Excel
+  // Handle print sales order
+  const handlePrintSalesOrder = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Sales Order - ${salesOrderData.orderNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .info-section { margin-bottom: 20px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background-color: #f5f5f5; }
+            .totals { margin-top: 20px; text-align: right; }
+            .totals table { width: auto; margin-left: auto; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>SALES ORDER</h1>
+            <p>Order #${salesOrderData.orderNumber}</p>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-grid">
+              <div>
+                <h3>From:</h3>
+                <p>
+                  ${salesOrderData.businessName}<br/>
+                  ${salesOrderData.businessAddress}<br/>
+                  Phone: ${salesOrderData.businessPhone}<br/>
+                  Email: ${salesOrderData.businessEmail}
+                </p>
+              </div>
+              <div>
+                <h3>To:</h3>
+                <p>
+                  ${salesOrderData.customerName}<br/>
+                  ${salesOrderData.customerAddress}<br/>
+                  Phone: ${salesOrderData.customerPhone}<br/>
+                  Email: ${salesOrderData.customerEmail}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="info-section">
+            <p><strong>Order Date:</strong> ${salesOrderData.orderDate}</p>
+            <p><strong>Required By:</strong> ${salesOrderData.requiredBy || 'Not specified'}</p>
+            <p><strong>Payment Terms:</strong> ${salesOrderData.paymentTerms || 'Not specified'}</p>
+            <p><strong>Shipping Method:</strong> ${salesOrderData.shippingMethod || 'Not specified'}</p>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${salesOrderData.items.map((item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${item.description}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.unit || 'pcs'}</td>
+                  <td>${formatCurrency(item.unitPrice)}</td>
+                  <td>${formatCurrency(item.total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="totals">
+            <table>
+              <tr>
+                <td><strong>Subtotal:</strong></td>
+                <td>${formatCurrency(salesOrderData.subtotal)}</td>
+              </tr>
+              <tr>
+                <td><strong>Discount:</strong></td>
+                <td>-${formatCurrency(salesOrderData.discount)}</td>
+              </tr>
+              <tr>
+                <td><strong>Tax (${salesOrderData.taxRate}%):</strong></td>
+                <td>${formatCurrency(salesOrderData.taxAmount)}</td>
+              </tr>
+              <tr>
+                <td><strong>Shipping:</strong></td>
+                <td>${formatCurrency(salesOrderData.shippingCost || 0)}</td>
+              </tr>
+              <tr style="font-size: 1.2em; font-weight: bold;">
+                <td><strong>TOTAL:</strong></td>
+                <td>${formatCurrency(salesOrderData.total)}</td>
+              </tr>
+            </table>
+          </div>
+          
+          ${salesOrderData.specialInstructions ? `
+            <div class="info-section" style="margin-top: 30px;">
+              <h3>Special Instructions:</h3>
+              <p>${salesOrderData.specialInstructions}</p>
+            </div>
+          ` : ''}
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() {
+                window.close();
+              };
+            };
+          </script>
+        </body>
+        </html>
+      `;
+      
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+    }
+  };
+
+  // Handle download sales order
+  const handleDownloadSalesOrder = () => {
+    setShowSalesOrderOptions(false);
+    // For now, directly download as PDF
+    handleDownloadSalesOrderAsPDF();
+  };
+
+  // Handle download sales order as PDF
+  const handleDownloadSalesOrderAsPDF = () => {
+    try {
+      // Import html2pdf dynamically
+      import('html2pdf.js').then((html2pdf) => {
+        // Create a temporary element with the sales order content
+        const element = document.createElement('div');
+        element.innerHTML = `
+          <div style="padding: 20px; font-family: Arial, sans-serif;">
+            <h1 style="text-align: center;">SALES ORDER</h1>
+            <p style="text-align: center;">Order #${salesOrderData.orderNumber}</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+              <div>
+                <h3>From:</h3>
+                <p>${salesOrderData.businessName}<br/>${salesOrderData.businessAddress}<br/>Phone: ${salesOrderData.businessPhone}<br/>Email: ${salesOrderData.businessEmail}</p>
+              </div>
+              <div>
+                <h3>To:</h3>
+                <p>${salesOrderData.customerName}<br/>${salesOrderData.customerAddress}<br/>Phone: ${salesOrderData.customerPhone}<br/>Email: ${salesOrderData.customerEmail}</p>
+              </div>
+            </div>
+            <p><strong>Order Date:</strong> ${salesOrderData.orderDate}</p>
+            <p><strong>Required By:</strong> ${salesOrderData.requiredBy || 'Not specified'}</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+              <thead>
+                <tr style="background-color: #f5f5f5;">
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">#</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Description</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Quantity</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Unit</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Unit Price</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${salesOrderData.items.map((item, index) => `
+                  <tr>
+                    <td style="border: 1px solid #ddd; padding: 10px;">${index + 1}</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">${item.description}</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">${item.quantity}</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">${item.unit || 'pcs'}</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">${formatCurrency(item.unitPrice)}</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">${formatCurrency(item.total)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div style="text-align: right; margin-top: 20px;">
+              <p><strong>Subtotal:</strong> ${formatCurrency(salesOrderData.subtotal)}</p>
+              <p><strong>Discount:</strong> -${formatCurrency(salesOrderData.discount)}</p>
+              <p><strong>Tax:</strong> ${formatCurrency(salesOrderData.taxAmount)}</p>
+              <p><strong>Total:</strong> ${formatCurrency(salesOrderData.total)}</p>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(element);
+        
+        const opt = {
+          margin: 10,
+          filename: `SalesOrder_${salesOrderData.orderNumber}.pdf`,
+          image: { type: 'jpeg' as const, quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+        };
+        
+        html2pdf.default().set(opt).from(element).save().then(() => {
+          document.body.removeChild(element);
+        });
+      }).catch(err => {
+        console.error('Error generating PDF:', err);
+        alert('Error generating PDF file. Please try again.');
+      });
+    } catch (error) {
+      console.error('Error downloading sales order:', error);
+      alert('Error downloading sales order. Please try again.');
+    }
+  };
+
+  // Handle share sales order
+  const handleShareSalesOrder = () => {
+    setShowSalesOrderOptions(false);
+    // For now, show a simple alert - can be enhanced with WhatsApp/Email sharing like invoices
+    let shareText = `SALES ORDER\n\n`;
+    shareText += `Order #: ${salesOrderData.orderNumber}\n`;
+    shareText += `Order Date: ${salesOrderData.orderDate}\n`;
+    shareText += `Customer: ${salesOrderData.customerName}\n\n`;
+    shareText += `Items:\n`;
+    salesOrderData.items.forEach(item => {
+      shareText += `- ${item.description}: ${item.quantity} ${item.unit || 'pcs'} @ ${formatCurrency(item.unitPrice)} = ${formatCurrency(item.total)}\n`;
+    });
+    shareText += `\nSubtotal: ${formatCurrency(salesOrderData.subtotal)}\n`;
+    shareText += `Discount: -${formatCurrency(salesOrderData.discount)}\n`;
+    shareText += `Tax: ${formatCurrency(salesOrderData.taxAmount)}\n`;
+    shareText += `TOTAL: ${formatCurrency(salesOrderData.total)}\n`;
+    
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert('Sales order details copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      alert('Failed to copy sales order details to clipboard');
+    });
+  };
+
+  // Handle export sales order as Excel
+  const handleExportSalesOrder = () => {
+    import('xlsx').then((XLSXModule) => {
+      // Create worksheet data
+      const wsData = [
+        ['SALES ORDER', salesOrderData.orderNumber],
+        ['Order Date', salesOrderData.orderDate],
+        ['Required By', salesOrderData.requiredBy || ''],
+        [],
+        ['FROM:'],
+        [salesOrderData.businessName],
+        [salesOrderData.businessAddress],
+        ['Phone:', salesOrderData.businessPhone],
+        ['Email:', salesOrderData.businessEmail],
+        [],
+        ['TO:'],
+        [salesOrderData.customerName],
+        [salesOrderData.customerAddress],
+        ['Phone:', salesOrderData.customerPhone],
+        ['Email:', salesOrderData.customerEmail],
+        [],
+        ['DESCRIPTION', 'QUANTITY', 'UNIT', 'UNIT PRICE', 'TOTAL'],
+        ...salesOrderData.items.map(item => [
+          item.description, 
+          item.quantity, 
+          item.unit || 'pcs', 
+          `${formatCurrency(item.unitPrice)}`, 
+          `${formatCurrency(item.total)}`
+        ]),
+        [],
+        ['SUBTOTAL', `${formatCurrency(salesOrderData.subtotal)}`],
+        ['DISCOUNT', `${formatCurrency(salesOrderData.discount)}`],
+        ['TAX', `${formatCurrency(salesOrderData.taxAmount)}`],
+        ['TOTAL', `${formatCurrency(salesOrderData.total)}`]
+      ];
+      
+      const ws = XLSXModule.utils.aoa_to_sheet(wsData);
+      const wb = XLSXModule.utils.book_new();
+      XLSXModule.utils.book_append_sheet(wb, ws, 'Sales Order');
+      
+      XLSXModule.writeFile(wb, `SalesOrder_${salesOrderData.orderNumber}.xlsx`);
+      
+      closeSalesOrderOptionsDialog();
+    }).catch(err => {
+      console.error('Error generating Excel:', err);
+      alert('Error generating Excel file. Please try again.');
+    });
+  };
+
   const handleExportInvoice = () => {
     import('xlsx').then((XLSXModule) => {
       // Create worksheet data
@@ -7377,6 +7777,27 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                   username="User" 
                 />
               </div>
+            ) : activeTab === "savedSalesOrders" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Saved Sales Orders</h3>
+                    <p className="text-sm text-muted-foreground">View and manage your pending sales orders</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <SavedSalesOrdersSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
             ) : activeTab === "preview" ? (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -7523,6 +7944,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                           console.error('Error saving invoice:', error);
                           alert('Error saving invoice. Please try again.');
                         }
+                      } else if (currentTemplate?.type === "sales-order") {
+                        // Automatically save sales order to saved sales orders
+                        await handleSaveSalesOrder();
                       } else if (currentTemplate?.type === "salary-slip") {
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
                       } else if (currentTemplate?.type === "complimentary-goods") {
@@ -7689,6 +8113,16 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                       >
                         <CreditCard className="h-4 w-4" />
                         View Saved Settlements
+                      </Button>
+                    )}
+                    {currentTemplate?.type === "sales-order" && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setActiveTab('savedSalesOrders')}
+                        className="flex items-center gap-2"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        View Saved Orders
                       </Button>
                     )}
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
@@ -11803,6 +12237,63 @@ Enter choice (1-3):`);
             <div className="mt-4 flex justify-end">
               <Button 
                 onClick={closeDeliveryNoteOptionsDialog}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Sales Order Options Dialog */}
+      {showSalesOrderOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold mb-4">Sales Order Options</h3>
+            <p className="mb-4">Choose an action for your sales order:</p>
+            
+            <div className="space-y-2">
+              <Button 
+                onClick={handlePrintSalesOrder}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Sales Order
+              </Button>
+              
+              <Button 
+                onClick={handleDownloadSalesOrder}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Sales Order
+              </Button>
+              
+              <Button 
+                onClick={handleShareSalesOrder}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Share className="h-4 w-4 mr-2" />
+                Share Sales Order
+              </Button>
+              
+              <Button 
+                onClick={handleExportSalesOrder}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Export Sales Order
+              </Button>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={closeSalesOrderOptionsDialog}
                 variant="outline"
               >
                 Cancel
