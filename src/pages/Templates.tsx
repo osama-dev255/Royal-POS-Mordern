@@ -5820,9 +5820,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [grnDescriptions, setGrnDescriptions] = useState<string[]>([]);
   const [grnItemsMap, setGrnItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
   
-  // Effect to handle dropdown positioning for delivery note, invoice, and GRN
+  // Effect to handle dropdown positioning for delivery note, invoice, GRN, and sales order
   useEffect(() => {
-    if (showDeliveryNoteDropdown || showDropdown || showGrnDropdown) {
+    if (showDeliveryNoteDropdown || showDropdown || showGrnDropdown || showSalesOrderDropdown) {
       const updateDropdownPosition = () => {
         const activeInput = document.activeElement;
         if (activeInput instanceof HTMLInputElement) {
@@ -5866,6 +5866,19 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               element.style.zIndex = '1000';
             });
           }
+          
+          // Handle sales order dropdowns
+          if (showSalesOrderDropdown) {
+            const salesOrderDropdowns = document.querySelectorAll('[id^="sales-order-dropdown-"]');
+            salesOrderDropdowns.forEach(dropdown => {
+              const element = dropdown as HTMLElement;
+              element.style.position = 'fixed';
+              element.style.top = `${rect.bottom + window.scrollY}px`;
+              element.style.left = `${rect.left + window.scrollX}px`;
+              element.style.minWidth = `${Math.max(rect.width, 400)}px`;
+              element.style.zIndex = '9999';
+            });
+          }
         }
       };
       
@@ -5882,7 +5895,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         window.removeEventListener('resize', resizeHandler);
       };
     }
-  }, [showDeliveryNoteDropdown, showDropdown, showGrnDropdown]);
+  }, [showDeliveryNoteDropdown, showDropdown, showGrnDropdown, showSalesOrderDropdown]);
   
   // Load GRN descriptions and items map on component mount
   useEffect(() => {
@@ -8808,7 +8821,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                         {showSalesOrderDropdown && (
                                           <div 
                                             id={`sales-order-dropdown-${item.id}`}
-                                            className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto z-[9999]"
+                                            className="fixed bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto z-[9999]"
                                             style={{ minWidth: '400px', maxHeight: '300px' }}
                                             onMouseDown={(e) => e.preventDefault()} // Prevent blur from closing dropdown
                                           >
