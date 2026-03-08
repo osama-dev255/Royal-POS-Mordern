@@ -1175,6 +1175,17 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [grnProductDescriptions, setGrnProductDescriptions] = useState<string[]>([]);
   const [showGrnDropdown, setShowGrnDropdown] = useState<boolean>(false);
   const [showDeliveryNoteDropdown, setShowDeliveryNoteDropdown] = useState<boolean>(false);
+  
+  // Product inventory search states for invoice
+  const [invoiceProductItemsMap, setInvoiceProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  const [invoiceProductDescriptions, setInvoiceProductDescriptions] = useState<string[]>([]);
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  
+  // Product inventory search states for sales order
+  const [salesOrderProductItemsMap, setSalesOrderProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  const [salesOrderProductDescriptions, setSalesOrderProductDescriptions] = useState<string[]>([]);
+  const [showSalesOrderDropdown, setShowSalesOrderDropdown] = useState<boolean>(false);
+  
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
 
@@ -5770,6 +5781,29 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       return new Map<string, { rate: number, unit: string }>();
     }
   };
+
+  // Fetch all product items for sales order dropdown (uses selling price)
+  const getSalesOrderProductItems = async () => {
+    try {
+      const products = await getProducts();
+      const itemsMap = new Map<string, { rate: number, unit: string }>(); // description -> { selling_price, unit }
+      
+      products.forEach(product => {
+        if (product.name) {
+          // Use the selling price for sales orders and unit of measure as the unit
+          itemsMap.set(product.name, { 
+            rate: product.selling_price || 0, 
+            unit: product.unit_of_measure || 'piece'
+          });
+        }
+      });
+      
+      return itemsMap;
+    } catch (error) {
+      console.error('Error fetching sales order product items:', error);
+      return new Map<string, { rate: number, unit: string }>();
+    }
+  };
   
   // Fetch all GRN descriptions for the searchable dropdown
   const getAllGRNDescriptions = async (): Promise<string[]> => {
@@ -5785,10 +5819,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   // State for GRN descriptions
   const [grnDescriptions, setGrnDescriptions] = useState<string[]>([]);
   const [grnItemsMap, setGrnItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
-  // State for Product Inventory descriptions (for invoices)
-  const [invoiceProductDescriptions, setInvoiceProductDescriptions] = useState<string[]>([]);
-  const [invoiceProductItemsMap, setInvoiceProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
-  const [showDropdown, setShowDropdown] = useState<boolean>(false);
   
   // Effect to handle dropdown positioning for delivery note, invoice, and GRN
   useEffect(() => {
@@ -8741,14 +8771,87 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                 {salesOrderData.items.map((item, index) => (
                                   <tr key={item.id}>
                                     <td className="border border-gray-300 p-2">
-                                      ITM-{String(index + 1).padStart(3, '0')}
+                                      {String(index + 1).padStart(3, '0')}
                                     </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.description}
-                                        onChange={(e) => handleSalesOrderItemChange(item.id, 'description', e.target.value)}
-                                        className="p-1 h-8 text-sm"
-                                      />
+                                    <td className="border border-gray-300 p-2 relative">
+                                      <div className="relative">
+                                        <Input
+                                          value={item.description}
+                                          onChange={(e) => {
+                                            handleSalesOrderItemChange(item.id, 'description', e.target.value);
+                                          }}
+                                          onFocus={async (e) => {
+                                            console.log('Description field focused, loading products...');
+                                            try {
+                                              // Load product items map when the input is focused
+                                              const itemsMap = await getSalesOrderProductItems();
+                                              console.log('Products loaded:', itemsMap.size);
+                                              setSalesOrderProductItemsMap(itemsMap);
+                                              setSalesOrderProductDescriptions(Array.from(itemsMap.keys()));
+                                              setShowSalesOrderDropdown(true);
+                                              console.log('Dropdown shown, products count:', Array.from(itemsMap.keys()).length);
+                                            } catch (error) {
+                                              console.error('Error loading products:', error);
+                                            }
+                                          }}
+                                          onBlur={(e) => {
+                                            console.log('Description field blurred');
+                                            // Delay hiding the dropdown to allow click events to register
+                                            setTimeout(() => {
+                                              setShowSalesOrderDropdown(false);
+                                              console.log('Dropdown hidden');
+                                            }, 200);
+                                          }}
+                                          className="p-1 h-8 text-sm w-full"
+                                          placeholder="Select or enter description..."
+                                        />
+                                        {showSalesOrderDropdown && (
+                                          <div 
+                                            id={`sales-order-dropdown-${item.id}`}
+                                            className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto z-[9999]"
+                                            style={{ minWidth: '400px', maxHeight: '300px' }}
+                                            onMouseDown={(e) => e.preventDefault()} // Prevent blur from closing dropdown
+                                          >
+                                            {salesOrderProductDescriptions.length > 0 ? (
+                                              salesOrderProductDescriptions
+                                                .filter(desc => 
+                                                  item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
+                                                )
+                                                .map((desc, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                    onClick={() => {
+                                                      handleSalesOrderItemChange(item.id, 'description', desc);
+                                                      // Set the selling_price and unit from the product inventory if available
+                                                      const itemDataFromProduct = salesOrderProductItemsMap.get(desc);
+                                                      if (itemDataFromProduct) {
+                                                        handleSalesOrderItemChange(item.id, 'unitPrice', itemDataFromProduct.rate);
+                                                        handleSalesOrderItemChange(item.id, 'unit', itemDataFromProduct.unit);
+                                                        // Also update the total based on the effective rate and existing quantity
+                                                        const newTotal = item.quantity * itemDataFromProduct.rate;
+                                                        handleSalesOrderItemChange(item.id, 'total', newTotal);
+                                                        calculateSalesOrderTotals();
+                                                      }
+                                                      setShowSalesOrderDropdown(false);
+                                                    }}
+                                                  >
+                                                    {desc}
+                                                  </div>
+                                                ))
+                                            ) : (
+                                              <div className="px-3 py-2 text-gray-500 text-sm">Loading products...</div>
+                                            )}
+                                            {salesOrderProductDescriptions.length > 0 && 
+                                              salesOrderProductDescriptions.filter(desc => 
+                                                item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
+                                              ).length === 0 && (
+                                                <div className="px-3 py-2 text-gray-500 text-sm">No products found</div>
+                                              )
+                                            }
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
