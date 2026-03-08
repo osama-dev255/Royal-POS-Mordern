@@ -148,6 +148,13 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
       description: "View and manage your saved delivery notes from completed transactions",
       icon: Truck,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "saved-orders",
+      title: "Saved Sales Orders",
+      description: "View and manage your pending sales orders",
+      icon: FileText,
+      color: "bg-white border border-gray-200"
     }
   ];
 
@@ -177,6 +184,9 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
     } else if (module === "saved-deliveries") {
       // Navigate to the saved deliveries page
       navigate('/sales/saved-deliveries');
+    } else if (module === "saved-orders") {
+      // Navigate to the saved sales orders page
+      navigate('/sales/saved-orders');
     } else if (module === "saved-customer-settlements") {
       // Navigate to the saved customer settlements page
       navigate('/sales/saved-customer-settlements');

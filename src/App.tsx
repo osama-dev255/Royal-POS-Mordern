@@ -19,6 +19,7 @@ import QRTestPage from "./pages/QRTestPage";
 import TestAssets from "./pages/TestAssets";
 import { SavedInvoicesSection } from "@/components/SavedInvoicesSection";
 import { SavedDeliveriesSection } from "@/components/SavedDeliveriesSection";
+import { SavedSalesOrdersSection } from "@/components/SavedSalesOrdersSection";
 import { SavedCustomerSettlements } from "./pages/SavedCustomerSettlements";
 import { GRNInventoryDashboard } from "./pages/GRNInventoryDashboard";
 import { useEffect } from "react";
@@ -89,6 +90,7 @@ const App = () => {
                 <Route path="/test/assets" element={<TestAssets />} />
                 <Route path="/sales/saved-invoices" element={<SavedInvoicesSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/saved-deliveries" element={<SavedDeliveriesSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/saved-orders" element={<SavedSalesOrdersSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/saved-customer-settlements" element={<SavedCustomerSettlements username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/grn-inventory-dashboard" element={<GRNInventoryDashboard username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -1,42 +1,44 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Package, CreditCard, FileText, Printer, Download, Mail, Phone } from "lucide-react";
+import { Calendar, User, Package, FileText, Printer, Download, Edit } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 
-interface Customer {
-  name: string;
-  email?: string;
-  phone?: string;
-}
-
-interface OrderItem {
-  id: string;
-  name: string;
+interface SalesOrderItem {
+  id?: string;
+  productId?: string;
+  productName: string;
   quantity: number;
-  unitPrice: number;
-  totalPrice: number;
+  unitPrice?: number;
+  price?: number;
+  total?: number;
+  unit?: string;
 }
 
 interface SalesOrderDetailsProps {
   id: string;
+  orderNumber: string;
   date: string;
-  customer: Customer;
-  items: OrderItem[];
+  customer: string;
+  items: SalesOrderItem[];
   subtotal: number;
   discount: number;
   tax: number;
   total: number;
-  paymentMethod: string;
-  status: "pending" | "completed" | "refunded" | "cancelled";
+  status: "pending" | "completed" | "cancelled";
   notes?: string;
+  amountPaid?: number;
+  creditBroughtForward?: number;
+  amountDue?: number;
   onBack: () => void;
   onPrint?: () => void;
   onDownload?: () => void;
+  onEdit?: () => void;
 }
 
 export const SalesOrderDetails = ({ 
   id, 
+  orderNumber, 
   date, 
   customer, 
   items, 
@@ -44,12 +46,15 @@ export const SalesOrderDetails = ({
   discount, 
   tax, 
   total, 
-  paymentMethod, 
   status, 
   notes,
+  amountPaid,
+  creditBroughtForward,
+  amountDue,
   onBack,
   onPrint,
-  onDownload
+  onDownload,
+  onEdit
 }: SalesOrderDetailsProps) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -65,8 +70,6 @@ export const SalesOrderDetails = ({
         return "bg-green-500 hover:bg-green-500";
       case "pending":
         return "bg-yellow-500 hover:bg-yellow-500";
-      case "refunded":
-        return "bg-blue-500 hover:bg-blue-500";
       case "cancelled":
         return "bg-red-500 hover:bg-red-500";
       default:
@@ -78,7 +81,6 @@ export const SalesOrderDetails = ({
     if (onPrint) {
       onPrint();
     } else {
-      // For now, just alert that print would happen
       alert('Print functionality would be implemented here');
     }
   };
@@ -87,10 +89,22 @@ export const SalesOrderDetails = ({
     if (onDownload) {
       onDownload();
     } else {
-      // For now, just alert that download would happen
       alert('Download functionality would be implemented here');
     }
   };
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit();
+    } else {
+      alert('Edit functionality would be implemented here');
+    }
+  };
+
+  // Calculate missing financial values
+  const calculatedAmountPaid = amountPaid !== undefined ? amountPaid : 0;
+  const calculatedCreditBroughtForward = creditBroughtForward !== undefined ? creditBroughtForward : 0;
+  const calculatedAmountDue = amountDue !== undefined ? amountDue : (total - calculatedAmountPaid + calculatedCreditBroughtForward);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -99,7 +113,8 @@ export const SalesOrderDetails = ({
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-2xl flex items-center gap-2">
-                Sales Order #{id}
+                <FileText className="h-6 w-6" />
+                Sales Order #{orderNumber}
               </CardTitle>
               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                 <Calendar className="h-4 w-4" />
@@ -123,40 +138,18 @@ export const SalesOrderDetails = ({
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Name:</span>
-                  <span>{customer.name}</span>
+                  <span>{customer}</span>
                 </div>
-                {customer.email && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      Email:
-                    </span>
-                    <span>{customer.email}</span>
-                  </div>
-                )}
-                {customer.phone && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      Phone:
-                    </span>
-                    <span>{customer.phone}</span>
-                  </div>
-                )}
               </div>
             </div>
 
             {/* Order Information */}
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
+                <Package className="h-5 w-5" />
                 Order Information
               </h3>
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Payment Method:</span>
-                  <span>{paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</span>
-                </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Items:</span>
                   <span>{items.length}</span>
@@ -164,6 +157,10 @@ export const SalesOrderDetails = ({
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total:</span>
                   <span className="font-semibold">{formatCurrency(total)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="capitalize">{status}</span>
                 </div>
               </div>
             </div>
@@ -192,19 +189,23 @@ export const SalesOrderDetails = ({
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
+                    <th className="text-left p-3">#</th>
                     <th className="text-left p-3">Product</th>
                     <th className="text-right p-3">Quantity</th>
-                    <th className="text-right p-3">Unit Price</th>
-                    <th className="text-right p-3">Total</th>
+                    <th className="text-left p-3">Unit</th>
+                    <th className="text-right p-3">Rate</th>
+                    <th className="text-right p-3">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item, index) => (
-                    <tr key={item.id} className={index % 2 === 0 ? "bg-muted/50" : ""}>
-                      <td className="p-3">{item.name}</td>
+                    <tr key={item.id || index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
+                      <td className="p-3">{index + 1}</td>
+                      <td className="p-3">{item.productName}</td>
                       <td className="p-3 text-right">{item.quantity}</td>
-                      <td className="p-3 text-right">{formatCurrency(item.unitPrice)}</td>
-                      <td className="p-3 text-right">{formatCurrency(item.totalPrice)}</td>
+                      <td className="p-3">{item.unit || 'pcs'}</td>
+                      <td className="p-3 text-right">{formatCurrency(item.unitPrice ?? item.price ?? 0)}</td>
+                      <td className="p-3 text-right">{formatCurrency(item.total ?? ((item.price ?? item.unitPrice ?? 0) * item.quantity))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -230,6 +231,20 @@ export const SalesOrderDetails = ({
                   <span>Total:</span>
                   <span>{formatCurrency(total)}</span>
                 </div>
+                
+                {/* Payment details */}
+                <div className="flex justify-between pt-2 border-t mt-2">
+                  <span className="text-muted-foreground">Amount Paid:</span>
+                  <span>{formatCurrency(calculatedAmountPaid)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Credit Brought Forward:</span>
+                  <span>{formatCurrency(calculatedCreditBroughtForward)}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>AMOUNT DUE:</span>
+                  <span>{formatCurrency(calculatedAmountDue)}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -239,14 +254,24 @@ export const SalesOrderDetails = ({
             <Button variant="outline" onClick={onBack}>
               Back
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button variant="outline" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </Button>
+            {onEdit && (
+              <Button variant="outline" onClick={handleEdit}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
+            {onPrint && (
+              <Button variant="outline" onClick={handlePrint}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            )}
+            {onDownload && (
+              <Button variant="outline" onClick={handleDownload}>
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
