@@ -31,7 +31,8 @@ export const saveSalesOrder = async (order: SalesOrderData): Promise<void> => {
     // Then save to database with user context
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { error } = await supabase
+      // First insert the sales order and get the generated ID
+      const { data: salesData, error } = await supabase
         .from('sales')
         .insert({
           user_id: user.id,
@@ -46,17 +47,19 @@ export const saveSalesOrder = async (order: SalesOrderData): Promise<void> => {
           discount_amount: order.discount,
           amount_paid: order.amountPaid,
           notes: order.notes
-        });
-        
+        })
+        .select()
+        .single();
+          
       if (error) {
         console.error('Error saving sales order to database:', error);
         // Don't throw error - still have local storage backup
       }
-      
-      // Save order items if available
-      if (order.itemsList && order.itemsList.length > 0 && user.id) {
+          
+      // Save order items if available and we got a valid sale_id from database
+      if (order.itemsList && order.itemsList.length > 0 && salesData?.id) {
         const orderItems = order.itemsList.map(item => ({
-          sale_id: order.id,
+          sale_id: salesData.id, // Use the generated UUID from database instead of order.id string
           product_id: item.productId,
           product_name: item.productName,
           quantity: item.quantity,
@@ -64,11 +67,11 @@ export const saveSalesOrder = async (order: SalesOrderData): Promise<void> => {
           total_price: item.total || ((item.unitPrice || item.price || 0) * item.quantity),
           unit: item.unit
         }));
-        
+            
         const { error: itemsError } = await supabase
           .from('sale_items')
           .insert(orderItems);
-          
+              
         if (itemsError) {
           console.error('Error saving sales order items:', itemsError);
         }
