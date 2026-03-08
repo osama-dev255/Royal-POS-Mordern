@@ -5539,19 +5539,43 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
   // Handle sales order item changes
   const handleSalesOrderItemChange = (itemId: string, field: keyof SalesOrderItem | 'unit', value: string | number) => {
-    setSalesOrderData(prev => ({
-      ...prev,
-      items: prev.items.map(item => 
-        item.id === itemId ? { ...item, [field]: value } : item
-      )
-    }));
+    setSalesOrderData(prev => {
+      // Update the specific item field
+      const updatedItems = prev.items.map(item => {
+        if (item.id === itemId) {
+          const updatedItem = { ...item, [field]: value };
+          
+          // If quantity or unitPrice changed, recalculate the item's total
+          if (field === 'quantity') {
+            updatedItem.total = updatedItem.quantity * updatedItem.unitPrice;
+          } else if (field === 'unitPrice') {
+            updatedItem.total = updatedItem.quantity * value;
+          }
+          
+          return updatedItem;
+        }
+        return item;
+      });
+      
+      // Calculate subtotal from ALL items' total column
+      const subtotal = updatedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      const taxAmount = subtotal * (Number(prev.taxRate) / 100);
+      const total = subtotal - Number(prev.discount) + taxAmount + Number(prev.shippingCost);
+      
+      return {
+        ...prev,
+        items: updatedItems,
+        subtotal,
+        taxAmount,
+        total
+      };
+    });
   };
 
   // Add new sales order item
   const handleAddSalesOrderItem = () => {
-    setSalesOrderData(prev => ({
-      ...prev,
-      items: [
+    setSalesOrderData(prev => {
+      const newItems = [
         ...prev.items,
         {
           id: Date.now().toString(),
@@ -5561,33 +5585,61 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           unitPrice: 0,
           total: 0
         }
-      ]
-    }));
+      ];
+      
+      // Recalculate totals with new item
+      const subtotal = newItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      const taxAmount = subtotal * (Number(prev.taxRate) / 100);
+      const total = subtotal - Number(prev.discount) + taxAmount + Number(prev.shippingCost);
+      
+      return {
+        ...prev,
+        items: newItems,
+        subtotal,
+        taxAmount,
+        total
+      };
+    });
   };
 
   // Remove sales order item
   const handleRemoveSalesOrderItem = (itemId: string) => {
-    setSalesOrderData(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.id !== itemId)
-    }));
+    setSalesOrderData(prev => {
+      const updatedItems = prev.items.filter(item => item.id !== itemId);
+      
+      // Recalculate totals after removing item
+      const subtotal = updatedItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      const taxAmount = subtotal * (Number(prev.taxRate) / 100);
+      const total = subtotal - Number(prev.discount) + taxAmount + Number(prev.shippingCost);
+      
+      return {
+        ...prev,
+        items: updatedItems,
+        subtotal,
+        taxAmount,
+        total
+      };
+    });
   };
 
-  // Calculate sales order totals
+  // Calculate sales order totals (used when discount/tax/shipping changes)
   const calculateSalesOrderTotals = () => {
-    const subtotal = salesOrderData.items.reduce((sum, item) => sum + Number(item.total || 0), 0);
-    const taxAmount = subtotal * (Number(salesOrderData.taxRate) / 100);
-    const total = subtotal - Number(salesOrderData.discount) + taxAmount + Number(salesOrderData.shippingCost);
-    
-    // Update the state with calculated totals
-    setSalesOrderData(prev => ({
-      ...prev,
-      subtotal,
-      taxAmount,
-      total
-    }));
-    
-    return { subtotal, taxAmount, total };
+    return new Promise<{ subtotal: number; taxAmount: number; total }>((resolve) => {
+      setSalesOrderData(prev => {
+        const subtotal = prev.items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+        const taxAmount = subtotal * (Number(prev.taxRate) / 100);
+        const total = subtotal - Number(prev.discount) + taxAmount + Number(prev.shippingCost);
+        
+        resolve({ subtotal, taxAmount, total });
+        
+        return {
+          ...prev,
+          subtotal,
+          taxAmount,
+          total
+        };
+      });
+    });
   };
   
   // Handle invoice data changes
@@ -8873,9 +8925,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                         onChange={(e) => {
                                           const newQuantity = parseFloat(e.target.value);
                                           handleSalesOrderItemChange(item.id, 'quantity', newQuantity);
-                                          // Update total when quantity changes
-                                          handleSalesOrderItemChange(item.id, 'total', newQuantity * item.unitPrice);
-                                          calculateSalesOrderTotals();
                                         }}
                                         className="p-1 h-8 text-sm"
                                       />
@@ -8895,9 +8944,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                         onChange={(e) => {
                                           const newPrice = parseFloat(e.target.value);
                                           handleSalesOrderItemChange(item.id, 'unitPrice', newPrice);
-                                          // Update total when unit price changes
-                                          handleSalesOrderItemChange(item.id, 'total', item.quantity * newPrice);
-                                          calculateSalesOrderTotals();
                                         }}
                                         className="p-1 h-8 text-sm"
                                       />
