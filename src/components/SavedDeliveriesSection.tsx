@@ -61,11 +61,12 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
 
   // Filter deliveries based on search term and date
   const filteredDeliveries = deliveries.filter(delivery => {
-    // Text search (delivery note number, customer, ID)
+    // Text search (delivery note number, customer, ID, driver)
     const matchesText = 
       delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.id.toLowerCase().includes(searchTerm.toLowerCase());
+      delivery.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      delivery.driver.toLowerCase().includes(searchTerm.toLowerCase());
     
     // Date search
     let matchesDate = true;
@@ -292,7 +293,7 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by delivery note number, customer name..."
+                      placeholder="Search by delivery note number, customer name, driver..."
                       className="pl-10 py-5 text-responsive-base w-64"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
