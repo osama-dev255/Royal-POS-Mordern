@@ -343,6 +343,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Delivery Note #</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Customer</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Driver</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Value</th>
@@ -351,7 +352,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                 <tbody>
                   {filteredDeliveries.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={6} className="text-center py-8 text-muted-foreground">
                         No deliveries found for the selected criteria
                       </td>
                     </tr>
@@ -360,6 +361,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                       <tr key={delivery.id} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-4 font-medium">{delivery.deliveryNoteNumber}</td>
                         <td className="py-3 px-4">{delivery.customer}</td>
+                        <td className="py-3 px-4">{delivery.driver || 'N/A'}</td>
                         <td className="py-3 px-4 text-muted-foreground">
                           {new Date(delivery.date).toLocaleDateString()}
                         </td>
