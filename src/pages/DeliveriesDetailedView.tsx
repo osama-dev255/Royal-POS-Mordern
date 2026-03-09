@@ -347,6 +347,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Customer</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Driver</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Product</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Quantity</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Value</th>
                   </tr>
@@ -354,7 +355,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                 <tbody>
                   {filteredDeliveries.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={8} className="text-center py-8 text-muted-foreground">
                         No deliveries found for the selected criteria
                       </td>
                     </tr>
@@ -371,6 +372,9 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                           {delivery.itemsList && delivery.itemsList.length > 0 
                             ? delivery.itemsList.map(item => item.name).slice(0, 2).join(', ') + (delivery.itemsList.length > 2 ? '...' : '')
                             : 'N/A'}
+                        </td>
+                        <td className="text-right py-3 px-4 font-medium">
+                          {delivery.itemsList?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
                         </td>
                         <td className="py-3 px-4">
                           <Badge variant={delivery.status === 'delivered' ? 'default' : 'secondary'}>
