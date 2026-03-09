@@ -64,7 +64,8 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
   const filteredDeliveries = deliveries.filter(del => {
     const matchesDate = isInDateRange(del.date);
     const matchesSearch = del.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         del.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase());
+                         del.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (del.driver && del.driver.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === "all" || del.status === statusFilter;
     return matchesDate && matchesSearch && matchesStatus;
   });
@@ -189,7 +190,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
             <div className="flex items-center gap-2 ml-4">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search customer or delivery..."
+                placeholder="Search customer, driver or delivery..."
                 value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-64"
@@ -341,10 +342,10 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Delivery Note #</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Customer</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Driver</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Value</th>
                   </tr>
@@ -359,12 +360,12 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                   ) : (
                     filteredDeliveries.map((delivery) => (
                       <tr key={delivery.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4 font-medium">{delivery.deliveryNoteNumber}</td>
-                        <td className="py-3 px-4">{delivery.customer}</td>
-                        <td className="py-3 px-4">{delivery.driver || 'N/A'}</td>
                         <td className="py-3 px-4 text-muted-foreground">
                           {new Date(delivery.date).toLocaleDateString()}
                         </td>
+                        <td className="py-3 px-4 font-medium">{delivery.deliveryNoteNumber}</td>
+                        <td className="py-3 px-4">{delivery.customer}</td>
+                        <td className="py-3 px-4">{delivery.driver || 'N/A'}</td>
                         <td className="py-3 px-4">
                           <Badge variant={delivery.status === 'delivered' ? 'default' : 'secondary'}>
                             {delivery.status}
