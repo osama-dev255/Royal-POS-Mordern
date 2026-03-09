@@ -27,10 +27,11 @@ import { formatCurrency } from "@/lib/currency";
 interface SalesManagementReportProps {
   onBack: () => void;
   onLogout: () => void;
+  onNavigate?: (section: string, detailed?: boolean) => void;
   username: string;
 }
 
-export const SalesManagementReport = ({ onBack, onLogout, username }: SalesManagementReportProps) => {
+export const SalesManagementReport = ({ onBack, onLogout, username, onNavigate }: SalesManagementReportProps) => {
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -121,6 +122,46 @@ export const SalesManagementReport = ({ onBack, onLogout, username }: SalesManag
     pendingDeliveries,
     outstandingDebt,
     averageOrderValue
+  };
+
+  // Navigate to specific sections
+  const handleNavigateToSection = (section: string, detailed: boolean = false) => {
+    if (onNavigate) {
+    onNavigate(section, detailed);
+    } else {
+      // Fallback to router navigation if onNavigate is not provided
+      if (detailed) {
+      switch (section) {
+       case 'invoices':
+         window.location.href = '/sales/invoices-detailed';
+         break;
+       case 'orders':
+         window.location.href = '/sales/orders-detailed';
+         break;
+       case 'deliveries':
+         window.location.href = '/sales/deliveries-detailed';
+         break;
+       case 'settlements':
+         window.location.href = '/sales/settlements-detailed';
+         break;
+       }
+      } else {
+      switch (section) {
+       case 'invoices':
+         window.location.href = '/sales/saved-invoices';
+         break;
+       case 'orders':
+         window.location.href = '/sales/saved-orders';
+         break;
+       case 'deliveries':
+         window.location.href = '/sales/saved-deliveries';
+         break;
+       case 'settlements':
+         window.location.href = '/sales/saved-customer-settlements';
+         break;
+       }
+      }
+    }
   };
 
   // Export report as CSV
@@ -297,13 +338,31 @@ export const SalesManagementReport = ({ onBack, onLogout, username }: SalesManag
           {/* Sales Invoices Section */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
                   <CardTitle>Sales Invoices</CardTitle>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {filteredInvoices.length} invoices
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    {filteredInvoices.length} invoices
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                 onClick={() => handleNavigateToSection('invoices', true)}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    Detailed Section
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                 onClick={() => handleNavigateToSection('invoices')}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    View All
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -339,13 +398,31 @@ export const SalesManagementReport = ({ onBack, onLogout, username }: SalesManag
           {/* Sales Orders Section */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Receipt className="h-5 w-5 text-primary" />
                   <CardTitle>Sales Orders</CardTitle>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {filteredOrders.length} orders
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    {filteredOrders.length} orders
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                onClick={() => handleNavigateToSection('orders', true)}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    Detailed Section
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                onClick={() => handleNavigateToSection('orders')}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    View All
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -381,13 +458,31 @@ export const SalesManagementReport = ({ onBack, onLogout, username }: SalesManag
           {/* Deliveries Section */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" />
                   <CardTitle>Delivery Notes</CardTitle>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {filteredDeliveries.length} deliveries
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    {filteredDeliveries.length} deliveries
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+               onClick={() => handleNavigateToSection('deliveries', true)}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    Detailed Section
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+               onClick={() => handleNavigateToSection('deliveries')}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    View All
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -423,13 +518,31 @@ export const SalesManagementReport = ({ onBack, onLogout, username }: SalesManag
           {/* Customer Settlements Section */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Wallet className="h-5 w-5 text-primary" />
                   <CardTitle>Customer Settlements</CardTitle>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {filteredSettlements.length} settlements
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    {filteredSettlements.length} settlements
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+            onClick={() => handleNavigateToSection('settlements', true)}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    Detailed Section
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+            onClick={() => handleNavigateToSection('settlements')}
+                    className="h-7 text-xs flex-shrink-0"
+                  >
+                    View All
+                  </Button>
                 </div>
               </div>
             </CardHeader>

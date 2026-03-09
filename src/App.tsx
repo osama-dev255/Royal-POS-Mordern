@@ -23,6 +23,10 @@ import { SavedSalesOrdersSection } from "@/components/SavedSalesOrdersSection";
 import { SavedCustomerSettlements } from "./pages/SavedCustomerSettlements";
 import { GRNInventoryDashboard } from "./pages/GRNInventoryDashboard";
 import { SalesManagementReport } from "./pages/SalesManagementReport";
+import { InvoiceDetailedView } from "./pages/InvoiceDetailedView";
+import { OrdersDetailedView } from "./pages/OrdersDetailedView";
+import { DeliveriesDetailedView } from "./pages/DeliveriesDetailedView";
+import { SettlementsDetailedView } from "./pages/SettlementsDetailedView";
 import { useEffect } from "react";
 // Import authentication context
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -93,7 +97,24 @@ const App = () => {
                 <Route path="/sales/saved-deliveries" element={<SavedDeliveriesSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/saved-orders" element={<SavedSalesOrdersSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/saved-customer-settlements" element={<SavedCustomerSettlements username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
-                <Route path="/sales/sales-management-report" element={<SalesManagementReport username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/sales-management-report" element={<SalesManagementReport username="admin" onBack={() => window.history.back()} onLogout={() => {}} onNavigate={(section: string, detailed?: boolean) => {
+                  const basePath = detailed 
+                    ? section === 'invoices' ? '/sales/invoices-detailed' 
+                      : section === 'orders' ? '/sales/orders-detailed'
+                      : section === 'deliveries' ? '/sales/deliveries-detailed'
+                      : section === 'settlements' ? '/sales/settlements-detailed'
+                      : ''
+                    : section === 'invoices' ? '/sales/saved-invoices'
+                      : section === 'orders' ? '/sales/saved-orders'
+                      : section === 'deliveries' ? '/sales/saved-deliveries'
+                      : section === 'settlements' ? '/sales/saved-customer-settlements'
+                      : '';
+                  if (basePath) window.location.href = basePath;
+                }} />} />
+                <Route path="/sales/invoices-detailed" element={<InvoiceDetailedView username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/orders-detailed" element={<OrdersDetailedView username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/deliveries-detailed" element={<DeliveriesDetailedView username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/settlements-detailed" element={<SettlementsDetailedView username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/grn-inventory-dashboard" element={<GRNInventoryDashboard username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
