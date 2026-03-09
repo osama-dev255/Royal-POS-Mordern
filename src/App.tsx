@@ -22,6 +22,7 @@ import { SavedDeliveriesSection } from "@/components/SavedDeliveriesSection";
 import { SavedSalesOrdersSection } from "@/components/SavedSalesOrdersSection";
 import { SavedCustomerSettlements } from "./pages/SavedCustomerSettlements";
 import { GRNInventoryDashboard } from "./pages/GRNInventoryDashboard";
+import { SalesManagementReport } from "./pages/SalesManagementReport";
 import { useEffect } from "react";
 // Import authentication context
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -92,6 +93,7 @@ const App = () => {
                 <Route path="/sales/saved-deliveries" element={<SavedDeliveriesSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/saved-orders" element={<SavedSalesOrdersSection username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/saved-customer-settlements" element={<SavedCustomerSettlements username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/sales/sales-management-report" element={<SalesManagementReport username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/grn-inventory-dashboard" element={<GRNInventoryDashboard username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

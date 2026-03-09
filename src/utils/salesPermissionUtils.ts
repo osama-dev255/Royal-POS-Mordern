@@ -116,7 +116,8 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
-      'grn-inventory-dashboard'
+      'grn-inventory-dashboard',
+      'sales-management-report'
     ],
     'manager': [
       'sales', 'inventory', 'customers', 'suppliers', 'purchase', 'finance', 
@@ -137,7 +138,8 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
-      'grn-inventory-dashboard'
+      'grn-inventory-dashboard',
+      'sales-management-report'
     ],
     'cashier': [
       'sales', 'customers', 'products', 'transactions', 'discounts', 'scanner',
@@ -149,7 +151,8 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
-      'grn-inventory-dashboard'
+      'grn-inventory-dashboard',
+      'sales-management-report'
     ],
     'staff': [
       'inventory', 'customers', 'products', 'capital',
@@ -158,8 +161,9 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
-      'grn-inventory-dashboard'
-    ]
+      'grn-inventory-dashboard',
+      'sales-management-report'
+    ],
   };
   
   // Check if the role exists and has access to the module

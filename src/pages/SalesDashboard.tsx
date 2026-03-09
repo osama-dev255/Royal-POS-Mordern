@@ -11,7 +11,8 @@ import {
   Scan,
   Truck,
   Wallet,
-  FileText
+  FileText,
+  TrendingUp
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -155,6 +156,13 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
       description: "View and manage your pending sales orders",
       icon: FileText,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "sales-management-report",
+      title: "Sales Management Report",
+      description: "Comprehensive analytics and reporting for all sales modules",
+      icon: TrendingUp,
+      color: "bg-white border border-gray-200"
     }
   ];
 
@@ -173,7 +181,7 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
   const handleNavigate = async (module: string) => {
     // Check if user has access to the requested module
     if (!hasModuleAccess(userRole, module)) {
-      console.log("User does not have access to module:", module);
+     console.log("User does not have access to module:", module);
       // Optionally show an error message
       return;
     }
@@ -190,8 +198,11 @@ export const SalesDashboard = ({ username, onBack, onLogout, onNavigate }: Sales
     } else if (module === "saved-customer-settlements") {
       // Navigate to the saved customer settlements page
       navigate('/sales/saved-customer-settlements');
+    } else if (module === "sales-management-report") {
+      // Navigate to the sales management report page
+      navigate('/sales/sales-management-report');
     } else {
-      onNavigate(module);
+     onNavigate(module);
     }
   };
 
