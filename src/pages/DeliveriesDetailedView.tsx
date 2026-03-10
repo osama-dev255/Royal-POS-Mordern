@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ interface DeliveriesDetailedViewProps {
 }
 
 export const DeliveriesDetailedView = ({ onBack, onLogout, username }: DeliveriesDetailedViewProps) => {
+  const tableRef = useRef<HTMLDivElement>(null);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -122,9 +123,130 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
   window.URL.revokeObjectURL(url);
   };
 
-  // Handle Print
-  const handlePrint = () => {
-   window.print();
+  // Handle Print- Print only All Deliveries table
+  const handlePrint= () => {
+    const element= tableRef.current;
+  if (!element) {
+      alert('Table not available for printing');
+      return;
+    }
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+      alert('Please allow popups to print');
+      return;
+    }
+
+    // Get the current date and time for the print header
+    const printDateTime= new Date().toLocaleString();
+
+    // Create print content with styles
+    const printContent= `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>All Deliveries Report</title>
+        <style>
+          @media print {
+            body { 
+              margin: 0; 
+              padding: 20px; 
+              font-family: Arial, sans-serif;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            @page { 
+              size: A4 landscape; 
+              margin: 10mm; 
+            }
+          }
+          body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: Arial, sans-serif;
+          }
+          .header {
+            margin-bottom: 20px;
+          }
+          .header h1 {
+            margin: 0 0 5px 0;
+            color: #000;
+            font-size: 24px;
+          }
+          .header p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+          }
+          table {
+          width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+          th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+          }
+          th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+            text-align: left;
+          }
+          .text-right {
+            text-align: right;
+          }
+          .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+          }
+          .badge-default {
+            background-color: #22c55d;
+            color: white;
+          }
+          .badge-secondary {
+            background-color: #f97316;
+            color: white;
+          }
+          .footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>All Deliveries Report</h1>
+          <p>Date Range: ${dateRange.start} to ${dateRange.end}</p>
+          <p>Printed on: ${printDateTime}</p>
+          <p>Total Deliveries: ${filteredDeliveries.length}</p>
+        </div>
+        ${element.outerHTML}
+        <div class="footer">
+          <p>Generated from Delivery Detailed Analytics</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Write content to the new window
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+
+    // Wait for content to load then print
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   // Handle Export to Excel
@@ -162,22 +284,87 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
     }
   };
 
-  // Handle Share
+  // Handle Share - Share table as image
   const handleShare = async () => {
     try {
-     if (navigator.share) {
-        await navigator.share({
-         title: 'Delivery Analytics Report',
-          text: `Delivery Analytics from ${dateRange.start} to ${dateRange.end}`,
-          url: window.location.href
-        });
-      } else {
-        // Fallback: copy URL to clipboard
-        await navigator.clipboard.writeText(window.location.href);
-        alert('Link copied to clipboard!');
+      const element = tableRef.current;
+    if (!element) {
+        alert('Table not available for sharing');
+        return;
       }
+
+      // Show loading state
+      const shareButton = document.querySelector('button[onclick*="handleShare"] span');
+      const originalText = shareButton?.textContent;
+    if (shareButton && originalText) {
+        shareButton.textContent = 'Capturing...';
+      }
+
+      // Use html2canvas to capture the table
+      const html2canvas = (await import('html2canvas')).default;
+      
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+
+      // Convert canvas to blob
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+          alert('Failed to capture table');
+        if (shareButton && originalText) {
+            shareButton.textContent= originalText;
+          }
+          return;
+        }
+
+        // Create file from blob
+        const file = new File([blob], 'deliveries-table.png', { type: 'image/png' });
+
+        // Try to use Web Share API with files
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+            title: 'Delivery Analytics Report',
+              text: `Delivery Analytics from ${dateRange.start} to ${dateRange.end}`,
+              files: [file]
+            });
+          } catch (shareError) {
+            console.error('Share failed:', shareError);
+            // Fallback: download the image
+            downloadCanvas(canvas);
+          }
+        } else {
+          // Fallback: download the image
+          downloadCanvas(canvas);
+        }
+
+        // Reset button text
+      if (shareButton && originalText) {
+          shareButton.textContent = originalText;
+        }
+      }, 'image/png');
     } catch (error) {
-      console.error('Error sharing:', error);
+      console.error('Error capturing table:', error);
+      alert('Failed to capture table. Downloading data instead...');
+      // Fallback to CSV export
+      handleExport();
+    }
+  };
+
+  // Helper function to download canvas as image
+  const downloadCanvas = (canvas: HTMLCanvasElement) => {
+    try {
+      const link = document.createElement('a');
+      link.download = `deliveries-table-${dateRange.start}-${dateRange.end}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      alert('Table image downloaded! You can now share it manually.');
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download table image');
     }
   };
 
@@ -431,7 +618,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div ref={tableRef} className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
