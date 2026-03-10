@@ -15,7 +15,10 @@ import {
   BarChart3,
   PieChart,
   MapPin,
-  Activity
+  Activity,
+  Printer,
+  Share2,
+  FileSpreadsheet
 } from "lucide-react";
 import { getSavedDeliveries, DeliveryData } from "@/utils/deliveryUtils";
 import { formatCurrency } from "@/lib/currency";
@@ -117,6 +120,65 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
    a.download = `deliveries-detailed-${dateRange.start}-${dateRange.end}.csv`;
     a.click();
   window.URL.revokeObjectURL(url);
+  };
+
+  // Handle Print
+  const handlePrint = () => {
+   window.print();
+  };
+
+  // Handle Export to Excel
+  const handleExport = () => {
+    try {
+      // Create CSV content
+      const headers = ['Date', 'Delivery Note #', 'Customer', 'Driver', 'Products', 'Quantity', 'Status', 'Value'];
+      const rows = filteredDeliveries.map(del => [
+        del.date,
+        del.deliveryNoteNumber,
+        del.customer,
+        del.driver || 'N/A',
+        del.itemsList && del.itemsList.length > 0 
+          ? del.itemsList.map(item => item.name).join('; ')
+          : 'N/A',
+        (del.itemsList?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0).toString(),
+        del.status,
+        del.total?.toString() || '0'
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+     a.download = `deliveries-${dateRange.start}-${dateRange.end}.csv`;
+      a.click();
+    window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting deliveries:', error);
+    }
+  };
+
+  // Handle Share
+  const handleShare = async () => {
+    try {
+     if (navigator.share) {
+        await navigator.share({
+         title: 'Delivery Analytics Report',
+          text: `Delivery Analytics from ${dateRange.start} to ${dateRange.end}`,
+          url: window.location.href
+        });
+      } else {
+        // Fallback: copy URL to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
   };
 
   if (loading) {
@@ -332,9 +394,40 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
         {/* Detailed Table */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Truck className="h-5 w-5 text-primary" />
-              <CardTitle>All Deliveries</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-primary" />
+                <CardTitle>All Deliveries</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                 onClick={handlePrint}
+                  className="flex items-center gap-2"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                 onClick={handleExport}
+                  className="flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                 onClick={handleShare}
+                  className="flex items-center gap-2"
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Share</span>
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
