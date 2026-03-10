@@ -67,9 +67,26 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
 
   const filteredDeliveries = deliveries.filter(del => {
     const matchesDate = isInDateRange(del.date);
+    
+    // Calculate total quantity for the delivery
+    const totalQuantity = del.itemsList?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+    
+    // Check if any product name matches the search term
+    const hasProductMatch = del.itemsList?.some(item => 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    // Check if quantity matches (exact match or starts with the search term)
+    const quantityStr = totalQuantity.toString();
+    const matchesQuantity = searchTerm && /^\d+$/.test(searchTerm) && 
+                           (quantityStr === searchTerm || quantityStr.startsWith(searchTerm));
+    
     const matchesSearch = del.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          del.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (del.driver && del.driver.toLowerCase().includes(searchTerm.toLowerCase()));
+                         (del.driver && del.driver.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         hasProductMatch ||
+                         matchesQuantity;
+    
     const matchesStatus = statusFilter === "all" || del.status === statusFilter;
     return matchesDate && matchesSearch && matchesStatus;
   });
@@ -439,7 +456,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
             <div className="flex items-center gap-2 ml-4">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search customer, driver or delivery..."
+                placeholder="Search customer, driver, product or quantity..."
                 value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-64"
