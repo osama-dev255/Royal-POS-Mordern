@@ -159,6 +159,37 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
     setIsEditModalOpen(true);
   };
 
+  const handleSaveStatus = async (newStatus: string) => {
+    if (!editingDelivery) return;
+    
+    try {
+      // Validate and cast the status to ensure type safety
+      const validStatuses = ["completed", "in-transit", "pending", "delivered", "cancelled"] as const;
+      if (!validStatuses.includes(newStatus as any)) {
+        throw new Error('Invalid status value');
+      }
+      
+      // Update only the status field
+      const updatedDelivery: DeliveryData = {
+        ...editingDelivery,
+        status: newStatus as "completed" | "in-transit" | "pending" | "delivered" | "cancelled"
+      };
+      
+      await updateDelivery(updatedDelivery);
+      
+      // Update the state to reflect the changes
+      setDeliveries(prev => prev.map(d => d.id === updatedDelivery.id ? updatedDelivery : d));
+      
+      // Update the editing delivery reference
+      setEditingDelivery(updatedDelivery);
+      
+      alert('Status updated successfully!');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Error updating status. Please try again.');
+    }
+  };
+
   // Handle changes to an item in the editable items list
   const handleItemChange = (index: number, field: string, value: any) => {
     const updatedItems = [...editableItems];
@@ -254,6 +285,8 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
           onPrint={() => handlePrintDelivery(selectedDelivery)}
           onDownload={() => handleDownloadDelivery(selectedDelivery)}
           onEdit={() => handleEditDelivery(selectedDelivery)}
+          onSaveStatus={handleSaveStatus}
+          isEditing={false}
         />
       ) : (
         <>
@@ -374,7 +407,7 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
             </DialogHeader>
             
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Customer Name</label>
                   <Input 
@@ -390,6 +423,19 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                     readOnly
                     className="bg-gray-100"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status</label>
+                  <select
+                    value={editingDelivery.status}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, status: e.target.value} : null)}
+                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
                 </div>
               </div>
               

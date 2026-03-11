@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Calendar, User, Package, MapPin, Phone, Mail, FileText, Printer, Download, Edit } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Truck, Calendar, User, Package, MapPin, Phone, Mail, FileText, Printer, Download, Edit, Save, X } from "lucide-react";
 import { DeliveryData } from "@/utils/deliveryUtils";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -13,6 +15,8 @@ interface DeliveryDetailsProps {
   onPrint?: () => void;
   onDownload?: () => void;
   onEdit?: () => void;
+  onSaveStatus?: (newStatus: string) => void;
+  isEditing?: boolean;
 }
 
 export const DeliveryDetails = ({ 
@@ -20,8 +24,12 @@ export const DeliveryDetails = ({
   onBack,
   onPrint,
   onDownload,
-  onEdit
+  onEdit,
+  onSaveStatus,
+  isEditing = false
 }: DeliveryDetailsProps) => {
+  const [editableStatus, setEditableStatus] = useState<string>(delivery.status);
+  const [isEditingMode, setIsEditingMode] = useState<boolean>(isEditing);
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -87,9 +95,21 @@ export const DeliveryDetails = ({
     if (onEdit) {
       onEdit();
     } else {
-      // For now, just alert that edit would happen
-      alert('Edit functionality would be implemented here');
+      // Toggle editing mode for status
+      setIsEditingMode(!isEditingMode);
     }
+  };
+
+  const handleSaveStatus = () => {
+    if (onSaveStatus) {
+      onSaveStatus(editableStatus);
+    }
+    setIsEditingMode(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditableStatus(delivery.status);
+    setIsEditingMode(false);
   };
 
   return (
@@ -139,19 +159,41 @@ export const DeliveryDetails = ({
                   {formatDate(delivery.date)}
                 </p>
               </div>
-              <Badge 
-                className={`${
-                  delivery.status === 'completed' || delivery.status === 'delivered' 
-                    ? 'bg-green-500 hover:bg-green-500' 
-                    : delivery.status === 'in-transit' 
-                      ? 'bg-blue-500 hover:bg-blue-500' 
-                      : delivery.status === 'pending' 
-                        ? 'bg-yellow-500 hover:bg-yellow-500' 
-                        : 'bg-red-500 hover:bg-red-500'
-                }`}
-              >
-                {delivery.status.charAt(0).toUpperCase() + delivery.status.slice(1)}
-              </Badge>
+              {isEditingMode ? (
+                <div className="flex items-center gap-2">
+                  <Select value={editableStatus} onValueChange={setEditableStatus}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-transit">In Transit</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" onClick={handleSaveStatus}>
+                    <Save className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Badge 
+                  className={`${
+                    editableStatus === 'completed' || editableStatus === 'delivered' 
+                      ? 'bg-green-500 hover:bg-green-500' 
+                      : editableStatus === 'in-transit' 
+                        ? 'bg-blue-500 hover:bg-blue-500' 
+                        : editableStatus === 'pending' 
+                          ? 'bg-yellow-500 hover:bg-yellow-500' 
+                          : 'bg-red-500 hover:bg-red-500'
+                  }`}
+                >
+                  {editableStatus.charAt(0).toUpperCase() + editableStatus.slice(1)}
+                </Badge>
+              )}
             </div>
           </CardHeader>
           
