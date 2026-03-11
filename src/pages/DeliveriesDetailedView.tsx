@@ -644,6 +644,7 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Customer</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Driver</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Product</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Price</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Quantity</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-right py-3 px-4 font-medium text-muted-foreground">Value</th>
@@ -652,37 +653,58 @@ export const DeliveriesDetailedView = ({ onBack, onLogout, username }: Deliverie
                 <tbody>
                   {filteredDeliveries.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={9} className="text-center py-8 text-muted-foreground">
                         No deliveries found for the selected criteria
                       </td>
                     </tr>
                   ) : (
-                    filteredDeliveries.map((delivery) => (
-                      <tr key={delivery.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4 text-muted-foreground">
-                          {new Date(delivery.date).toLocaleDateString()}
+                    <>
+                      {filteredDeliveries.map((delivery) => (
+                        <tr key={delivery.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {new Date(delivery.date).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4 font-medium">{delivery.deliveryNoteNumber}</td>
+                          <td className="py-3 px-4">{delivery.customer}</td>
+                          <td className="py-3 px-4">{delivery.driver || 'N/A'}</td>
+                          <td className="py-3 px-4 max-w-xs truncate" title={delivery.itemsList?.map(item => item.name).join(', ') || 'N/A'}>
+                            {delivery.itemsList && delivery.itemsList.length > 0 
+                              ? delivery.itemsList.map(item => item.name).slice(0, 2).join(', ') + (delivery.itemsList.length > 2 ? '...' : '')
+                              : 'N/A'}
+                          </td>
+                          <td className="text-right py-3 px-4 font-medium">
+                            {formatCurrency(delivery.total / (delivery.itemsList?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1))}
+                          </td>
+                          <td className="text-right py-3 px-4 font-medium">
+                            {delivery.itemsList?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant={delivery.status === 'delivered' ? 'default' : 'secondary'}>
+                              {delivery.status}
+                            </Badge>
+                          </td>
+                          <td className="text-right py-3 px-4 font-bold">
+                            {formatCurrency(delivery.total)}
+                          </td>
+                        </tr>
+                      ))}
+                      {/* Total Summation Row */}
+                      <tr className="bg-muted font-bold border-t-2">
+                        <td colSpan={5} className="py-3 px-4 text-right">
+                          Total:
                         </td>
-                        <td className="py-3 px-4 font-medium">{delivery.deliveryNoteNumber}</td>
-                        <td className="py-3 px-4">{delivery.customer}</td>
-                        <td className="py-3 px-4">{delivery.driver || 'N/A'}</td>
-                        <td className="py-3 px-4 max-w-xs truncate" title={delivery.itemsList?.map(item => item.name).join(', ') || 'N/A'}>
-                          {delivery.itemsList && delivery.itemsList.length > 0 
-                            ? delivery.itemsList.map(item => item.name).slice(0, 2).join(', ') + (delivery.itemsList.length > 2 ? '...' : '')
-                            : 'N/A'}
+                        <td className="text-right py-3 px-4">
+                          -
                         </td>
-                        <td className="text-right py-3 px-4 font-medium">
-                          {delivery.itemsList?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                        <td className="text-right py-3 px-4">
+                          {filteredDeliveries.reduce((sum, del) => sum + (del.itemsList?.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0) || 0), 0)}
                         </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={delivery.status === 'delivered' ? 'default' : 'secondary'}>
-                            {delivery.status}
-                          </Badge>
-                        </td>
-                        <td className="text-right py-3 px-4 font-bold">
-                          {formatCurrency(delivery.total)}
+                        <td colSpan={1}></td>
+                        <td className="text-right py-3 px-4">
+                          {formatCurrency(filteredDeliveries.reduce((sum, del) => sum + (del.total || 0), 0))}
                         </td>
                       </tr>
-                    ))
+                    </>
                   )}
                 </tbody>
               </table>
