@@ -314,6 +314,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {/* Delete button hidden - uncomment if delete functionality is needed
                         <Button 
                           variant="destructive" 
                           size="sm"
@@ -321,6 +322,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                        */}
                       </div>
                     </TableCell>
                   </TableRow>
