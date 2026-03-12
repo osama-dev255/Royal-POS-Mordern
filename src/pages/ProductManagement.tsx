@@ -1199,6 +1199,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                             >
                               <span className="text-xs">Duplicate</span>
                             </Button> */}
+                            {/* Delete button hidden - uncomment if delete functionality is needed
                             <Button
                               variant="outline"
                               size="sm"
@@ -1207,6 +1208,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
+                            */}
                           </div>
                         </TableCell>
                       </TableRow>
