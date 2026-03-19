@@ -138,9 +138,9 @@ export const RegisteredOutlets = () => {
 
   const handleViewOutlet = (outlet: Outlet) => {
     console.log("handleViewOutlet called with outlet:", outlet);
-    // Navigate to a specific outlet page
-    console.log("Setting window.location.hash to:", `#/outlet/${outlet.id}`);
-    window.location.hash = `#/outlet/${outlet.id}`;
+    // Navigate to outlet inventory page
+    console.log("Setting window.location.hash to:", `#/outlet-inventory/${outlet.id}`);
+    window.location.hash = `#/outlet-inventory/${outlet.id}`;
   };
 
   // Removed outlet details modal functionality
@@ -266,85 +266,91 @@ export const RegisteredOutlets = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium">Name</th>
-                  <th className="text-left py-3 px-4 font-medium">Location</th>
-                  <th className="text-left py-3 px-4 font-medium">Manager</th>
-                  <th className="text-left py-3 px-4 font-medium">Employees</th>
-                  <th className="text-left py-3 px-4 font-medium">Products</th>
-                  <th className="text-left py-3 px-4 font-medium">Status</th>
-                  <th className="text-left py-3 px-4 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOutlets.map((outlet) => (
-                  <tr 
-                    key={outlet.id} 
-                    className="border-b hover:bg-muted/50 cursor-pointer" 
-                    onClick={() => handleViewOutlet(outlet)}
-                  >
-                    <td className="py-3 px-4">
-                      <div className="font-medium">{outlet.name}</div>
-                      <div className="text-sm text-muted-foreground">{outlet.phone}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1 text-sm">
-                        <MapPin className="h-3 w-3" />
-                        {outlet.location}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredOutlets.map((outlet) => (
+              <Card 
+                key={outlet.id} 
+                className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
+                onClick={() => handleViewOutlet(outlet)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-blue-100 rounded-lg">
+                        <Building className="h-6 w-6 text-blue-600" />
                       </div>
-                      <div className="text-sm text-muted-foreground">{outlet.email}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="font-medium">{outlet.manager}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {outlet.employee_count || 0}
+                      <div>
+                        <CardTitle className="text-lg">{outlet.name}</CardTitle>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {outlet.location}
+                        </p>
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Package className="h-4 w-4" />
-                        {outlet.product_count || 0}
+                    </div>
+                    <Badge className={getStatusColor(outlet.status)}>
+                      {outlet.status.charAt(0).toUpperCase() + outlet.status.slice(1)}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span>{outlet.phone || 'No phone'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="truncate">{outlet.email || 'No email'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span>Manager: {outlet.manager || 'Not assigned'}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                        <Users className="h-4 w-4 text-blue-600" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Employees</p>
+                          <p className="font-semibold">{outlet.employee_count || 0}</p>
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge className={getStatusColor(outlet.status)}>
-                        {outlet.status.charAt(0).toUpperCase() + outlet.status.slice(1)}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Add edit functionality here if needed
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteOutlet(outlet.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                        <Package className="h-4 w-4 text-purple-600" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Products</p>
+                          <p className="font-semibold">{outlet.product_count || 0}</p>
+                        </div>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteOutlet(outlet.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </CardContent>
       </Card>

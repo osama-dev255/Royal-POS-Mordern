@@ -56,6 +56,7 @@ import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettl
 import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 import { OutletDetails } from "@/pages/OutletDetails";
+import { OutletInventory } from "@/pages/OutletInventory";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -123,6 +124,16 @@ export const Index = () => {
           // Set a special view to handle outlet details with ID
           console.log("Setting currentView to:", `outlet-details-${outletId}`);
           setCurrentView(`outlet-details-${outletId}`);
+        }
+      }
+      
+      if (hash.startsWith('/outlet-inventory/')) {
+        // Extract outlet ID from the hash (e.g., #/outlet-inventory/abc123 -> abc123)
+        const outletId = hash.split('/')[2];
+        console.log("Extracted outlet ID for inventory:", outletId);
+        if (outletId) {
+          console.log("Setting currentView to:", `outlet-inventory-${outletId}`);
+          setCurrentView(`outlet-inventory-${outletId}`);
         }
       }
     };
@@ -392,7 +403,11 @@ export const Index = () => {
     "inventory", "grn-inventory-dashboard", "registered-outlets"
   ];
 
-  if (!authorizedViews.includes(currentView)) {
+  // Check if view is authorized, but allow outlet-details and outlet-inventory patterns
+  const isOutletDetailsView = currentView.startsWith('outlet-details-');
+  const isOutletInventoryView = currentView.startsWith('outlet-inventory-');
+  
+  if (!authorizedViews.includes(currentView) && !isOutletDetailsView && !isOutletInventoryView) {
     console.log(`Unauthorized view requested: ${currentView}, redirecting to comprehensive dashboard`);
     setCurrentView("comprehensive");
   }
@@ -1757,12 +1772,7 @@ export const Index = () => {
             case "registered-outlets":
               console.log("Rendering RegisteredOutlets");
               return (
-                <AdvancedLayout
-                  username={user?.email || "admin"}
-                  onLogout={handleLogout}
-                >
-                  <RegisteredOutlets />
-                </AdvancedLayout>
+                <RegisteredOutlets />
               );
             default:
               console.log("Current view is:", currentView);
@@ -1774,17 +1784,32 @@ export const Index = () => {
                   <AdvancedLayout
                     username={user?.email || "admin"}
                     onLogout={handleLogout}
-                    currentView="registered-outlets" // Set the current view to registered-outlets to highlight the correct menu item
+                    currentView="registered-outlets"
+                    onNavigate={handleNavigate}
                   >
                     <OutletDetails 
                       outletId={outletId}
                       onBack={() => {
-                        // Navigate back to the registered outlets page
                         setCurrentView("registered-outlets");
                         window.location.hash = "#/registered-outlets";
                       }} 
                     />
                   </AdvancedLayout>
+                );
+              }
+              
+              // Check if this is an outlet inventory view (pattern: outlet-inventory-{id})
+              if (currentView.startsWith('outlet-inventory-')) {
+                const outletId = currentView.substring('outlet-inventory-'.length);
+                console.log("Rendering OutletInventory for outlet ID:", outletId);
+                return (
+                  <OutletInventory 
+                    outletId={outletId}
+                    onBack={() => {
+                      setCurrentView("registered-outlets");
+                      window.location.hash = "#/registered-outlets";
+                    }} 
+                  />
                 );
               }
               
