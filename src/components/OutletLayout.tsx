@@ -13,7 +13,10 @@ import {
   User,
   LogOut,
   Truck,
-  Store
+  Store,
+  Users,
+  CreditCard,
+  FileText
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -24,7 +27,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'reports' | 'settings';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings';
 }
 
 interface MenuItem {
@@ -42,10 +45,11 @@ export const OutletLayout = ({
   outletName,
   currentView
 }: OutletLayoutProps) => {
+  console.log("OutletLayout rendered with outletId:", outletId);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Outlet-specific menu items
+  // Outlet-specific menu items - All Quick Actions
   const menuItems: MenuItem[] = [
     {
       id: "dashboard",
@@ -61,9 +65,33 @@ export const OutletLayout = ({
     },
     {
       id: "sales",
-      title: "Sales",
+      title: "New Sale",
       icon: <ShoppingCart className="h-5 w-5" />,
-      view: "sales-cart"
+      view: `outlet-sales/${outletId}`
+    },
+    {
+      id: "customers",
+      title: "Customers",
+      icon: <Users className="h-5 w-5" />,
+      view: "customers"
+    },
+    {
+      id: "deliveries",
+      title: "Deliveries",
+      icon: <Truck className="h-5 w-5" />,
+      view: "templates"
+    },
+    {
+      id: "payments",
+      title: "Payments",
+      icon: <CreditCard className="h-5 w-5" />,
+      view: "customer-settlements"
+    },
+    {
+      id: "grn",
+      title: "GRN",
+      icon: <FileText className="h-5 w-5" />,
+      view: "grn-inventory-dashboard"
     },
     {
       id: "reports",
@@ -80,6 +108,8 @@ export const OutletLayout = ({
   ];
 
   const handleNavigation = (view: string) => {
+    console.log("OutletLayout handleNavigation called with view:", view);
+    console.log("Setting hash to:", `#/${view}`);
     window.location.hash = `#/${view}`;
     setMobileMenuOpen(false);
   };

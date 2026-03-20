@@ -21,6 +21,7 @@ import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 import { getProducts, getCustomers, updateProductStock, createCustomer, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
 
 interface CartItem {
   id: string;
@@ -56,9 +57,12 @@ interface SalesCartProps {
   onBack: () => void;
   onLogout: () => void;
   autoOpenScanner?: boolean;
+  outletId?: string;
+  outletName?: string;
 }
 
-export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
+export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: SalesCartProps) => {
+  console.log("SalesCart rendered with outletId:", outletId, "outletName:", outletName);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [productName, setProductName] = useState("");
   const [productPrice, setProductPrice] = useState("");
@@ -110,10 +114,45 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
     const loadData = async () => {
       try {
         setLoading(true);
-        // Load products
-        const productData = await getProducts();
-        // Fix: Set products directly without mapping to a different structure
-        setProducts(productData);
+        
+        // Load products - use outlet-specific products if outletId is provided
+        if (outletId) {
+          // Fetch products from outlet deliveries
+          const deliveries = await getDeliveriesByOutletId(outletId);
+          const outletProducts: Product[] = [];
+          
+          deliveries.forEach(delivery => {
+            if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
+              delivery.itemsList.forEach((item: any) => {
+                const existingProduct = outletProducts.find(p => p.name === (item.description || item.name));
+                if (existingProduct) {
+                  existingProduct.stock_quantity += item.quantity || item.delivered || 0;
+                } else {
+                  outletProducts.push({
+                    id: `${delivery.id}-${item.description || item.name}`,
+                    name: item.description || item.name || 'Unknown Product',
+                    selling_price: item.rate || item.price || 0,
+                    cost_price: item.rate || item.price || 0,
+                    stock_quantity: item.quantity || item.delivered || 0,
+                    barcode: item.barcode || '',
+                    sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                    category: item.category || 'General',
+                    unit: item.unit || 'pcs',
+                    vat_rate: item.vat_rate || 18,
+                    is_active: true
+                  } as Product);
+                }
+              });
+            }
+          });
+          
+          setProducts(outletProducts);
+          console.log(`Loaded ${outletProducts.length} products for outlet ${outletId}`);
+        } else {
+          // Load general products
+          const productData = await getProducts();
+          setProducts(productData);
+        }
         
         // Load customers
         const customerData = await getCustomers();
@@ -141,7 +180,7 @@ export const SalesCart = ({ username, onBack, onLogout }: SalesCartProps) => {
     };
 
     loadData();
-  }, []);
+  }, [outletId]);
 
   const filteredProducts = products.filter(product => 
     (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())) ||

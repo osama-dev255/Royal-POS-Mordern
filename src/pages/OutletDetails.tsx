@@ -386,7 +386,15 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/sales-cart"}
+                  onClick={() => {
+                    console.log("New Sale button clicked, outlet:", outlet);
+                    if (outlet?.id) {
+                      console.log("Setting hash to #/outlet-sales/" + outlet.id);
+                      window.location.hash = `#/outlet-sales/${outlet.id}`;
+                    } else {
+                      console.log("No outlet ID found!");
+                    }
+                  }}
                 >
                   <ShoppingBag className="h-6 w-6" />
                   <span className="text-sm">New Sale</span>
@@ -422,7 +430,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/saved-deliveries"}
+                  onClick={() => window.location.hash = "#/templates"}
                 >
                   <Truck className="h-6 w-6" />
                   <span className="text-sm">Deliveries</span>
