@@ -461,7 +461,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     <span className="font-medium">{item.category}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Unit Price:</span>
+                    <span className="text-muted-foreground">Unit Cost:</span>
                     <span className="font-medium">{formatCurrency(item.unitPrice)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -504,7 +504,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     <th className="text-left py-3 px-4 font-medium">SKU</th>
                     <th className="text-left py-3 px-4 font-medium">Category</th>
                     <th className="text-left py-3 px-4 font-medium">Quantity</th>
-                    <th className="text-left py-3 px-4 font-medium">Unit Price</th>
+                    <th className="text-left py-3 px-4 font-medium">Unit Cost</th>
                     <th className="text-left py-3 px-4 font-medium">Total Value</th>
                     <th className="text-left py-3 px-4 font-medium">Status</th>
                     <th className="text-left py-3 px-4 font-medium">Actions</th>
