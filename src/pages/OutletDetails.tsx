@@ -335,7 +335,16 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <BarChart3 className="h-5 w-5" />
                 Sales Overview
               </CardTitle>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("View Full Report clicked, navigating to financial-reports");
+                  window.location.hash = "#/financial-reports";
+                }}
+              >
                 View Full Report
                 <ExternalLink className="h-4 w-4 ml-2" />
               </Button>
@@ -374,35 +383,71 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/sales-cart"}
+                >
                   <ShoppingBag className="h-6 w-6" />
                   <span className="text-sm">New Sale</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => {
+                    if (outlet?.id) {
+                      window.location.hash = `#/outlet-inventory/${outlet.id}`;
+                    }
+                  }}
+                >
                   <Package className="h-6 w-6" />
                   <span className="text-sm">Products</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/financial-reports"}
+                >
                   <FileText className="h-6 w-6" />
                   <span className="text-sm">Reports</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/customers"}
+                >
                   <Users className="h-6 w-6" />
                   <span className="text-sm">Customers</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/saved-deliveries"}
+                >
                   <Truck className="h-6 w-6" />
                   <span className="text-sm">Deliveries</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/customer-settlements"}
+                >
                   <CreditCard className="h-6 w-6" />
                   <span className="text-sm">Payments</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/grn-inventory-dashboard"}
+                >
                   <PackageCheck className="h-6 w-6" />
                   <span className="text-sm">GRN</span>
                 </Button>
-                <Button className="h-auto py-4 flex flex-col items-center gap-2" variant="outline">
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = "#/settings"}
+                >
                   <Settings className="h-6 w-6" />
                   <span className="text-sm">Settings</span>
                 </Button>

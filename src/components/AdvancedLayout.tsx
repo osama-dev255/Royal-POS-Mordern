@@ -41,7 +41,7 @@ export const AdvancedLayout = ({
   username, 
   onLogout,
   currentView = "dashboard",
-  onNavigate 
+  onNavigate
 }: AdvancedLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

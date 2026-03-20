@@ -57,6 +57,7 @@ import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 import { OutletDetails } from "@/pages/OutletDetails";
 import { OutletInventory } from "@/pages/OutletInventory";
+import { OutletLayout } from "@/components/OutletLayout";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -1781,20 +1782,23 @@ export const Index = () => {
                 const outletId = currentView.substring('outlet-details-'.length);
                 console.log("Rendering OutletDetails for outlet ID:", outletId);
                 return (
-                  <AdvancedLayout
+                  <OutletLayout
                     username={user?.email || "admin"}
                     onLogout={handleLogout}
-                    currentView="registered-outlets"
-                    onNavigate={handleNavigate}
+                    outletId={outletId}
+                    outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+                    currentView="dashboard"
                   >
-                    <OutletDetails 
-                      outletId={outletId}
-                      onBack={() => {
-                        setCurrentView("registered-outlets");
-                        window.location.hash = "#/registered-outlets";
-                      }} 
-                    />
-                  </AdvancedLayout>
+                    <div className="p-6">
+                      <OutletDetails 
+                        outletId={outletId}
+                        onBack={() => {
+                          setCurrentView("registered-outlets");
+                          window.location.hash = "#/registered-outlets";
+                        }} 
+                      />
+                    </div>
+                  </OutletLayout>
                 );
               }
               
@@ -1803,13 +1807,23 @@ export const Index = () => {
                 const outletId = currentView.substring('outlet-inventory-'.length);
                 console.log("Rendering OutletInventory for outlet ID:", outletId);
                 return (
-                  <OutletInventory 
+                  <OutletLayout
+                    username={user?.email || "admin"}
+                    onLogout={handleLogout}
                     outletId={outletId}
-                    onBack={() => {
-                      setCurrentView("registered-outlets");
-                      window.location.hash = "#/registered-outlets";
-                    }} 
-                  />
+                    outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+                    currentView="inventory"
+                  >
+                    <div className="p-6">
+                      <OutletInventory 
+                        outletId={outletId}
+                        onBack={() => {
+                          setCurrentView("registered-outlets");
+                          window.location.hash = "#/registered-outlets";
+                        }} 
+                      />
+                    </div>
+                  </OutletLayout>
                 );
               }
               
