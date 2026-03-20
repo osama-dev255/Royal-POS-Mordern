@@ -369,3 +369,64 @@ export const getDeliveryById = async (deliveryId: string): Promise<DeliveryData 
     return undefined;
   }
 };
+
+export const getDeliveriesByOutletId = async (outletId: string): Promise<DeliveryData[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      // Query deliveries by outlet_id
+      const { data, error } = await supabase
+        .from('saved_delivery_notes')
+        .select('*')
+        .eq('outlet_id', outletId)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('Error retrieving deliveries by outlet ID from database:', error);
+        // Fallback to localStorage
+        const saved = localStorage.getItem(SAVED_DELIVERIES_KEY);
+        if (saved) {
+          const deliveries = JSON.parse(saved);
+          return deliveries.filter((d: DeliveryData) => d.outletId === outletId);
+        }
+        return [];
+      }
+      
+      // Transform database records to DeliveryData format
+      const deliveries = data.map(dbDelivery => ({
+        id: dbDelivery.id,
+        deliveryNoteNumber: dbDelivery.delivery_note_number,
+        date: dbDelivery.date,
+        customer: dbDelivery.customer,
+        items: dbDelivery.items,
+        total: dbDelivery.total,
+        paymentMethod: dbDelivery.payment_method,
+        status: dbDelivery.status,
+        itemsList: dbDelivery.items_list,
+        subtotal: dbDelivery.subtotal,
+        tax: dbDelivery.tax,
+        discount: dbDelivery.discount,
+        amountReceived: dbDelivery.amount_received,
+        change: dbDelivery.change,
+        vehicle: dbDelivery.vehicle,
+        driver: dbDelivery.driver,
+        deliveryNotes: dbDelivery.delivery_notes,
+        outletId: dbDelivery.outlet_id
+      }));
+      
+      return deliveries;
+    } else {
+      // If not authenticated, use localStorage
+      const saved = localStorage.getItem(SAVED_DELIVERIES_KEY);
+      if (saved) {
+        const deliveries = JSON.parse(saved);
+        return deliveries.filter((d: DeliveryData) => d.outletId === outletId);
+      }
+      return [];
+    }
+  } catch (error) {
+    console.error('Error retrieving deliveries by outlet ID:', error);
+    return [];
+  }
+};

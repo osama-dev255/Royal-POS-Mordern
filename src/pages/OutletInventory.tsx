@@ -22,9 +22,11 @@ import {
   Filter,
   Grid3X3,
   List,
-  ExternalLink
+  ExternalLink,
+  Truck
 } from "lucide-react";
 import { getOutlets, Outlet } from "@/services/databaseService";
+import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 
 interface OutletInventoryProps {
   onBack: () => void;
@@ -43,6 +45,7 @@ interface InventoryItem {
   totalValue: number;
   status: 'in-stock' | 'low-stock' | 'out-of-stock';
   lastUpdated: string;
+  deliveryNoteNumber?: string;
 }
 
 interface InventoryStats {
@@ -52,6 +55,7 @@ interface InventoryStats {
   outOfStockItems: number;
   categories: number;
   avgTurnover: number;
+  totalDeliveries: number;
 }
 
 export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInventoryProps) => {
@@ -61,17 +65,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    { id: '1', name: 'Coca Cola 500ml', sku: 'BEV-001', category: 'Beverages', quantity: 150, minStock: 50, maxStock: 200, unitPrice: 1500, totalValue: 225000, status: 'in-stock', lastUpdated: '2024-03-15' },
-    { id: '2', name: 'Pepsi 500ml', sku: 'BEV-002', category: 'Beverages', quantity: 25, minStock: 30, maxStock: 150, unitPrice: 1400, totalValue: 35000, status: 'low-stock', lastUpdated: '2024-03-14' },
-    { id: '3', name: 'Fanta Orange 500ml', sku: 'BEV-003', category: 'Beverages', quantity: 0, minStock: 20, maxStock: 100, unitPrice: 1400, totalValue: 0, status: 'out-of-stock', lastUpdated: '2024-03-13' },
-    { id: '4', name: 'Rice 1kg', sku: 'GRY-001', category: 'Groceries', quantity: 80, minStock: 40, maxStock: 120, unitPrice: 3500, totalValue: 280000, status: 'in-stock', lastUpdated: '2024-03-15' },
-    { id: '5', name: 'Sugar 1kg', sku: 'GRY-002', category: 'Groceries', quantity: 45, minStock: 50, maxStock: 100, unitPrice: 2800, totalValue: 126000, status: 'low-stock', lastUpdated: '2024-03-14' },
-    { id: '6', name: 'Cooking Oil 1L', sku: 'GRY-003', category: 'Groceries', quantity: 60, minStock: 30, maxStock: 80, unitPrice: 4500, totalValue: 270000, status: 'in-stock', lastUpdated: '2024-03-15' },
-    { id: '7', name: 'Bread White', sku: 'BAK-001', category: 'Bakery', quantity: 30, minStock: 20, maxStock: 50, unitPrice: 2000, totalValue: 60000, status: 'in-stock', lastUpdated: '2024-03-15' },
-    { id: '8', name: 'Milk 1L', sku: 'DAI-001', category: 'Dairy', quantity: 40, minStock: 25, maxStock: 60, unitPrice: 3200, totalValue: 128000, status: 'in-stock', lastUpdated: '2024-03-15' },
-  ]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   const [stats, setStats] = useState<InventoryStats>({
     totalProducts: 0,
@@ -79,18 +75,19 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     lowStockItems: 0,
     outOfStockItems: 0,
     categories: 0,
-    avgTurnover: 0
+    avgTurnover: 0,
+    totalDeliveries: 0
   });
 
   useEffect(() => {
-    fetchOutlet();
+    fetchOutletAndInventory();
   }, [propOutletId]);
 
   useEffect(() => {
     calculateStats();
   }, [inventory]);
 
-  const fetchOutlet = async () => {
+  const fetchOutletAndInventory = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -100,6 +97,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
         return;
       }
       
+      // Fetch outlet details
       const allOutlets = await getOutlets();
       const foundOutlet = allOutlets.find(o => o.id === propOutletId);
       
@@ -107,10 +105,65 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
         setOutlet(foundOutlet);
       } else {
         setError("Outlet not found");
+        return;
       }
+      
+      // Fetch deliveries for this outlet
+      const outletDeliveries = await getDeliveriesByOutletId(propOutletId);
+      setDeliveries(outletDeliveries);
+      
+      // Process deliveries into inventory items
+      const inventoryMap = new Map<string, InventoryItem>();
+      
+      outletDeliveries.forEach(delivery => {
+        if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
+          delivery.itemsList.forEach((item: any) => {
+            const itemName = item.description || item.name || 'Unknown Product';
+            const existingItem = inventoryMap.get(itemName);
+            
+            if (existingItem) {
+              // Aggregate quantities for same product
+              existingItem.quantity += item.quantity || item.delivered || 0;
+              existingItem.totalValue = existingItem.quantity * existingItem.unitPrice;
+              existingItem.lastUpdated = delivery.date;
+              existingItem.deliveryNoteNumber = delivery.deliveryNoteNumber;
+            } else {
+              // Create new inventory item
+              const quantity = item.quantity || item.delivered || 0;
+              const unitPrice = item.rate || item.price || 0;
+              const minStock = Math.floor(quantity * 0.2); // 20% of quantity as min stock
+              const maxStock = Math.floor(quantity * 1.5); // 150% of quantity as max stock
+              
+              inventoryMap.set(itemName, {
+                id: `${delivery.id}-${itemName}`,
+                name: itemName,
+                sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                category: item.category || 'General',
+                quantity: quantity,
+                minStock: minStock,
+                maxStock: maxStock,
+                unitPrice: unitPrice,
+                totalValue: quantity * unitPrice,
+                status: quantity > minStock ? 'in-stock' : quantity > 0 ? 'low-stock' : 'out-of-stock',
+                lastUpdated: delivery.date,
+                deliveryNoteNumber: delivery.deliveryNoteNumber
+              });
+            }
+          });
+        }
+      });
+      
+      // Convert map to array and update status
+      const inventoryArray = Array.from(inventoryMap.values()).map(item => ({
+        ...item,
+        status: (item.quantity > item.minStock ? 'in-stock' : 
+                item.quantity > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock'
+      }));
+      
+      setInventory(inventoryArray);
     } catch (err) {
-      setError("Failed to fetch outlet details. Please try again.");
-      console.error("Error fetching outlet:", err);
+      setError("Failed to fetch outlet inventory. Please try again.");
+      console.error("Error fetching outlet inventory:", err);
     } finally {
       setLoading(false);
     }
@@ -128,7 +181,8 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       lowStockItems: lowStock,
       outOfStockItems: outOfStock,
       categories,
-      avgTurnover: 4.2
+      avgTurnover: 4.2,
+      totalDeliveries: deliveries.length
     });
   };
 
@@ -182,7 +236,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               <h3 className="text-red-800 font-medium">Error</h3>
               <p className="text-red-700 mt-1">{error}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchOutlet} className="ml-4">
+            <Button variant="outline" size="sm" onClick={fetchOutletAndInventory} className="ml-4">
               Retry
             </Button>
           </div>
@@ -235,7 +289,11 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product
                 </Button>
-                <Button variant="outline" className="border-white text-white hover:bg-white/20">
+                <Button variant="outline" className="border-white text-white hover:bg-white/20" onClick={() => {
+                  if (outlet?.id) {
+                    window.location.hash = `#/outlet/${outlet.id}`;
+                  }
+                }}>
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Full Dashboard
                 </Button>
