@@ -23,7 +23,8 @@ import {
   Grid3X3,
   List,
   ExternalLink,
-  Truck
+  Truck,
+  Pencil
 } from "lucide-react";
 import { getOutlets, Outlet } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
@@ -42,6 +43,7 @@ interface InventoryItem {
   minStock: number;
   maxStock: number;
   unitPrice: number;
+  sellingPrice: number;
   totalValue: number;
   status: 'in-stock' | 'low-stock' | 'out-of-stock';
   lastUpdated: string;
@@ -143,6 +145,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 minStock: minStock,
                 maxStock: maxStock,
                 unitPrice: unitPrice,
+                sellingPrice: unitPrice * 1.3, // 30% markup for selling price
                 totalValue: quantity * unitPrice,
                 status: quantity > minStock ? 'in-stock' : quantity > 0 ? 'low-stock' : 'out-of-stock',
                 lastUpdated: delivery.date,
@@ -465,8 +468,16 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     <span className="font-medium">{formatCurrency(item.unitPrice)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Value:</span>
+                    <span className="text-muted-foreground">Total Cost:</span>
                     <span className="font-semibold">{formatCurrency(item.totalValue)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Unit Price:</span>
+                    <span className="font-medium">{formatCurrency(item.sellingPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Price:</span>
+                    <span className="font-semibold">{formatCurrency(item.sellingPrice * item.quantity)}</span>
                   </div>
                   <div className="pt-2">
                     <div className="flex justify-between text-sm mb-1">
@@ -480,12 +491,8 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button variant="outline" size="sm" className="flex-1">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <Minus className="h-4 w-4 mr-1" />
-                      Remove
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit
                     </Button>
                   </div>
                 </div>
@@ -505,7 +512,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     <th className="text-left py-3 px-4 font-medium">Category</th>
                     <th className="text-left py-3 px-4 font-medium">Quantity</th>
                     <th className="text-left py-3 px-4 font-medium">Unit Cost</th>
-                    <th className="text-left py-3 px-4 font-medium">Total Value</th>
+                    <th className="text-left py-3 px-4 font-medium">Total Cost</th>
+                    <th className="text-left py-3 px-4 font-medium">Unit Price</th>
+                    <th className="text-left py-3 px-4 font-medium">Total Price</th>
                     <th className="text-left py-3 px-4 font-medium">Status</th>
                     <th className="text-left py-3 px-4 font-medium">Actions</th>
                   </tr>
@@ -529,20 +538,17 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                       </td>
                       <td className="py-3 px-4">{formatCurrency(item.unitPrice)}</td>
                       <td className="py-3 px-4 font-semibold">{formatCurrency(item.totalValue)}</td>
+                      <td className="py-3 px-4">{formatCurrency(item.sellingPrice)}</td>
+                      <td className="py-3 px-4 font-semibold">{formatCurrency(item.sellingPrice * item.quantity)}</td>
                       <td className="py-3 px-4">
                         <Badge className={getStatusColor(item.status)}>
                           {item.status.replace('-', ' ')}
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Button variant="outline" size="sm">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
