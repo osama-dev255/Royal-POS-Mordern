@@ -63,6 +63,7 @@ import { OutletDeliveries } from "@/pages/OutletDeliveries";
 import { OutletPayments } from "@/pages/OutletPayments";
 import { OutletGRN } from "@/pages/OutletGRN";
 import { OutletReports } from "@/pages/OutletReports";
+import { OutletStockTake } from "@/pages/OutletStockTake";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -152,6 +153,17 @@ export const Index = () => {
         if (outletId) {
           console.log("Setting currentView to:", `outlet-sales-${outletId}`);
           setCurrentView(`outlet-sales-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-stock-take/')) {
+        // Extract outlet ID from the hash (e.g., #/outlet-stock-take/abc123 -> abc123)
+        const outletId = hash.split('/')[2];
+        console.log("Extracted outlet ID for stock take:", outletId);
+        if (outletId) {
+          console.log("Setting currentView to:", `outlet-stock-take-${outletId}`);
+          setCurrentView(`outlet-stock-take-${outletId}`);
         }
         return;
       }
@@ -438,6 +450,7 @@ export const Index = () => {
   const isOutletPaymentsView = currentView.startsWith('outlet-payments-');
   const isOutletGRNView = currentView.startsWith('outlet-grn-');
   const isOutletReportsView = currentView.startsWith('outlet-reports-');
+  const isOutletStockTakeView = currentView.startsWith('outlet-stock-take-');
   
   if (!authorizedViews.includes(currentView) && 
       !isOutletDetailsView && 
@@ -447,7 +460,8 @@ export const Index = () => {
       !isOutletDeliveriesView &&
       !isOutletPaymentsView &&
       !isOutletGRNView &&
-      !isOutletReportsView) {
+      !isOutletReportsView &&
+      !isOutletStockTakeView) {
     console.log(`Unauthorized view requested: ${currentView}, redirecting to comprehensive dashboard`);
     setCurrentView("comprehensive");
   }
@@ -460,7 +474,8 @@ export const Index = () => {
                        currentView.startsWith('outlet-deliveries-') ||
                        currentView.startsWith('outlet-payments-') ||
                        currentView.startsWith('outlet-grn-') ||
-                       currentView.startsWith('outlet-reports-');
+                       currentView.startsWith('outlet-reports-') ||
+                       currentView.startsWith('outlet-stock-take-');
 
   // For outlet views, render without AdvancedLayout wrapper
   if (isOutletView) {
@@ -658,6 +673,30 @@ export const Index = () => {
               onBack={() => {
                 setCurrentView(`outlet-details-${outletId}`);
                 window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet stock take view
+    if (currentView.startsWith('outlet-stock-take-')) {
+      const outletId = currentView.substring('outlet-stock-take-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="inventory"
+        >
+          <div className="p-6">
+            <OutletStockTake
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-sales-${outletId}`);
+                window.location.hash = `#/outlet-sales/${outletId}`;
               }}
             />
           </div>

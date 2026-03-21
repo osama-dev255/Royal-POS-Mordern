@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
@@ -784,6 +784,18 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     <Scan className="h-4 w-4 xs:h-5 xs:w-5 mr-1 xs:mr-2" />
                     <span className="hidden xs:inline">Scan</span>
                   </Button>
+                  {outletId && (
+                    <Button 
+                      onClick={() => {
+                        window.location.hash = `#/outlet-stock-take/${outletId}`;
+                      }} 
+                      variant="outline"
+                      className="btn-touch px-3 xs:px-4"
+                    >
+                      <ClipboardCheck className="h-4 w-4 xs:h-5 xs:w-5 mr-1 xs:mr-2" />
+                      <span className="hidden xs:inline">Stock Take</span>
+                    </Button>
+                  )}
                 </div>
                 
                 {searchTerm && (
