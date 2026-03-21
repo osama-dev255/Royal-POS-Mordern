@@ -99,6 +99,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
 
   // Helper functions for persisting selling prices to localStorage
   const getSavedPricesKey = (outletId: string) => `outlet_${outletId}_selling_prices`;
+  const getSoldQuantitiesKey = (outletId: string) => `outlet_${outletId}_sold_quantities`;
   
   const loadSavedSellingPrices = (outletId: string): Record<string, number> => {
     try {
@@ -107,6 +108,17 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       return saved ? JSON.parse(saved) : {};
     } catch (error) {
       console.error("Error loading saved selling prices:", error);
+      return {};
+    }
+  };
+  
+  const loadSoldQuantities = (outletId: string): Record<string, number> => {
+    try {
+      const key = getSoldQuantitiesKey(outletId);
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+      console.error("Error loading sold quantities:", error);
       return {};
     }
   };
@@ -204,12 +216,21 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 item.quantity > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock'
       }));
       
-      // Apply saved selling prices from localStorage
+      // Apply saved selling prices and sold quantities from localStorage
       const savedPrices = loadSavedSellingPrices(propOutletId);
-      const inventoryWithSavedPrices = inventoryArray.map(item => ({
-        ...item,
-        sellingPrice: savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice
-      }));
+      const soldQuantities = loadSoldQuantities(propOutletId);
+      const inventoryWithSavedPrices = inventoryArray.map(item => {
+        const soldQty = soldQuantities[item.id] || 0;
+        const availableQuantity = Math.max(0, item.quantity - soldQty);
+        const newStatus = availableQuantity > item.minStock ? 'in-stock' : availableQuantity > 0 ? 'low-stock' : 'out-of-stock';
+        
+        return {
+          ...item,
+          sellingPrice: savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice,
+          quantity: availableQuantity,
+          status: newStatus as 'in-stock' | 'low-stock' | 'out-of-stock'
+        };
+      });
       
       setInventory(inventoryWithSavedPrices);
     } catch (err) {

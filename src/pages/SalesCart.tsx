@@ -125,6 +125,10 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const savedPricesKey = `outlet_${outletId}_selling_prices`;
           const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
           
+          // Load sold quantities from localStorage
+          const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
+          const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
+          
           deliveries.forEach(delivery => {
             if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
               delivery.itemsList.forEach((item: any) => {
@@ -136,13 +140,17 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                   const unitCost = item.rate || item.price || 0;
                   // Use saved selling price if available, otherwise use unit cost
                   const sellingPrice = savedPrices[productId] !== undefined ? savedPrices[productId] : unitCost;
+                  // Calculate available stock (original - sold)
+                  const originalQuantity = item.quantity || item.delivered || 0;
+                  const soldQuantity = soldQuantities[productId] || 0;
+                  const availableStock = Math.max(0, originalQuantity - soldQuantity);
                   
                   outletProducts.push({
                     id: productId,
                     name: item.description || item.name || 'Unknown Product',
                     selling_price: sellingPrice,
                     cost_price: unitCost,
-                    stock_quantity: item.quantity || item.delivered || 0,
+                    stock_quantity: availableStock,
                     barcode: item.barcode || '',
                     sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
                     category: item.category || 'General',
@@ -450,14 +458,67 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         if (product) {
           // Calculate new stock quantity
           const newStock = Math.max(0, product.stock_quantity - item.quantity);
-          // Update stock in database
-          await updateProductStock(item.id, newStock);
+          
+          // For outlet sales, update localStorage sold quantities
+          if (outletId) {
+            const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
+            const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
+            soldQuantities[item.id] = (soldQuantities[item.id] || 0) + item.quantity;
+            localStorage.setItem(soldQuantitiesKey, JSON.stringify(soldQuantities));
+          } else {
+            // For general sales, update stock in database
+            await updateProductStock(item.id, newStock);
+          }
         }
       }
       
       // Reload products to get updated stock quantities
-      const updatedProducts = await getProducts();
-      setProducts(updatedProducts);
+      if (outletId) {
+        // Reload outlet products with updated sold quantities
+        const deliveries = await getDeliveriesByOutletId(outletId);
+        const savedPricesKey = `outlet_${outletId}_selling_prices`;
+        const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
+        const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
+        const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
+        
+        const updatedProducts: Product[] = [];
+        deliveries.forEach(delivery => {
+          if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
+            delivery.itemsList.forEach((item: any) => {
+              const productId = `${delivery.id}-${item.description || item.name}`;
+              const existingProduct = updatedProducts.find(p => p.name === (item.description || item.name));
+              if (existingProduct) {
+                existingProduct.stock_quantity += item.quantity || item.delivered || 0;
+              } else {
+                const unitCost = item.rate || item.price || 0;
+                const sellingPrice = savedPrices[productId] !== undefined ? savedPrices[productId] : unitCost;
+                const originalQuantity = item.quantity || item.delivered || 0;
+                const soldQty = soldQuantities[productId] || 0;
+                const availableStock = Math.max(0, originalQuantity - soldQty);
+                
+                updatedProducts.push({
+                  id: productId,
+                  name: item.description || item.name || 'Unknown Product',
+                  selling_price: sellingPrice,
+                  cost_price: unitCost,
+                  stock_quantity: availableStock,
+                  barcode: item.barcode || '',
+                  sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                  category: item.category || 'General',
+                  unit: item.unit || 'pcs',
+                  vat_rate: item.vat_rate || 18,
+                  is_active: true
+                } as Product);
+              }
+            });
+          }
+        });
+        setProducts(updatedProducts);
+      } else {
+        // Reload general products
+        const updatedProducts = await getProducts();
+        setProducts(updatedProducts);
+      }
 
       // Create transaction object for printing
       const transaction = {
