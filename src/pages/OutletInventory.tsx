@@ -4,6 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { 
   Building, 
   Package, 
@@ -70,6 +79,13 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    quantity: 0,
+    unitCost: 0,
+    sellingPrice: 0
+  });
 
   const [stats, setStats] = useState<InventoryStats>({
     totalProducts: 0,
@@ -80,6 +96,31 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     avgTurnover: 0,
     totalDeliveries: 0
   });
+
+  // Helper functions for persisting selling prices to localStorage
+  const getSavedPricesKey = (outletId: string) => `outlet_${outletId}_selling_prices`;
+  
+  const loadSavedSellingPrices = (outletId: string): Record<string, number> => {
+    try {
+      const key = getSavedPricesKey(outletId);
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+      console.error("Error loading saved selling prices:", error);
+      return {};
+    }
+  };
+  
+  const saveSellingPrice = (outletId: string, productId: string, price: number) => {
+    try {
+      const key = getSavedPricesKey(outletId);
+      const savedPrices = loadSavedSellingPrices(outletId);
+      savedPrices[productId] = price;
+      localStorage.setItem(key, JSON.stringify(savedPrices));
+    } catch (error) {
+      console.error("Error saving selling price:", error);
+    }
+  };
 
   useEffect(() => {
     fetchOutletAndInventory();
@@ -145,7 +186,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 minStock: minStock,
                 maxStock: maxStock,
                 unitPrice: unitPrice,
-                sellingPrice: unitPrice * 1.3, // 30% markup for selling price
+                sellingPrice: unitPrice , // 30% markup for selling price
                 totalValue: quantity * unitPrice,
                 status: quantity > minStock ? 'in-stock' : quantity > 0 ? 'low-stock' : 'out-of-stock',
                 lastUpdated: delivery.date,
@@ -163,7 +204,14 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 item.quantity > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock'
       }));
       
-      setInventory(inventoryArray);
+      // Apply saved selling prices from localStorage
+      const savedPrices = loadSavedSellingPrices(propOutletId);
+      const inventoryWithSavedPrices = inventoryArray.map(item => ({
+        ...item,
+        sellingPrice: savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice
+      }));
+      
+      setInventory(inventoryWithSavedPrices);
     } catch (err) {
       setError("Failed to fetch outlet inventory. Please try again.");
       console.error("Error fetching outlet inventory:", err);
@@ -219,6 +267,41 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   });
 
   const categories = ['all', ...new Set(inventory.map(item => item.category))];
+
+  const handleEditClick = (item: InventoryItem) => {
+    setEditingItem(item);
+    setEditForm({
+      quantity: item.quantity,
+      unitCost: item.unitPrice,
+      sellingPrice: item.sellingPrice
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingItem || !propOutletId) return;
+    
+    // Save to localStorage
+    saveSellingPrice(propOutletId, editingItem.id, editForm.sellingPrice);
+    
+    setInventory(prev => prev.map(item => {
+      if (item.id === editingItem.id) {
+        return {
+          ...item,
+          sellingPrice: editForm.sellingPrice
+        };
+      }
+      return item;
+    }));
+    
+    setIsEditDialogOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditDialogOpen(false);
+    setEditingItem(null);
+  };
 
   if (loading) {
     return (
@@ -490,7 +573,12 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     />
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleEditClick(item)}
+                    >
                       <Pencil className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
@@ -546,7 +634,11 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditClick(item)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </td>
@@ -558,6 +650,56 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+            <DialogDescription>
+              {editingItem?.name} ({editingItem?.sku})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-muted-foreground">
+                Quantity
+              </Label>
+              <div className="col-span-3 py-2 px-3 bg-muted rounded-md text-sm">
+                {editForm.quantity}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-muted-foreground">
+                Unit Cost
+              </Label>
+              <div className="col-span-3 py-2 px-3 bg-muted rounded-md text-sm">
+                {formatCurrency(editForm.unitCost)}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="sellingPrice" className="text-right">
+                Selling Price
+              </Label>
+              <Input
+                id="sellingPrice"
+                type="number"
+                value={editForm.sellingPrice}
+                onChange={(e) => setEditForm({ ...editForm, sellingPrice: parseFloat(e.target.value) || 0 })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseEdit}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
