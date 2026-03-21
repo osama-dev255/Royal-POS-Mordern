@@ -58,6 +58,11 @@ import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 import { OutletDetails } from "@/pages/OutletDetails";
 import { OutletInventory } from "@/pages/OutletInventory";
 import { OutletLayout } from "@/components/OutletLayout";
+import { OutletCustomers } from "@/pages/OutletCustomers";
+import { OutletDeliveries } from "@/pages/OutletDeliveries";
+import { OutletPayments } from "@/pages/OutletPayments";
+import { OutletGRN } from "@/pages/OutletGRN";
+import { OutletReports } from "@/pages/OutletReports";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -424,12 +429,25 @@ export const Index = () => {
     "inventory", "grn-inventory-dashboard", "registered-outlets"
   ];
 
-  // Check if view is authorized, but allow outlet-details, outlet-inventory, and outlet-sales patterns
+  // Check if view is authorized, but allow outlet-specific patterns
   const isOutletDetailsView = currentView.startsWith('outlet-details-');
   const isOutletInventoryView = currentView.startsWith('outlet-inventory-');
   const isOutletSalesView = currentView.startsWith('outlet-sales-');
+  const isOutletCustomersView = currentView.startsWith('outlet-customers-');
+  const isOutletDeliveriesView = currentView.startsWith('outlet-deliveries-');
+  const isOutletPaymentsView = currentView.startsWith('outlet-payments-');
+  const isOutletGRNView = currentView.startsWith('outlet-grn-');
+  const isOutletReportsView = currentView.startsWith('outlet-reports-');
   
-  if (!authorizedViews.includes(currentView) && !isOutletDetailsView && !isOutletInventoryView && !isOutletSalesView) {
+  if (!authorizedViews.includes(currentView) && 
+      !isOutletDetailsView && 
+      !isOutletInventoryView && 
+      !isOutletSalesView &&
+      !isOutletCustomersView &&
+      !isOutletDeliveriesView &&
+      !isOutletPaymentsView &&
+      !isOutletGRNView &&
+      !isOutletReportsView) {
     console.log(`Unauthorized view requested: ${currentView}, redirecting to comprehensive dashboard`);
     setCurrentView("comprehensive");
   }
@@ -437,7 +455,12 @@ export const Index = () => {
   // Check if we're in an outlet-specific view
   const isOutletView = currentView.startsWith('outlet-details-') || 
                        currentView.startsWith('outlet-inventory-') || 
-                       currentView.startsWith('outlet-sales-');
+                       currentView.startsWith('outlet-sales-') ||
+                       currentView.startsWith('outlet-customers-') ||
+                       currentView.startsWith('outlet-deliveries-') ||
+                       currentView.startsWith('outlet-payments-') ||
+                       currentView.startsWith('outlet-grn-') ||
+                       currentView.startsWith('outlet-reports-');
 
   // For outlet views, render without AdvancedLayout wrapper
   if (isOutletView) {
@@ -516,6 +539,126 @@ export const Index = () => {
               autoOpenScanner={true}
               outletId={outletId}
               outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet customers view
+    if (currentView.startsWith('outlet-customers-')) {
+      const outletId = currentView.substring('outlet-customers-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="customers"
+        >
+          <div className="p-6">
+            <OutletCustomers
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet deliveries view
+    if (currentView.startsWith('outlet-deliveries-')) {
+      const outletId = currentView.substring('outlet-deliveries-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="deliveries"
+        >
+          <div className="p-6">
+            <OutletDeliveries
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet payments view
+    if (currentView.startsWith('outlet-payments-')) {
+      const outletId = currentView.substring('outlet-payments-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="payments"
+        >
+          <div className="p-6">
+            <OutletPayments
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet GRN view
+    if (currentView.startsWith('outlet-grn-')) {
+      const outletId = currentView.substring('outlet-grn-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="grn"
+        >
+          <div className="p-6">
+            <OutletGRN
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet reports view
+    if (currentView.startsWith('outlet-reports-')) {
+      const outletId = currentView.substring('outlet-reports-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="reports"
+        >
+          <div className="p-6">
+            <OutletReports
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
+              }}
             />
           </div>
         </OutletLayout>

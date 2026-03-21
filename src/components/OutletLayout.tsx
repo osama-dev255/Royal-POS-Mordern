@@ -73,31 +73,31 @@ export const OutletLayout = ({
       id: "customers",
       title: "Customers",
       icon: <Users className="h-5 w-5" />,
-      view: "customers"
+      view: `outlet-customers-${outletId}`
     },
     {
       id: "deliveries",
       title: "Deliveries",
       icon: <Truck className="h-5 w-5" />,
-      view: "templates"
+      view: `outlet-deliveries-${outletId}`
     },
     {
       id: "payments",
       title: "Payments",
       icon: <CreditCard className="h-5 w-5" />,
-      view: "customer-settlements"
+      view: `outlet-payments-${outletId}`
     },
     {
       id: "grn",
       title: "GRN",
       icon: <FileText className="h-5 w-5" />,
-      view: "grn-inventory-dashboard"
+      view: `outlet-grn-${outletId}`
     },
     {
       id: "reports",
       title: "Reports",
       icon: <BarChart3 className="h-5 w-5" />,
-      view: "financial-reports"
+      view: `outlet-reports-${outletId}`
     },
     {
       id: "back",
