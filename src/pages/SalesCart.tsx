@@ -121,18 +121,27 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const deliveries = await getDeliveriesByOutletId(outletId);
           const outletProducts: Product[] = [];
           
+          // Load saved selling prices from localStorage
+          const savedPricesKey = `outlet_${outletId}_selling_prices`;
+          const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
+          
           deliveries.forEach(delivery => {
             if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
               delivery.itemsList.forEach((item: any) => {
+                const productId = `${delivery.id}-${item.description || item.name}`;
                 const existingProduct = outletProducts.find(p => p.name === (item.description || item.name));
                 if (existingProduct) {
                   existingProduct.stock_quantity += item.quantity || item.delivered || 0;
                 } else {
+                  const unitCost = item.rate || item.price || 0;
+                  // Use saved selling price if available, otherwise use unit cost
+                  const sellingPrice = savedPrices[productId] !== undefined ? savedPrices[productId] : unitCost;
+                  
                   outletProducts.push({
-                    id: `${delivery.id}-${item.description || item.name}`,
+                    id: productId,
                     name: item.description || item.name || 'Unknown Product',
-                    selling_price: item.rate || item.price || 0,
-                    cost_price: item.rate || item.price || 0,
+                    selling_price: sellingPrice,
+                    cost_price: unitCost,
                     stock_quantity: item.quantity || item.delivered || 0,
                     barcode: item.barcode || '',
                     sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
