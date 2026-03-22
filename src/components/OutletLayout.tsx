@@ -16,7 +16,8 @@ import {
   Store,
   Users,
   CreditCard,
-  FileText
+  FileText,
+  TrendingUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings' | 'back';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
@@ -35,6 +36,7 @@ interface MenuItem {
   title: string;
   icon: React.ReactNode;
   view: string;
+  hash?: string;
 }
 
 export const OutletLayout = ({ 
@@ -64,16 +66,11 @@ export const OutletLayout = ({
       view: `outlet-inventory-${outletId}`
     },
     {
-      id: "sales",
-      title: "New Sale",
-      icon: <ShoppingCart className="h-5 w-5" />,
-      view: `outlet-sales/${outletId}`
-    },
-    {
-      id: "customers",
-      title: "Customers",
-      icon: <Users className="h-5 w-5" />,
-      view: `outlet-customers-${outletId}`
+      id: "sales-management",
+      title: "Sales Management",
+      icon: <TrendingUp className="h-5 w-5" />,
+      view: `outlet-sales-management-${outletId}`,
+      hash: `#/outlet-sales-management/${outletId}`
     },
     {
       id: "deliveries",
@@ -113,10 +110,15 @@ export const OutletLayout = ({
     }
   ];
 
-  const handleNavigation = (view: string) => {
+  const handleNavigation = (view: string, hash?: string) => {
     console.log("OutletLayout handleNavigation called with view:", view);
-    console.log("Setting hash to:", `#/${view}`);
-    window.location.hash = `#/${view}`;
+    if (hash) {
+      console.log("Setting hash to:", hash);
+      window.location.hash = hash;
+    } else {
+      console.log("Setting hash to:", `#/${view}`);
+      window.location.hash = `#/${view}`;
+    }
     setMobileMenuOpen(false);
   };
 
@@ -203,7 +205,7 @@ export const OutletLayout = ({
                   "w-full justify-start gap-3",
                   !sidebarOpen && "justify-center px-2"
                 )}
-                onClick={() => handleNavigation(item.view)}
+                onClick={() => handleNavigation(item.view, item.hash)}
               >
                 {item.icon}
                 {sidebarOpen && <span>{item.title}</span>}
@@ -275,7 +277,7 @@ export const OutletLayout = ({
                   key={item.id}
                   variant={currentView === item.id ? "default" : "ghost"}
                   className="w-full justify-start gap-3"
-                  onClick={() => handleNavigation(item.view)}
+                  onClick={() => handleNavigation(item.view, item.hash)}
                 >
                   {item.icon}
                   <span>{item.title}</span>
