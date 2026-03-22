@@ -454,7 +454,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/settings"}
+                  onClick={() => window.location.hash = `#/outlet-settings-${outlet?.id}`}
                 >
                   <Settings className="h-6 w-6" />
                   <span className="text-sm">Settings</span>

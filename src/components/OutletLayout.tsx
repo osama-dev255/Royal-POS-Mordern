@@ -27,7 +27,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
@@ -98,6 +98,12 @@ export const OutletLayout = ({
       title: "Reports",
       icon: <BarChart3 className="h-5 w-5" />,
       view: `outlet-reports-${outletId}`
+    },
+    {
+      id: "settings",
+      title: "Settings",
+      icon: <Settings className="h-5 w-5" />,
+      view: `outlet-settings-${outletId}`
     },
     {
       id: "back",

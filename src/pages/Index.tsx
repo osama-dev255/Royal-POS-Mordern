@@ -64,6 +64,7 @@ import { OutletPayments } from "@/pages/OutletPayments";
 import { OutletGRN } from "@/pages/OutletGRN";
 import { OutletReports } from "@/pages/OutletReports";
 import { OutletStockTake } from "@/pages/OutletStockTake";
+import { OutletSettings } from "@/pages/OutletSettings";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -451,6 +452,7 @@ export const Index = () => {
   const isOutletGRNView = currentView.startsWith('outlet-grn-');
   const isOutletReportsView = currentView.startsWith('outlet-reports-');
   const isOutletStockTakeView = currentView.startsWith('outlet-stock-take-');
+  const isOutletSettingsView = currentView.startsWith('outlet-settings-');
   
   if (!authorizedViews.includes(currentView) && 
       !isOutletDetailsView && 
@@ -461,7 +463,8 @@ export const Index = () => {
       !isOutletPaymentsView &&
       !isOutletGRNView &&
       !isOutletReportsView &&
-      !isOutletStockTakeView) {
+      !isOutletStockTakeView &&
+      !isOutletSettingsView) {
     console.log(`Unauthorized view requested: ${currentView}, redirecting to comprehensive dashboard`);
     setCurrentView("comprehensive");
   }
@@ -475,7 +478,8 @@ export const Index = () => {
                        currentView.startsWith('outlet-payments-') ||
                        currentView.startsWith('outlet-grn-') ||
                        currentView.startsWith('outlet-reports-') ||
-                       currentView.startsWith('outlet-stock-take-');
+                       currentView.startsWith('outlet-stock-take-') ||
+                       currentView.startsWith('outlet-settings-');
 
   // For outlet views, render without AdvancedLayout wrapper
   if (isOutletView) {
@@ -697,6 +701,30 @@ export const Index = () => {
               onBack={() => {
                 setCurrentView(`outlet-sales-${outletId}`);
                 window.location.hash = `#/outlet-sales/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet settings view
+    if (currentView.startsWith('outlet-settings-')) {
+      const outletId = currentView.substring('outlet-settings-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="settings"
+        >
+          <div className="p-6">
+            <OutletSettings
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
               }}
             />
           </div>
