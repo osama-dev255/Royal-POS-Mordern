@@ -1,15 +1,14 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  ShoppingCart, 
   ArrowLeft, 
-  Store,
-  FileText,
-  Save,
-  Users
+  Banknote,
+  CreditCard,
+  Smartphone,
+  FileText
 } from "lucide-react";
 
-interface OutletSalesManagementProps {
+interface OutletSavedSalesProps {
   onBack: () => void;
   outletId?: string;
 }
@@ -22,35 +21,35 @@ interface NavigationCard {
   route: string;
 }
 
-export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagementProps) => {
+export const OutletSavedSales = ({ onBack, outletId }: OutletSavedSalesProps) => {
   const navigationCards: NavigationCard[] = [
     {
-      id: "sales-terminal",
-      title: "Sales Terminal",
-      description: "Create new sales and process transactions",
-      icon: <Store className="h-8 w-8" />,
-      route: outletId ? `#/outlet-sales/${outletId}` : "#/sales-cart"
+      id: "saved-cash-sales",
+      title: "Saved Cash Sales",
+      description: "View and manage saved cash transactions",
+      icon: <Banknote className="h-8 w-8" />,
+      route: outletId ? `#/outlet-saved-cash-${outletId}` : "#/saved-cash-sales"
     },
     {
-      id: "sales-orders",
-      title: "Sales Orders",
-      description: "View and manage all sales orders",
+      id: "saved-card-sales",
+      title: "Saved Card Sales",
+      description: "View and manage saved card transactions",
+      icon: <CreditCard className="h-8 w-8" />,
+      route: outletId ? `#/outlet-saved-card-${outletId}` : "#/saved-card-sales"
+    },
+    {
+      id: "saved-mobile-sales",
+      title: "Saved Mobile Money Sales",
+      description: "View and manage saved mobile money transactions",
+      icon: <Smartphone className="h-8 w-8" />,
+      route: outletId ? `#/outlet-saved-mobile-${outletId}` : "#/saved-mobile-sales"
+    },
+    {
+      id: "saved-debts",
+      title: "Saved Debts",
+      description: "View and manage saved debt transactions",
       icon: <FileText className="h-8 w-8" />,
-      route: "#/sales-orders"
-    },
-    {
-      id: "saved-sales",
-      title: "Saved Sales",
-      description: "Access saved and pending sales",
-      icon: <Save className="h-8 w-8" />,
-      route: outletId ? `#/outlet-saved-sales-${outletId}` : "#/saved-sales"
-    },
-    {
-      id: "customers",
-      title: "Customers",
-      description: "Manage customer information and history",
-      icon: <Users className="h-8 w-8" />,
-      route: outletId ? `#/outlet-customers-${outletId}` : "#/customers"
+      route: outletId ? `#/outlet-saved-debts-${outletId}` : "#/saved-debts"
     }
   ];
 
@@ -66,8 +65,8 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Sales Management</h1>
-          <p className="text-muted-foreground">Select an option to manage sales operations</p>
+          <h1 className="text-2xl font-bold">Saved Sales</h1>
+          <p className="text-muted-foreground">Select a category to view saved transactions</p>
         </div>
       </div>
 
@@ -93,8 +92,6 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
           </Card>
         ))}
       </div>
-
-
     </div>
   );
 };
