@@ -414,7 +414,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/financial-reports"}
+                  onClick={() => window.location.hash = `#/outlet-reports-${outlet?.id}`}
                 >
                   <FileText className="h-6 w-6" />
                   <span className="text-sm">Reports</span>
@@ -422,7 +422,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/customers"}
+                  onClick={() => window.location.hash = `#/outlet-customers-${outlet?.id}`}
                 >
                   <Users className="h-6 w-6" />
                   <span className="text-sm">Customers</span>
@@ -430,7 +430,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/templates"}
+                  onClick={() => window.location.hash = `#/outlet-deliveries-${outlet?.id}`}
                 >
                   <Truck className="h-6 w-6" />
                   <span className="text-sm">Deliveries</span>
@@ -438,7 +438,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/customer-settlements"}
+                  onClick={() => window.location.hash = `#/outlet-payments-${outlet?.id}`}
                 >
                   <CreditCard className="h-6 w-6" />
                   <span className="text-sm">Payments</span>
@@ -446,7 +446,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 
                   variant="outline"
-                  onClick={() => window.location.hash = "#/grn-inventory-dashboard"}
+                  onClick={() => window.location.hash = `#/outlet-grn-${outlet?.id}`}
                 >
                   <PackageCheck className="h-6 w-6" />
                   <span className="text-sm">GRN</span>
