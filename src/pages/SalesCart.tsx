@@ -421,9 +421,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       // Create sale items for each product in the cart
       const itemsWithQuantity = cart.filter(item => item.quantity > 0);
       for (const item of itemsWithQuantity) {
+        // For outlet sales, product_id may not be a valid UUID
+        // Only include product_id if it's a valid UUID format
+        const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+        
         const saleItemData = {
           sale_id: createdSale.id || '',
-          product_id: item.id,
+          product_id: isValidUuid ? item.id : null,
           quantity: item.quantity,
           unit_price: item.price,
           discount_amount: 0, // In a real app, this would be calculated
@@ -587,6 +591,45 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         };
         
         await saveInvoice(invoiceToSave);
+        
+        // Save to outlet-specific saved sales based on payment method
+        if (outletId) {
+          const savedSale = {
+            id: createdSale.id || Date.now().toString(),
+            invoiceNumber: createdSale.invoice_number || `INV-${Date.now()}`,
+            date: createdSale.sale_date || new Date().toISOString(),
+            customer: selectedCustomer?.name || 'Walk-in Customer',
+            items: cart.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price
+            })),
+            subtotal: subtotal,
+            tax: tax,
+            total: totalWithTax,
+            paymentMethod: paymentMethod,
+            status: paymentMethod === "debt" ? "outstanding" : "completed"
+          };
+          
+          // Determine the correct localStorage key based on payment method
+          let savedSalesKey: string;
+          if (paymentMethod === "cash") {
+            savedSalesKey = `outlet_${outletId}_saved_cash_sales`;
+          } else if (paymentMethod === "card") {
+            savedSalesKey = `outlet_${outletId}_saved_card_sales`;
+          } else if (paymentMethod === "mobile") {
+            savedSalesKey = `outlet_${outletId}_saved_mobile_sales`;
+          } else if (paymentMethod === "debt") {
+            savedSalesKey = `outlet_${outletId}_saved_debts`;
+          } else {
+            savedSalesKey = `outlet_${outletId}_saved_cash_sales`; // Default to cash
+          }
+          
+          // Load existing sales and add the new one
+          const existingSales = JSON.parse(localStorage.getItem(savedSalesKey) || '[]');
+          existingSales.unshift(savedSale); // Add to beginning of array
+          localStorage.setItem(savedSalesKey, JSON.stringify(existingSales));
+        }
       } catch (error) {
         console.error('Error saving invoice:', error);
         toast({

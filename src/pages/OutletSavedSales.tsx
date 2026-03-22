@@ -28,28 +28,28 @@ export const OutletSavedSales = ({ onBack, outletId }: OutletSavedSalesProps) =>
       title: "Saved Cash Sales",
       description: "View and manage saved cash transactions",
       icon: <Banknote className="h-8 w-8" />,
-      route: outletId ? `#/outlet-saved-cash-${outletId}` : "#/saved-cash-sales"
+      route: outletId ? `#/outlet-saved-cash/${outletId}` : "#/saved-cash-sales"
     },
     {
       id: "saved-card-sales",
       title: "Saved Card Sales",
       description: "View and manage saved card transactions",
       icon: <CreditCard className="h-8 w-8" />,
-      route: outletId ? `#/outlet-saved-card-${outletId}` : "#/saved-card-sales"
+      route: outletId ? `#/outlet-saved-card/${outletId}` : "#/saved-card-sales"
     },
     {
       id: "saved-mobile-sales",
       title: "Saved Mobile Money Sales",
       description: "View and manage saved mobile money transactions",
       icon: <Smartphone className="h-8 w-8" />,
-      route: outletId ? `#/outlet-saved-mobile-${outletId}` : "#/saved-mobile-sales"
+      route: outletId ? `#/outlet-saved-mobile/${outletId}` : "#/saved-mobile-sales"
     },
     {
       id: "saved-debts",
       title: "Saved Debts",
       description: "View and manage saved debt transactions",
       icon: <FileText className="h-8 w-8" />,
-      route: outletId ? `#/outlet-saved-debts-${outletId}` : "#/saved-debts"
+      route: outletId ? `#/outlet-saved-debts/${outletId}` : "#/saved-debts"
     }
   ];
 

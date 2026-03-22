@@ -52,9 +52,6 @@ export const saveInvoice = async (invoice: InvoiceData): Promise<void> => {
           discount: invoice.discount,
           amount_received: invoice.amountReceived,
           change: invoice.change,
-          business_name: invoice.businessName,
-          business_address: invoice.businessAddress,
-          business_phone: invoice.businessPhone,
           amount_paid: invoice.amountPaid,
           credit_brought_forward: invoice.creditBroughtForward,
           amount_due: invoice.amountDue
@@ -115,9 +112,6 @@ export const getSavedInvoices = async (): Promise<InvoiceData[]> => {
         discount: dbInvoice.discount,
         amountReceived: dbInvoice.amount_received,
         change: dbInvoice.change,
-        businessName: dbInvoice.business_name,
-        businessAddress: dbInvoice.business_address,
-        businessPhone: dbInvoice.business_phone,
         amountPaid: dbInvoice.amount_paid,
         creditBroughtForward: dbInvoice.credit_brought_forward,
         amountDue: dbInvoice.amount_due
@@ -201,9 +195,6 @@ export const updateInvoice = async (updatedInvoice: InvoiceData): Promise<void> 
         discount: updatedInvoice.discount,
         amount_received: updatedInvoice.amountReceived,
         change: updatedInvoice.change,
-        business_name: updatedInvoice.businessName,
-        business_address: updatedInvoice.businessAddress,
-        business_phone: updatedInvoice.businessPhone,
         amount_paid: updatedInvoice.amountPaid,
         credit_brought_forward: updatedInvoice.creditBroughtForward,
         amount_due: updatedInvoice.amountDue

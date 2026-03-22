@@ -67,6 +67,10 @@ import { OutletStockTake } from "@/pages/OutletStockTake";
 import { OutletSettings } from "@/pages/OutletSettings";
 import { OutletSalesManagement } from "@/pages/OutletSalesManagement";
 import { OutletSavedSales } from "@/pages/OutletSavedSales";
+import { OutletSavedCashSales } from "@/pages/OutletSavedCashSales";
+import { OutletSavedCardSales } from "@/pages/OutletSavedCardSales";
+import { OutletSavedMobileSales } from "@/pages/OutletSavedMobileSales";
+import { OutletSavedDebts } from "@/pages/OutletSavedDebts";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -189,6 +193,38 @@ export const Index = () => {
         if (outletId) {
           console.log("Setting currentView to:", `outlet-saved-sales-${outletId}`);
           setCurrentView(`outlet-saved-sales-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-saved-cash/')) {
+        const outletId = hash.split('/')[2];
+        if (outletId) {
+          setCurrentView(`outlet-saved-cash-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-saved-card/')) {
+        const outletId = hash.split('/')[2];
+        if (outletId) {
+          setCurrentView(`outlet-saved-card-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-saved-mobile/')) {
+        const outletId = hash.split('/')[2];
+        if (outletId) {
+          setCurrentView(`outlet-saved-mobile-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-saved-debts/')) {
+        const outletId = hash.split('/')[2];
+        if (outletId) {
+          setCurrentView(`outlet-saved-debts-${outletId}`);
         }
         return;
       }
@@ -479,6 +515,10 @@ export const Index = () => {
   const isOutletSettingsView = currentView.startsWith('outlet-settings-');
   const isOutletSalesManagementView = currentView.startsWith('outlet-sales-management-');
   const isOutletSavedSalesView = currentView.startsWith('outlet-saved-sales-');
+  const isOutletSavedCashView = currentView.startsWith('outlet-saved-cash-');
+  const isOutletSavedCardView = currentView.startsWith('outlet-saved-card-');
+  const isOutletSavedMobileView = currentView.startsWith('outlet-saved-mobile-');
+  const isOutletSavedDebtsView = currentView.startsWith('outlet-saved-debts-');
   
   if (!authorizedViews.includes(currentView) && 
       !isOutletDetailsView && 
@@ -492,7 +532,11 @@ export const Index = () => {
       !isOutletStockTakeView &&
       !isOutletSettingsView &&
       !isOutletSalesManagementView &&
-      !isOutletSavedSalesView) {
+      !isOutletSavedSalesView &&
+      !isOutletSavedCashView &&
+      !isOutletSavedCardView &&
+      !isOutletSavedMobileView &&
+      !isOutletSavedDebtsView) {
     console.log(`Unauthorized view requested: ${currentView}, redirecting to comprehensive dashboard`);
     setCurrentView("comprehensive");
   }
@@ -509,7 +553,11 @@ export const Index = () => {
                        currentView.startsWith('outlet-stock-take-') ||
                        currentView.startsWith('outlet-settings-') ||
                        currentView.startsWith('outlet-sales-management-') ||
-                       currentView.startsWith('outlet-saved-sales-');
+                       currentView.startsWith('outlet-saved-sales-') ||
+                       currentView.startsWith('outlet-saved-cash-') ||
+                       currentView.startsWith('outlet-saved-card-') ||
+                       currentView.startsWith('outlet-saved-mobile-') ||
+                       currentView.startsWith('outlet-saved-debts-');
 
   // For outlet views, render without AdvancedLayout wrapper
   if (isOutletView) {
@@ -606,6 +654,102 @@ export const Index = () => {
               onBack={() => {
                 setCurrentView(`outlet-sales-management-${outletId}`);
                 window.location.hash = `#/outlet-sales-management/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet saved cash sales view
+    if (currentView.startsWith('outlet-saved-cash-')) {
+      const outletId = currentView.substring('outlet-saved-cash-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="saved-cash"
+        >
+          <div className="p-6">
+            <OutletSavedCashSales
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-saved-sales-${outletId}`);
+                window.location.hash = `#/outlet-saved-sales/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet saved card sales view
+    if (currentView.startsWith('outlet-saved-card-')) {
+      const outletId = currentView.substring('outlet-saved-card-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="saved-card"
+        >
+          <div className="p-6">
+            <OutletSavedCardSales
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-saved-sales-${outletId}`);
+                window.location.hash = `#/outlet-saved-sales/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet saved mobile sales view
+    if (currentView.startsWith('outlet-saved-mobile-')) {
+      const outletId = currentView.substring('outlet-saved-mobile-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="saved-mobile"
+        >
+          <div className="p-6">
+            <OutletSavedMobileSales
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-saved-sales-${outletId}`);
+                window.location.hash = `#/outlet-saved-sales/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet saved debts view
+    if (currentView.startsWith('outlet-saved-debts-')) {
+      const outletId = currentView.substring('outlet-saved-debts-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="saved-debts"
+        >
+          <div className="p-6">
+            <OutletSavedDebts
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-saved-sales-${outletId}`);
+                window.location.hash = `#/outlet-saved-sales/${outletId}`;
               }}
             />
           </div>

@@ -28,7 +28,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings' | 'back';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
