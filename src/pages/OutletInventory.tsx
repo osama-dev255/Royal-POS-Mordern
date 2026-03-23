@@ -33,7 +33,12 @@ import {
   List,
   ExternalLink,
   Truck,
-  Pencil
+  Pencil,
+  MoreVertical,
+  Printer,
+  Share2,
+  Download,
+  FileOutput
 } from "lucide-react";
 import { getOutlets, Outlet } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
@@ -81,6 +86,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isActionsDialogOpen, setIsActionsDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     quantity: 0,
     unitCost: 0,
@@ -511,6 +517,15 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsActionsDialogOpen(true)}
+                className="flex items-center gap-1"
+              >
+                <MoreVertical className="h-4 w-4" />
+                Actions
+              </Button>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -719,6 +734,312 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               Save Changes
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Actions Dialog */}
+      <Dialog open={isActionsDialogOpen} onOpenChange={setIsActionsDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Actions</DialogTitle>
+            <DialogDescription>
+              Choose an action for the inventory data
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-4">
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+              onClick={() => {
+                setIsActionsDialogOpen(false);
+                // Create a printable inventory report
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                  const tableRows = filteredInventory.map(item => `
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.sku}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.category}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.sellingPrice)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.totalValue)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: ${item.status === 'in-stock' ? 'green' : item.status === 'low-stock' ? 'orange' : 'red'};">${item.status.replace('-', ' ')}</td>
+                    </tr>
+                  `).join('');
+
+                  printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <title>Inventory Report - ${outlet?.name || 'Outlet'}</title>
+                      <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
+                        h1 { text-align: center; margin-bottom: 5px; }
+                        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+                        .header p { margin: 5px 0; color: #666; }
+                        .stats { display: flex; justify-content: space-around; margin: 20px 0; background: #f5f5f5; padding: 15px; border-radius: 8px; }
+                        .stat { text-align: center; }
+                        .stat-value { font-size: 24px; font-weight: bold; color: #333; }
+                        .stat-label { font-size: 12px; color: #666; }
+                        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                        th { background: #333; color: white; padding: 10px; text-align: left; }
+                        th, td { border: 1px solid #ddd; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+                        @media print { body { padding: 0; } }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="header">
+                        <h1>INVENTORY REPORT</h1>
+                        <p><strong>${outlet?.name || 'Outlet'}</strong></p>
+                        <p>Generated on: ${new Date().toLocaleString()}</p>
+                      </div>
+                      
+                      <div class="stats">
+                        <div class="stat">
+                          <div class="stat-value">${stats.totalProducts}</div>
+                          <div class="stat-label">Total Products</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${formatCurrency(stats.totalValue)}</div>
+                          <div class="stat-label">Total Value</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${stats.lowStockItems}</div>
+                          <div class="stat-label">Low Stock</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${stats.outOfStockItems}</div>
+                          <div class="stat-label">Out of Stock</div>
+                        </div>
+                      </div>
+
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Product Name</th>
+                            <th style="text-align: center;">SKU</th>
+                            <th style="text-align: center;">Category</th>
+                            <th style="text-align: center;">Qty</th>
+                            <th style="text-align: right;">Unit Cost</th>
+                            <th style="text-align: right;">Selling Price</th>
+                            <th style="text-align: right;">Total Value</th>
+                            <th style="text-align: center;">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${tableRows}
+                        </tbody>
+                      </table>
+
+                      <div class="footer">
+                        <p>Royal POS - Inventory Management System</p>
+                        <p>This report was automatically generated</p>
+                      </div>
+                    </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                  printWindow.print();
+                }
+              }}
+            >
+              <Printer className="h-6 w-6 text-blue-600" />
+              <span>Print</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+              onClick={() => {
+                setIsActionsDialogOpen(false);
+                if (navigator.share) {
+                  navigator.share({
+                    title: `${outlet?.name || 'Outlet'} Inventory`,
+                    text: `Inventory report for ${outlet?.name || 'Outlet'} - ${filteredInventory.length} products`,
+                    url: window.location.href
+                  });
+                } else {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Link copied to clipboard!');
+                }
+              }}
+            >
+              <Share2 className="h-6 w-6 text-green-600" />
+              <span>Share</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+              onClick={() => {
+                setIsActionsDialogOpen(false);
+                // Generate PDF by opening print dialog with Save as PDF option
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                  const tableRows = filteredInventory.map(item => `
+                    <tr>
+                      <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.sku}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.category}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.sellingPrice)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.totalValue)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.status.replace('-', ' ')}</td>
+                    </tr>
+                  `).join('');
+
+                  printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <title>Inventory Report - ${outlet?.name || 'Outlet'}</title>
+                      <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
+                        h1 { text-align: center; margin-bottom: 5px; }
+                        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+                        .header p { margin: 5px 0; color: #666; }
+                        .stats { display: flex; justify-content: space-around; margin: 20px 0; background: #f5f5f5; padding: 15px; border-radius: 8px; }
+                        .stat { text-align: center; }
+                        .stat-value { font-size: 24px; font-weight: bold; color: #333; }
+                        .stat-label { font-size: 12px; color: #666; }
+                        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                        th { background: #333; color: white; padding: 10px; text-align: left; }
+                        th, td { border: 1px solid #ddd; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+                        @media print { body { padding: 0; } }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="header">
+                        <h1>INVENTORY REPORT</h1>
+                        <p><strong>${outlet?.name || 'Outlet'}</strong></p>
+                        <p>Generated on: ${new Date().toLocaleString()}</p>
+                      </div>
+                      <div class="stats">
+                        <div class="stat">
+                          <div class="stat-value">${stats.totalProducts}</div>
+                          <div class="stat-label">Total Products</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${formatCurrency(stats.totalValue)}</div>
+                          <div class="stat-label">Total Value</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${stats.lowStockItems}</div>
+                          <div class="stat-label">Low Stock</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${stats.outOfStockItems}</div>
+                          <div class="stat-label">Out of Stock</div>
+                        </div>
+                      </div>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Product Name</th>
+                            <th style="text-align: center;">SKU</th>
+                            <th style="text-align: center;">Category</th>
+                            <th style="text-align: center;">Qty</th>
+                            <th style="text-align: right;">Unit Cost</th>
+                            <th style="text-align: right;">Selling Price</th>
+                            <th style="text-align: right;">Total Value</th>
+                            <th style="text-align: center;">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                      </table>
+                      <div class="footer">
+                        <p>Royal POS - Inventory Management System</p>
+                        <p>This report was automatically generated</p>
+                      </div>
+                    </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                  // Automatically trigger print dialog for PDF save
+                  setTimeout(() => {
+                    printWindow.print();
+                  }, 250);
+                }
+              }}
+            >
+              <Download className="h-6 w-6 text-purple-600" />
+              <span>Download</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+              onClick={() => {
+                setIsActionsDialogOpen(false);
+                // Generate Excel file (HTML table format that Excel can open)
+                const excelContent = `
+                  <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                  <head>
+                    <meta charset="UTF-8">
+                    <style>
+                      table { border-collapse: collapse; }
+                      th, td { border: 1px solid #000; padding: 8px; }
+                      th { background-color: #4F46E5; color: white; font-weight: bold; }
+                      .header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+                      .subheader { color: #666; margin-bottom: 20px; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="header">Inventory Report - ${outlet?.name || 'Outlet'}</div>
+                    <div class="subheader">Generated on: ${new Date().toLocaleString()}</div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Product Name</th>
+                          <th>SKU</th>
+                          <th>Category</th>
+                          <th>Quantity</th>
+                          <th>Unit Cost</th>
+                          <th>Selling Price</th>
+                          <th>Total Value</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${filteredInventory.map(item => `
+                          <tr>
+                            <td>${item.name}</td>
+                            <td>${item.sku}</td>
+                            <td>${item.category}</td>
+                            <td style="text-align: center;">${item.quantity}</td>
+                            <td style="text-align: right;">${formatCurrency(item.unitPrice)}</td>
+                            <td style="text-align: right;">${formatCurrency(item.sellingPrice)}</td>
+                            <td style="text-align: right;">${formatCurrency(item.totalValue)}</td>
+                            <td>${item.status.replace('-', ' ')}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                    <br/>
+                    <table>
+                      <tr><td><strong>Total Products:</strong></td><td>${stats.totalProducts}</td></tr>
+                      <tr><td><strong>Total Value:</strong></td><td>${formatCurrency(stats.totalValue)}</td></tr>
+                      <tr><td><strong>Low Stock Items:</strong></td><td>${stats.lowStockItems}</td></tr>
+                      <tr><td><strong>Out of Stock Items:</strong></td><td>${stats.outOfStockItems}</td></tr>
+                    </table>
+                  </body>
+                  </html>
+                `;
+                
+                const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${outlet?.name || 'outlet'}_inventory_${new Date().toISOString().split('T')[0]}.xls`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <FileOutput className="h-6 w-6 text-orange-600" />
+              <span>Export</span>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
