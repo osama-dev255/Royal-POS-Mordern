@@ -99,6 +99,25 @@ export interface Outlet {
   updated_at?: string;
 }
 
+export interface InventoryProduct {
+  id?: string;
+  outlet_id: string;
+  name: string;
+  sku?: string;
+  category?: string;
+  quantity: number;
+  min_stock?: number;
+  max_stock?: number;
+  unit_cost: number;
+  selling_price: number;
+  total_value?: number;
+  status?: 'in-stock' | 'low-stock' | 'out-of-stock';
+  delivery_note_number?: string;
+  last_updated?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Sale {
   id?: string;
   customer_id?: string;
@@ -1389,12 +1408,124 @@ export const deleteOutlet = async (id: string): Promise<boolean> => {
       .from('outlets')
       .delete()
       .eq('id', id);
-      
+    
     if (error) throw error;
     return true;
   } catch (error) {
     console.error('Error deleting outlet:', error);
     return false;
+  }
+};
+
+// Inventory Products CRUD operations
+export const getInventoryProducts = async (): Promise<InventoryProduct[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching inventory products:', error);
+    return [];
+  }
+};
+
+export const getInventoryProductsByOutlet = async (outletId: string): Promise<InventoryProduct[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching inventory products by outlet:', error);
+    return [];
+  }
+};
+
+export const getInventoryProductById = async (id: string): Promise<InventoryProduct | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching inventory product:', error);
+    return null;
+  }
+};
+
+export const createInventoryProduct = async (product: Omit<InventoryProduct, 'id'>): Promise<InventoryProduct | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .insert([product])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating inventory product:', error);
+    return null;
+  }
+};
+
+export const updateInventoryProduct = async (id: string, product: Partial<InventoryProduct>): Promise<InventoryProduct | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .update(product)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating inventory product:', error);
+    return null;
+  }
+};
+
+export const deleteInventoryProduct = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('inventory_products')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting inventory product:', error);
+    return false;
+  }
+};
+
+export const upsertInventoryProduct = async (product: InventoryProduct): Promise<InventoryProduct | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .upsert(product, { onConflict: 'outlet_id,name' })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error upserting inventory product:', error);
+    return null;
   }
 };
 

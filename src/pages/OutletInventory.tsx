@@ -69,6 +69,7 @@ interface InventoryItem {
 interface InventoryStats {
   totalProducts: number;
   totalValue: number;
+  totalRetailValue: number;
   lowStockItems: number;
   outOfStockItems: number;
   categories: number;
@@ -98,6 +99,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const [stats, setStats] = useState<InventoryStats>({
     totalProducts: 0,
     totalValue: 0,
+    totalRetailValue: 0,
     lowStockItems: 0,
     outOfStockItems: 0,
     categories: 0,
@@ -206,7 +208,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 minStock: minStock,
                 maxStock: maxStock,
                 unitPrice: unitPrice,
-                sellingPrice: unitPrice , // 30% markup for selling price
+                sellingPrice: unitPrice * 1.3, // 30% markup for selling price
                 totalValue: quantity * unitPrice,
                 status: quantity > minStock ? 'in-stock' : quantity > 0 ? 'low-stock' : 'out-of-stock',
                 lastUpdated: delivery.date,
@@ -251,6 +253,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
 
   const calculateStats = () => {
     const totalValue = inventory.reduce((sum, item) => sum + item.totalValue, 0);
+    const totalRetailValue = inventory.reduce((sum, item) => sum + (item.quantity * item.sellingPrice), 0);
     const lowStock = inventory.filter(item => item.status === 'low-stock').length;
     const outOfStock = inventory.filter(item => item.status === 'out-of-stock').length;
     const categories = new Set(inventory.map(item => item.category)).size;
@@ -258,6 +261,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     setStats({
       totalProducts: inventory.length,
       totalValue,
+      totalRetailValue,
       lowStockItems: lowStock,
       outOfStockItems: outOfStock,
       categories,
@@ -443,6 +447,20 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               </div>
               <div className="p-2 bg-green-100 rounded-full">
                 <DollarSign className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Retail Value</p>
+                <p className="text-xl font-bold text-emerald-600">{formatCurrency(stats.totalRetailValue)}</p>
+              </div>
+              <div className="p-2 bg-emerald-100 rounded-full">
+                <TrendingUp className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
           </CardContent>
