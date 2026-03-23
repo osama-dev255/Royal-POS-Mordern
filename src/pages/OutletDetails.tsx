@@ -341,8 +341,8 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log("View Full Report clicked, navigating to financial-reports");
-                  window.location.hash = "#/financial-reports";
+                  console.log("View Full Report clicked, navigating to outlet-reports");
+                  window.location.hash = `#outlet-reports-${outlet.id}`;
                 }}
               >
                 View Full Report
