@@ -13,6 +13,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { 
   Building, 
   Package, 
@@ -873,95 +875,84 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               className="flex flex-col items-center gap-2 h-auto py-4"
               onClick={() => {
                 setIsActionsDialogOpen(false);
-                // Generate PDF by opening print dialog with Save as PDF option
-                const printWindow = window.open('', '_blank');
-                if (printWindow) {
-                  const tableRows = filteredInventory.map(item => `
-                    <tr>
-                      <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.sku}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.category}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.unitPrice)}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.sellingPrice)}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.totalValue)}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.status.replace('-', ' ')}</td>
-                    </tr>
-                  `).join('');
-
-                  printWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <title>Inventory Report - ${outlet?.name || 'Outlet'}</title>
-                      <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
-                        h1 { text-align: center; margin-bottom: 5px; }
-                        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
-                        .header p { margin: 5px 0; color: #666; }
-                        .stats { display: flex; justify-content: space-around; margin: 20px 0; background: #f5f5f5; padding: 15px; border-radius: 8px; }
-                        .stat { text-align: center; }
-                        .stat-value { font-size: 24px; font-weight: bold; color: #333; }
-                        .stat-label { font-size: 12px; color: #666; }
-                        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-                        th { background: #333; color: white; padding: 10px; text-align: left; }
-                        th, td { border: 1px solid #ddd; }
-                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-                        @media print { body { padding: 0; } }
-                      </style>
-                    </head>
-                    <body>
-                      <div class="header">
-                        <h1>INVENTORY REPORT</h1>
-                        <p><strong>${outlet?.name || 'Outlet'}</strong></p>
-                        <p>Generated on: ${new Date().toLocaleString()}</p>
-                      </div>
-                      <div class="stats">
-                        <div class="stat">
-                          <div class="stat-value">${stats.totalProducts}</div>
-                          <div class="stat-label">Total Products</div>
-                        </div>
-                        <div class="stat">
-                          <div class="stat-value">${formatCurrency(stats.totalValue)}</div>
-                          <div class="stat-label">Total Value</div>
-                        </div>
-                        <div class="stat">
-                          <div class="stat-value">${stats.lowStockItems}</div>
-                          <div class="stat-label">Low Stock</div>
-                        </div>
-                        <div class="stat">
-                          <div class="stat-value">${stats.outOfStockItems}</div>
-                          <div class="stat-label">Out of Stock</div>
-                        </div>
-                      </div>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Product Name</th>
-                            <th style="text-align: center;">SKU</th>
-                            <th style="text-align: center;">Category</th>
-                            <th style="text-align: center;">Qty</th>
-                            <th style="text-align: right;">Unit Cost</th>
-                            <th style="text-align: right;">Selling Price</th>
-                            <th style="text-align: right;">Total Value</th>
-                            <th style="text-align: center;">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>${tableRows}</tbody>
-                      </table>
-                      <div class="footer">
-                        <p>Royal POS - Inventory Management System</p>
-                        <p>This report was automatically generated</p>
-                      </div>
-                    </body>
-                    </html>
-                  `);
-                  printWindow.document.close();
-                  // Automatically trigger print dialog for PDF save
-                  setTimeout(() => {
-                    printWindow.print();
-                  }, 250);
+                // Generate PDF using jsPDF
+                const doc = new jsPDF('landscape');
+                
+                // Title
+                doc.setFontSize(20);
+                doc.setTextColor(51, 51, 51);
+                doc.text('INVENTORY REPORT', 148, 20, { align: 'center' });
+                
+                // Outlet name and date
+                doc.setFontSize(12);
+                doc.setTextColor(102, 102, 102);
+                doc.text(`${outlet?.name || 'Outlet'}`, 148, 28, { align: 'center' });
+                doc.text(`Generated on: ${new Date().toLocaleString()}`, 148, 34, { align: 'center' });
+                
+                // Stats summary
+                doc.setFontSize(10);
+                doc.setTextColor(51, 51, 51);
+                const statsY = 45;
+                doc.text(`Total Products: ${stats.totalProducts}`, 20, statsY);
+                doc.text(`Total Value: ${formatCurrency(stats.totalValue)}`, 80, statsY);
+                doc.text(`Low Stock: ${stats.lowStockItems}`, 150, statsY);
+                doc.text(`Out of Stock: ${stats.outOfStockItems}`, 210, statsY);
+                
+                // Draw line separator
+                doc.setDrawColor(200, 200, 200);
+                doc.line(20, statsY + 5, 277, statsY + 5);
+                
+                // Table data
+                const tableData = filteredInventory.map(item => [
+                  item.name,
+                  item.sku,
+                  item.category,
+                  item.quantity.toString(),
+                  formatCurrency(item.unitPrice),
+                  formatCurrency(item.sellingPrice),
+                  formatCurrency(item.totalValue),
+                  item.status.replace('-', ' ')
+                ]);
+                
+                // Generate table
+                autoTable(doc, {
+                  startY: statsY + 10,
+                  head: [['Product Name', 'SKU', 'Category', 'Qty', 'Unit Cost', 'Selling Price', 'Total Value', 'Status']],
+                  body: tableData,
+                  theme: 'striped',
+                  headStyles: { 
+                    fillColor: [51, 51, 51],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold'
+                  },
+                  styles: {
+                    fontSize: 8,
+                    cellPadding: 3
+                  },
+                  columnStyles: {
+                    0: { cellWidth: 50 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 30 },
+                    3: { cellWidth: 15, halign: 'center' },
+                    4: { cellWidth: 30, halign: 'right' },
+                    5: { cellWidth: 30, halign: 'right' },
+                    6: { cellWidth: 35, halign: 'right' },
+                    7: { cellWidth: 25, halign: 'center' }
+                  }
+                });
+                
+                // Footer
+                const pageCount = doc.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                  doc.setPage(i);
+                  doc.setFontSize(8);
+                  doc.setTextColor(150, 150, 150);
+                  doc.text('Royal POS - Inventory Management System', 148, doc.internal.pageSize.height - 10, { align: 'center' });
+                  doc.text(`Page ${i} of ${pageCount}`, 277, doc.internal.pageSize.height - 10, { align: 'right' });
                 }
+                
+                // Save the PDF
+                doc.save(`${outlet?.name || 'outlet'}_inventory_${new Date().toISOString().split('T')[0]}.pdf`);
               }}
             >
               <Download className="h-6 w-6 text-purple-600" />
