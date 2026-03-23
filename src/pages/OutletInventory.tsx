@@ -853,17 +853,102 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
             <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => {
+              onClick={async () => {
                 setIsActionsDialogOpen(false);
-                if (navigator.share) {
-                  navigator.share({
-                    title: `${outlet?.name || 'Outlet'} Inventory`,
-                    text: `Inventory report for ${outlet?.name || 'Outlet'} - ${filteredInventory.length} products`,
-                    url: window.location.href
-                  });
+                // Generate PDF for sharing
+                const doc = new jsPDF('landscape');
+                
+                // Title
+                doc.setFontSize(20);
+                doc.setTextColor(51, 51, 51);
+                doc.text('INVENTORY REPORT', 148, 20, { align: 'center' });
+                
+                // Outlet name and date
+                doc.setFontSize(12);
+                doc.setTextColor(102, 102, 102);
+                doc.text(`${outlet?.name || 'Outlet'}`, 148, 28, { align: 'center' });
+                doc.text(`Generated on: ${new Date().toLocaleString()}`, 148, 34, { align: 'center' });
+                
+                // Stats summary
+                doc.setFontSize(10);
+                doc.setTextColor(51, 51, 51);
+                const statsY = 45;
+                doc.text(`Total Products: ${stats.totalProducts}`, 20, statsY);
+                doc.text(`Total Value: ${formatCurrency(stats.totalValue)}`, 80, statsY);
+                doc.text(`Low Stock: ${stats.lowStockItems}`, 150, statsY);
+                doc.text(`Out of Stock: ${stats.outOfStockItems}`, 210, statsY);
+                
+                // Draw line separator
+                doc.setDrawColor(200, 200, 200);
+                doc.line(20, statsY + 5, 277, statsY + 5);
+                
+                // Table data
+                const tableData = filteredInventory.map(item => [
+                  item.name,
+                  item.sku,
+                  item.category,
+                  item.quantity.toString(),
+                  formatCurrency(item.unitPrice),
+                  formatCurrency(item.sellingPrice),
+                  formatCurrency(item.totalValue),
+                  item.status.replace('-', ' ')
+                ]);
+                
+                // Generate table
+                autoTable(doc, {
+                  startY: statsY + 10,
+                  head: [['Product Name', 'SKU', 'Category', 'Qty', 'Unit Cost', 'Selling Price', 'Total Value', 'Status']],
+                  body: tableData,
+                  theme: 'striped',
+                  headStyles: { 
+                    fillColor: [51, 51, 51],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold'
+                  },
+                  styles: {
+                    fontSize: 8,
+                    cellPadding: 3
+                  },
+                  columnStyles: {
+                    0: { cellWidth: 50 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 30 },
+                    3: { cellWidth: 15, halign: 'center' },
+                    4: { cellWidth: 30, halign: 'right' },
+                    5: { cellWidth: 30, halign: 'right' },
+                    6: { cellWidth: 35, halign: 'right' },
+                    7: { cellWidth: 25, halign: 'center' }
+                  }
+                });
+                
+                // Footer
+                const pageCount = doc.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                  doc.setPage(i);
+                  doc.setFontSize(8);
+                  doc.setTextColor(150, 150, 150);
+                  doc.text('Royal POS - Inventory Management System', 148, doc.internal.pageSize.height - 10, { align: 'center' });
+                  doc.text(`Page ${i} of ${pageCount}`, 277, doc.internal.pageSize.height - 10, { align: 'right' });
+                }
+                
+                // Convert PDF to Blob and share
+                const pdfBlob = doc.output('blob');
+                const pdfFile = new File([pdfBlob], `${outlet?.name || 'outlet'}_inventory_${new Date().toISOString().split('T')[0]}.pdf`, { type: 'application/pdf' });
+                
+                // Try to share the file using Web Share API
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                  try {
+                    await navigator.share({
+                      title: `${outlet?.name || 'Outlet'} Inventory Report`,
+                      text: `Inventory report for ${outlet?.name || 'Outlet'} - ${filteredInventory.length} products`,
+                      files: [pdfFile]
+                    });
+                  } catch (err) {
+                    console.log('Share cancelled or failed:', err);
+                  }
                 } else {
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link copied to clipboard!');
+                  // Fallback: download the PDF if sharing is not supported
+                  doc.save(`${outlet?.name || 'outlet'}_inventory_${new Date().toISOString().split('T')[0]}.pdf`);
                 }
               }}
             >
