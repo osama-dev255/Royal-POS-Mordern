@@ -110,7 +110,8 @@ export interface InventoryProduct {
   max_stock?: number;
   unit_cost: number;
   selling_price: number;
-  total_value?: number;
+  total_cost?: number;
+  total_price?: number;
   status?: 'in-stock' | 'low-stock' | 'out-of-stock';
   delivery_note_number?: string;
   last_updated?: string;

@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS inventory_products (
   max_stock INTEGER DEFAULT 0,
   unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
   selling_price DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total_value DECIMAL(15,2) GENERATED ALWAYS AS (quantity * unit_cost) STORED,
+  total_cost DECIMAL(15,2) GENERATED ALWAYS AS (quantity * unit_cost) STORED,
+  total_price DECIMAL(15,2) GENERATED ALWAYS AS (quantity * selling_price) STORED,
   status VARCHAR(20) NOT NULL DEFAULT 'in-stock' CHECK (status IN ('in-stock', 'low-stock', 'out-of-stock')),
   delivery_note_number VARCHAR(100),
   last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -32,7 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_inventory_products_sku ON inventory_products(sku)
 COMMENT ON TABLE inventory_products IS 'Stores inventory products for each registered outlet';
 COMMENT ON COLUMN inventory_products.unit_cost IS 'The cost price per unit (purchase price)';
 COMMENT ON COLUMN inventory_products.selling_price IS 'The selling price per unit (retail price)';
-COMMENT ON COLUMN inventory_products.total_value IS 'Computed as quantity * unit_cost';
+COMMENT ON COLUMN inventory_products.total_cost IS 'Computed as quantity * unit_cost (inventory value)';
+COMMENT ON COLUMN inventory_products.total_price IS 'Computed as quantity * selling_price (retail value)';
 COMMENT ON COLUMN inventory_products.min_stock IS 'Minimum stock level before low stock alert';
 COMMENT ON COLUMN inventory_products.max_stock IS 'Maximum stock capacity';
 
