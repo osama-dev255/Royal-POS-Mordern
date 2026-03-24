@@ -42,7 +42,7 @@ import {
   Download,
   FileOutput
 } from "lucide-react";
-import { getOutlets, Outlet } from "@/services/databaseService";
+import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { supabase } from "@/lib/supabaseClient";
 import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
@@ -152,7 +152,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
 
   useEffect(() => {
     calculateStats();
-  }, [inventory]);
+  }, [inventory, propOutletId]);
 
   const fetchOutletAndInventory = async () => {
     try {
@@ -253,17 +253,32 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     }
   };
 
-  const calculateStats = () => {
-    const totalValue = inventory.reduce((sum, item) => sum + item.totalValue, 0);
-    const totalRetailValue = inventory.reduce((sum, item) => sum + (item.quantity * item.sellingPrice), 0);
+  const calculateStats = async () => {
+    // Calculate frontend-based stats
     const lowStock = inventory.filter(item => item.status === 'low-stock').length;
     const outOfStock = inventory.filter(item => item.status === 'out-of-stock').length;
     const categories = new Set(inventory.map(item => item.category)).size;
     
+    // Fetch database-calculated totals
+    let dbTotals: InventoryTotals = {
+      totalInventoryValue: 0,
+      totalRetailValue: 0,
+      totalProducts: inventory.length,
+      totalQuantity: 0
+    };
+    
+    if (propOutletId) {
+      try {
+        dbTotals = await getInventoryTotalsByOutlet(propOutletId);
+      } catch (err) {
+        console.error('Error fetching inventory totals from database:', err);
+      }
+    }
+    
     setStats({
       totalProducts: inventory.length,
-      totalValue,
-      totalRetailValue,
+      totalValue: dbTotals.totalInventoryValue,
+      totalRetailValue: dbTotals.totalRetailValue,
       lowStockItems: lowStock,
       outOfStockItems: outOfStock,
       categories,

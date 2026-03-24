@@ -1530,6 +1530,55 @@ export const upsertInventoryProduct = async (product: InventoryProduct): Promise
   }
 };
 
+export interface InventoryTotals {
+  totalInventoryValue: number;
+  totalRetailValue: number;
+  totalProducts: number;
+  totalQuantity: number;
+}
+
+export const getInventoryTotalsByOutlet = async (outletId: string): Promise<InventoryTotals> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .select('total_cost, total_price, quantity')
+      .eq('outlet_id', outletId);
+    
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return {
+        totalInventoryValue: 0,
+        totalRetailValue: 0,
+        totalProducts: 0,
+        totalQuantity: 0
+      };
+    }
+    
+    const totals = data.reduce((acc, item) => ({
+      totalInventoryValue: acc.totalInventoryValue + (item.total_cost || 0),
+      totalRetailValue: acc.totalRetailValue + (item.total_price || 0),
+      totalProducts: acc.totalProducts + 1,
+      totalQuantity: acc.totalQuantity + (item.quantity || 0)
+    }), {
+      totalInventoryValue: 0,
+      totalRetailValue: 0,
+      totalProducts: 0,
+      totalQuantity: 0
+    });
+    
+    return totals;
+  } catch (error) {
+    console.error('Error fetching inventory totals:', error);
+    return {
+      totalInventoryValue: 0,
+      totalRetailValue: 0,
+      totalProducts: 0,
+      totalQuantity: 0
+    };
+  }
+};
+
 // Sales CRUD operations
 export const getSales = async (): Promise<Sale[]> => {
   try {
