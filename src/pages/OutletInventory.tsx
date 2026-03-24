@@ -44,6 +44,8 @@ import {
 } from "lucide-react";
 import { getOutlets, Outlet } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
+import { supabase } from "@/lib/supabaseClient";
+import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
 
 interface OutletInventoryProps {
   onBack: () => void;
@@ -311,12 +313,13 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingItem || !propOutletId) return;
     
     // Save to localStorage
     saveSellingPrice(propOutletId, editingItem.id, editForm.sellingPrice);
     
+    // Update local state
     setInventory(prev => prev.map(item => {
       if (item.id === editingItem.id) {
         return {
@@ -326,6 +329,26 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       }
       return item;
     }));
+    
+    // Sync to database - update inventory_products table
+    try {
+      const { error } = await supabase
+        .from('inventory_products')
+        .update({ 
+          selling_price: editForm.sellingPrice,
+          updated_at: new Date().toISOString()
+        })
+        .eq('outlet_id', propOutletId)
+        .eq('name', editingItem.name);
+      
+      if (error) {
+        console.error('Error updating inventory product in database:', error);
+      } else {
+        console.log('Selling price updated in database successfully');
+      }
+    } catch (err) {
+      console.error('Failed to sync selling price to database:', err);
+    }
     
     setIsEditDialogOpen(false);
     setEditingItem(null);
@@ -1132,6 +1155,26 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
             >
               <FileOutput className="h-6 w-6 text-orange-600" />
               <span>Export</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+              onClick={async () => {
+                setIsActionsDialogOpen(false);
+                if (!propOutletId) {
+                  alert('No outlet selected');
+                  return;
+                }
+                const result = await syncSellingPricesToDatabase(propOutletId);
+                if (result.success) {
+                  alert(`Successfully synced ${result.updated} selling prices to database!`);
+                } else {
+                  alert(`Sync completed with ${result.errors.length} errors. Check console for details.`);
+                }
+              }}
+            >
+              <RefreshCw className="h-6 w-6 text-blue-600" />
+              <span>Sync Prices</span>
             </Button>
           </div>
         </DialogContent>
