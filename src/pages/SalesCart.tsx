@@ -117,30 +117,21 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         
         // Load products - use outlet-specific products if outletId is provided
         if (outletId) {
-          // Fetch products from database with sold quantities
+          // Fetch products from database with sold quantities (everything from database)
           const dbInventory = await getAvailableInventoryByOutlet(outletId);
           const outletProducts: Product[] = [];
           
-          // Load saved selling prices from localStorage
-          const savedPricesKey = `outlet_${outletId}_selling_prices`;
-          const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
-          
-          // Convert database inventory to Product format
+          // Convert database inventory to Product format (all values from DB)
           dbInventory.forEach(item => {
             const productId = `${item.outlet_id}-${item.name}`;
             const existingProduct = outletProducts.find(p => p.name === item.name);
             if (existingProduct) {
               existingProduct.stock_quantity += item.available_quantity || 0;
             } else {
-              // Use saved selling price if available, otherwise use database selling_price
-              const sellingPrice = savedPrices[productId] !== undefined 
-                ? savedPrices[productId] 
-                : item.selling_price;
-              
               outletProducts.push({
                 id: productId,
                 name: item.name,
-                selling_price: sellingPrice,
+                selling_price: item.selling_price,
                 cost_price: item.unit_cost,
                 stock_quantity: item.available_quantity || 0,
                 barcode: '',
@@ -468,8 +459,6 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       if (outletId) {
         // Reload outlet products with updated sold quantities from database
         const dbInventory = await getAvailableInventoryByOutlet(outletId);
-        const savedPricesKey = `outlet_${outletId}_selling_prices`;
-        const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
         
         const updatedProducts: Product[] = [];
         dbInventory.forEach(item => {
@@ -478,14 +467,10 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           if (existingProduct) {
             existingProduct.stock_quantity += item.available_quantity || 0;
           } else {
-            const sellingPrice = savedPrices[productId] !== undefined 
-              ? savedPrices[productId] 
-              : item.selling_price;
-            
             updatedProducts.push({
               id: productId,
               name: item.name,
-              selling_price: sellingPrice,
+              selling_price: item.selling_price,
               cost_price: item.unit_cost,
               stock_quantity: item.available_quantity || 0,
               barcode: '',

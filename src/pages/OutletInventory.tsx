@@ -110,30 +110,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     totalDeliveries: 0
   });
 
-  // Helper functions for persisting selling prices to localStorage
-  const getSavedPricesKey = (outletId: string) => `outlet_${outletId}_selling_prices`;
-  
-  const loadSavedSellingPrices = (outletId: string): Record<string, number> => {
-    try {
-      const key = getSavedPricesKey(outletId);
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-      console.error("Error loading saved selling prices:", error);
-      return {};
-    }
-  };
-  
-  const saveSellingPrice = (outletId: string, productId: string, price: number) => {
-    try {
-      const key = getSavedPricesKey(outletId);
-      const savedPrices = loadSavedSellingPrices(outletId);
-      savedPrices[productId] = price;
-      localStorage.setItem(key, JSON.stringify(savedPrices));
-    } catch (error) {
-      console.error("Error saving selling price:", error);
-    }
-  };
+
 
   useEffect(() => {
     fetchOutletAndInventory();
@@ -168,18 +145,12 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       const outletDeliveries = await getDeliveriesByOutletId(propOutletId);
       setDeliveries(outletDeliveries);
       
-      // Fetch inventory from database with sold quantities
+      // Fetch inventory from database with sold quantities (everything from database)
       const dbInventory = await getAvailableInventoryByOutlet(propOutletId);
       
-      // Load saved selling prices from localStorage
-      const savedPrices = loadSavedSellingPrices(propOutletId);
-      
-      // Convert database inventory to InventoryItem format
+      // Convert database inventory to InventoryItem format (all values from DB)
       const inventoryItems: InventoryItem[] = dbInventory.map(item => {
         const availableQty = item.available_quantity || Math.max(0, item.quantity - (item.sold_quantity || 0));
-        const sellingPrice = savedPrices[`${item.outlet_id}-${item.name}`] !== undefined 
-          ? savedPrices[`${item.outlet_id}-${item.name}`] 
-          : item.selling_price;
         
         return {
           id: `${item.outlet_id}-${item.name}`,
@@ -190,9 +161,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
           minStock: item.min_stock || Math.floor(item.quantity * 0.2),
           maxStock: item.max_stock || Math.floor(item.quantity * 1.5),
           unitPrice: item.unit_cost,
-          sellingPrice: sellingPrice,
+          sellingPrice: item.selling_price,
           totalValue: availableQty * item.unit_cost,
-          totalPrice: availableQty * sellingPrice,
+          totalPrice: availableQty * item.selling_price,
           status: (availableQty > (item.min_stock || 0) ? 'in-stock' : 
                    availableQty > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock',
           lastUpdated: item.last_updated || new Date().toISOString(),
@@ -215,12 +186,14 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     const outOfStock = inventory.filter(item => item.status === 'out-of-stock').length;
     const categories = new Set(inventory.map(item => item.category)).size;
     
-    // Fetch database-calculated totals
+    // Fetch totals from database (everything from database)
     let dbTotals: InventoryTotals = {
       totalInventoryValue: 0,
       totalRetailValue: 0,
       totalProducts: inventory.length,
-      totalQuantity: 0
+      totalQuantity: 0,
+      totalSold: 0,
+      totalAvailable: 0
     };
     
     if (propOutletId) {
@@ -326,9 +299,6 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const handleSaveEdit = async () => {
     if (!editingItem || !propOutletId) return;
     
-    // Save to localStorage
-    saveSellingPrice(propOutletId, editingItem.id, editForm.sellingPrice);
-    
     // Update local state - recalculate totalPrice when sellingPrice changes
     setInventory(prev => prev.map(item => {
       if (item.id === editingItem.id) {
@@ -341,7 +311,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       return item;
     }));
     
-    // Sync to database - update inventory_products table
+    // Save to database - update inventory_products table
     try {
       const { error } = await supabase
         .from('inventory_products')

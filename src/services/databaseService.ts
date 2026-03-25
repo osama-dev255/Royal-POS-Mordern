@@ -1545,7 +1545,7 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
   try {
     const { data, error } = await supabase
       .from('inventory_products')
-      .select('total_cost, total_price, quantity')
+      .select('unit_cost, selling_price, quantity, sold_quantity, available_quantity')
       .eq('outlet_id', outletId);
     
     if (error) throw error;
@@ -1555,20 +1555,32 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
         totalInventoryValue: 0,
         totalRetailValue: 0,
         totalProducts: 0,
-        totalQuantity: 0
+        totalQuantity: 0,
+        totalSold: 0,
+        totalAvailable: 0
       };
     }
     
-    const totals = data.reduce((acc, item) => ({
-      totalInventoryValue: acc.totalInventoryValue + (item.total_cost || 0),
-      totalRetailValue: acc.totalRetailValue + (item.total_price || 0),
-      totalProducts: acc.totalProducts + 1,
-      totalQuantity: acc.totalQuantity + (item.quantity || 0)
-    }), {
+    const totals = data.reduce((acc, item) => {
+      const availableQty = item.available_quantity || Math.max(0, (item.quantity || 0) - (item.sold_quantity || 0));
+      const inventoryValue = availableQty * (item.unit_cost || 0);
+      const retailValue = availableQty * (item.selling_price || 0);
+      
+      return {
+        totalInventoryValue: acc.totalInventoryValue + inventoryValue,
+        totalRetailValue: acc.totalRetailValue + retailValue,
+        totalProducts: acc.totalProducts + 1,
+        totalQuantity: acc.totalQuantity + (item.quantity || 0),
+        totalSold: acc.totalSold + (item.sold_quantity || 0),
+        totalAvailable: acc.totalAvailable + availableQty
+      };
+    }, {
       totalInventoryValue: 0,
       totalRetailValue: 0,
       totalProducts: 0,
-      totalQuantity: 0
+      totalQuantity: 0,
+      totalSold: 0,
+      totalAvailable: 0
     });
     
     return totals;
@@ -1578,7 +1590,9 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
       totalInventoryValue: 0,
       totalRetailValue: 0,
       totalProducts: 0,
-      totalQuantity: 0
+      totalQuantity: 0,
+      totalSold: 0,
+      totalAvailable: 0
     };
   }
 };

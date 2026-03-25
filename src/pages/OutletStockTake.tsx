@@ -12,8 +12,9 @@ import {
   Calculator
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
-import { getAvailableInventoryByOutlet, InventoryProduct } from "@/services/databaseService";
+import { getAvailableInventoryByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 interface OutletStockTakeProps {
   onBack: () => void;
@@ -104,9 +105,10 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
     }));
   };
 
-  const savePhysicalCounts = () => {
+  const savePhysicalCounts = async () => {
     if (!outletId) return;
     
+    // Save physical counts to localStorage (for UI persistence)
     const physicalCountsKey = `outlet_${outletId}_physical_counts`;
     const physicalCounts: Record<string, number> = {};
     
@@ -116,24 +118,38 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
     
     localStorage.setItem(physicalCountsKey, JSON.stringify(physicalCounts));
     
-    // Update sold quantities based on physical count
+    // Update sold quantities in database based on physical count
     // Formula: Sold = Original - Physical Count
-    const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
-    const soldQuantities: Record<string, number> = {};
-    
-    stockItems.forEach(item => {
-      soldQuantities[item.id] = Math.max(0, item.originalQuantity - item.physicalCount);
-    });
-    
-    localStorage.setItem(soldQuantitiesKey, JSON.stringify(soldQuantities));
-    
-    toast({
-      title: "Stock Take Saved",
-      description: "Physical counts have been saved and inventory updated"
-    });
-    
-    // Reload data to reflect changes
-    loadStockData();
+    try {
+      for (const item of stockItems) {
+        const calculatedSoldQty = Math.max(0, item.originalQuantity - item.physicalCount);
+        
+        // Update sold_quantity in database
+        await supabase
+          .from('inventory_products')
+          .update({
+            sold_quantity: calculatedSoldQty,
+            updated_at: new Date().toISOString()
+          })
+          .eq('outlet_id', outletId)
+          .eq('name', item.name);
+      }
+      
+      toast({
+        title: "Stock Take Saved",
+        description: "Physical counts have been saved and inventory updated in database"
+      });
+      
+      // Reload data to reflect changes
+      loadStockData();
+    } catch (error) {
+      console.error("Error saving stock take:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save stock take to database",
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredItems = stockItems.filter(item =>

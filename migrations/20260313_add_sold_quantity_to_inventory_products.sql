@@ -93,8 +93,8 @@ RETURNS TABLE (
 BEGIN
   RETURN QUERY
   SELECT 
-    COALESCE(SUM(ip.total_cost), 0) as total_inventory_value,
-    COALESCE(SUM(ip.total_price), 0) as total_retail_value,
+    COALESCE(SUM(ip.available_quantity * ip.unit_cost), 0) as total_inventory_value,
+    COALESCE(SUM(ip.available_quantity * ip.selling_price), 0) as total_retail_value,
     COUNT(*)::BIGINT as total_products,
     COALESCE(SUM(ip.quantity), 0)::BIGINT as total_quantity,
     COALESCE(SUM(ip.sold_quantity), 0)::BIGINT as total_sold,
