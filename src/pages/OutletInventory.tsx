@@ -42,7 +42,7 @@ import {
   Download,
   FileOutput
 } from "lucide-react";
-import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals } from "@/services/databaseService";
+import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { supabase } from "@/lib/supabaseClient";
 import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
@@ -63,6 +63,7 @@ interface InventoryItem {
   unitPrice: number;
   sellingPrice: number;
   totalValue: number;
+  totalPrice: number;
   status: 'in-stock' | 'low-stock' | 'out-of-stock';
   lastUpdated: string;
   deliveryNoteNumber?: string;
@@ -192,6 +193,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               // Aggregate quantities for same product
               existingItem.quantity += item.quantity || item.delivered || 0;
               existingItem.totalValue = existingItem.quantity * existingItem.unitPrice;
+              existingItem.totalPrice = existingItem.quantity * existingItem.sellingPrice;
               existingItem.lastUpdated = delivery.date;
               existingItem.deliveryNoteNumber = delivery.deliveryNoteNumber;
             } else {
@@ -210,8 +212,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 minStock: minStock,
                 maxStock: maxStock,
                 unitPrice: unitPrice,
-                sellingPrice: unitPrice * 1.3, // 30% markup for selling price
+                sellingPrice: unitPrice, // Same as unit price (no markup)
                 totalValue: quantity * unitPrice,
+                totalPrice: quantity * unitPrice,
                 status: quantity > minStock ? 'in-stock' : quantity > 0 ? 'low-stock' : 'out-of-stock',
                 lastUpdated: delivery.date,
                 deliveryNoteNumber: delivery.deliveryNoteNumber
@@ -231,8 +234,23 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       // Apply saved selling prices and sold quantities from localStorage
       const savedPrices = loadSavedSellingPrices(propOutletId);
       const soldQuantities = loadSoldQuantities(propOutletId);
+      
+      // Aggregate sold quantities by product name
+      // Key format is "${deliveryId}-${itemName}" where deliveryId is a UUID (36 chars with dashes)
+      // So the product name starts after position 37 (36 + 1 for the dash separator)
+      const soldQuantitiesByName: Record<string, number> = {};
+      for (const [key, qty] of Object.entries(soldQuantities)) {
+        // Extract product name - it's everything after the UUID and separator
+        // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars)
+        const productName = key.substring(37); // 36 (UUID) + 1 (dash) = 37
+        if (productName) {
+          soldQuantitiesByName[productName] = (soldQuantitiesByName[productName] || 0) + qty;
+        }
+      }
+      
       const inventoryWithSavedPrices = inventoryArray.map(item => {
-        const soldQty = soldQuantities[item.id] || 0;
+        // Use product name to find sold quantity
+        const soldQty = soldQuantitiesByName[item.name] || 0;
         const availableQuantity = Math.max(0, item.quantity - soldQty);
         const newStatus = availableQuantity > item.minStock ? 'in-stock' : availableQuantity > 0 ? 'low-stock' : 'out-of-stock';
         
@@ -240,6 +258,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
           ...item,
           sellingPrice: savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice,
           quantity: availableQuantity,
+          totalPrice: availableQuantity * (savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice),
           status: newStatus as 'in-stock' | 'low-stock' | 'out-of-stock'
         };
       });
@@ -285,6 +304,56 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       avgTurnover: 4.2,
       totalDeliveries: deliveries.length
     });
+  };
+
+  // Helper function to fetch inventory from database for Actions (uses latest edited values)
+  const fetchInventoryFromDatabase = async (): Promise<InventoryItem[]> => {
+    if (!propOutletId) return [];
+    
+    try {
+      const dbProducts = await getInventoryProductsByOutlet(propOutletId);
+      
+      // Load sold quantities from localStorage to calculate available quantity
+      const soldQuantities = loadSoldQuantities(propOutletId);
+      
+      return dbProducts.map((product: InventoryProduct) => {
+        // Try to find sold quantity by matching product name in localStorage keys
+        // Sold quantities are keyed by "${delivery.id}-${itemName}" format
+        let soldQty = 0;
+        for (const [key, qty] of Object.entries(soldQuantities)) {
+          if (key.includes(product.name)) {
+            soldQty += qty;
+          }
+        }
+        
+        const availableQuantity = Math.max(0, product.quantity - soldQty);
+        const newStatus = availableQuantity > (product.min_stock || 0) 
+          ? 'in-stock' 
+          : availableQuantity > 0 
+            ? 'low-stock' 
+            : 'out-of-stock';
+        
+        return {
+          id: product.id || '',
+          name: product.name,
+          sku: product.sku || '',
+          category: product.category || 'General',
+          quantity: availableQuantity,
+          minStock: product.min_stock || 0,
+          maxStock: product.max_stock || 0,
+          unitPrice: product.unit_cost,
+          sellingPrice: product.selling_price,
+          totalValue: availableQuantity * product.unit_cost,
+          totalPrice: availableQuantity * product.selling_price,
+          status: newStatus,
+          lastUpdated: product.last_updated || '',
+          deliveryNoteNumber: product.delivery_note_number
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching inventory from database:', error);
+      return [];
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -334,12 +403,13 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     // Save to localStorage
     saveSellingPrice(propOutletId, editingItem.id, editForm.sellingPrice);
     
-    // Update local state
+    // Update local state - recalculate totalPrice when sellingPrice changes
     setInventory(prev => prev.map(item => {
       if (item.id === editingItem.id) {
         return {
           ...item,
-          sellingPrice: editForm.sellingPrice
+          sellingPrice: editForm.sellingPrice,
+          totalPrice: item.quantity * editForm.sellingPrice
         };
       }
       return item;
@@ -808,9 +878,12 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
             <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => {
+              onClick={async () => {
                 setIsActionsDialogOpen(false);
-                // Create a printable inventory report
+                // Fetch latest totals from database for stats
+                const dbTotals = await getInventoryTotalsByOutlet(propOutletId || '');
+                
+                // Create a printable inventory report using frontend inventory (has correct available quantities)
                 const printWindow = window.open('', '_blank');
                 if (printWindow) {
                   const tableRows = filteredInventory.map(item => `
@@ -820,8 +893,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                       <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.category}</td>
                       <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity}</td>
                       <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.unitPrice)}</td>
-                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.sellingPrice)}</td>
                       <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.totalValue)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.sellingPrice)}</td>
+                      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.totalPrice)}</td>
                       <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: ${item.status === 'in-stock' ? 'green' : item.status === 'low-stock' ? 'orange' : 'red'};">${item.status.replace('-', ' ')}</td>
                     </tr>
                   `).join('');
@@ -856,19 +930,23 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                       
                       <div class="stats">
                         <div class="stat">
-                          <div class="stat-value">${stats.totalProducts}</div>
+                          <div class="stat-value">${filteredInventory.length}</div>
                           <div class="stat-label">Total Products</div>
                         </div>
                         <div class="stat">
-                          <div class="stat-value">${formatCurrency(stats.totalValue)}</div>
-                          <div class="stat-label">Total Value</div>
+                          <div class="stat-value">${formatCurrency(dbTotals.totalInventoryValue)}</div>
+                          <div class="stat-label">Inventory Value</div>
                         </div>
                         <div class="stat">
-                          <div class="stat-value">${stats.lowStockItems}</div>
+                          <div class="stat-value">${formatCurrency(dbTotals.totalRetailValue)}</div>
+                          <div class="stat-label">Retail Value</div>
+                        </div>
+                        <div class="stat">
+                          <div class="stat-value">${filteredInventory.filter(i => i.status === 'low-stock').length}</div>
                           <div class="stat-label">Low Stock</div>
                         </div>
                         <div class="stat">
-                          <div class="stat-value">${stats.outOfStockItems}</div>
+                          <div class="stat-value">${filteredInventory.filter(i => i.status === 'out-of-stock').length}</div>
                           <div class="stat-label">Out of Stock</div>
                         </div>
                       </div>
@@ -881,8 +959,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                             <th style="text-align: center;">Category</th>
                             <th style="text-align: center;">Qty</th>
                             <th style="text-align: right;">Unit Cost</th>
-                            <th style="text-align: right;">Selling Price</th>
-                            <th style="text-align: right;">Total Value</th>
+                            <th style="text-align: right;">Total Cost</th>
+                            <th style="text-align: right;">Unit Price</th>
+                            <th style="text-align: right;">Total Price</th>
                             <th style="text-align: center;">Status</th>
                           </tr>
                         </thead>
@@ -911,7 +990,10 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
               className="flex flex-col items-center gap-2 h-auto py-4"
               onClick={async () => {
                 setIsActionsDialogOpen(false);
-                // Generate PDF for sharing
+                // Fetch latest totals from database for stats
+                const dbTotals = await getInventoryTotalsByOutlet(propOutletId || '');
+                
+                // Generate PDF for sharing using frontend inventory (has correct available quantities)
                 const doc = new jsPDF('landscape');
                 
                 // Title
@@ -929,14 +1011,15 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 doc.setFontSize(10);
                 doc.setTextColor(51, 51, 51);
                 const statsY = 45;
-                doc.text(`Total Products: ${stats.totalProducts}`, 20, statsY);
-                doc.text(`Total Value: ${formatCurrency(stats.totalValue)}`, 80, statsY);
-                doc.text(`Low Stock: ${stats.lowStockItems}`, 150, statsY);
-                doc.text(`Out of Stock: ${stats.outOfStockItems}`, 210, statsY);
+                doc.text(`Total Products: ${filteredInventory.length}`, 20, statsY);
+                doc.text(`Inventory Value: ${formatCurrency(dbTotals.totalInventoryValue)}`, 80, statsY);
+                doc.text(`Retail Value: ${formatCurrency(dbTotals.totalRetailValue)}`, 150, statsY);
+                doc.text(`Low Stock: ${filteredInventory.filter(i => i.status === 'low-stock').length}`, 220, statsY);
+                doc.text(`Out of Stock: ${filteredInventory.filter(i => i.status === 'out-of-stock').length}`, 20, statsY + 8);
                 
                 // Draw line separator
                 doc.setDrawColor(200, 200, 200);
-                doc.line(20, statsY + 5, 277, statsY + 5);
+                doc.line(20, statsY + 13, 277, statsY + 13);
                 
                 // Table data
                 const tableData = filteredInventory.map(item => [
@@ -945,15 +1028,16 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                   item.category,
                   item.quantity.toString(),
                   formatCurrency(item.unitPrice),
-                  formatCurrency(item.sellingPrice),
                   formatCurrency(item.totalValue),
+                  formatCurrency(item.sellingPrice),
+                  formatCurrency(item.totalPrice),
                   item.status.replace('-', ' ')
                 ]);
                 
                 // Generate table
                 autoTable(doc, {
-                  startY: statsY + 10,
-                  head: [['Product Name', 'SKU', 'Category', 'Qty', 'Unit Cost', 'Selling Price', 'Total Value', 'Status']],
+                  startY: statsY + 18,
+                  head: [['Product Name', 'SKU', 'Category', 'Qty', 'Unit Cost', 'Total Cost', 'Unit Price', 'Total Price', 'Status']],
                   body: tableData,
                   theme: 'striped',
                   headStyles: { 
@@ -1014,9 +1098,12 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
             <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => {
+              onClick={async () => {
                 setIsActionsDialogOpen(false);
-                // Generate PDF using jsPDF
+                // Fetch latest totals from database for stats
+                const dbTotals = await getInventoryTotalsByOutlet(propOutletId || '');
+                
+                // Generate PDF using jsPDF with frontend inventory (has correct available quantities)
                 const doc = new jsPDF('landscape');
                 
                 // Title
@@ -1034,14 +1121,15 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 doc.setFontSize(10);
                 doc.setTextColor(51, 51, 51);
                 const statsY = 45;
-                doc.text(`Total Products: ${stats.totalProducts}`, 20, statsY);
-                doc.text(`Total Value: ${formatCurrency(stats.totalValue)}`, 80, statsY);
-                doc.text(`Low Stock: ${stats.lowStockItems}`, 150, statsY);
-                doc.text(`Out of Stock: ${stats.outOfStockItems}`, 210, statsY);
+                doc.text(`Total Products: ${filteredInventory.length}`, 20, statsY);
+                doc.text(`Inventory Value: ${formatCurrency(dbTotals.totalInventoryValue)}`, 80, statsY);
+                doc.text(`Retail Value: ${formatCurrency(dbTotals.totalRetailValue)}`, 150, statsY);
+                doc.text(`Low Stock: ${filteredInventory.filter(i => i.status === 'low-stock').length}`, 220, statsY);
+                doc.text(`Out of Stock: ${filteredInventory.filter(i => i.status === 'out-of-stock').length}`, 20, statsY + 8);
                 
                 // Draw line separator
                 doc.setDrawColor(200, 200, 200);
-                doc.line(20, statsY + 5, 277, statsY + 5);
+                doc.line(20, statsY + 13, 277, statsY + 13);
                 
                 // Table data
                 const tableData = filteredInventory.map(item => [
@@ -1050,15 +1138,16 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                   item.category,
                   item.quantity.toString(),
                   formatCurrency(item.unitPrice),
-                  formatCurrency(item.sellingPrice),
                   formatCurrency(item.totalValue),
+                  formatCurrency(item.sellingPrice),
+                  formatCurrency(item.totalPrice),
                   item.status.replace('-', ' ')
                 ]);
                 
                 // Generate table
                 autoTable(doc, {
-                  startY: statsY + 10,
-                  head: [['Product Name', 'SKU', 'Category', 'Qty', 'Unit Cost', 'Selling Price', 'Total Value', 'Status']],
+                  startY: statsY + 18,
+                  head: [['Product Name', 'SKU', 'Category', 'Qty', 'Unit Cost', 'Total Cost', 'Unit Price', 'Total Price', 'Status']],
                   body: tableData,
                   theme: 'striped',
                   headStyles: { 
@@ -1102,9 +1191,12 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
             <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => {
+              onClick={async () => {
                 setIsActionsDialogOpen(false);
-                // Generate Excel file (HTML table format that Excel can open)
+                // Fetch latest totals from database for stats
+                const dbTotals = await getInventoryTotalsByOutlet(propOutletId || '');
+                
+                // Generate Excel file (HTML table format that Excel can open) using frontend inventory
                 const excelContent = `
                   <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
                   <head>
@@ -1128,8 +1220,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                           <th>Category</th>
                           <th>Quantity</th>
                           <th>Unit Cost</th>
-                          <th>Selling Price</th>
-                          <th>Total Value</th>
+                          <th>Total Cost</th>
+                          <th>Unit Price</th>
+                          <th>Total Price</th>
                           <th>Status</th>
                         </tr>
                       </thead>
@@ -1141,8 +1234,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                             <td>${item.category}</td>
                             <td style="text-align: center;">${item.quantity}</td>
                             <td style="text-align: right;">${formatCurrency(item.unitPrice)}</td>
-                            <td style="text-align: right;">${formatCurrency(item.sellingPrice)}</td>
                             <td style="text-align: right;">${formatCurrency(item.totalValue)}</td>
+                            <td style="text-align: right;">${formatCurrency(item.sellingPrice)}</td>
+                            <td style="text-align: right;">${formatCurrency(item.totalPrice)}</td>
                             <td>${item.status.replace('-', ' ')}</td>
                           </tr>
                         `).join('')}
@@ -1150,10 +1244,11 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     </table>
                     <br/>
                     <table>
-                      <tr><td><strong>Total Products:</strong></td><td>${stats.totalProducts}</td></tr>
-                      <tr><td><strong>Total Value:</strong></td><td>${formatCurrency(stats.totalValue)}</td></tr>
-                      <tr><td><strong>Low Stock Items:</strong></td><td>${stats.lowStockItems}</td></tr>
-                      <tr><td><strong>Out of Stock Items:</strong></td><td>${stats.outOfStockItems}</td></tr>
+                      <tr><td><strong>Total Products:</strong></td><td>${filteredInventory.length}</td></tr>
+                      <tr><td><strong>Inventory Value:</strong></td><td>${formatCurrency(dbTotals.totalInventoryValue)}</td></tr>
+                      <tr><td><strong>Total Retail Value:</strong></td><td>${formatCurrency(dbTotals.totalRetailValue)}</td></tr>
+                      <tr><td><strong>Low Stock Items:</strong></td><td>${filteredInventory.filter(i => i.status === 'low-stock').length}</td></tr>
+                      <tr><td><strong>Out of Stock Items:</strong></td><td>${filteredInventory.filter(i => i.status === 'out-of-stock').length}</td></tr>
                     </table>
                   </body>
                   </html>
