@@ -73,6 +73,7 @@ interface InventoryStats {
   totalProducts: number;
   totalValue: number;
   totalRetailValue: number;
+  potentialEarnings: number;
   lowStockItems: number;
   outOfStockItems: number;
   categories: number;
@@ -103,6 +104,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     totalProducts: 0,
     totalValue: 0,
     totalRetailValue: 0,
+    potentialEarnings: 0,
     lowStockItems: 0,
     outOfStockItems: 0,
     categories: 0,
@@ -208,10 +210,11 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       totalProducts: inventory.length,
       totalValue: dbTotals.totalInventoryValue,
       totalRetailValue: dbTotals.totalRetailValue,
+      potentialEarnings: dbTotals.totalRetailValue - dbTotals.totalInventoryValue,
       lowStockItems: lowStock,
       outOfStockItems: outOfStock,
       categories,
-      avgTurnover: 4.2,
+      avgTurnover: dbTotals.avgTurnover || 0,
       totalDeliveries: deliveries.length
     });
   };
@@ -427,100 +430,114 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Products</p>
-                <p className="text-2xl font-bold">{stats.totalProducts}</p>
+                <p className="text-xs text-muted-foreground">Total Products</p>
+                <p className="text-lg font-bold">{stats.totalProducts}</p>
               </div>
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Boxes className="h-5 w-5 text-blue-600" />
+              <div className="p-1.5 bg-blue-100 rounded-full">
+                <Boxes className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Inventory Value</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.totalValue)}</p>
+                <p className="text-xs text-muted-foreground">Inventory Value</p>
+                <p className="text-lg font-bold">{formatCurrency(stats.totalValue)}</p>
               </div>
-              <div className="p-2 bg-green-100 rounded-full">
-                <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="p-1.5 bg-green-100 rounded-full">
+                <DollarSign className="h-4 w-4 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-emerald-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Retail Value</p>
-                <p className="text-xl font-bold text-emerald-600">{formatCurrency(stats.totalRetailValue)}</p>
+                <p className="text-xs text-muted-foreground">Total Retail Value</p>
+                <p className="text-lg font-bold text-emerald-600">{formatCurrency(stats.totalRetailValue)}</p>
               </div>
-              <div className="p-2 bg-emerald-100 rounded-full">
-                <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <div className="p-1.5 bg-emerald-100 rounded-full">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-cyan-500">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Potential Earnings</p>
+                <p className="text-lg font-bold text-cyan-600">{formatCurrency(stats.potentialEarnings)}</p>
+              </div>
+              <div className="p-1.5 bg-cyan-100 rounded-full">
+                <TrendingUp className="h-4 w-4 text-cyan-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-yellow-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</p>
+                <p className="text-xs text-muted-foreground">Low Stock</p>
+                <p className="text-lg font-bold text-yellow-600">{stats.lowStockItems}</p>
               </div>
-              <div className="p-2 bg-yellow-100 rounded-full">
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <div className="p-1.5 bg-yellow-100 rounded-full">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-red-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Out of Stock</p>
-                <p className="text-2xl font-bold text-red-600">{stats.outOfStockItems}</p>
+                <p className="text-xs text-muted-foreground">Out of Stock</p>
+                <p className="text-lg font-bold text-red-600">{stats.outOfStockItems}</p>
               </div>
-              <div className="p-2 bg-red-100 rounded-full">
-                <Package className="h-5 w-5 text-red-600" />
+              <div className="p-1.5 bg-red-100 rounded-full">
+                <Package className="h-4 w-4 text-red-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Categories</p>
-                <p className="text-2xl font-bold">{stats.categories}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
+                <p className="text-lg font-bold">{stats.categories}</p>
               </div>
-              <div className="p-2 bg-purple-100 rounded-full">
-                <Grid3X3 className="h-5 w-5 text-purple-600" />
+              <div className="p-1.5 bg-purple-100 rounded-full">
+                <Grid3X3 className="h-4 w-4 text-purple-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Turnover</p>
-                <p className="text-2xl font-bold">{stats.avgTurnover}x</p>
+                <p className="text-xs text-muted-foreground">Avg Turnover</p>
+                <p className="text-lg font-bold">{stats.avgTurnover.toFixed(2)}x</p>
               </div>
-              <div className="p-2 bg-orange-100 rounded-full">
-                <TrendingUp className="h-5 w-5 text-orange-600" />
+              <div className="p-1.5 bg-orange-100 rounded-full">
+                <TrendingUp className="h-4 w-4 text-orange-600" />
               </div>
             </div>
           </CardContent>

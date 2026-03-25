@@ -1539,6 +1539,8 @@ export interface InventoryTotals {
   totalQuantity: number;
   totalSold?: number;
   totalAvailable?: number;
+  avgTurnover?: number;
+  totalCostOfGoodsSold?: number;
 }
 
 export const getInventoryTotalsByOutlet = async (outletId: string): Promise<InventoryTotals> => {
@@ -1557,7 +1559,9 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
         totalProducts: 0,
         totalQuantity: 0,
         totalSold: 0,
-        totalAvailable: 0
+        totalAvailable: 0,
+        avgTurnover: 0,
+        totalCostOfGoodsSold: 0
       };
     }
     
@@ -1565,6 +1569,7 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
       const availableQty = item.available_quantity || Math.max(0, (item.quantity || 0) - (item.sold_quantity || 0));
       const inventoryValue = availableQty * (item.unit_cost || 0);
       const retailValue = availableQty * (item.selling_price || 0);
+      const costOfGoodsSold = (item.sold_quantity || 0) * (item.unit_cost || 0);
       
       return {
         totalInventoryValue: acc.totalInventoryValue + inventoryValue,
@@ -1572,7 +1577,8 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
         totalProducts: acc.totalProducts + 1,
         totalQuantity: acc.totalQuantity + (item.quantity || 0),
         totalSold: acc.totalSold + (item.sold_quantity || 0),
-        totalAvailable: acc.totalAvailable + availableQty
+        totalAvailable: acc.totalAvailable + availableQty,
+        totalCostOfGoodsSold: acc.totalCostOfGoodsSold + costOfGoodsSold
       };
     }, {
       totalInventoryValue: 0,
@@ -1580,10 +1586,20 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
       totalProducts: 0,
       totalQuantity: 0,
       totalSold: 0,
-      totalAvailable: 0
+      totalAvailable: 0,
+      totalCostOfGoodsSold: 0
     });
     
-    return totals;
+    // Calculate average turnover: COGS / Average Inventory Value
+    // If no inventory value, turnover is 0
+    const avgTurnover = totals.totalInventoryValue > 0 
+      ? totals.totalCostOfGoodsSold / totals.totalInventoryValue 
+      : 0;
+    
+    return {
+      ...totals,
+      avgTurnover
+    };
   } catch (error) {
     console.error('Error fetching inventory totals:', error);
     return {
@@ -1592,7 +1608,9 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
       totalProducts: 0,
       totalQuantity: 0,
       totalSold: 0,
-      totalAvailable: 0
+      totalAvailable: 0,
+      avgTurnover: 0,
+      totalCostOfGoodsSold: 0
     };
   }
 };
