@@ -42,7 +42,7 @@ import {
   Download,
   FileOutput
 } from "lucide-react";
-import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
+import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { supabase } from "@/lib/supabaseClient";
 import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
@@ -112,7 +112,6 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
 
   // Helper functions for persisting selling prices to localStorage
   const getSavedPricesKey = (outletId: string) => `outlet_${outletId}_selling_prices`;
-  const getSoldQuantitiesKey = (outletId: string) => `outlet_${outletId}_sold_quantities`;
   
   const loadSavedSellingPrices = (outletId: string): Record<string, number> => {
     try {
@@ -121,17 +120,6 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       return saved ? JSON.parse(saved) : {};
     } catch (error) {
       console.error("Error loading saved selling prices:", error);
-      return {};
-    }
-  };
-  
-  const loadSoldQuantities = (outletId: string): Record<string, number> => {
-    try {
-      const key = getSoldQuantitiesKey(outletId);
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-      console.error("Error loading sold quantities:", error);
       return {};
     }
   };
@@ -180,90 +168,39 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       const outletDeliveries = await getDeliveriesByOutletId(propOutletId);
       setDeliveries(outletDeliveries);
       
-      // Process deliveries into inventory items
-      const inventoryMap = new Map<string, InventoryItem>();
+      // Fetch inventory from database with sold quantities
+      const dbInventory = await getAvailableInventoryByOutlet(propOutletId);
       
-      outletDeliveries.forEach(delivery => {
-        if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
-          delivery.itemsList.forEach((item: any) => {
-            const itemName = item.description || item.name || 'Unknown Product';
-            const existingItem = inventoryMap.get(itemName);
-            
-            if (existingItem) {
-              // Aggregate quantities for same product
-              existingItem.quantity += item.quantity || item.delivered || 0;
-              existingItem.totalValue = existingItem.quantity * existingItem.unitPrice;
-              existingItem.totalPrice = existingItem.quantity * existingItem.sellingPrice;
-              existingItem.lastUpdated = delivery.date;
-              existingItem.deliveryNoteNumber = delivery.deliveryNoteNumber;
-            } else {
-              // Create new inventory item
-              const quantity = item.quantity || item.delivered || 0;
-              const unitPrice = item.rate || item.price || 0;
-              const minStock = Math.floor(quantity * 0.2); // 20% of quantity as min stock
-              const maxStock = Math.floor(quantity * 1.5); // 150% of quantity as max stock
-              
-              inventoryMap.set(itemName, {
-                id: `${delivery.id}-${itemName}`,
-                name: itemName,
-                sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-                category: item.category || 'General',
-                quantity: quantity,
-                minStock: minStock,
-                maxStock: maxStock,
-                unitPrice: unitPrice,
-                sellingPrice: unitPrice, // Same as unit price (no markup)
-                totalValue: quantity * unitPrice,
-                totalPrice: quantity * unitPrice,
-                status: quantity > minStock ? 'in-stock' : quantity > 0 ? 'low-stock' : 'out-of-stock',
-                lastUpdated: delivery.date,
-                deliveryNoteNumber: delivery.deliveryNoteNumber
-              });
-            }
-          });
-        }
-      });
-      
-      // Convert map to array and update status
-      const inventoryArray = Array.from(inventoryMap.values()).map(item => ({
-        ...item,
-        status: (item.quantity > item.minStock ? 'in-stock' : 
-                item.quantity > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock'
-      }));
-      
-      // Apply saved selling prices and sold quantities from localStorage
+      // Load saved selling prices from localStorage
       const savedPrices = loadSavedSellingPrices(propOutletId);
-      const soldQuantities = loadSoldQuantities(propOutletId);
       
-      // Aggregate sold quantities by product name
-      // Key format is "${deliveryId}-${itemName}" where deliveryId is a UUID (36 chars with dashes)
-      // So the product name starts after position 37 (36 + 1 for the dash separator)
-      const soldQuantitiesByName: Record<string, number> = {};
-      for (const [key, qty] of Object.entries(soldQuantities)) {
-        // Extract product name - it's everything after the UUID and separator
-        // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars)
-        const productName = key.substring(37); // 36 (UUID) + 1 (dash) = 37
-        if (productName) {
-          soldQuantitiesByName[productName] = (soldQuantitiesByName[productName] || 0) + qty;
-        }
-      }
-      
-      const inventoryWithSavedPrices = inventoryArray.map(item => {
-        // Use product name to find sold quantity
-        const soldQty = soldQuantitiesByName[item.name] || 0;
-        const availableQuantity = Math.max(0, item.quantity - soldQty);
-        const newStatus = availableQuantity > item.minStock ? 'in-stock' : availableQuantity > 0 ? 'low-stock' : 'out-of-stock';
+      // Convert database inventory to InventoryItem format
+      const inventoryItems: InventoryItem[] = dbInventory.map(item => {
+        const availableQty = item.available_quantity || Math.max(0, item.quantity - (item.sold_quantity || 0));
+        const sellingPrice = savedPrices[`${item.outlet_id}-${item.name}`] !== undefined 
+          ? savedPrices[`${item.outlet_id}-${item.name}`] 
+          : item.selling_price;
         
         return {
-          ...item,
-          sellingPrice: savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice,
-          quantity: availableQuantity,
-          totalPrice: availableQuantity * (savedPrices[item.id] !== undefined ? savedPrices[item.id] : item.sellingPrice),
-          status: newStatus as 'in-stock' | 'low-stock' | 'out-of-stock'
+          id: `${item.outlet_id}-${item.name}`,
+          name: item.name,
+          sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+          category: item.category || 'General',
+          quantity: availableQty,
+          minStock: item.min_stock || Math.floor(item.quantity * 0.2),
+          maxStock: item.max_stock || Math.floor(item.quantity * 1.5),
+          unitPrice: item.unit_cost,
+          sellingPrice: sellingPrice,
+          totalValue: availableQty * item.unit_cost,
+          totalPrice: availableQty * sellingPrice,
+          status: (availableQty > (item.min_stock || 0) ? 'in-stock' : 
+                   availableQty > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock',
+          lastUpdated: item.last_updated || new Date().toISOString(),
+          deliveryNoteNumber: item.delivery_note_number
         };
       });
       
-      setInventory(inventoryWithSavedPrices);
+      setInventory(inventoryItems);
     } catch (err) {
       setError("Failed to fetch outlet inventory. Please try again.");
       console.error("Error fetching outlet inventory:", err);
@@ -311,22 +248,11 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     if (!propOutletId) return [];
     
     try {
-      const dbProducts = await getInventoryProductsByOutlet(propOutletId);
-      
-      // Load sold quantities from localStorage to calculate available quantity
-      const soldQuantities = loadSoldQuantities(propOutletId);
+      // Use getAvailableInventoryByOutlet which already accounts for sold quantities
+      const dbProducts = await getAvailableInventoryByOutlet(propOutletId);
       
       return dbProducts.map((product: InventoryProduct) => {
-        // Try to find sold quantity by matching product name in localStorage keys
-        // Sold quantities are keyed by "${delivery.id}-${itemName}" format
-        let soldQty = 0;
-        for (const [key, qty] of Object.entries(soldQuantities)) {
-          if (key.includes(product.name)) {
-            soldQty += qty;
-          }
-        }
-        
-        const availableQuantity = Math.max(0, product.quantity - soldQty);
+        const availableQuantity = product.available_quantity || Math.max(0, product.quantity - (product.sold_quantity || 0));
         const newStatus = availableQuantity > (product.min_stock || 0) 
           ? 'in-stock' 
           : availableQuantity > 0 

@@ -12,6 +12,7 @@ import {
   Calculator
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
+import { getAvailableInventoryByOutlet, InventoryProduct } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletStockTakeProps {
@@ -48,53 +49,35 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
     try {
       setLoading(true);
       
-      // Load deliveries
-      const deliveries = await getDeliveriesByOutletId(outletId);
-      
-      // Load sold quantities from localStorage
-      const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
-      const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
+      // Load inventory from database with sold quantities
+      const dbInventory = await getAvailableInventoryByOutlet(outletId);
       
       // Load physical counts from localStorage
       const physicalCountsKey = `outlet_${outletId}_physical_counts`;
       const physicalCounts: Record<string, number> = JSON.parse(localStorage.getItem(physicalCountsKey) || '{}');
       
-      // Process deliveries into stock items
-      const itemsMap = new Map<string, StockItem>();
-      
-      deliveries.forEach(delivery => {
-        if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
-          delivery.itemsList.forEach((item: any) => {
-            const productId = `${delivery.id}-${item.description || item.name}`;
-            const itemName = item.description || item.name || 'Unknown Product';
-            const existingItem = itemsMap.get(itemName);
-            
-            if (existingItem) {
-              existingItem.originalQuantity += item.quantity || item.delivered || 0;
-              existingItem.soldQuantity = soldQuantities[productId] || 0;
-              existingItem.stockRemain = existingItem.originalQuantity - existingItem.soldQuantity;
-            } else {
-              const originalQty = item.quantity || item.delivered || 0;
-              const soldQty = soldQuantities[productId] || 0;
-              const physicalCount = physicalCounts[productId] ?? originalQty - soldQty;
-              
-              itemsMap.set(itemName, {
-                id: productId,
-                name: itemName,
-                sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-                category: item.category || 'General',
-                originalQuantity: originalQty,
-                soldQuantity: soldQty,
-                stockRemain: originalQty - soldQty,
-                physicalCount: physicalCount,
-                discrepancy: physicalCount - (originalQty - soldQty)
-              });
-            }
-          });
-        }
+      // Convert database inventory to stock items
+      const stockItemsList: StockItem[] = dbInventory.map(item => {
+        const productId = `${item.outlet_id}-${item.name}`;
+        const originalQty = item.quantity;
+        const soldQty = item.sold_quantity || 0;
+        const availableQty = item.available_quantity || Math.max(0, originalQty - soldQty);
+        const physicalCount = physicalCounts[productId] ?? availableQty;
+        
+        return {
+          id: productId,
+          name: item.name,
+          sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+          category: item.category || 'General',
+          originalQuantity: originalQty,
+          soldQuantity: soldQty,
+          stockRemain: availableQty,
+          physicalCount: physicalCount,
+          discrepancy: physicalCount - availableQty
+        };
       });
       
-      setStockItems(Array.from(itemsMap.values()));
+      setStockItems(stockItemsList);
     } catch (error) {
       console.error("Error loading stock data:", error);
       toast({

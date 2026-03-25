@@ -106,6 +106,8 @@ export interface InventoryProduct {
   sku?: string;
   category?: string;
   quantity: number;
+  sold_quantity?: number;
+  available_quantity?: number;
   min_stock?: number;
   max_stock?: number;
   unit_cost: number;
@@ -1535,6 +1537,8 @@ export interface InventoryTotals {
   totalRetailValue: number;
   totalProducts: number;
   totalQuantity: number;
+  totalSold?: number;
+  totalAvailable?: number;
 }
 
 export const getInventoryTotalsByOutlet = async (outletId: string): Promise<InventoryTotals> => {
@@ -1577,6 +1581,93 @@ export const getInventoryTotalsByOutlet = async (outletId: string): Promise<Inve
       totalQuantity: 0
     };
   }
+};
+
+// Increment sold quantity for a product (called when a sale is made)
+export const incrementSoldQuantity = async (
+  outletId: string,
+  productName: string,
+  quantity: number
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('inventory_products')
+      .update({
+        sold_quantity: supabase.rpc('increment_field', {
+          table_name: 'inventory_products',
+          field_name: 'sold_quantity',
+          row_id: outletId,
+          increment_by: quantity
+        }),
+        updated_at: new Date().toISOString()
+      })
+      .eq('outlet_id', outletId)
+      .eq('name', productName);
+
+    if (error) {
+      // Fallback: fetch current value, increment, and update
+      const { data: current } = await supabase
+        .from('inventory_products')
+        .select('sold_quantity')
+        .eq('outlet_id', outletId)
+        .eq('name', productName)
+        .single();
+
+      if (current) {
+        const newSoldQty = (current.sold_quantity || 0) + quantity;
+        const { error: updateError } = await supabase
+          .from('inventory_products')
+          .update({
+            sold_quantity: newSoldQty,
+            updated_at: new Date().toISOString()
+          })
+          .eq('outlet_id', outletId)
+          .eq('name', productName);
+
+        if (updateError) throw updateError;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error incrementing sold quantity:', error);
+    return false;
+  }
+};
+
+// Get available inventory for an outlet (respecting sold quantities)
+export const getAvailableInventoryByOutlet = async (outletId: string): Promise<InventoryProduct[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('name');
+
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      ...item,
+      available_quantity: (item.quantity || 0) - (item.sold_quantity || 0),
+      status: getInventoryStatus(
+        (item.quantity || 0) - (item.sold_quantity || 0),
+        item.min_stock || 0
+      )
+    }));
+  } catch (error) {
+    console.error('Error fetching available inventory:', error);
+    return [];
+  }
+};
+
+// Helper function to determine inventory status
+const getInventoryStatus = (
+  availableQty: number,
+  minStock: number
+): 'in-stock' | 'low-stock' | 'out-of-stock' => {
+  if (availableQty <= 0) return 'out-of-stock';
+  if (availableQty <= minStock) return 'low-stock';
+  return 'in-stock';
 };
 
 // Sales CRUD operations

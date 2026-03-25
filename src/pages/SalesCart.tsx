@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -117,49 +117,39 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         
         // Load products - use outlet-specific products if outletId is provided
         if (outletId) {
-          // Fetch products from outlet deliveries
-          const deliveries = await getDeliveriesByOutletId(outletId);
+          // Fetch products from database with sold quantities
+          const dbInventory = await getAvailableInventoryByOutlet(outletId);
           const outletProducts: Product[] = [];
           
           // Load saved selling prices from localStorage
           const savedPricesKey = `outlet_${outletId}_selling_prices`;
           const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
           
-          // Load sold quantities from localStorage
-          const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
-          const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
-          
-          deliveries.forEach(delivery => {
-            if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
-              delivery.itemsList.forEach((item: any) => {
-                const productId = `${delivery.id}-${item.description || item.name}`;
-                const existingProduct = outletProducts.find(p => p.name === (item.description || item.name));
-                if (existingProduct) {
-                  existingProduct.stock_quantity += item.quantity || item.delivered || 0;
-                } else {
-                  const unitCost = item.rate || item.price || 0;
-                  // Use saved selling price if available, otherwise use unit cost
-                  const sellingPrice = savedPrices[productId] !== undefined ? savedPrices[productId] : unitCost;
-                  // Calculate available stock (original - sold)
-                  const originalQuantity = item.quantity || item.delivered || 0;
-                  const soldQuantity = soldQuantities[productId] || 0;
-                  const availableStock = Math.max(0, originalQuantity - soldQuantity);
-                  
-                  outletProducts.push({
-                    id: productId,
-                    name: item.description || item.name || 'Unknown Product',
-                    selling_price: sellingPrice,
-                    cost_price: unitCost,
-                    stock_quantity: availableStock,
-                    barcode: item.barcode || '',
-                    sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-                    category: item.category || 'General',
-                    unit: item.unit || 'pcs',
-                    vat_rate: item.vat_rate || 18,
-                    is_active: true
-                  } as Product);
-                }
-              });
+          // Convert database inventory to Product format
+          dbInventory.forEach(item => {
+            const productId = `${item.outlet_id}-${item.name}`;
+            const existingProduct = outletProducts.find(p => p.name === item.name);
+            if (existingProduct) {
+              existingProduct.stock_quantity += item.available_quantity || 0;
+            } else {
+              // Use saved selling price if available, otherwise use database selling_price
+              const sellingPrice = savedPrices[productId] !== undefined 
+                ? savedPrices[productId] 
+                : item.selling_price;
+              
+              outletProducts.push({
+                id: productId,
+                name: item.name,
+                selling_price: sellingPrice,
+                cost_price: item.unit_cost,
+                stock_quantity: item.available_quantity || 0,
+                barcode: '',
+                sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                category: item.category || 'General',
+                unit: 'pcs',
+                vat_rate: 18,
+                is_active: true
+              } as Product);
             }
           });
           
@@ -463,12 +453,10 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           // Calculate new stock quantity
           const newStock = Math.max(0, product.stock_quantity - item.quantity);
           
-          // For outlet sales, update localStorage sold quantities
+          // For outlet sales, update sold quantities in database
           if (outletId) {
-            const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
-            const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
-            soldQuantities[item.id] = (soldQuantities[item.id] || 0) + item.quantity;
-            localStorage.setItem(soldQuantitiesKey, JSON.stringify(soldQuantities));
+            // Update sold_quantity in inventory_products table
+            await incrementSoldQuantity(outletId, product.name, item.quantity);
           } else {
             // For general sales, update stock in database
             await updateProductStock(item.id, newStock);
@@ -478,43 +466,35 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       
       // Reload products to get updated stock quantities
       if (outletId) {
-        // Reload outlet products with updated sold quantities
-        const deliveries = await getDeliveriesByOutletId(outletId);
+        // Reload outlet products with updated sold quantities from database
+        const dbInventory = await getAvailableInventoryByOutlet(outletId);
         const savedPricesKey = `outlet_${outletId}_selling_prices`;
         const savedPrices: Record<string, number> = JSON.parse(localStorage.getItem(savedPricesKey) || '{}');
-        const soldQuantitiesKey = `outlet_${outletId}_sold_quantities`;
-        const soldQuantities: Record<string, number> = JSON.parse(localStorage.getItem(soldQuantitiesKey) || '{}');
         
         const updatedProducts: Product[] = [];
-        deliveries.forEach(delivery => {
-          if (delivery.itemsList && Array.isArray(delivery.itemsList)) {
-            delivery.itemsList.forEach((item: any) => {
-              const productId = `${delivery.id}-${item.description || item.name}`;
-              const existingProduct = updatedProducts.find(p => p.name === (item.description || item.name));
-              if (existingProduct) {
-                existingProduct.stock_quantity += item.quantity || item.delivered || 0;
-              } else {
-                const unitCost = item.rate || item.price || 0;
-                const sellingPrice = savedPrices[productId] !== undefined ? savedPrices[productId] : unitCost;
-                const originalQuantity = item.quantity || item.delivered || 0;
-                const soldQty = soldQuantities[productId] || 0;
-                const availableStock = Math.max(0, originalQuantity - soldQty);
-                
-                updatedProducts.push({
-                  id: productId,
-                  name: item.description || item.name || 'Unknown Product',
-                  selling_price: sellingPrice,
-                  cost_price: unitCost,
-                  stock_quantity: availableStock,
-                  barcode: item.barcode || '',
-                  sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-                  category: item.category || 'General',
-                  unit: item.unit || 'pcs',
-                  vat_rate: item.vat_rate || 18,
-                  is_active: true
-                } as Product);
-              }
-            });
+        dbInventory.forEach(item => {
+          const productId = `${item.outlet_id}-${item.name}`;
+          const existingProduct = updatedProducts.find(p => p.name === item.name);
+          if (existingProduct) {
+            existingProduct.stock_quantity += item.available_quantity || 0;
+          } else {
+            const sellingPrice = savedPrices[productId] !== undefined 
+              ? savedPrices[productId] 
+              : item.selling_price;
+            
+            updatedProducts.push({
+              id: productId,
+              name: item.name,
+              selling_price: sellingPrice,
+              cost_price: item.unit_cost,
+              stock_quantity: item.available_quantity || 0,
+              barcode: '',
+              sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+              category: item.category || 'General',
+              unit: 'pcs',
+              vat_rate: 18,
+              is_active: true
+            } as Product);
           }
         });
         setProducts(updatedProducts);
