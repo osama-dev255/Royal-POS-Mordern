@@ -40,7 +40,8 @@ import {
   Printer,
   Share2,
   Download,
-  FileOutput
+  FileOutput,
+  Calendar
 } from "lucide-react";
 import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
@@ -88,6 +89,10 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
+    start: '',
+    end: ''
+  });
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -120,7 +125,27 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
 
   useEffect(() => {
     calculateStats();
-  }, [inventory, propOutletId]);
+  }, [inventory, propOutletId, dateRange]);
+
+  // Helper function to filter inventory by date range
+  const filterByDateRange = (items: InventoryItem[]) => {
+    if (!dateRange.start && !dateRange.end) return items;
+    
+    return items.filter(item => {
+      const itemDate = new Date(item.lastUpdated);
+      if (dateRange.start) {
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        if (itemDate < startDate) return false;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        if (itemDate > endDate) return false;
+      }
+      return true;
+    });
+  };
 
   const fetchOutletAndInventory = async () => {
     try {
@@ -183,38 +208,34 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   };
 
   const calculateStats = async () => {
-    // Calculate frontend-based stats
-    const lowStock = inventory.filter(item => item.status === 'low-stock').length;
-    const outOfStock = inventory.filter(item => item.status === 'out-of-stock').length;
-    const categories = new Set(inventory.map(item => item.category)).size;
+    // Filter inventory by date range first
+    const dateFilteredInventory = filterByDateRange(inventory);
     
-    // Fetch totals from database (everything from database)
-    let dbTotals: InventoryTotals = {
-      totalInventoryValue: 0,
-      totalRetailValue: 0,
-      totalProducts: inventory.length,
-      totalQuantity: 0,
-      totalSold: 0,
-      totalAvailable: 0
-    };
+    // Calculate stats from filtered inventory
+    const lowStock = dateFilteredInventory.filter(item => item.status === 'low-stock').length;
+    const outOfStock = dateFilteredInventory.filter(item => item.status === 'out-of-stock').length;
+    const categories = new Set(dateFilteredInventory.map(item => item.category)).size;
     
-    if (propOutletId) {
-      try {
-        dbTotals = await getInventoryTotalsByOutlet(propOutletId);
-      } catch (err) {
-        console.error('Error fetching inventory totals from database:', err);
-      }
-    }
+    // Calculate totals from filtered inventory
+    const totalInventoryValue = dateFilteredInventory.reduce((sum, item) => sum + item.totalValue, 0);
+    const totalRetailValue = dateFilteredInventory.reduce((sum, item) => sum + item.totalPrice, 0);
+    const totalCostOfGoodsSold = dateFilteredInventory.reduce((sum, item) => {
+      const soldQty = item.maxStock - item.quantity; // Estimate sold from original vs current
+      return sum + (soldQty > 0 ? soldQty * item.unitPrice : 0);
+    }, 0);
+    
+    // Calculate avg turnover
+    const avgTurnover = totalInventoryValue > 0 ? totalCostOfGoodsSold / totalInventoryValue : 0;
     
     setStats({
-      totalProducts: inventory.length,
-      totalValue: dbTotals.totalInventoryValue,
-      totalRetailValue: dbTotals.totalRetailValue,
-      potentialEarnings: dbTotals.totalRetailValue - dbTotals.totalInventoryValue,
+      totalProducts: dateFilteredInventory.length,
+      totalValue: totalInventoryValue,
+      totalRetailValue: totalRetailValue,
+      potentialEarnings: totalRetailValue - totalInventoryValue,
       lowStockItems: lowStock,
       outOfStockItems: outOfStock,
       categories,
-      avgTurnover: dbTotals.avgTurnover || 0,
+      avgTurnover,
       totalDeliveries: deliveries.length
     });
   };
@@ -284,7 +305,24 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    
+    // Date range filtering
+    let matchesDateRange = true;
+    if (dateRange.start || dateRange.end) {
+      const itemDate = new Date(item.lastUpdated);
+      if (dateRange.start) {
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        matchesDateRange = matchesDateRange && itemDate >= startDate;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && itemDate <= endDate;
+      }
+    }
+    
+    return matchesSearch && matchesCategory && matchesDateRange;
   });
 
   const categories = ['all', ...new Set(inventory.map(item => item.category))];
@@ -557,6 +595,37 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 className="pl-10 w-full"
               />
             </div>
+            
+            {/* Date Range Picker */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                className="px-2 py-1.5 border rounded-md text-sm"
+                placeholder="Start Date"
+              />
+              <span className="text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                className="px-2 py-1.5 border rounded-md text-sm"
+                placeholder="End Date"
+              />
+              {(dateRange.start || dateRange.end) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange({ start: '', end: '' })}
+                  className="h-7 px-2"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+            
             <div className="flex gap-2 w-full md:w-auto">
               <Button
                 variant="outline"
