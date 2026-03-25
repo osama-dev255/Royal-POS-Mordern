@@ -251,7 +251,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
               <h3 className="font-semibold text-blue-800">How Stock Take Works</h3>
               <p className="text-sm text-blue-700 mt-1">
                 Enter the physical count for each product. The system will calculate: 
-                <strong> Stock Sold = Original Quantity - Physical Count</strong>
+                <strong> Stock Sold = Total Received Qty - Physical Count</strong>
               </p>
             </div>
           </div>
@@ -286,8 +286,8 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
                   <th className="text-left py-3 px-4 font-medium">Product</th>
                   <th className="text-left py-3 px-4 font-medium">SKU</th>
                   <th className="text-left py-3 px-4 font-medium">Category</th>
-                  <th className="text-right py-3 px-4 font-medium">Original Qty</th>
-                  <th className="text-right py-3 px-4 font-medium">System Stock</th>
+                  <th className="text-right py-3 px-4 font-medium">Total Received Qty</th>
+                  <th className="text-right py-3 px-4 font-medium">Available Stock</th>
                   <th className="text-right py-3 px-4 font-medium">Physical Count</th>
                   <th className="text-right py-3 px-4 font-medium">Discrepancy</th>
                   <th className="text-right py-3 px-4 font-medium">Calculated Sold</th>
