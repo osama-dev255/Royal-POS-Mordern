@@ -1,5 +1,5 @@
--- Migration: Add trigger to update inventory_products when delivery note is saved
--- This ensures outlet inventory is updated automatically when deliveries are made
+-- Migration: Add trigger to update inventory_products when delivery note status changes to 'Delivered'
+-- This ensures outlet inventory is updated only when delivery is confirmed delivered
 
 -- Create function to update inventory from delivery note
 CREATE OR REPLACE FUNCTION update_inventory_from_delivery()
@@ -18,6 +18,11 @@ DECLARE
 BEGIN
     -- Only process if outlet_id is provided
     IF NEW.outlet_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+    
+    -- Only update inventory when status is 'delivered'
+    IF NEW.status IS NULL OR NEW.status != 'delivered' THEN
         RETURN NEW;
     END IF;
     
@@ -91,23 +96,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger on saved_delivery_notes
+-- Create trigger on saved_delivery_notes for INSERT
 DROP TRIGGER IF EXISTS trg_update_inventory_on_delivery ON saved_delivery_notes;
 CREATE TRIGGER trg_update_inventory_on_delivery
     AFTER INSERT ON saved_delivery_notes
     FOR EACH ROW
     EXECUTE FUNCTION update_inventory_from_delivery();
 
--- Also create trigger for updates (when delivery is modified)
-CREATE OR REPLACE FUNCTION update_inventory_on_delivery_update()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- For now, we only handle inserts. Updates would require complex logic
-    -- to calculate differences. This can be enhanced later.
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Create trigger on saved_delivery_notes for UPDATE (when status changes to delivered)
+DROP TRIGGER IF EXISTS trg_update_inventory_on_delivery_update ON saved_delivery_notes;
+CREATE TRIGGER trg_update_inventory_on_delivery_update
+    AFTER UPDATE OF status ON saved_delivery_notes
+    FOR EACH ROW
+    WHEN (NEW.status = 'delivered' AND (OLD.status IS NULL OR OLD.status != 'delivered'))
+    EXECUTE FUNCTION update_inventory_from_delivery();
 
 -- Add comment explaining the trigger
 COMMENT ON FUNCTION update_inventory_from_delivery() IS 
-'Automatically updates inventory_products when a delivery note is saved. Adds quantities to existing products or creates new ones.';
+'Automatically updates inventory_products when a delivery note status is set to "delivered". Adds quantities to existing products or creates new ones.';
