@@ -31,6 +31,8 @@ interface StockItem {
   stockRemain: number;
   physicalCount: number;
   discrepancy: number;
+  unitCost: number;
+  unitPrice: number;
 }
 
 export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
@@ -74,7 +76,9 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           soldQuantity: soldQty,
           stockRemain: availableQty,
           physicalCount: physicalCount,
-          discrepancy: physicalCount - availableQty
+          discrepancy: physicalCount - availableQty,
+          unitCost: item.unit_cost || 0,
+          unitPrice: item.selling_price || 0
         };
       });
       
@@ -89,6 +93,15 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-TZ', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
   };
 
   const handlePhysicalCountChange = (itemId: string, value: number) => {
@@ -251,7 +264,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
               <h3 className="font-semibold text-blue-800">How Stock Take Works</h3>
               <p className="text-sm text-blue-700 mt-1">
                 Enter the physical count for each product. The system will calculate: 
-                <strong> Stock Sold = Total Received Qty - Physical Count</strong>
+                <strong> Stock Sold = Available Stock - Physical Count</strong>
               </p>
             </div>
           </div>
@@ -289,8 +302,11 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
                   <th className="text-right py-3 px-4 font-medium">Total Received Qty</th>
                   <th className="text-right py-3 px-4 font-medium">Available Stock</th>
                   <th className="text-right py-3 px-4 font-medium">Physical Count</th>
-                  <th className="text-right py-3 px-4 font-medium">Discrepancy</th>
                   <th className="text-right py-3 px-4 font-medium">Calculated Sold</th>
+                  <th className="text-right py-3 px-4 font-medium">Unit Cost</th>
+                  <th className="text-right py-3 px-4 font-medium">Total Costs</th>
+                  <th className="text-right py-3 px-4 font-medium">Unit Price</th>
+                  <th className="text-right py-3 px-4 font-medium">Total Price</th>
                 </tr>
               </thead>
               <tbody>
@@ -314,18 +330,13 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
                         onBlur={() => setIsEditing(null)}
                       />
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <Badge className={
-                        item.discrepancy > 0 ? 'bg-green-100 text-green-800' :
-                        item.discrepancy < 0 ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }>
-                        {item.discrepancy > 0 ? '+' : ''}{item.discrepancy}
-                      </Badge>
-                    </td>
                     <td className="py-3 px-4 text-right font-semibold">
-                      {item.originalQuantity - item.physicalCount}
+                      {item.stockRemain - item.physicalCount}
                     </td>
+                    <td className="py-3 px-4 text-right">{formatCurrency(item.unitCost)}</td>
+                    <td className="py-3 px-4 text-right font-semibold">{formatCurrency((item.stockRemain - item.physicalCount) * item.unitCost)}</td>
+                    <td className="py-3 px-4 text-right">{formatCurrency(item.unitPrice)}</td>
+                    <td className="py-3 px-4 text-right font-semibold">{formatCurrency((item.stockRemain - item.physicalCount) * item.unitPrice)}</td>
                   </tr>
                 ))}
               </tbody>
