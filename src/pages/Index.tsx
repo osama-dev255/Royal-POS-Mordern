@@ -71,6 +71,7 @@ import { OutletSavedCashSales } from "@/pages/OutletSavedCashSales";
 import { OutletSavedCardSales } from "@/pages/OutletSavedCardSales";
 import { OutletSavedMobileSales } from "@/pages/OutletSavedMobileSales";
 import { OutletSavedDebts } from "@/pages/OutletSavedDebts";
+import { OutletSavedStockTakes } from "@/pages/OutletSavedStockTakes";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -225,6 +226,22 @@ export const Index = () => {
         const outletId = hash.split('/')[2];
         if (outletId) {
           setCurrentView(`outlet-saved-debts-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-saved-stock-takes/')) {
+        const outletId = hash.split('/')[2];
+        if (outletId) {
+          setCurrentView(`outlet-saved-stock-takes-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-customers/')) {
+        const outletId = hash.split('/')[2];
+        if (outletId) {
+          setCurrentView(`outlet-customers-${outletId}`);
         }
         return;
       }
@@ -519,10 +536,11 @@ export const Index = () => {
   const isOutletSavedCardView = currentView.startsWith('outlet-saved-card-');
   const isOutletSavedMobileView = currentView.startsWith('outlet-saved-mobile-');
   const isOutletSavedDebtsView = currentView.startsWith('outlet-saved-debts-');
-  
-  if (!authorizedViews.includes(currentView) && 
-      !isOutletDetailsView && 
-      !isOutletInventoryView && 
+  const isOutletSavedStockTakesView = currentView.startsWith('outlet-saved-stock-takes-');
+    
+  if (!authorizedViews.includes(currentView) &&
+      !isOutletDetailsView &&
+      !isOutletInventoryView &&
       !isOutletSalesView &&
       !isOutletCustomersView &&
       !isOutletDeliveriesView &&
@@ -536,7 +554,8 @@ export const Index = () => {
       !isOutletSavedCashView &&
       !isOutletSavedCardView &&
       !isOutletSavedMobileView &&
-      !isOutletSavedDebtsView) {
+      !isOutletSavedDebtsView &&
+      !isOutletSavedStockTakesView) {
     console.log(`Unauthorized view requested: ${currentView}, redirecting to comprehensive dashboard`);
     setCurrentView("comprehensive");
   }
@@ -557,7 +576,8 @@ export const Index = () => {
                        currentView.startsWith('outlet-saved-cash-') ||
                        currentView.startsWith('outlet-saved-card-') ||
                        currentView.startsWith('outlet-saved-mobile-') ||
-                       currentView.startsWith('outlet-saved-debts-');
+                       currentView.startsWith('outlet-saved-debts-') ||
+                       currentView.startsWith('outlet-saved-stock-takes-');
 
   // For outlet views, render without AdvancedLayout wrapper
   if (isOutletView) {
@@ -750,6 +770,30 @@ export const Index = () => {
               onBack={() => {
                 setCurrentView(`outlet-saved-sales-${outletId}`);
                 window.location.hash = `#/outlet-saved-sales/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet saved stock takes view
+    if (currentView.startsWith('outlet-saved-stock-takes-')) {
+      const outletId = currentView.substring('outlet-saved-stock-takes-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="sales-management"
+        >
+          <div className="p-6">
+            <OutletSavedStockTakes
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-sales-management-${outletId}`);
+                window.location.hash = `#/outlet-sales-management/${outletId}`;
               }}
             />
           </div>

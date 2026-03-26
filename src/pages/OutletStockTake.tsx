@@ -9,7 +9,10 @@ import {
   Search,
   Package,
   Save,
-  Calculator
+  Calculator,
+  DollarSign,
+  TrendingUp,
+  BarChart3
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { getAvailableInventoryByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
@@ -120,23 +123,23 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
 
   const savePhysicalCounts = async () => {
     if (!outletId) return;
-    
+      
     // Save physical counts to localStorage (for UI persistence)
     const physicalCountsKey = `outlet_${outletId}_physical_counts`;
     const physicalCounts: Record<string, number> = {};
-    
+      
     stockItems.forEach(item => {
       physicalCounts[item.id] = item.physicalCount;
     });
-    
+  
     localStorage.setItem(physicalCountsKey, JSON.stringify(physicalCounts));
-    
+  
     // Update sold quantities in database based on physical count
-    // Formula: Sold = Original - Physical Count
+    // Formula: Sold = Available Stock - Physical Count
     try {
       for (const item of stockItems) {
-        const calculatedSoldQty = Math.max(0, item.originalQuantity - item.physicalCount);
-        
+        const calculatedSoldQty = Math.max(0, item.stockRemain - item.physicalCount);
+          
         // Update sold_quantity in database
         await supabase
           .from('inventory_products')
@@ -147,12 +150,64 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           .eq('outlet_id', outletId)
           .eq('name', item.name);
       }
-      
+  
+      // Generate stock take number
+      const stockTakeNumber = `STK-${Date.now().toString(36).toUpperCase()}`;
+        
+      // Calculate totals for saving
+      const totalCalculatedSold = stockItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
+      const totalCosts = stockItems.reduce((sum, item) => {
+        const calculatedSold = item.stockRemain - item.physicalCount;
+        return sum + (calculatedSold * item.unitCost);
+      }, 0);
+      const totalPrice = stockItems.reduce((sum, item) => {
+        const calculatedSold = item.stockRemain - item.physicalCount;
+        return sum + (calculatedSold * item.unitPrice);
+      }, 0);
+      const potentialEarnings = totalPrice - totalCosts;
+      const avgTurnover = totalCosts > 0 ? totalPrice / totalCosts : 0;
+  
+      // Prepare items for JSON storage
+      const itemsJson = stockItems.map(item => ({
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        originalQuantity: item.originalQuantity,
+        stockRemain: item.stockRemain,
+        physicalCount: item.physicalCount,
+        calculatedSold: item.stockRemain - item.physicalCount,
+        unitCost: item.unitCost,
+        unitPrice: item.unitPrice,
+        totalCost: (item.stockRemain - item.physicalCount) * item.unitCost,
+        totalPrice: (item.stockRemain - item.physicalCount) * item.unitPrice
+      }));
+  
+      // Save to saved_stock_takes table
+      const { error: saveError } = await supabase
+        .from('saved_stock_takes')
+        .insert({
+          outlet_id: outletId,
+          stock_take_number: stockTakeNumber,
+          date: new Date().toISOString().split('T')[0],
+          total_products: stockItems.length,
+          total_calculated_sold: totalCalculatedSold,
+          total_costs: totalCosts,
+          total_price: totalPrice,
+          potential_earnings: potentialEarnings,
+          avg_turnover: avgTurnover,
+          items: itemsJson,
+          status: 'completed'
+        });
+  
+      if (saveError) {
+        console.error("Error saving stock take record:", saveError);
+      }
+        
       toast({
         title: "Stock Take Saved",
-        description: "Physical counts have been saved and inventory updated in database"
+        description: `Stock take ${stockTakeNumber} has been saved successfully`
       });
-      
+        
       // Reload data to reflect changes
       loadStockData();
     } catch (error) {
@@ -173,6 +228,21 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
 
   const totalDiscrepancy = stockItems.reduce((sum, item) => sum + item.discrepancy, 0);
   const itemsWithDiscrepancy = stockItems.filter(item => item.discrepancy !== 0).length;
+  const totalCalculatedSold = stockItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
+  
+  // Financial calculations for sold inventory
+  const totalCosts = stockItems.reduce((sum, item) => {
+    const calculatedSold = item.stockRemain - item.physicalCount;
+    return sum + (calculatedSold * item.unitCost);
+  }, 0);
+  
+  const totalPrice = stockItems.reduce((sum, item) => {
+    const calculatedSold = item.stockRemain - item.physicalCount;
+    return sum + (calculatedSold * item.unitPrice);
+  }, 0);
+  
+  const potentialEarnings = totalPrice - totalCosts;
+  const avgTurnover = totalCosts > 0 ? totalPrice / totalCosts : 0;
 
   if (loading) {
     return (
@@ -244,12 +314,64 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Net Difference</p>
-                <p className={`text-2xl font-bold ${totalDiscrepancy > 0 ? 'text-green-600' : totalDiscrepancy < 0 ? 'text-red-600' : ''}`}>
-                  {totalDiscrepancy > 0 ? '+' : ''}{totalDiscrepancy}
+                <p className="text-sm text-muted-foreground">Total Calculated Sold</p>
+                <p className="text-2xl font-bold">
+                  {totalCalculatedSold}
                 </p>
               </div>
               <ClipboardCheck className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Costs</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(totalCosts)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Price</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(totalPrice)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Potential Earnings</p>
+                <p className={`text-2xl font-bold ${potentialEarnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(potentialEarnings)}
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-emerald-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Avg Turnover</p>
+                <p className="text-2xl font-bold">
+                  {avgTurnover.toFixed(2)}x
+                </p>
+              </div>
+              <BarChart3 className="h-8 w-8 text-indigo-500" />
             </div>
           </CardContent>
         </Card>

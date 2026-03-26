@@ -6,7 +6,8 @@ import {
   Store,
   FileText,
   Save,
-  Users
+  Users,
+  ClipboardCheck
 } from "lucide-react";
 
 interface OutletSalesManagementProps {
@@ -43,14 +44,21 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
       title: "Saved Sales",
       description: "Access saved and pending sales",
       icon: <Save className="h-8 w-8" />,
-      route: outletId ? `#/outlet-saved-sales-${outletId}` : "#/saved-sales"
+      route: outletId ? `#/outlet-saved-sales/${outletId}` : "#/saved-sales"
     },
     {
       id: "customers",
       title: "Customers",
       description: "Manage customer information and history",
       icon: <Users className="h-8 w-8" />,
-      route: outletId ? `#/outlet-customers-${outletId}` : "#/customers"
+      route: outletId ? `#/outlet-customers/${outletId}` : "#/customers"
+    },
+    {
+      id: "saved-stock-takes",
+      title: "Saved Stock Takes",
+      description: "View and manage saved stock take records",
+      icon: <ClipboardCheck className="h-8 w-8" />,
+      route: outletId ? `#/outlet-saved-stock-takes/${outletId}` : "#/saved-stock-takes"
     }
   ];
 
@@ -72,7 +80,7 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
       </div>
 
       {/* Navigation Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {navigationCards.map((card) => (
           <Card 
             key={card.id}
