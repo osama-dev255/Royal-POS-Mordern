@@ -23,6 +23,11 @@ interface OutletDeliveriesProps {
 
 export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
+    start: '',
+    end: ''
+  });
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -54,11 +59,34 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     }
   };
   
-  const filteredDeliveries = deliveries.filter(delivery =>
-    delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    delivery.driver.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDeliveries = deliveries.filter(delivery => {
+    // Search filter
+    const matchesSearch = 
+      delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (delivery.driver && delivery.driver.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Status filter
+    const matchesStatus = !statusFilter || delivery.status === statusFilter;
+    
+    // Date range filter
+    let matchesDateRange = true;
+    if (dateRange.start || dateRange.end) {
+      const deliveryDate = new Date(delivery.date);
+      if (dateRange.start) {
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        matchesDateRange = matchesDateRange && deliveryDate >= startDate;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && deliveryDate <= endDate;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesDateRange;
+  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TZ', {
@@ -198,7 +226,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Deliveries</p>
-                <p className="text-2xl font-bold">{deliveries.length}</p>
+                <p className="text-2xl font-bold">{filteredDeliveries.length}</p>
               </div>
               <Truck className="h-8 w-8 text-primary" />
             </div>
@@ -209,7 +237,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Delivered</p>
-                <p className="text-2xl font-bold">{deliveries.filter(d => d.status === 'delivered').length}</p>
+                <p className="text-2xl font-bold">{filteredDeliveries.filter(d => d.status === 'delivered').length}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
                 <div className="h-3 w-3 rounded-full bg-green-500" />
@@ -222,7 +250,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">In Transit</p>
-                <p className="text-2xl font-bold">{deliveries.filter(d => d.status === 'in-transit').length}</p>
+                <p className="text-2xl font-bold">{filteredDeliveries.filter(d => d.status === 'in-transit').length}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                 <div className="h-3 w-3 rounded-full bg-blue-500" />
@@ -236,7 +264,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               <div>
                 <p className="text-sm text-muted-foreground">Total Value</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(deliveries.reduce((sum, d) => sum + d.total, 0))}
+                  {formatCurrency(filteredDeliveries.reduce((sum, d) => sum + d.total, 0))}
                 </p>
               </div>
               <Package className="h-8 w-8 text-blue-500" />
@@ -245,17 +273,62 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search and Date Range */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search deliveries by note number, customer, or driver..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search deliveries by note number, customer, or driver..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
+            
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm w-full md:w-auto"
+            >
+              <option value="">All Status</option>
+              <option value="delivered">Delivered</option>
+              <option value="in-transit">In Transit</option>
+              <option value="pending">Pending</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            
+            {/* Date Range Picker */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                className="px-2 py-1.5 border rounded-md text-sm"
+                placeholder="Start Date"
+              />
+              <span className="text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                className="px-2 py-1.5 border rounded-md text-sm"
+                placeholder="End Date"
+              />
+              {(dateRange.start || dateRange.end) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange({ start: '', end: '' })}
+                  className="h-7 px-2"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
