@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,95 +10,49 @@ import {
   Calendar,
   Package,
   User,
-  MapPin
+  MapPin,
+  Eye
 } from "lucide-react";
+import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
+import { useToast } from "@/hooks/use-toast";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
   outletId?: string;
 }
 
-interface Delivery {
-  id: string;
-  deliveryNoteNumber: string;
-  date: string;
-  customer: string;
-  driver: string;
-  vehicle: string;
-  items: number;
-  totalValue: number;
-  status: 'pending' | 'in-transit' | 'delivered' | 'cancelled';
-  address: string;
-}
-
-// Mock data for outlet deliveries
-const generateMockDeliveries = (outletId: string): Delivery[] => [
-  {
-    id: `del-${outletId}-1`,
-    deliveryNoteNumber: "DN-2026-001",
-    date: "2026-03-13",
-    customer: "John Smith",
-    driver: "Ahmed Hassan",
-    vehicle: "T123 ABC",
-    items: 15,
-    totalValue: 1250000,
-    status: 'delivered',
-    address: "123 Main St, Dar es Salaam"
-  },
-  {
-    id: `del-${outletId}-2`,
-    deliveryNoteNumber: "DN-2026-002",
-    date: "2026-03-12",
-    customer: "Sarah Johnson",
-    driver: "John Mwinyi",
-    vehicle: "T456 DEF",
-    items: 8,
-    totalValue: 890000,
-    status: 'in-transit',
-    address: "456 Oak Ave, Dar es Salaam"
-  },
-  {
-    id: `del-${outletId}-3`,
-    deliveryNoteNumber: "DN-2026-003",
-    date: "2026-03-11",
-    customer: "Michael Brown",
-    driver: "Peter Joseph",
-    vehicle: "T789 GHI",
-    items: 25,
-    totalValue: 2340000,
-    status: 'pending',
-    address: "789 Pine Rd, Dar es Salaam"
-  },
-  {
-    id: `del-${outletId}-4`,
-    deliveryNoteNumber: "DN-2026-004",
-    date: "2026-03-10",
-    customer: "Emily Davis",
-    driver: "Ahmed Hassan",
-    vehicle: "T123 ABC",
-    items: 5,
-    totalValue: 567000,
-    status: 'delivered',
-    address: "321 Elm St, Dar es Salaam"
-  },
-  {
-    id: `del-${outletId}-5`,
-    deliveryNoteNumber: "DN-2026-005",
-    date: "2026-03-09",
-    customer: "David Wilson",
-    driver: "John Mwinyi",
-    vehicle: "T456 DEF",
-    items: 18,
-    totalValue: 1780000,
-    status: 'cancelled',
-    address: "654 Maple Dr, Dar es Salaam"
-  }
-];
-
 export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  
-  const deliveries = outletId ? generateMockDeliveries(outletId) : [];
+  const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadDeliveries();
+  }, [outletId]);
+
+  const loadDeliveries = async () => {
+    if (!outletId) {
+      setDeliveries([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await getDeliveriesByOutletId(outletId);
+      setDeliveries(data);
+    } catch (error) {
+      console.error("Error loading deliveries:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load deliveries. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const filteredDeliveries = deliveries.filter(delivery =>
     delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -122,6 +76,105 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleViewDelivery = (delivery: DeliveryData) => {
+    // Open delivery details in a new window/tab
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const itemsList = delivery.itemsList || [];
+      const itemsHtml = itemsList.map((item: any) => `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">${item.description || item.name || 'N/A'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity || item.delivered || 0}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.rate || item.price || 0)}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency((item.quantity || item.delivered || 0) * (item.rate || item.price || 0))}</td>
+        </tr>
+      `).join('');
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Delivery Note - ${delivery.deliveryNoteNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { margin: 0; color: #333; }
+            .header p { margin: 5px 0; color: #666; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .info-box { background: #f5f5f5; padding: 15px; border-radius: 5px; }
+            .info-box h3 { margin-top: 0; color: #555; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #f0f0f0; padding: 10px; text-align: left; border: 1px solid #ddd; }
+            .total-row { font-weight: bold; background: #f9f9f9; }
+            .status-badge { 
+              display: inline-block; 
+              padding: 5px 15px; 
+              border-radius: 15px; 
+              font-size: 14px; 
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .status-delivered { background: #d4edda; color: #155724; }
+            .status-in-transit { background: #cce5ff; color: #004085; }
+            .status-pending { background: #fff3cd; color: #856404; }
+            .status-cancelled { background: #f8d7da; color: #721c24; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>DELIVERY NOTE</h1>
+            <p><strong>${delivery.deliveryNoteNumber}</strong></p>
+            <span class="status-badge status-${delivery.status}">${delivery.status}</span>
+          </div>
+          
+          <div class="info-grid">
+            <div class="info-box">
+              <h3>Delivery Information</h3>
+              <p><strong>Date:</strong> ${delivery.date}</p>
+              <p><strong>Customer:</strong> ${delivery.customer}</p>
+              <p><strong>Driver:</strong> ${delivery.driver || 'N/A'}</p>
+              <p><strong>Vehicle:</strong> ${delivery.vehicle || 'N/A'}</p>
+            </div>
+            <div class="info-box">
+              <h3>Summary</h3>
+              <p><strong>Total Items:</strong> ${delivery.items}</p>
+              <p><strong>Total Value:</strong> ${formatCurrency(delivery.total)}</p>
+              ${delivery.paymentMethod ? `<p><strong>Payment Method:</strong> ${delivery.paymentMethod}</p>` : ''}
+            </div>
+          </div>
+          
+          <h3>Items Delivered</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th style="text-align: center;">Quantity</th>
+                <th style="text-align: right;">Rate</th>
+                <th style="text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+              <tr class="total-row">
+                <td colspan="3" style="text-align: right; padding: 10px;"><strong>Total:</strong></td>
+                <td style="text-align: right; padding: 10px;"><strong>${formatCurrency(delivery.total)}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          
+          ${delivery.deliveryNotes ? `
+            <div style="margin-top: 30px; padding: 15px; background: #f9f9f9; border-radius: 5px;">
+              <h3>Delivery Notes</h3>
+              <p>${delivery.deliveryNotes}</p>
+            </div>
+          ` : ''}
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
     }
   };
 
@@ -183,7 +236,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               <div>
                 <p className="text-sm text-muted-foreground">Total Value</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(deliveries.reduce((sum, d) => sum + d.totalValue, 0))}
+                  {formatCurrency(deliveries.reduce((sum, d) => sum + d.total, 0))}
                 </p>
               </div>
               <Package className="h-8 w-8 text-blue-500" />
@@ -208,56 +261,70 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       </Card>
 
       {/* Deliveries List */}
-      <div className="space-y-4">
-        {filteredDeliveries.map((delivery) => (
-          <Card key={delivery.id} className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold">{delivery.deliveryNoteNumber}</h3>
-                    <Badge className={getStatusColor(delivery.status)}>
-                      {delivery.status}
-                    </Badge>
+      {loading ? (
+        <div className="text-center py-12">
+          <Truck className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-pulse" />
+          <h3 className="text-lg font-medium">Loading deliveries...</h3>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredDeliveries.map((delivery) => (
+            <Card key={delivery.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold">{delivery.deliveryNoteNumber}</h3>
+                      <Badge className={getStatusColor(delivery.status)}>
+                        {delivery.status}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        {delivery.date}
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="h-4 w-4" />
+                        {delivery.customer}
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Truck className="h-4 w-4" />
+                        {delivery.driver || 'N/A'}
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        {delivery.vehicle || 'N/A'}
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      {delivery.date}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="h-4 w-4" />
-                      {delivery.customer}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Truck className="h-4 w-4" />
-                      {delivery.driver}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      {delivery.vehicle}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 inline mr-1" />
-                    {delivery.address}
+                  <div className="text-right">
+                    <p className="text-lg font-bold">{formatCurrency(delivery.total)}</p>
+                    <p className="text-sm text-muted-foreground">{delivery.items} items</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => handleViewDelivery(delivery)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold">{formatCurrency(delivery.totalValue)}</p>
-                  <p className="text-sm text-muted-foreground">{delivery.items} items</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {filteredDeliveries.length === 0 && (
+      {!loading && filteredDeliveries.length === 0 && (
         <div className="text-center py-12">
           <Truck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium">No deliveries found</h3>
-          <p className="text-muted-foreground">Try adjusting your search terms</p>
+          <p className="text-muted-foreground">
+            {searchTerm ? 'Try adjusting your search terms' : 'No deliveries for this outlet yet'}
+          </p>
         </div>
       )}
     </div>
