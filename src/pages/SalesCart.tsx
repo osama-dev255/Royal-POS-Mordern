@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -35,6 +35,7 @@ interface Customer {
   name: string;
   loyaltyPoints: number;
   address?: string;
+  district_ward?: string;
   email?: string;
   phone?: string;
   tax_id?: string; // Add tax_id field
@@ -88,6 +89,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
     email: "",
     phone: "",
     address: "",
+    district_ward: "",
     tax_id: ""
   }); // State for new customer data
   const { toast } = useToast();
@@ -159,6 +161,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           name: `${customer.first_name} ${customer.last_name}`,
           loyaltyPoints: customer.loyalty_points || 0,
           address: customer.address || '',
+          district_ward: customer.district_ward || '',
           email: customer.email || '',
           phone: customer.phone || '',
           tax_id: customer.tax_id || '', // Include tax_id field
@@ -698,12 +701,16 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         email: newCustomer.email || "",
         phone: newCustomer.phone || "",
         address: newCustomer.address || "",
+        district_ward: newCustomer.district_ward || "",
         tax_id: newCustomer.tax_id || "",
         loyalty_points: 0,
         is_active: true
       };
 
-      const createdCustomer = await createCustomer(customerData);
+      // Use createCustomerForOutlet if outletId is provided, otherwise use createCustomer
+      const createdCustomer = outletId 
+        ? await createCustomerForOutlet(customerData, outletId)
+        : await createCustomer(customerData);
       
       if (createdCustomer) {
         // Format the created customer to match our Customer interface
@@ -712,6 +719,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           name: `${createdCustomer.first_name} ${createdCustomer.last_name}`,
           loyaltyPoints: createdCustomer.loyalty_points || 0,
           address: createdCustomer.address || '',
+          district_ward: createdCustomer.district_ward || '',
           email: createdCustomer.email || '',
           phone: createdCustomer.phone || '',
           tax_id: createdCustomer.tax_id || ''
@@ -733,6 +741,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           email: "",
           phone: "",
           address: "",
+          district_ward: "",
           tax_id: ""
         });
         
@@ -1223,6 +1232,16 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             </div>
             
             <div>
+              <Label htmlFor="district_ward">District/Ward</Label>
+              <Input
+                id="district_ward"
+                placeholder="District or ward"
+                value={newCustomer.district_ward}
+                onChange={(e) => setNewCustomer({...newCustomer, district_ward: e.target.value})}
+              />
+            </div>
+            
+            <div>
               <Label htmlFor="tax_id">Tax ID (TIN)</Label>
               <Input
                 id="tax_id"
@@ -1244,6 +1263,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     email: "",
                     phone: "",
                     address: "",
+                    district_ward: "",
                     tax_id: ""
                   });
                 }}

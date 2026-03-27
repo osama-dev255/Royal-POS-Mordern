@@ -48,15 +48,13 @@ export interface Customer {
   email?: string;
   phone?: string;
   address?: string;
-  city?: string;
+  district_ward?: string;
   state?: string;
-  zip_code?: string;
-  country?: string;
-  date_of_birth?: string;
   loyalty_points?: number;
   credit_limit?: number;
   tax_id?: string;
   is_active?: boolean;
+  outlet_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -1165,6 +1163,23 @@ export const getCustomers = async (): Promise<Customer[]> => {
   }
 };
 
+export const getCustomersByOutletId = async (outletId: string): Promise<Customer[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('first_name', { ascending: true })
+      .order('last_name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching customers by outlet:', error);
+    return [];
+  }
+};
+
 export const getCustomerById = async (id: string): Promise<Customer | null> => {
   try {
     const { data, error } = await supabase
@@ -1193,6 +1208,27 @@ export const createCustomer = async (customer: Omit<Customer, 'id'>): Promise<Cu
     return data || null;
   } catch (error) {
     console.error('Error creating customer:', error);
+    return null;
+  }
+};
+
+export const createCustomerForOutlet = async (customer: Omit<Customer, 'id'>, outletId: string): Promise<Customer | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .insert([{ 
+        ...customer, 
+        outlet_id: outletId,
+        created_at: new Date().toISOString(), 
+        updated_at: new Date().toISOString() 
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating customer for outlet:', error);
     return null;
   }
 };
