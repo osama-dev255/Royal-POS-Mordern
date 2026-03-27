@@ -3297,40 +3297,336 @@ export class PrintUtils {
 
   // Print invoice for Debt payment transactions
   static printDebtInvoice(transaction: any) {
-    // Convert transaction to invoice-like format for consistent printing
-    const invoiceLike = {
-      id: transaction.id,
-      invoiceNumber: transaction.receiptNumber,
-      date: transaction.date || new Date().toISOString(),
-      customer: transaction.customer?.name || 'Walk-in Customer',
-      items: transaction.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
-      total: transaction.total,
-      paymentMethod: 'debt',
-      status: 'pending',
-      itemsList: transaction.items.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        description: '',
-        quantity: item.quantity,
-        rate: item.price,
-        amount: item.price * item.quantity,
-        unit: 'unit'
-      })),
-      subtotal: transaction.subtotal,
-      tax: transaction.tax,
-      discount: transaction.discount,
-      amountReceived: transaction.amountReceived || 0,
-      change: transaction.change || 0,
-      businessName: localStorage.getItem('businessName'),
-      businessAddress: localStorage.getItem('businessAddress'),
-      businessPhone: localStorage.getItem('businessPhone'),
-      amountPaid: 0, // For debt transactions, amount paid is 0
-      creditBroughtForward: 0,
-      amountDue: transaction.total // For debt transactions, amount due equals total
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) return;
+    
+    const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+    const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
+    const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
+    const businessEmail = localStorage.getItem('businessEmail') || 'kilangogroup1@gmail.com';
+    
+    const invoiceNumber = transaction.receiptNumber || `INV-${Date.now()}`;
+    const invoiceDate = new Date(transaction.date || new Date()).toLocaleDateString();
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(); // 30 days from now
+    
+    const customerName = transaction.customer?.name || 'Walk-in Customer';
+    const customerPhone = transaction.customer?.phone || '';
+    const customerAddress = transaction.customer?.address || '';
+    const customerEmail = transaction.customer?.email || '';
+    
+    const items = transaction.items || [];
+    const subtotal = transaction.subtotal || 0;
+    const total = transaction.total || 0;
+    const totalQuantity = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+    
+    const formatCurrency = (amount: number) => {
+      return `TSh ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
     
-    // Use the same printSavedInvoice function for consistent formatting
-    this.printSavedInvoice(invoiceLike);
+    const reportContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice ${invoiceNumber}</title>
+          <style>
+            @media print {
+              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              color: #333;
+              font-size: 14px;
+              line-height: 1.4;
+            }
+            .invoice-header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .invoice-title {
+              font-size: 28px;
+              font-weight: bold;
+              margin-bottom: 10px;
+              letter-spacing: 2px;
+            }
+            .invoice-number {
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .generated-date {
+              font-size: 12px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .amount-due-label {
+              font-size: 14px;
+              margin-bottom: 5px;
+            }
+            .amount-due {
+              font-size: 32px;
+              font-weight: bold;
+              color: #dc2626;
+              margin-bottom: 30px;
+            }
+            .info-section {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 30px;
+            }
+            .info-box {
+              width: 45%;
+            }
+            .info-label {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 10px;
+              text-transform: uppercase;
+            }
+            .info-content {
+              font-size: 13px;
+              line-height: 1.6;
+            }
+            .dates-section {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 30px;
+              border-top: 1px solid #ddd;
+              border-bottom: 1px solid #ddd;
+              padding: 15px 0;
+            }
+            .date-item {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+            }
+            .date-label {
+              font-weight: bold;
+              font-size: 13px;
+            }
+            .date-value {
+              font-size: 13px;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 15px;
+              text-transform: uppercase;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 30px;
+            }
+            .items-table th {
+              background-color: #f5f5f5;
+              padding: 10px;
+              text-align: left;
+              font-weight: bold;
+              font-size: 13px;
+              border: 1px solid #ddd;
+            }
+            .items-table td {
+              padding: 10px;
+              border: 1px solid #ddd;
+              font-size: 13px;
+            }
+            .notes-section {
+              margin-bottom: 30px;
+            }
+            .notes-label {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 10px;
+            }
+            .notes-content {
+              font-size: 13px;
+              font-style: italic;
+            }
+            .payment-options {
+              margin-bottom: 30px;
+            }
+            .payment-label {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 10px;
+            }
+            .payment-methods {
+              font-size: 13px;
+            }
+            .summary-section {
+              width: 350px;
+              margin-left: auto;
+              margin-bottom: 30px;
+            }
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              border-bottom: 1px solid #eee;
+            }
+            .summary-row:last-child {
+              border-bottom: none;
+            }
+            .summary-row.total {
+              font-weight: bold;
+              font-size: 15px;
+              border-top: 2px solid #333;
+              margin-top: 10px;
+              padding-top: 10px;
+            }
+            .summary-row.amount-due-final {
+              font-weight: bold;
+              font-size: 16px;
+              color: #dc2626;
+              border-top: 2px solid #333;
+              margin-top: 10px;
+              padding-top: 10px;
+            }
+            .summary-label {
+              font-weight: 600;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 50px;
+              font-size: 12px;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-header">
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-number">${invoiceNumber}</div>
+            <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
+            <div class="amount-due-label">AMOUNT DUE</div>
+            <div class="amount-due">${formatCurrency(total)}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-box">
+              <div class="info-label">FROM:</div>
+              <div class="info-content">
+                ${businessName}<br>
+                ${businessAddress}<br>
+                Phone: ${businessPhone}<br>
+                Email: ${businessEmail}
+              </div>
+            </div>
+            <div class="info-box">
+              <div class="info-label">BILL TO:</div>
+              <div class="info-content">
+                ${customerName}<br>
+                ${customerAddress ? `Address: ${customerAddress}<br>` : ''}
+                ${customerPhone ? `Phone: ${customerPhone}<br>` : ''}
+                ${customerEmail ? `Email: ${customerEmail}` : ''}
+              </div>
+            </div>
+          </div>
+          
+          <div class="dates-section">
+            <div class="date-item">
+              <span class="date-label">INVOICE DATE:</span>
+              <span class="date-value">${invoiceDate}</span>
+            </div>
+            <div class="date-item">
+              <span class="date-label">DUE DATE:</span>
+              <span class="date-value">${dueDate}</span>
+            </div>
+          </div>
+          
+          <div class="section-title">SERVICES RENDERED:</div>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Rate</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item: any, index: number) => `
+                <tr>
+                  <td>${String(index + 1).padStart(3, '0')}</td>
+                  <td>${item.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>ctns</td>
+                  <td>${formatCurrency(item.price)}</td>
+                  <td>${formatCurrency(item.price * item.quantity)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="notes-section">
+            <div class="notes-label">NOTES:</div>
+            <div class="notes-content">Thank you for your business!</div>
+          </div>
+          
+          <div class="payment-options">
+            <div class="payment-label">PAYMENT OPTIONS:</div>
+            <div class="payment-methods">Cash, Bank Transfer, Check, or Credit Card</div>
+          </div>
+          
+          <div class="summary-section">
+            <div class="summary-row">
+              <span class="summary-label">Subtotal:</span>
+              <span>${formatCurrency(subtotal)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Total Quantity:</span>
+              <span>${totalQuantity}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Discount:</span>
+              <span>${formatCurrency(transaction.discount || 0)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Tax:</span>
+              <span>${formatCurrency(transaction.tax || 0)}</span>
+            </div>
+            <div class="summary-row total">
+              <span class="summary-label">TOTAL:</span>
+              <span>${formatCurrency(total)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Amount Paid:</span>
+              <span>${formatCurrency(0)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Shipping:</span>
+              <span>${formatCurrency(0)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Credit Brought Forward from previous:</span>
+              <span>${formatCurrency(0)}</span>
+            </div>
+            <div class="summary-row amount-due-final">
+              <span class="summary-label">AMOUNT DUE:</span>
+              <span>${formatCurrency(total)}</span>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p>This is a computer-generated invoice.</p>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    
+    reportWindow.document.write(reportContent);
+    reportWindow.document.close();
   }
 
   // Print purchase order
