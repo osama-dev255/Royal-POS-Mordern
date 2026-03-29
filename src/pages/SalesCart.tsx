@@ -1031,15 +1031,29 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     )}
                   </div>
                   
+                  {/* Total Quantity */}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Quantity</span>
+                    <span className="font-medium">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                  </div>
+                  
+                  {/* Tax */}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tax (18%)</span>
+                    <span className="font-medium">{formatCurrency(tax)}</span>
+                  </div>
+                  
+                  {/* Credit Brought Forward */}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Credit Brought Forward from previous</span>
+                    <span className="font-medium">{formatCurrency(0)}</span>
+                  </div>
+                  
                   <Separator />
                   
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
                     <span>{formatCurrency(total)}</span>
-                  </div>
-                  
-                  <div className="text-xs text-muted-foreground mt-2">
-                    <p>Tax (18%): {formatCurrency(tax)} (for display purposes only)</p>
                   </div>
                 </div>
               </CardContent>
