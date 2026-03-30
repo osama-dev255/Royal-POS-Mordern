@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, getOutletDebtsByCustomerId, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -33,13 +33,15 @@ interface CartItem {
 interface Customer {
   id: string;
   name: string;
+  first_name?: string;
+  last_name?: string;
   loyaltyPoints: number;
   address?: string;
   district_ward?: string;
   email?: string;
   phone?: string;
-  tax_id?: string; // Add tax_id field
-  creditLimit?: number; // Add credit limit field
+  tax_id?: string;
+  creditLimit?: number;
 }
 
 // Update the temporary product interface to match the Product type
@@ -388,24 +390,53 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
 
     try {
       // Create the sale record in the database
-      const saleData = {
-        customer_id: selectedCustomer?.id || null,
-        user_id: null, // In In a real app, this would be the current user ID
-        invoice_number: `INV-${Date.now()}`,
-        sale_date: new Date().toISOString(),
-        subtotal: subtotal,
-        discount_amount: discountAmount,
-        tax_amount: tax, // Display only tax (18%)
-        total_amount: totalWithTax, // Actual total without tax effect
-        amount_paid: paymentMethod === "debt" ? 0 : (parseFloat(amountReceived) || totalWithTax),
-        change_amount: paymentMethod === "debt" ? 0 : change,
-        payment_method: paymentMethod,
-        payment_status: paymentMethod === "debt" ? "unpaid" : "paid",
-        sale_status: "completed",
-        notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
-      };
-
-      const createdSale = await createSale(saleData);
+      // Use outlet_sales table for outlet-specific sales, otherwise use general sales table
+      let createdSale;
+      
+      if (outletId) {
+        // Create outlet-specific sale
+        const outletSaleData = {
+          outlet_id: outletId,
+          customer_id: selectedCustomer?.id || null,
+          user_id: null,
+          invoice_number: `INV-${Date.now()}`,
+          sale_date: new Date().toISOString(),
+          subtotal: subtotal,
+          discount_amount: discountAmount,
+          tax_amount: tax,
+          shipping_amount: parseFloat(shippingCost) || 0,
+          credit_brought_forward: creditBroughtForward,
+          total_amount: totalWithTax,
+          amount_paid: paymentMethod === "debt" ? 0 : (parseFloat(amountReceived) || totalWithTax),
+          change_amount: paymentMethod === "debt" ? 0 : change,
+          payment_method: paymentMethod,
+          payment_status: paymentMethod === "debt" ? "unpaid" : "paid",
+          sale_status: "completed",
+          notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
+        };
+        
+        createdSale = await createOutletSale(outletSaleData);
+      } else {
+        // Create general sale
+        const saleData = {
+          customer_id: selectedCustomer?.id || null,
+          user_id: null,
+          invoice_number: `INV-${Date.now()}`,
+          sale_date: new Date().toISOString(),
+          subtotal: subtotal,
+          discount_amount: discountAmount,
+          tax_amount: tax,
+          total_amount: totalWithTax,
+          amount_paid: paymentMethod === "debt" ? 0 : (parseFloat(amountReceived) || totalWithTax),
+          change_amount: paymentMethod === "debt" ? 0 : change,
+          payment_method: paymentMethod,
+          payment_status: paymentMethod === "debt" ? "unpaid" : "paid",
+          sale_status: "completed",
+          notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
+        };
+        
+        createdSale = await createSale(saleData);
+      }
       
       if (!createdSale) {
         throw new Error("Failed to create sale record");
@@ -418,33 +449,66 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         // Only include product_id if it's a valid UUID format
         const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
         
-        const saleItemData = {
-          sale_id: createdSale.id || '',
-          product_id: isValidUuid ? item.id : null,
-          quantity: item.quantity,
-          unit_price: item.price,
-          discount_amount: 0, // In a real app, this would be calculated
-          tax_amount: item.price * item.quantity * 0.18, // Display only tax (18%)
-          total_price: item.price * item.quantity
-        };
-        
-        await createSaleItem(saleItemData);
+        if (outletId) {
+          // Create outlet sale item
+          const outletSaleItemData = {
+            sale_id: createdSale.id || '',
+            product_id: isValidUuid ? item.id : null,
+            quantity: item.quantity,
+            unit_price: item.price,
+            discount_amount: 0,
+            total_price: item.price * item.quantity
+          };
+          
+          await createOutletSaleItem(outletSaleItemData);
+        } else {
+          // Create general sale item
+          const saleItemData = {
+            sale_id: createdSale.id || '',
+            product_id: isValidUuid ? item.id : null,
+            quantity: item.quantity,
+            unit_price: item.price,
+            discount_amount: 0,
+            tax_amount: item.price * item.quantity * 0.18,
+            total_price: item.price * item.quantity
+          };
+          
+          await createSaleItem(saleItemData);
+        }
       }
 
       // Create debt record for debt transactions
       if (paymentMethod === "debt" && selectedCustomer) {
-        const debtData = {
-          customer_id: selectedCustomer.id,
-          debt_type: "customer",
-          amount: totalWithTax,
-          description: `Debt for sale ${createdSale.id || 'unknown'}`,
-          status: "outstanding",
-          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 30 days from now
-        };
+        if (outletId) {
+          // Create outlet-specific debt
+          const outletDebtData = {
+            outlet_id: outletId,
+            customer_id: selectedCustomer.id,
+            amount: totalWithTax,
+            description: `Debt for sale ${createdSale.id || 'unknown'}`,
+            status: "outstanding" as const,
+            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          };
 
-        const createdDebt = await createDebt(debtData);
-        if (!createdDebt) {
-          console.warn("Failed to create debt record for transaction");
+          const createdDebt = await createOutletDebt(outletDebtData);
+          if (!createdDebt) {
+            console.warn("Failed to create outlet debt record for transaction");
+          }
+        } else {
+          // Create general debt
+          const debtData = {
+            customer_id: selectedCustomer.id,
+            debt_type: "customer",
+            amount: totalWithTax,
+            description: `Debt for sale ${createdSale.id || 'unknown'}`,
+            status: "outstanding",
+            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          };
+
+          const createdDebt = await createDebt(debtData);
+          if (!createdDebt) {
+            console.warn("Failed to create debt record for transaction");
+          }
         }
       }
 
@@ -574,7 +638,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const savedSaleData = {
             outlet_id: outletId,
             invoice_number: createdSale.invoice_number || `INV-${Date.now()}`,
-            customer: selectedCustomer ? `${selectedCustomer.first_name} ${selectedCustomer.last_name}` : 'Walk-in Customer',
+            customer: selectedCustomer?.name || 'Walk-in Customer',
             customer_id: selectedCustomer?.id,
             items: cart.map(item => ({
               name: item.name,
@@ -1178,25 +1242,30 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                       // Fetch customer's outstanding debts from both database and localStorage
                       if (customer.id) {
                         try {
-                          // Get debts from Supabase database
-                          const dbDebts = await getDebtsByCustomerId(customer.id);
-                          const dbTotalDebt = dbDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+                          let totalDebt = 0;
                           
-                          // Get debts from localStorage (Saved Debts)
-                          let localStorageDebt = 0;
                           if (outletId) {
+                            // Get outlet-specific debts from database
+                            const outletDebts = await getOutletDebtsByCustomerId(outletId, customer.id);
+                            const outletDbDebt = outletDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+                            
+                            // Get debts from localStorage (Saved Debts)
                             const savedSalesKey = `outlet_${outletId}_saved_debts`;
                             const savedDebts = JSON.parse(localStorage.getItem(savedSalesKey) || '[]');
                             const customerDebts = savedDebts.filter((debt: any) => 
                               debt.customer === customer.name || debt.customerId === customer.id
                             );
-                            localStorageDebt = customerDebts.reduce((sum: number, debt: any) => 
+                            const localStorageDebt = customerDebts.reduce((sum: number, debt: any) => 
                               sum + (debt.total || debt.amount || 0), 0
                             );
+                            
+                            totalDebt = outletDbDebt + localStorageDebt;
+                          } else {
+                            // Get general debts from database
+                            const dbDebts = await getDebtsByCustomerId(customer.id);
+                            totalDebt = dbDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
                           }
                           
-                          // Combine both sources
-                          const totalDebt = dbTotalDebt + localStorageDebt;
                           setCreditBroughtForward(totalDebt);
                         } catch (error) {
                           console.error('Error fetching customer debts:', error);

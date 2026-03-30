@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS saved_sales (
   outlet_id UUID REFERENCES outlets(id) ON DELETE CASCADE,
   invoice_number VARCHAR(100) NOT NULL,
   customer VARCHAR(255),
-  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  customer_id UUID REFERENCES outlet_customers(id) ON DELETE SET NULL,
   items JSONB NOT NULL DEFAULT '[]',
   subtotal DECIMAL(15,2) NOT NULL DEFAULT 0,
   tax DECIMAL(15,2) NOT NULL DEFAULT 0,

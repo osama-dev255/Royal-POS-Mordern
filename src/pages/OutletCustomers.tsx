@@ -22,9 +22,20 @@ import {
   Plus,
   Trash2,
   UserPlus,
-  Loader2
+  Loader2,
+  LayoutGrid,
+  List
 } from "lucide-react";
-import { getOutletCustomers, createOutletCustomer, deleteOutletCustomer, OutletCustomer } from "@/services/databaseService";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { getOutletCustomers, createOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletCustomersProps {
@@ -35,9 +46,11 @@ interface OutletCustomersProps {
 export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [customers, setCustomers] = useState<OutletCustomer[]>([]);
+  const [customerBalances, setCustomerBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const { toast } = useToast();
 
   // Form state for new customer - aligned with SalesCart
@@ -63,6 +76,19 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       // Use outlet_customers table - completely separate from general customers
       const data = await getOutletCustomers(outletId);
       setCustomers(data);
+      
+      // Fetch all debts for this outlet and calculate balances per customer
+      const debts = await getOutletDebtsByOutletId(outletId);
+      const balances: Record<string, number> = {};
+      
+      // Sum up outstanding debts for each customer
+      debts.forEach(debt => {
+        if (debt.customer_id && debt.status === 'outstanding') {
+          balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.amount || 0);
+        }
+      });
+      
+      setCustomerBalances(balances);
     } catch (error) {
       console.error("Error loading outlet customers:", error);
       toast({
@@ -211,10 +237,21 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             <p className="text-muted-foreground">Manage customers for this outlet</p>
           </div>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Customer
-        </Button>
+        <div className="flex items-center gap-4">
+          {/* View Toggle */}
+          <ToggleGroup type="single" value={viewMode} onValueChange={(value) => value && setViewMode(value as "card" | "table")}>
+            <ToggleGroupItem value="card" aria-label="Card view">
+              <LayoutGrid className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="table" aria-label="Table view">
+              <List className="h-4 w-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -299,7 +336,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             </Button>
           )}
         </div>
-      ) : (
+      ) : viewMode === "card" ? (
+        /* Card View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCustomers.map((customer) => (
             <Card key={customer.id} className="hover:shadow-lg transition-shadow">
@@ -347,6 +385,12 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                       <span className="text-muted-foreground">Loyalty Points:</span>
                       <span className="font-semibold">{(customer.loyalty_points || 0).toLocaleString()}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Balance:</span>
+                      <span className={`font-semibold ${customerBalances[customer.id!] ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(customerBalances[customer.id!] || 0)}
+                      </span>
+                    </div>
                     {customer.created_at && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Joined:</span>
@@ -361,6 +405,60 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             </Card>
           ))}
         </div>
+      ) : (
+        /* Table View */
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>District/Ward</TableHead>
+                <TableHead>Loyalty Points</TableHead>
+                <TableHead>Balance</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCustomers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell className="font-medium">
+                    {customer.first_name} {customer.last_name}
+                  </TableCell>
+                  <TableCell>{customer.phone || '-'}</TableCell>
+                  <TableCell>{customer.email || '-'}</TableCell>
+                  <TableCell>{customer.address || '-'}</TableCell>
+                  <TableCell>{customer.district_ward || '-'}</TableCell>
+                  <TableCell>{(customer.loyalty_points || 0).toLocaleString()}</TableCell>
+                  <TableCell className={customerBalances[customer.id!] ? 'text-red-600 font-medium' : 'text-green-600'}>
+                    {formatCurrency(customerBalances[customer.id!] || 0)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={customer.is_active !== false ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {customer.is_active !== false ? 'active' : 'inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '-'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteCustomer(customer.id!, `${customer.first_name} ${customer.last_name}`)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       {/* Add Customer Dialog */}
