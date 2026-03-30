@@ -40,14 +40,15 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  // Form state for new customer
+  // Form state for new customer - aligned with SalesCart
   const [newCustomer, setNewCustomer] = useState({
     first_name: "",
     last_name: "",
     phone: "",
     email: "",
     address: "",
-    district_ward: ""
+    district_ward: "",
+    tax_id: ""
   });
 
   useEffect(() => {
@@ -110,6 +111,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         email: newCustomer.email.trim() || undefined,
         address: newCustomer.address.trim() || undefined,
         district_ward: newCustomer.district_ward.trim() || undefined,
+        tax_id: newCustomer.tax_id.trim() || undefined,
         is_active: true,
         loyalty_points: 0
       });
@@ -122,7 +124,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           phone: "",
           email: "",
           address: "",
-          district_ward: ""
+          district_ward: "",
+          tax_id: ""
         });
         setIsAddDialogOpen(false);
         toast({
@@ -175,7 +178,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       phone: "",
       email: "",
       address: "",
-      district_ward: ""
+      district_ward: "",
+      tax_id: ""
     });
   };
 
@@ -418,6 +422,14 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                 value={newCustomer.district_ward}
                 onChange={(e) => setNewCustomer(prev => ({ ...prev, district_ward: e.target.value }))}
                 placeholder="Enter district or ward"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Tax ID (TIN)</label>
+              <Input
+                value={newCustomer.tax_id}
+                onChange={(e) => setNewCustomer(prev => ({ ...prev, tax_id: e.target.value }))}
+                placeholder="Enter tax identification number"
               />
             </div>
           </div>
