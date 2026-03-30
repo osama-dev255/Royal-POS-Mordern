@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, getOutletDebtsByCustomerId, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -82,6 +82,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [transactionId, setTransactionId] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerBalances, setCustomerBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [completedTransaction, setCompletedTransaction] = useState<any>(null); // Store completed transaction for printing
   const [creditBroughtForward, setCreditBroughtForward] = useState<number>(0); // Credit brought forward from previous debts
@@ -177,6 +178,18 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           creditLimit: customer.credit_limit || 0 // Include credit limit field
         }));
         setCustomers(formattedCustomers);
+        
+        // Fetch customer balances from outlet_debts if outletId is present
+        if (outletId) {
+          const debts = await getOutletDebtsByOutletId(outletId);
+          const balances: Record<string, number> = {};
+          debts.forEach(debt => {
+            if (debt.customer_id && debt.status === 'outstanding') {
+              balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.amount || 0);
+            }
+          });
+          setCustomerBalances(balances);
+        }
       } catch (error) {
         console.error("Error loading data:", error);
         toast({
@@ -1284,6 +1297,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                         )}
                       </div>
                     </div>
+                    {outletId && customerBalances[customer.id] > 0 && (
+                      <div className="text-right">
+                        <span className="text-sm font-semibold text-red-600">
+                          Balance: {formatCurrency(customerBalances[customer.id])}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
             </div>
