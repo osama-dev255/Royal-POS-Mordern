@@ -24,7 +24,7 @@ import {
   UserPlus,
   Loader2
 } from "lucide-react";
-import { getCustomersByOutletId, createCustomerForOutlet, deleteCustomer, Customer } from "@/services/databaseService";
+import { getOutletCustomers, createOutletCustomer, deleteOutletCustomer, OutletCustomer } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletCustomersProps {
@@ -34,7 +34,7 @@ interface OutletCustomersProps {
 
 export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<OutletCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -59,13 +59,14 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
     
     try {
       setLoading(true);
-      const data = await getCustomersByOutletId(outletId);
+      // Use outlet_customers table - completely separate from general customers
+      const data = await getOutletCustomers(outletId);
       setCustomers(data);
     } catch (error) {
-      console.error("Error loading customers:", error);
+      console.error("Error loading outlet customers:", error);
       toast({
         title: "Error",
-        description: "Failed to load customers",
+        description: "Failed to load outlet customers",
         variant: "destructive"
       });
     } finally {
@@ -101,7 +102,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
 
     try {
       setIsSaving(true);
-      const customer = await createCustomerForOutlet({
+      const customer = await createOutletCustomer({
+        outlet_id: outletId,
         first_name: newCustomer.first_name.trim(),
         last_name: newCustomer.last_name.trim(),
         phone: newCustomer.phone.trim() || undefined,
@@ -110,7 +112,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         district_ward: newCustomer.district_ward.trim() || undefined,
         is_active: true,
         loyalty_points: 0
-      }, outletId);
+      });
 
       if (customer) {
         setCustomers(prev => [...prev, customer]);
@@ -125,16 +127,16 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         setIsAddDialogOpen(false);
         toast({
           title: "Success",
-          description: "Customer added successfully"
+          description: "Outlet customer added successfully"
         });
       } else {
-        throw new Error("Failed to create customer");
+        throw new Error("Failed to create outlet customer");
       }
     } catch (error) {
-      console.error("Error adding customer:", error);
+      console.error("Error adding outlet customer:", error);
       toast({
         title: "Error",
-        description: "Failed to add customer",
+        description: "Failed to add outlet customer",
         variant: "destructive"
       });
     } finally {
@@ -146,21 +148,21 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
     if (!confirm(`Are you sure you want to delete "${customerName}"?`)) return;
 
     try {
-      const success = await deleteCustomer(customerId);
+      const success = await deleteOutletCustomer(customerId);
       if (success) {
         setCustomers(prev => prev.filter(c => c.id !== customerId));
         toast({
           title: "Success",
-          description: "Customer deleted successfully"
+          description: "Outlet customer deleted successfully"
         });
       } else {
-        throw new Error("Failed to delete customer");
+        throw new Error("Failed to delete outlet customer");
       }
     } catch (error) {
-      console.error("Error deleting customer:", error);
+      console.error("Error deleting outlet customer:", error);
       toast({
         title: "Error",
-        description: "Failed to delete customer",
+        description: "Failed to delete outlet customer",
         variant: "destructive"
       });
     }

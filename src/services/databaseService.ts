@@ -97,6 +97,31 @@ export interface Outlet {
   updated_at?: string;
 }
 
+export interface SavedSale {
+  id?: string;
+  outlet_id: string;
+  invoice_number: string;
+  customer?: string;
+  customer_id?: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  shipping: number;
+  credit_brought_forward: number;
+  total: number;
+  payment_method: string;
+  status: string;
+  sale_date?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface InventoryProduct {
   id?: string;
   outlet_id: string;
@@ -2326,6 +2351,24 @@ export const getDebts = async (): Promise<Debt[]> => {
   }
 };
 
+export const getDebtsByCustomerId = async (customerId: string): Promise<Debt[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('debts')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('debt_type', 'customer')
+      .eq('status', 'outstanding')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching customer debts:', error);
+    return [];
+  }
+};
+
 export const createDebt = async (debt: Omit<Debt, 'id'>): Promise<Debt | null> => {
   try {
     const { data, error } = await supabase
@@ -3674,5 +3717,236 @@ export const testAssetTables = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Error testing asset tables:', error);
     return false;
+  }
+};
+
+// Saved Sales CRUD operations for outlet-specific saved sales
+export const getSavedSalesByOutletId = async (outletId: string): Promise<SavedSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_sales')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching saved sales by outlet:', error);
+    return [];
+  }
+};
+
+export const getSavedSalesByOutletAndPaymentMethod = async (outletId: string, paymentMethod: string): Promise<SavedSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_sales')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('payment_method', paymentMethod)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching saved sales by outlet and payment method:', error);
+    return [];
+  }
+};
+
+export const createSavedSale = async (savedSale: Omit<SavedSale, 'id'>): Promise<SavedSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_sales')
+      .insert([{
+        ...savedSale,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating saved sale:', error);
+    return null;
+  }
+};
+
+export const updateSavedSale = async (id: string, savedSale: Partial<SavedSale>): Promise<SavedSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_sales')
+      .update({
+        ...savedSale,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating saved sale:', error);
+    return null;
+  }
+};
+
+export const deleteSavedSale = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('saved_sales')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting saved sale:', error);
+    return false;
+  }
+};
+
+export const getSavedSalesByCustomerId = async (customerId: string): Promise<SavedSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_sales')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching saved sales by customer:', error);
+    return [];
+  }
+};
+
+// Outlet Customer CRUD operations - completely separate from general customers
+export interface OutletCustomer {
+  id?: string;
+  outlet_id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  district_ward?: string;
+  state?: string;
+  loyalty_points?: number;
+  credit_limit?: number;
+  tax_id?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getOutletCustomers = async (outletId: string): Promise<OutletCustomer[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customers')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('first_name', { ascending: true })
+      .order('last_name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet customers:', error);
+    return [];
+  }
+};
+
+export const getOutletCustomerById = async (id: string): Promise<OutletCustomer | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customers')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error fetching outlet customer:', error);
+    return null;
+  }
+};
+
+export const createOutletCustomer = async (customer: Omit<OutletCustomer, 'id'>): Promise<OutletCustomer | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customers')
+      .insert([{
+        ...customer,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating outlet customer:', error);
+    return null;
+  }
+};
+
+export const updateOutletCustomer = async (id: string, customer: Partial<OutletCustomer>): Promise<OutletCustomer | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customers')
+      .update({
+        ...customer,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet customer:', error);
+    return null;
+  }
+};
+
+export const deleteOutletCustomer = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_customers')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet customer:', error);
+    return false;
+  }
+};
+
+export const searchOutletCustomers = async (outletId: string, searchTerm: string): Promise<OutletCustomer[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customers')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      .order('first_name', { ascending: true })
+      .order('last_name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error searching outlet customers:', error);
+    return [];
   }
 };

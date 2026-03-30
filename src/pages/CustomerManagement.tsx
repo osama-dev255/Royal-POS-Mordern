@@ -39,6 +39,8 @@ export const CustomerManagement = ({ username, onBack, onLogout }: { username: s
   const loadCustomers = async () => {
     try {
       setLoading(true);
+      // Load general system customers only (from customers table)
+      // Outlet-specific customers are managed separately in each outlet
       const data = await getCustomers();
       setCustomers(data);
     } catch (error) {
@@ -246,8 +248,8 @@ export const CustomerManagement = ({ username, onBack, onLogout }: { username: s
       <main className="container mx-auto p-6">
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Customer Management</h1>
-            <p className="text-muted-foreground">Manage your customer database and loyalty programs</p>
+            <h1 className="text-3xl font-bold">General Customer Management</h1>
+            <p className="text-muted-foreground">Manage system-wide customers. Outlet-specific customers are managed separately in each outlet.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">

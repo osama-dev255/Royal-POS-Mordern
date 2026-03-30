@@ -17,9 +17,11 @@ import {
   Calendar,
   User,
   ShoppingCart,
-  Printer
+  Printer,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getSavedSalesByOutletAndPaymentMethod, deleteSavedSale, SavedSale as DatabaseSavedSale } from "@/services/databaseService";
 
 interface OutletSavedMobileSalesProps {
   onBack: () => void;
@@ -44,16 +46,43 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
   const [sales, setSales] = useState<SavedSale[]>([]);
   const [selectedSale, setSelectedSale] = useState<SavedSale | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (outletId) {
-      const savedSalesKey = `outlet_${outletId}_saved_mobile_sales`;
-      const saved = localStorage.getItem(savedSalesKey);
-      if (saved) {
-        setSales(JSON.parse(saved));
-      }
-    }
+    fetchSavedMobileSales();
   }, [outletId]);
+
+  const fetchSavedMobileSales = async () => {
+    if (!outletId) return;
+    
+    setLoading(true);
+    try {
+      const data = await getSavedSalesByOutletAndPaymentMethod(outletId, 'mobile');
+      // Map database format to component format
+      const mappedSales: SavedSale[] = data.map((sale: DatabaseSavedSale) => ({
+        id: sale.id || '',
+        invoiceNumber: sale.invoice_number,
+        date: sale.sale_date || sale.created_at || '',
+        customer: sale.customer || 'Unknown',
+        items: sale.items || [],
+        subtotal: sale.subtotal,
+        tax: sale.tax,
+        total: sale.total,
+        paymentMethod: sale.payment_method,
+        status: sale.status
+      }));
+      setSales(mappedSales);
+    } catch (error) {
+      console.error('Error fetching saved mobile sales:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch saved mobile sales",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TZ', {
@@ -139,15 +168,29 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
     }
   };
 
-  const handleDelete = (saleId: string) => {
-    if (outletId) {
-      const savedSalesKey = `outlet_${outletId}_saved_mobile_sales`;
-      const updatedSales = sales.filter(s => s.id !== saleId);
-      localStorage.setItem(savedSalesKey, JSON.stringify(updatedSales));
-      setSales(updatedSales);
+  const handleDelete = async (saleId: string) => {
+    try {
+      const success = await deleteSavedSale(saleId);
+      if (success) {
+        const updatedSales = sales.filter(s => s.id !== saleId);
+        setSales(updatedSales);
+        toast({
+          title: "Sale Deleted",
+          description: "The mobile money sale has been removed"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete sale record",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting sale:', error);
       toast({
-        title: "Sale Deleted",
-        description: "The mobile money sale has been removed"
+        title: "Error",
+        description: "Failed to delete sale record",
+        variant: "destructive"
       });
     }
   };
@@ -171,7 +214,15 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
       </div>
 
       <div className="space-y-4">
-        {sales.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Loader2 className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-spin" />
+              <h3 className="text-lg font-medium">Loading Mobile Money Sales...</h3>
+              <p className="text-muted-foreground">Fetching mobile money sales from database</p>
+            </CardContent>
+          </Card>
+        ) : sales.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Smartphone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

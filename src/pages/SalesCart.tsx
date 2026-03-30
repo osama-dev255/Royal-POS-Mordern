@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, Product, Customer as DatabaseCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -82,6 +82,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [completedTransaction, setCompletedTransaction] = useState<any>(null); // Store completed transaction for printing
+  const [creditBroughtForward, setCreditBroughtForward] = useState<number>(0); // Credit brought forward from previous debts
+  const [shippingCost, setShippingCost] = useState<string>(""); // Shipping cost input
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false); // State for adding new customer
   const [newCustomer, setNewCustomer] = useState({
     first_name: "",
@@ -154,8 +156,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           setProducts(productData);
         }
         
-        // Load customers
-        const customerData = await getCustomers();
+        // Load customers - use outlet_customers if outletId is present, otherwise general customers
+        let customerData;
+        if (outletId) {
+          customerData = await getOutletCustomers(outletId);
+        } else {
+          customerData = await getCustomers();
+        }
         const formattedCustomers = customerData.map(customer => ({
           id: customer.id || '',
           name: `${customer.first_name} ${customer.last_name}`,
@@ -265,10 +272,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
     ? subtotal * (parseFloat(discountValue) / 100 || 0)
     : parseFloat(discountValue) || 0;
     
-  const total = subtotal - discountAmount;
+  const shippingAmount = parseFloat(shippingCost) || 0;
+  
+  const total = subtotal - discountAmount + shippingAmount + creditBroughtForward;
   
   // Tax is displayed as 18% but doesn't affect calculation (for display purposes only)
-  const tax = total * 0.18; // 18% tax for display
+  const tax = (subtotal - discountAmount) * 0.18; // 18% tax for display on subtotal after discount
   const totalWithTax = total; // Tax doesn't affect the actual total
   
   const amountReceivedNum = parseFloat(amountReceived) || 0;
@@ -560,13 +569,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         
         await saveInvoice(invoiceToSave);
         
-        // Save to outlet-specific saved sales based on payment method
+        // Save to outlet-specific saved sales based on payment method (database)
         if (outletId) {
-          const savedSale = {
-            id: createdSale.id || Date.now().toString(),
-            invoiceNumber: createdSale.invoice_number || `INV-${Date.now()}`,
-            date: createdSale.sale_date || new Date().toISOString(),
-            customer: selectedCustomer?.name || 'Walk-in Customer',
+          const savedSaleData = {
+            outlet_id: outletId,
+            invoice_number: createdSale.invoice_number || `INV-${Date.now()}`,
+            customer: selectedCustomer ? `${selectedCustomer.first_name} ${selectedCustomer.last_name}` : 'Walk-in Customer',
+            customer_id: selectedCustomer?.id,
             items: cart.map(item => ({
               name: item.name,
               quantity: item.quantity,
@@ -574,29 +583,18 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             })),
             subtotal: subtotal,
             tax: tax,
+            discount: discountAmount,
+            shipping: parseFloat(shippingCost) || 0,
+            credit_brought_forward: creditBroughtForward,
             total: totalWithTax,
-            paymentMethod: paymentMethod,
-            status: paymentMethod === "debt" ? "outstanding" : "completed"
+            payment_method: paymentMethod,
+            status: paymentMethod === "debt" ? "outstanding" : "completed",
+            sale_date: createdSale.sale_date || new Date().toISOString(),
+            notes: paymentMethod === "debt" ? "Debt transaction" : undefined
           };
           
-          // Determine the correct localStorage key based on payment method
-          let savedSalesKey: string;
-          if (paymentMethod === "cash") {
-            savedSalesKey = `outlet_${outletId}_saved_cash_sales`;
-          } else if (paymentMethod === "card") {
-            savedSalesKey = `outlet_${outletId}_saved_card_sales`;
-          } else if (paymentMethod === "mobile") {
-            savedSalesKey = `outlet_${outletId}_saved_mobile_sales`;
-          } else if (paymentMethod === "debt") {
-            savedSalesKey = `outlet_${outletId}_saved_debts`;
-          } else {
-            savedSalesKey = `outlet_${outletId}_saved_cash_sales`; // Default to cash
-          }
-          
-          // Load existing sales and add the new one
-          const existingSales = JSON.parse(localStorage.getItem(savedSalesKey) || '[]');
-          existingSales.unshift(savedSale); // Add to beginning of array
-          localStorage.setItem(savedSalesKey, JSON.stringify(existingSales));
+          // Save to Supabase database
+          await createSavedSale(savedSaleData);
         }
       } catch (error) {
         console.error('Error saving invoice:', error);
@@ -633,6 +631,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       // Clear cart and reset form (but don't show toast yet)
       setCart([]);
       setSelectedCustomer(null);
+      setCreditBroughtForward(0);
+      setShippingCost("");
       setDiscountValue("");
       setAmountReceived("");
       
@@ -707,9 +707,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         is_active: true
       };
 
-      // Use createCustomerForOutlet if outletId is provided, otherwise use createCustomer
+      // Use createOutletCustomer if outletId is provided (new separate table), otherwise use createCustomer
       const createdCustomer = outletId 
-        ? await createCustomerForOutlet(customerData, outletId)
+        ? await createOutletCustomer({
+            outlet_id: outletId,
+            ...customerData
+          })
         : await createCustomer(customerData);
       
       if (createdCustomer) {
@@ -959,7 +962,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedCustomer(null)}
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setCreditBroughtForward(0);
+                          setShippingCost("");
+                        }}
                         className="h-8 w-8 p-0 btn-touch"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1046,7 +1053,19 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                   {/* Credit Brought Forward */}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Credit Brought Forward from previous</span>
-                    <span className="font-medium">{formatCurrency(0)}</span>
+                    <span className="font-medium">{formatCurrency(creditBroughtForward)}</span>
+                  </div>
+                  
+                  {/* Shipping */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={shippingCost}
+                      onChange={(e) => setShippingCost(e.target.value)}
+                      className="w-24 h-8 text-right"
+                    />
                   </div>
                   
                   <Separator />
@@ -1151,10 +1170,39 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                   <div
                     key={customer.id}
                     className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-accent"
-                    onClick={() => {
+                    onClick={async () => {
                       setSelectedCustomer(customer);
                       setIsCustomerDialogOpen(false);
                       setSearchTerm("");
+                      
+                      // Fetch customer's outstanding debts from both database and localStorage
+                      if (customer.id) {
+                        try {
+                          // Get debts from Supabase database
+                          const dbDebts = await getDebtsByCustomerId(customer.id);
+                          const dbTotalDebt = dbDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+                          
+                          // Get debts from localStorage (Saved Debts)
+                          let localStorageDebt = 0;
+                          if (outletId) {
+                            const savedSalesKey = `outlet_${outletId}_saved_debts`;
+                            const savedDebts = JSON.parse(localStorage.getItem(savedSalesKey) || '[]');
+                            const customerDebts = savedDebts.filter((debt: any) => 
+                              debt.customer === customer.name || debt.customerId === customer.id
+                            );
+                            localStorageDebt = customerDebts.reduce((sum: number, debt: any) => 
+                              sum + (debt.total || debt.amount || 0), 0
+                            );
+                          }
+                          
+                          // Combine both sources
+                          const totalDebt = dbTotalDebt + localStorageDebt;
+                          setCreditBroughtForward(totalDebt);
+                        } catch (error) {
+                          console.error('Error fetching customer debts:', error);
+                          setCreditBroughtForward(0);
+                        }
+                      }
                     }}
                   >
                     <div>

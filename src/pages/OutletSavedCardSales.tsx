@@ -17,9 +17,11 @@ import {
   Calendar,
   User,
   ShoppingCart,
-  Printer
+  Printer,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getSavedSalesByOutletAndPaymentMethod, deleteSavedSale, SavedSale as DatabaseSavedSale } from "@/services/databaseService";
 
 interface OutletSavedCardSalesProps {
   onBack: () => void;
@@ -44,16 +46,43 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
   const [sales, setSales] = useState<SavedSale[]>([]);
   const [selectedSale, setSelectedSale] = useState<SavedSale | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (outletId) {
-      const savedSalesKey = `outlet_${outletId}_saved_card_sales`;
-      const saved = localStorage.getItem(savedSalesKey);
-      if (saved) {
-        setSales(JSON.parse(saved));
-      }
-    }
+    fetchSavedCardSales();
   }, [outletId]);
+
+  const fetchSavedCardSales = async () => {
+    if (!outletId) return;
+    
+    setLoading(true);
+    try {
+      const data = await getSavedSalesByOutletAndPaymentMethod(outletId, 'card');
+      // Map database format to component format
+      const mappedSales: SavedSale[] = data.map((sale: DatabaseSavedSale) => ({
+        id: sale.id || '',
+        invoiceNumber: sale.invoice_number,
+        date: sale.sale_date || sale.created_at || '',
+        customer: sale.customer || 'Unknown',
+        items: sale.items || [],
+        subtotal: sale.subtotal,
+        tax: sale.tax,
+        total: sale.total,
+        paymentMethod: sale.payment_method,
+        status: sale.status
+      }));
+      setSales(mappedSales);
+    } catch (error) {
+      console.error('Error fetching saved card sales:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch saved card sales",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TZ', {
@@ -139,15 +168,29 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
     }
   };
 
-  const handleDelete = (saleId: string) => {
-    if (outletId) {
-      const savedSalesKey = `outlet_${outletId}_saved_card_sales`;
-      const updatedSales = sales.filter(s => s.id !== saleId);
-      localStorage.setItem(savedSalesKey, JSON.stringify(updatedSales));
-      setSales(updatedSales);
+  const handleDelete = async (saleId: string) => {
+    try {
+      const success = await deleteSavedSale(saleId);
+      if (success) {
+        const updatedSales = sales.filter(s => s.id !== saleId);
+        setSales(updatedSales);
+        toast({
+          title: "Sale Deleted",
+          description: "The card sale has been removed"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete sale record",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting sale:', error);
       toast({
-        title: "Sale Deleted",
-        description: "The card sale has been removed"
+        title: "Error",
+        description: "Failed to delete sale record",
+        variant: "destructive"
       });
     }
   };
@@ -171,7 +214,15 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
       </div>
 
       <div className="space-y-4">
-        {sales.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Loader2 className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-spin" />
+              <h3 className="text-lg font-medium">Loading Card Sales...</h3>
+              <p className="text-muted-foreground">Fetching card sales from database</p>
+            </CardContent>
+          </Card>
+        ) : sales.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
