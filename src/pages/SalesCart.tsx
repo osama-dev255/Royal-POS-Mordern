@@ -87,6 +87,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [completedTransaction, setCompletedTransaction] = useState<any>(null); // Store completed transaction for printing
   const [creditBroughtForward, setCreditBroughtForward] = useState<number>(0); // Credit brought forward from previous debts
   const [shippingCost, setShippingCost] = useState<string>(""); // Shipping cost input
+  const [adjustments, setAdjustments] = useState<string>(""); // Adjustments amount (can be positive or negative)
+  const [adjustmentReason, setAdjustmentReason] = useState<string>(""); // Reason for adjustment
+  const [debtPaymentAmount, setDebtPaymentAmount] = useState<string>(""); // Amount paid toward previous debt
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false); // State for adding new customer
   const [newCustomer, setNewCustomer] = useState({
     first_name: "",
@@ -289,14 +292,53 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
     
   const shippingAmount = parseFloat(shippingCost) || 0;
   
-  const total = subtotal - discountAmount + shippingAmount + creditBroughtForward;
+  const adjustmentsAmount = parseFloat(adjustments) || 0;
+  
+  const total = subtotal - discountAmount + shippingAmount + creditBroughtForward + adjustmentsAmount;
   
   // Tax is displayed as 18% but doesn't affect calculation (for display purposes only)
   const tax = (subtotal - discountAmount) * 0.18; // 18% tax for display on subtotal after discount
   const totalWithTax = total; // Tax doesn't affect the actual total
   
   const amountReceivedNum = parseFloat(amountReceived) || 0;
-  const change = amountReceivedNum - total; // Change calculation based on actual total without tax
+  const debtPaymentNum = parseFloat(debtPaymentAmount) || 0;
+  
+  // Calculate the actual amount paid/received
+  // amount_paid = payment toward current transaction
+  // amount_received = total cash received (current transaction + debt payment)
+  const safeTotalWithTax = Number(totalWithTax) || 0;
+  
+  // For current transaction payment:
+  // - debt: use amountReceived (what they paid for current items)
+  // - non-debt: use amountReceived if entered, otherwise full payment
+  const actualAmountPaid = paymentMethod === "debt" 
+    ? amountReceivedNum  // For debt, what they paid for current items
+    : (amountReceivedNum > 0 ? amountReceivedNum : safeTotalWithTax);
+  
+  // Total cash received includes debt payment
+  const totalAmountReceived = actualAmountPaid + debtPaymentNum;
+  
+  // Change calculation: what they paid minus what they owe (current transaction only)
+  // For debt: if they paid more than current transaction, they get change
+  // For non-debt: standard change calculation
+  const change = paymentMethod === "debt"
+    ? (amountReceivedNum > total ? amountReceivedNum - total : 0)  // Only give change if overpaid current transaction
+    : amountReceivedNum - total;
+    
+  console.log('Payment Debug:', {
+    paymentMethod,
+    amountReceived,
+    amountReceivedNum,
+    debtPaymentAmount,
+    debtPaymentNum,
+    totalWithTax,
+    safeTotalWithTax,
+    actualAmountPaid,
+    totalAmountReceived,
+    change,
+    actualAmountPaidType: typeof actualAmountPaid,
+    isNaN: isNaN(actualAmountPaid)
+  });
 
   const processTransaction = () => {
     if (cart.length === 0) {
@@ -327,6 +369,15 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   };
 
   const completeTransaction = async () => {
+    console.log('completeTransaction called:', {
+      paymentMethod,
+      amountReceived,
+      amountReceivedNum,
+      totalWithTax,
+      actualAmountPaid,
+      change
+    });
+    
     if (cart.length === 0) {
       toast({
         title: "Error",
@@ -385,6 +436,16 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       return;
     }
 
+    // Check if adjustments have a reason when non-zero
+    if (adjustmentsAmount !== 0 && !adjustmentReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a reason for the adjustment",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check if user has permission to create sales
     const hasPermission = await canCreateSales();
     if (!hasPermission) {
@@ -407,28 +468,41 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       let createdSale;
       
       if (outletId) {
-        // Create outlet-specific sale
+        // Ensure all numeric values are properly converted to numbers
         const outletSaleData = {
           outlet_id: outletId,
           customer_id: selectedCustomer?.id || null,
           user_id: null,
           invoice_number: `INV-${Date.now()}`,
           sale_date: new Date().toISOString(),
-          subtotal: subtotal,
-          discount_amount: discountAmount,
-          tax_amount: tax,
-          shipping_amount: parseFloat(shippingCost) || 0,
-          credit_brought_forward: creditBroughtForward,
-          total_amount: totalWithTax,
-          amount_paid: paymentMethod === "debt" ? 0 : (parseFloat(amountReceived) || totalWithTax),
-          change_amount: paymentMethod === "debt" ? 0 : change,
+          subtotal: Number(subtotal) || 0,
+          discount_amount: Number(discountAmount) || 0,
+          tax_amount: Number(tax) || 0,
+          shipping_amount: Number(parseFloat(shippingCost) || 0),
+          credit_brought_forward: Number(creditBroughtForward) || 0,
+          adjustments: Number(adjustmentsAmount) || 0,
+          adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
+          amount_received: Number(totalAmountReceived),  // Total cash received (current + debt payment)
+          total_amount: Number(totalWithTax) || 0,
+          amount_paid: Number(actualAmountPaid),  // Payment for current transaction only
+          change_amount: Number(paymentMethod === "debt" ? 0 : change),
           payment_method: paymentMethod,
           payment_status: paymentMethod === "debt" ? "unpaid" : "paid",
           sale_status: "completed",
           notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
         };
         
+        console.log('Creating outlet sale with data:', outletSaleData);
+        console.log('amount_paid value:', outletSaleData.amount_paid, 'type:', typeof outletSaleData.amount_paid);
+        
         createdSale = await createOutletSale(outletSaleData);
+        
+        if (createdSale) {
+          console.log('Sale created successfully:', createdSale);
+          console.log('Saved amount_paid:', createdSale.amount_paid);
+        } else {
+          console.error('Failed to create sale - createOutletSale returned null');
+        }
       } else {
         // Create general sale
         const saleData = {
@@ -436,17 +510,20 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           user_id: null,
           invoice_number: `INV-${Date.now()}`,
           sale_date: new Date().toISOString(),
-          subtotal: subtotal,
-          discount_amount: discountAmount,
-          tax_amount: tax,
-          total_amount: totalWithTax,
-          amount_paid: paymentMethod === "debt" ? 0 : (parseFloat(amountReceived) || totalWithTax),
-          change_amount: paymentMethod === "debt" ? 0 : change,
+          subtotal: Number(subtotal) || 0,
+          discount_amount: Number(discountAmount) || 0,
+          tax_amount: Number(tax) || 0,
+          total_amount: Number(totalWithTax) || 0,
+          amount_paid: Number(actualAmountPaid),
+          change_amount: Number(paymentMethod === "debt" ? 0 : change),
           payment_method: paymentMethod,
           payment_status: paymentMethod === "debt" ? "unpaid" : "paid",
           sale_status: "completed",
           notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
         };
+        
+        console.log('Creating general sale with data:', saleData);
+        console.log('amount_paid value:', saleData.amount_paid, 'type:', typeof saleData.amount_paid);
         
         createdSale = await createSale(saleData);
       }
@@ -604,7 +681,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       try {
         // Calculate amountDue using the formula: Total - Amount Paid + Credit Brought Forward
         // For new sales from the terminal, credit brought forward is typically 0
-        const amountPaid = paymentMethod === "debt" ? 0 : (parseFloat(amountReceived) || totalWithTax);
+        const amountPaid = actualAmountPaid;
         const creditBroughtForward = 0; // For new sales, credit brought forward is typically 0
         const amountDue = totalWithTax - amountPaid + creditBroughtForward;
         
@@ -634,14 +711,16 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           subtotal: subtotal,
           tax: tax,
           discount: discountAmount,
-          amountReceived: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) : (parseFloat(amountReceived) || 0),
+          amountReceived: paymentMethod === "debt" ? 0 : amountReceivedNum,
           amountPaid: amountPaid,
           creditBroughtForward: creditBroughtForward,
           amountDue: amountDue,
-          change: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) - totalWithTax : change,
+          change: paymentMethod === "debt" ? 0 - totalWithTax : change,
           businessName: localStorage.getItem('businessName'),
           businessAddress: localStorage.getItem('businessAddress'),
           businessPhone: localStorage.getItem('businessPhone'),
+          adjustments: adjustmentsAmount,
+          adjustmentReason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
         };
         
         await saveInvoice(invoiceToSave);
@@ -663,6 +742,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             discount: discountAmount,
             shipping: parseFloat(shippingCost) || 0,
             credit_brought_forward: creditBroughtForward,
+            adjustments: adjustmentsAmount,
+            adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
+            amount_received: totalAmountReceived,  // Total cash received (current + debt payment)
             total: totalWithTax,
             payment_method: paymentMethod,
             status: paymentMethod === "debt" ? "outstanding" : "completed",
@@ -712,6 +794,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       setShippingCost("");
       setDiscountValue("");
       setAmountReceived("");
+      setDebtPaymentAmount("");
+      setAdjustments("");
+      setAdjustmentReason("");
       
       toast({
         title: "Success",
@@ -1133,6 +1218,45 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     <span className="font-medium">{formatCurrency(creditBroughtForward)}</span>
                   </div>
                   
+                  {/* Adjustments */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Adjustments</span>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={adjustments}
+                        onChange={(e) => setAdjustments(e.target.value)}
+                        className="w-24 h-8 text-right"
+                      />
+                    </div>
+                    
+                    {adjustmentsAmount !== 0 && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {adjustmentsAmount > 0 ? 'Addition' : 'Deduction'}
+                          </span>
+                          <span className={adjustmentsAmount > 0 ? 'text-orange-600' : 'text-green-600'}>
+                            {adjustmentsAmount > 0 ? '+' : ''}{formatCurrency(adjustmentsAmount)}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor="adjustmentReason" className="text-xs text-muted-foreground">
+                            Reason for adjustment *
+                          </Label>
+                          <Input
+                            id="adjustmentReason"
+                            placeholder="Enter reason for adjustment..."
+                            value={adjustmentReason}
+                            onChange={(e) => setAdjustmentReason(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
                   {/* Shipping */}
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Shipping</span>
@@ -1258,21 +1382,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                           let totalDebt = 0;
                           
                           if (outletId) {
-                            // Get outlet-specific debts from database
+                            // Get outlet-specific debts from database only
                             const outletDebts = await getOutletDebtsByCustomerId(outletId, customer.id);
-                            const outletDbDebt = outletDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
-                            
-                            // Get debts from localStorage (Saved Debts)
-                            const savedSalesKey = `outlet_${outletId}_saved_debts`;
-                            const savedDebts = JSON.parse(localStorage.getItem(savedSalesKey) || '[]');
-                            const customerDebts = savedDebts.filter((debt: any) => 
-                              debt.customer === customer.name || debt.customerId === customer.id
-                            );
-                            const localStorageDebt = customerDebts.reduce((sum: number, debt: any) => 
-                              sum + (debt.total || debt.amount || 0), 0
-                            );
-                            
-                            totalDebt = outletDbDebt + localStorageDebt;
+                            totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
                           } else {
                             // Get general debts from database
                             const dbDebts = await getDebtsByCustomerId(customer.id);
@@ -1453,6 +1565,27 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                 />
               </div>
             </div>
+            
+            {/* Show debt payment field if customer has previous debt */}
+            {creditBroughtForward > 0 && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-blue-700 font-medium">Previous Debt Balance</span>
+                  <span className="text-blue-700 font-bold">{formatCurrency(creditBroughtForward)}</span>
+                </div>
+                <div>
+                  <Label htmlFor="debtPayment" className="text-blue-700">Debt Payment Amount</Label>
+                  <Input
+                    id="debtPayment"
+                    type="number"
+                    placeholder="0.00"
+                    value={debtPaymentAmount}
+                    onChange={(e) => setDebtPaymentAmount(e.target.value)}
+                    className="text-lg bg-white"
+                  />
+                </div>
+              </div>
+            )}
             
             {amountReceivedNum > 0 && (
               <div className="p-3 bg-muted rounded-lg">

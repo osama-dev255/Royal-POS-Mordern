@@ -23,6 +23,8 @@ export interface InvoiceData {
   amountPaid?: number;
   creditBroughtForward?: number;
   amountDue?: number;
+  adjustments?: number;
+  adjustmentReason?: string;
 }
 
 export const saveInvoice = async (invoice: InvoiceData): Promise<void> => {
@@ -54,7 +56,9 @@ export const saveInvoice = async (invoice: InvoiceData): Promise<void> => {
           change: invoice.change,
           amount_paid: invoice.amountPaid,
           credit_brought_forward: invoice.creditBroughtForward,
-          amount_due: invoice.amountDue
+          amount_due: invoice.amountDue,
+          adjustments: invoice.adjustments,
+          adjustment_reason: invoice.adjustmentReason
         });
         
       if (error) {
@@ -114,7 +118,9 @@ export const getSavedInvoices = async (): Promise<InvoiceData[]> => {
         change: dbInvoice.change,
         amountPaid: dbInvoice.amount_paid,
         creditBroughtForward: dbInvoice.credit_brought_forward,
-        amountDue: dbInvoice.amount_due
+        amountDue: dbInvoice.amount_due,
+        adjustments: dbInvoice.adjustments,
+        adjustmentReason: dbInvoice.adjustment_reason
       }));
     } else {
       // If not authenticated, use localStorage
@@ -197,7 +203,9 @@ export const updateInvoice = async (updatedInvoice: InvoiceData): Promise<void> 
         change: updatedInvoice.change,
         amount_paid: updatedInvoice.amountPaid,
         credit_brought_forward: updatedInvoice.creditBroughtForward,
-        amount_due: updatedInvoice.amountDue
+        amount_due: updatedInvoice.amountDue,
+        adjustments: updatedInvoice.adjustments,
+        adjustment_reason: updatedInvoice.adjustmentReason
       });
       
       // Admins can update any invoice, others can only update their own

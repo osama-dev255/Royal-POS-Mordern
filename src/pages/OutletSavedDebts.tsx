@@ -173,8 +173,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   };
 
   const handleDelete = async (saleId: string) => {
+    console.log('handleDelete called with saleId:', saleId);
     try {
       const success = await deleteSavedSale(saleId);
+      console.log('deleteSavedSale result:', success);
       if (success) {
         const updatedSales = sales.filter(s => s.id !== saleId);
         setSales(updatedSales);
@@ -182,6 +184,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
           title: "Debt Deleted",
           description: "The debt record has been removed"
         });
+        // Refresh the list to ensure sync with database
+        await fetchSavedDebts();
       } else {
         toast({
           title: "Error",

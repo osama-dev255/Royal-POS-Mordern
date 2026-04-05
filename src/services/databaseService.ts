@@ -113,6 +113,9 @@ export interface SavedSale {
   discount: number;
   shipping: number;
   credit_brought_forward: number;
+  adjustments?: number;
+  adjustment_reason?: string;
+  amount_received?: number;
   total: number;
   payment_method: string;
   status: string;
@@ -1683,42 +1686,40 @@ export const incrementSoldQuantity = async (
   quantity: number
 ): Promise<boolean> => {
   try {
-    const { error } = await supabase
+    // First, get the current sold_quantity
+    const { data: current, error: fetchError } = await supabase
+      .from('inventory_products')
+      .select('sold_quantity')
+      .eq('outlet_id', outletId)
+      .eq('name', productName)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching current sold_quantity:', fetchError);
+      return false;
+    }
+
+    if (!current) {
+      console.error('Product not found in inventory_products');
+      return false;
+    }
+
+    // Calculate new sold quantity
+    const newSoldQty = (current.sold_quantity || 0) + quantity;
+
+    // Update with the new value
+    const { error: updateError } = await supabase
       .from('inventory_products')
       .update({
-        sold_quantity: supabase.rpc('increment_field', {
-          table_name: 'inventory_products',
-          field_name: 'sold_quantity',
-          row_id: outletId,
-          increment_by: quantity
-        }),
+        sold_quantity: newSoldQty,
         updated_at: new Date().toISOString()
       })
       .eq('outlet_id', outletId)
       .eq('name', productName);
 
-    if (error) {
-      // Fallback: fetch current value, increment, and update
-      const { data: current } = await supabase
-        .from('inventory_products')
-        .select('sold_quantity')
-        .eq('outlet_id', outletId)
-        .eq('name', productName)
-        .single();
-
-      if (current) {
-        const newSoldQty = (current.sold_quantity || 0) + quantity;
-        const { error: updateError } = await supabase
-          .from('inventory_products')
-          .update({
-            sold_quantity: newSoldQty,
-            updated_at: new Date().toISOString()
-          })
-          .eq('outlet_id', outletId)
-          .eq('name', productName);
-
-        if (updateError) throw updateError;
-      }
+    if (updateError) {
+      console.error('Error updating sold_quantity:', updateError);
+      return false;
     }
 
     return true;
@@ -3796,12 +3797,69 @@ export const updateSavedSale = async (id: string, savedSale: Partial<SavedSale>)
 
 export const deleteSavedSale = async (id: string): Promise<boolean> => {
   try {
+    console.log('Attempting to delete saved sale with ID:', id);
+    
+    // First get the saved sale to find related records
+    const { data: savedSale, error: fetchError } = await supabase
+      .from('saved_sales')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) {
+      console.error('Error fetching saved sale:', fetchError);
+    } else if (savedSale) {
+      console.log('Found saved sale:', savedSale);
+      
+      // If this is a debt sale, also delete from outlet_debts
+      if (savedSale.payment_method === 'debt' && savedSale.outlet_id && savedSale.customer_id) {
+        console.log('Deleting related outlet_debts records...');
+        console.log('Searching for outlet_id:', savedSale.outlet_id, 'customer_id:', savedSale.customer_id);
+        
+        // First, find the matching debt records by outlet_id and customer_id
+        const { data: debts, error: fetchDebtsError } = await supabase
+          .from('outlet_debts')
+          .select('*')
+          .eq('outlet_id', savedSale.outlet_id)
+          .eq('customer_id', savedSale.customer_id)
+          .eq('status', 'outstanding');
+        
+        if (fetchDebtsError) {
+          console.error('Error fetching outlet_debts:', fetchDebtsError);
+        } else if (debts && debts.length > 0) {
+          console.log('Found', debts.length, 'debt records');
+          
+          // Delete all matching debt records for this customer/outlet
+          const { error: debtDeleteError } = await supabase
+            .from('outlet_debts')
+            .delete()
+            .eq('outlet_id', savedSale.outlet_id)
+            .eq('customer_id', savedSale.customer_id)
+            .eq('status', 'outstanding');
+          
+          if (debtDeleteError) {
+            console.error('Error deleting outlet_debts:', debtDeleteError);
+          } else {
+            console.log('Successfully deleted', debts.length, 'outlet_debts records');
+          }
+        } else {
+          console.log('No outstanding debt records found for this customer/outlet');
+        }
+      }
+    }
+    
+    // Delete from saved_sales
     const { error } = await supabase
       .from('saved_sales')
       .delete()
       .eq('id', id);
       
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase delete error:', error);
+      throw error;
+    }
+    
+    console.log('Successfully deleted saved sale with ID:', id);
     return true;
   } catch (error) {
     console.error('Error deleting saved sale:', error);
@@ -3964,6 +4022,9 @@ export interface OutletSale {
   tax_amount: number;
   shipping_amount: number;
   credit_brought_forward: number;
+  adjustments?: number;
+  adjustment_reason?: string;
+  amount_received?: number;
   total_amount: number;
   amount_paid: number;
   change_amount: number;
@@ -3989,6 +4050,9 @@ export interface OutletSaleItem {
 
 export const createOutletSale = async (sale: Omit<OutletSale, 'id'>): Promise<OutletSale | null> => {
   try {
+    console.log('createOutletSale received:', sale);
+    console.log('amount_paid value:', sale.amount_paid, 'type:', typeof sale.amount_paid);
+    
     const { data, error } = await supabase
       .from('outlet_sales')
       .insert([{
@@ -3999,11 +4063,31 @@ export const createOutletSale = async (sale: Omit<OutletSale, 'id'>): Promise<Ou
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase insert error:', error);
+      throw error;
+    }
+    
+    console.log('createOutletSale result:', data);
     return data || null;
   } catch (error) {
     console.error('Error creating outlet sale:', error);
     return null;
+  }
+};
+
+export const deleteOutletSale = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_sales')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet sale:', error);
+    return false;
   }
 };
 
