@@ -567,14 +567,15 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }
       }
 
-      // Create debt record for debt transactions
-      if (paymentMethod === "debt" && selectedCustomer) {
+      // Create debt record for debt transactions only if not fully paid
+      const remainingDebt = totalWithTax - actualAmountPaid;
+      if (paymentMethod === "debt" && selectedCustomer && remainingDebt > 0) {
         if (outletId) {
-          // Create outlet-specific debt
+          // Create outlet-specific debt for remaining amount
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
-            amount: totalWithTax,
+            amount: remainingDebt,  // Only the remaining unpaid amount
             description: `Debt for sale ${createdSale.id || 'unknown'}`,
             status: "outstanding" as const,
             due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -585,11 +586,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             console.warn("Failed to create outlet debt record for transaction");
           }
         } else {
-          // Create general debt
+          // Create general debt for remaining amount
           const debtData = {
             customer_id: selectedCustomer.id,
             debt_type: "customer",
-            amount: totalWithTax,
+            amount: remainingDebt,  // Only the remaining unpaid amount
             description: `Debt for sale ${createdSale.id || 'unknown'}`,
             status: "outstanding",
             due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
