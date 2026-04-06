@@ -92,6 +92,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [debtPaymentAmount, setDebtPaymentAmount] = useState<string>(""); // Amount paid toward previous debt
   const [salesman, setSalesman] = useState<string>(""); // Salesman name
   const [driver, setDriver] = useState<string>(""); // Driver name
+  const [dueDate, setDueDate] = useState<string>(""); // Due date for debt transactions
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false); // State for adding new customer
   const [newCustomer, setNewCustomer] = useState({
     first_name: "",
@@ -714,7 +715,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         customer: selectedCustomer, // Include customer information
         salesman: salesman || 'Not Assigned',
         driver: driver || 'Not Assigned',
-        dueDate: paymentMethod === "debt" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
+        dueDate: paymentMethod === "debt" 
+          ? (dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()) 
+          : undefined,
         paymentStatus: paymentMethod === "debt" && actualAmountPaid < totalWithTax ? "partial" : 
                       paymentMethod === "debt" && actualAmountPaid >= totalWithTax ? "paid" : "completed"
       };
@@ -1630,6 +1633,23 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                 />
               </div>
             </div>
+            
+            {/* Due Date field for debt transactions */}
+            {paymentMethod === "debt" && (
+              <div>
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Default: 30 days from today if not specified
+                </p>
+              </div>
+            )}
             
             {/* Show debt payment field if customer has previous debt */}
             {creditBroughtForward > 0 && (
