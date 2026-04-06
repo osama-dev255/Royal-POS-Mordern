@@ -3307,12 +3307,19 @@ export class PrintUtils {
     
     const invoiceNumber = transaction.receiptNumber || `INV-${Date.now()}`;
     const invoiceDate = new Date(transaction.date || new Date()).toLocaleDateString();
-    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(); // 30 days from now
+    // Use transaction due_date if available, otherwise calculate 30 days from invoice date
+    const dueDate = transaction.dueDate 
+      ? new Date(transaction.dueDate).toLocaleDateString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
     
     const customerName = transaction.customer?.name || 'Walk-in Customer';
     const customerPhone = transaction.customer?.phone || '';
     const customerAddress = transaction.customer?.address || '';
     const customerEmail = transaction.customer?.email || '';
+    
+    // Salesman and Driver info
+    const salesman = transaction.salesman || 'Not Assigned';
+    const driver = transaction.driver || 'Not Assigned';
     
     const items = transaction.items || [];
     const subtotal = transaction.subtotal || 0;
@@ -3532,6 +3539,17 @@ export class PrintUtils {
             <div class="date-item">
               <span class="date-label">DUE DATE:</span>
               <span class="date-value">${dueDate}</span>
+            </div>
+          </div>
+          
+          <div class="dates-section" style="margin-top: 10px; background-color: #f9f9f9;">
+            <div class="date-item">
+              <span class="date-label">SALESMAN:</span>
+              <span class="date-value">${salesman}</span>
+            </div>
+            <div class="date-item">
+              <span class="date-label">DRIVER:</span>
+              <span class="date-value">${driver}</span>
             </div>
           </div>
           

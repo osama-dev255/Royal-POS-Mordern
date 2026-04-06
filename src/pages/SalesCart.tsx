@@ -90,6 +90,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [adjustments, setAdjustments] = useState<string>(""); // Adjustments amount (can be positive or negative)
   const [adjustmentReason, setAdjustmentReason] = useState<string>(""); // Reason for adjustment
   const [debtPaymentAmount, setDebtPaymentAmount] = useState<string>(""); // Amount paid toward previous debt
+  const [salesman, setSalesman] = useState<string>(""); // Salesman name
+  const [driver, setDriver] = useState<string>(""); // Driver name
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false); // State for adding new customer
   const [newCustomer, setNewCustomer] = useState({
     first_name: "",
@@ -710,6 +712,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         previousDebtBalance: creditBroughtForward, // Previous debt before payment
         change: change,
         customer: selectedCustomer, // Include customer information
+        salesman: salesman || 'Not Assigned',
+        driver: driver || 'Not Assigned',
+        dueDate: paymentMethod === "debt" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : undefined,
         paymentStatus: paymentMethod === "debt" && actualAmountPaid < totalWithTax ? "partial" : 
                       paymentMethod === "debt" && actualAmountPaid >= totalWithTax ? "paid" : "completed"
       };
@@ -1598,6 +1603,30 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                   value={amountReceived}
                   onChange={(e) => setAmountReceived(e.target.value)}
                   className="text-lg"
+                />
+              </div>
+            </div>
+            
+            {/* Salesman and Driver fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="salesman">Salesman</Label>
+                <Input
+                  id="salesman"
+                  type="text"
+                  placeholder="Enter salesman name"
+                  value={salesman}
+                  onChange={(e) => setSalesman(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="driver">Driver</Label>
+                <Input
+                  id="driver"
+                  type="text"
+                  placeholder="Enter driver name"
+                  value={driver}
+                  onChange={(e) => setDriver(e.target.value)}
                 />
               </div>
             </div>
