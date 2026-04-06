@@ -21,7 +21,7 @@ import {
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getSavedSalesByOutletAndPaymentMethod, deleteSavedSale, SavedSale as DatabaseSavedSale } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId } from "@/services/databaseService";
 
 interface OutletSavedDebtsProps {
   onBack: () => void;
@@ -63,27 +63,50 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     
     setLoading(true);
     try {
-      const data = await getSavedSalesByOutletAndPaymentMethod(outletId, 'debt');
-      // Map database format to component format
-      const mappedSales: SavedSale[] = data.map((sale: DatabaseSavedSale) => ({
-        id: sale.id || '',
-        invoiceNumber: sale.invoice_number,
-        date: sale.sale_date || sale.created_at || '',
-        customer: sale.customer || 'Unknown',
-        customerId: sale.customer_id,
-        items: sale.items || [],
-        subtotal: sale.subtotal,
-        tax: sale.tax,
-        total: sale.total,
-        amountPaid: sale.amount_received || 0,
-        amountReceived: sale.amount_received || 0,
-        paymentMethod: sale.payment_method,
-        status: sale.status,
-        creditBroughtForward: sale.credit_brought_forward || 0,
-        adjustments: sale.adjustments || 0,
-        adjustmentReason: sale.adjustment_reason
-      }));
-      setSales(mappedSales);
+      // Fetch from outlet_sales table which has accurate payment data
+      const data = await getOutletSalesByOutletAndPaymentMethod(outletId, 'debt');
+      
+      // Enrich data with customer names and item counts
+      const enrichedSales = await Promise.all(
+        data.map(async (sale: OutletSale) => {
+          // Fetch customer name if customer_id exists
+          let customerName = 'Walk-in Customer';
+          if (sale.customer_id) {
+            const customer = await getOutletCustomerById(sale.customer_id);
+            if (customer) {
+              customerName = `${customer.first_name} ${customer.last_name}`.trim();
+            }
+          }
+          
+          // Fetch item count for this sale
+          const saleItems = await getOutletSaleItemsBySaleId(sale.id || '');
+          
+          return {
+            id: sale.id || '',
+            invoiceNumber: sale.invoice_number || '',
+            date: sale.sale_date || sale.created_at || '',
+            customer: customerName,
+            customerId: sale.customer_id,
+            items: saleItems.map(item => ({
+              name: '', // Not needed for card view
+              quantity: item.quantity,
+              price: item.unit_price
+            })),
+            subtotal: sale.subtotal,
+            tax: sale.tax_amount,
+            total: sale.total_amount,
+            amountPaid: sale.amount_paid || 0,
+            amountReceived: sale.amount_received || 0,
+            paymentMethod: sale.payment_method,
+            status: sale.payment_status,
+            creditBroughtForward: sale.credit_brought_forward || 0,
+            adjustments: sale.adjustments || 0,
+            adjustmentReason: sale.adjustment_reason
+          };
+        })
+      );
+      
+      setSales(enrichedSales);
     } catch (error) {
       console.error('Error fetching saved debts:', error);
       toast({
@@ -187,7 +210,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleDelete = async (saleId: string) => {
     console.log('handleDelete called with saleId:', saleId);
     try {
-      const success = await deleteSavedSale(saleId);
+      const success = await deleteOutletSale(saleId);
       console.log('deleteSavedSale result:', success);
       if (success) {
         const updatedSales = sales.filter(s => s.id !== saleId);
@@ -256,14 +279,31 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             </CardContent>
           </Card>
         ) : (
-          sales.map((sale) => (
+          sales.map((sale) => {
+                // Calculate payment status
+                const amountPaid = sale.amountPaid || 0;
+                const total = sale.total || 0;
+                const remaining = total - amountPaid;
+                
+                let statusBadge;
+                if (amountPaid === 0) {
+                  statusBadge = <Badge className="bg-red-100 text-red-800">Unpaid</Badge>;
+                } else if (amountPaid > total) {
+                  statusBadge = <Badge className="bg-blue-100 text-blue-800">Overpaid</Badge>;
+                } else if (remaining === 0) {
+                  statusBadge = <Badge className="bg-green-100 text-green-800">Paid</Badge>;
+                } else {
+                  statusBadge = <Badge className="bg-yellow-100 text-yellow-800">Partial</Badge>;
+                }
+                
+                return (
             <Card key={sale.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold">{sale.invoiceNumber}</span>
-                      <Badge className="bg-red-100 text-red-800">{sale.status}</Badge>
+                      {statusBadge}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <span>{sale.date}</span>
@@ -271,6 +311,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       <span className="font-medium text-red-600">{sale.customer || 'Unknown Customer'}</span>
                       <span className="mx-2">•</span>
                       <span>{sale.items.length} items</span>
+                    </div>
+                    <div className="text-sm mt-1">
+                      <span className="text-muted-foreground">Paid: {formatCurrency(amountPaid)}</span>
+                      <span className="mx-2">•</span>
+                      <span className={remaining > 0 ? 'text-red-600' : 'text-green-600'}>
+                        {remaining > 0 ? `Due: ${formatCurrency(remaining)}` : 'Fully Paid'}
+                      </span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -305,7 +352,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 </div>
               </CardContent>
             </Card>
-          ))
+          );})
         )}
       </div>
 

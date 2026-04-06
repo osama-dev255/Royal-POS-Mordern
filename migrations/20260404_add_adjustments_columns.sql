@@ -12,7 +12,8 @@ ADD COLUMN IF NOT EXISTS adjustment_reason TEXT;
 ALTER TABLE saved_sales 
 ADD COLUMN IF NOT EXISTS adjustments DECIMAL(12,2) DEFAULT 0,
 ADD COLUMN IF NOT EXISTS adjustment_reason TEXT,
-ADD COLUMN IF NOT EXISTS amount_received DECIMAL(12,2) DEFAULT 0;
+ADD COLUMN IF NOT EXISTS amount_received DECIMAL(12,2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS amount_paid DECIMAL(12,2) DEFAULT 0;
 
 -- Add adjustments columns to outlet_sales table
 ALTER TABLE outlet_sales 
@@ -26,6 +27,7 @@ COMMENT ON COLUMN saved_invoices.adjustment_reason IS 'Required reason when adju
 COMMENT ON COLUMN saved_sales.adjustments IS 'Adjustment amount (can be positive or negative) applied to the sale total';
 COMMENT ON COLUMN saved_sales.adjustment_reason IS 'Required reason when adjustments is non-zero';
 COMMENT ON COLUMN saved_sales.amount_received IS 'The amount received from the customer during payment';
+COMMENT ON COLUMN saved_sales.amount_paid IS 'The amount paid toward the current transaction (excluding debt payments)';
 COMMENT ON COLUMN outlet_sales.adjustments IS 'Adjustment amount (can be positive or negative) applied to the sale total';
 COMMENT ON COLUMN outlet_sales.adjustment_reason IS 'Required reason when adjustments is non-zero';
 COMMENT ON COLUMN outlet_sales.amount_received IS 'The amount received from the customer during payment';

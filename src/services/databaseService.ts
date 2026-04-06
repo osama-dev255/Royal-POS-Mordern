@@ -116,6 +116,7 @@ export interface SavedSale {
   adjustments?: number;
   adjustment_reason?: string;
   amount_received?: number;
+  amount_paid?: number;
   total: number;
   payment_method: string;
   status: string;
@@ -4122,6 +4123,23 @@ export const getOutletSalesByOutletId = async (outletId: string): Promise<Outlet
     return data || [];
   } catch (error) {
     console.error('Error fetching outlet sales:', error);
+    return [];
+  }
+};
+
+export const getOutletSalesByOutletAndPaymentMethod = async (outletId: string, paymentMethod: string): Promise<OutletSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_sales')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('payment_method', paymentMethod)
+      .order('sale_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet sales by payment method:', error);
     return [];
   }
 };

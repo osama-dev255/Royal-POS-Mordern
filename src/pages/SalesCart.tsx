@@ -784,6 +784,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             adjustments: adjustmentsAmount,
             adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
             amount_received: totalAmountReceived,  // Total cash received (current + debt payment)
+            amount_paid: actualAmountPaid,  // Amount paid for current transaction
             total: totalWithTax,
             payment_method: paymentMethod,
             status: paymentMethod === "debt" ? "outstanding" : "completed",
