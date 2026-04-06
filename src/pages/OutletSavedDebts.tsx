@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +20,14 @@ import {
   User,
   ShoppingCart,
   Printer,
-  Loader2
+  Loader2,
+  Edit,
+  Save,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem } from "@/services/databaseService";
+import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletSavedDebtsProps {
   onBack: () => void;
@@ -52,7 +58,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const [sales, setSales] = useState<SavedSale[]>([]);
   const [selectedSale, setSelectedSale] = useState<SavedSale | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editFormData, setEditFormData] = useState<Partial<SavedSale>>({});
 
   useEffect(() => {
     fetchSavedDebts();
@@ -136,78 +144,139 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     setIsViewDialogOpen(true);
   };
 
-  const handlePrint = (sale: SavedSale) => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      const itemsHtml = sale.items.map(item => 
-        `<tr>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.name}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${formatCurrency(item.price)}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${formatCurrency(item.price * item.quantity)}</td>
-        </tr>`
-      ).join('');
+  const handleEdit = (sale: SavedSale) => {
+    setSelectedSale(sale);
+    setEditFormData({
+      customer: sale.customer,
+      subtotal: sale.subtotal,
+      tax: sale.tax,
+      creditBroughtForward: sale.creditBroughtForward,
+      adjustments: sale.adjustments,
+      adjustmentReason: sale.adjustmentReason,
+      total: sale.total,
+      amountPaid: sale.amountPaid,
+      status: sale.status,
+      items: [...sale.items] // Clone items for editing
+    });
+    setIsEditDialogOpen(true);
+  };
 
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Debt Invoice - ${sale.invoiceNumber}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
-            h2 { text-align: center; margin-bottom: 5px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .info { margin-bottom: 15px; }
-            .info p { margin: 5px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            th { background: #f5f5f5; padding: 8px; text-align: left; }
-            .totals { margin-top: 15px; }
-            .totals p { margin: 5px 0; display: flex; justify-content: space-between; }
-            .total-row { font-weight: bold; font-size: 18px; border-top: 2px solid #000; padding-top: 10px; color: #dc2626; }
-            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-            .payment-badge { display: inline-block; padding: 4px 12px; background: #fee2e2; color: #dc2626; border-radius: 4px; }
-            .warning { background: #fef2f2; border: 1px solid #fecaca; padding: 10px; margin: 15px 0; border-radius: 4px; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h2>DEBT INVOICE</h2>
-            <p style="color: #666;">${sale.invoiceNumber}</p>
-          </div>
-          <div class="info">
-            <p><strong>Date:</strong> ${sale.date}</p>
-            <p><strong>Customer:</strong> ${sale.customer || 'Unknown Customer'}</p>
-            <p><strong>Payment:</strong> <span class="payment-badge">Debt</span></p>
-          </div>
-          <div class="warning">
-            <strong>OUTSTANDING BALANCE</strong>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th style="text-align: center;">Qty</th>
-                <th style="text-align: right;">Price</th>
-                <th style="text-align: right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>${itemsHtml}</tbody>
-          </table>
-          <div class="totals">
-            <p><span>Subtotal:</span><span>${formatCurrency(sale.subtotal)}</span></p>
-            <p><span>Tax (18%):</span><span>${formatCurrency(sale.tax)}</span></p>
-            <p class="total-row"><span>Total Debt:</span><span>${formatCurrency(sale.total)}</span></p>
-          </div>
-          <div class="footer">
-            <p>Please settle this debt at your earliest convenience.</p>
-            <p>Status: Outstanding</p>
-          </div>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
+  const handleItemChange = (index: number, field: string, value: any) => {
+    setEditFormData(prev => {
+      const newItems = [...(prev.items || [])];
+      newItems[index] = { ...newItems[index], [field]: value };
+      
+      // Recalculate total if quantity or price changed
+      if (field === 'quantity' || field === 'price') {
+        const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        return { ...prev, items: newItems, total: newTotal };
+      }
+      
+      return { ...prev, items: newItems };
+    });
+  };
+
+  const handleAddItem = () => {
+    setEditFormData(prev => ({
+      ...prev,
+      items: [...(prev.items || []), { name: '', quantity: 1, price: 0 }]
+    }));
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setEditFormData(prev => {
+      const newItems = (prev.items || []).filter((_, i) => i !== index);
+      const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      return { ...prev, items: newItems, total: newTotal };
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedSale || !selectedSale.id) return;
+    
+    try {
+      // Update the sale record with all fields
+      const updatedSale = await updateOutletSale(selectedSale.id, {
+        subtotal: editFormData.subtotal,
+        tax_amount: editFormData.tax,
+        credit_brought_forward: editFormData.creditBroughtForward,
+        adjustments: editFormData.adjustments,
+        adjustment_reason: editFormData.adjustmentReason,
+        total_amount: editFormData.total,
+        amount_paid: editFormData.amountPaid,
+        payment_status: editFormData.status
+      });
+      
+      if (updatedSale) {
+        // Delete existing items and recreate them
+        await deleteOutletSaleItemsBySaleId(selectedSale.id);
+        
+        // Create new items
+        for (const item of (editFormData.items || [])) {
+          await createOutletSaleItem({
+            sale_id: selectedSale.id,
+            product_name: item.name,
+            quantity: item.quantity,
+            unit_price: item.price,
+            discount_amount: 0,
+            total_price: item.quantity * item.price
+          });
+        }
+        
+        toast({
+          title: "Success",
+          description: "Debt record updated successfully"
+        });
+        setIsEditDialogOpen(false);
+        fetchSavedDebts(); // Refresh the list
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update debt record",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating debt:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while updating",
+        variant: "destructive"
+      });
     }
+  };
+
+  const handlePrint = (sale: SavedSale) => {
+    // Create transaction object that matches PrintUtils.printDebtInvoice expectations
+    const transaction = {
+      receiptNumber: sale.invoiceNumber,
+      date: sale.date,
+      items: sale.items,
+      subtotal: sale.subtotal,
+      tax: sale.tax,
+      discount: 0,
+      shipping: 0,
+      adjustments: sale.adjustments || 0,
+      adjustmentReason: sale.adjustmentReason,
+      total: sale.total,
+      paymentMethod: 'debt',
+      amountPaid: sale.amountPaid || 0,
+      amountReceived: sale.amountReceived || 0,
+      debtPaymentAmount: 0,
+      previousDebtBalance: sale.creditBroughtForward || 0,
+      change: 0,
+      customer: {
+        name: sale.customer,
+        phone: '',
+        address: '',
+        email: ''
+      },
+      salesman: 'Not Assigned',
+      driver: 'Not Assigned',
+      dueDate: sale.date // Use sale date as due date if not specified
+    };
+    
+    PrintUtils.printDebtInvoice(transaction);
   };
 
   const handleDelete = async (saleId: string) => {
@@ -346,6 +415,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleEdit(sale)}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
                       </Button>
                       <Button 
                         size="sm" 
@@ -550,6 +627,215 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   <FileText className="h-3 w-3 mr-1" />
                   {selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'Paid (was Debt)' : 'Debt'}
                 </Badge>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Debt Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Edit Debt Record
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSale && (
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Invoice Number</p>
+                <p className="font-semibold">{selectedSale.invoiceNumber}</p>
+              </div>
+              
+              <div>
+                <Label htmlFor="editCustomer">Customer</Label>
+                <Input
+                  id="editCustomer"
+                  value={editFormData.customer || ''}
+                  onChange={(e) => setEditFormData({...editFormData, customer: e.target.value})}
+                />
+              </div>
+              
+              {/* Editable Items Table */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Items</Label>
+                  <Button type="button" size="sm" variant="outline" onClick={handleAddItem}>
+                    + Add Item
+                  </Button>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left py-2 px-2">Item Name</th>
+                        <th className="text-right py-2 px-2 w-20">Qty</th>
+                        <th className="text-right py-2 px-2 w-24">Price</th>
+                        <th className="text-right py-2 px-2 w-24">Total</th>
+                        <th className="text-center py-2 px-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(editFormData.items || []).map((item, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="py-1 px-2">
+                            <Input
+                              value={item.name}
+                              onChange={(e) => handleItemChange(index, 'name', e.target.value)}
+                              className="h-8 text-sm"
+                              placeholder="Item name"
+                            />
+                          </td>
+                          <td className="py-1 px-2">
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                              className="h-8 text-sm text-right"
+                              min="1"
+                            />
+                          </td>
+                          <td className="py-1 px-2">
+                            <Input
+                              type="number"
+                              value={item.price}
+                              onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
+                              className="h-8 text-sm text-right"
+                              min="0"
+                            />
+                          </td>
+                          <td className="py-1 px-2 text-right text-sm">
+                            {formatCurrency(item.quantity * item.price)}
+                          </td>
+                          <td className="py-1 px-2 text-center">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-red-500"
+                              onClick={() => handleRemoveItem(index)}
+                            >
+                              ×
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              {/* Subtotal, Tax, Credit, Adjustments */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editSubtotal">Subtotal</Label>
+                  <Input
+                    id="editSubtotal"
+                    type="number"
+                    value={editFormData.subtotal || 0}
+                    onChange={(e) => setEditFormData({...editFormData, subtotal: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editTax">Tax (18%)</Label>
+                  <Input
+                    id="editTax"
+                    type="number"
+                    value={editFormData.tax || 0}
+                    onChange={(e) => setEditFormData({...editFormData, tax: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editCredit">Credit Brought Forward</Label>
+                  <Input
+                    id="editCredit"
+                    type="number"
+                    value={editFormData.creditBroughtForward || 0}
+                    onChange={(e) => setEditFormData({...editFormData, creditBroughtForward: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editAdjustments">Adjustments</Label>
+                  <Input
+                    id="editAdjustments"
+                    type="number"
+                    value={editFormData.adjustments || 0}
+                    onChange={(e) => setEditFormData({...editFormData, adjustments: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+              
+              {editFormData.adjustments !== 0 && (
+                <div>
+                  <Label htmlFor="editAdjustmentReason">Adjustment Reason</Label>
+                  <Input
+                    id="editAdjustmentReason"
+                    value={editFormData.adjustmentReason || ''}
+                    onChange={(e) => setEditFormData({...editFormData, adjustmentReason: e.target.value})}
+                    placeholder="Reason for adjustment"
+                  />
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editTotal">Total Amount</Label>
+                  <Input
+                    id="editTotal"
+                    type="number"
+                    value={editFormData.total || 0}
+                    onChange={(e) => setEditFormData({...editFormData, total: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editAmountPaid">Amount Paid</Label>
+                  <Input
+                    id="editAmountPaid"
+                    type="number"
+                    value={editFormData.amountPaid || 0}
+                    onChange={(e) => setEditFormData({...editFormData, amountPaid: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="editStatus">Status</Label>
+                <select
+                  id="editStatus"
+                  className="w-full p-2 border rounded-md"
+                  value={editFormData.status || 'outstanding'}
+                  onChange={(e) => setEditFormData({...editFormData, status: e.target.value})}
+                >
+                  <option value="outstanding">Outstanding</option>
+                  <option value="partial">Partial</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+              
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span>Remaining Balance:</span>
+                  <span className="font-semibold">
+                    {formatCurrency((editFormData.total || 0) - (editFormData.amountPaid || 0))}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdate}>
+                  <Save className="h-4 w-4 mr-1" />
+                  Save Changes
+                </Button>
               </div>
             </div>
           )}

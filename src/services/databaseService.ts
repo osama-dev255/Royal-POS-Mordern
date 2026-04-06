@@ -4093,6 +4093,26 @@ export const deleteOutletSale = async (id: string): Promise<boolean> => {
   }
 };
 
+export const updateOutletSale = async (id: string, updates: Partial<OutletSale>): Promise<OutletSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_sales')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet sale:', error);
+    return null;
+  }
+};
+
 export const createOutletSaleItem = async (saleItem: Omit<OutletSaleItem, 'id'>): Promise<OutletSaleItem | null> => {
   try {
     const { data, error } = await supabase
@@ -4109,6 +4129,53 @@ export const createOutletSaleItem = async (saleItem: Omit<OutletSaleItem, 'id'>)
   } catch (error) {
     console.error('Error creating outlet sale item:', error);
     return null;
+  }
+};
+
+export const updateOutletSaleItem = async (id: string, updates: Partial<OutletSaleItem>): Promise<OutletSaleItem | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_sale_items')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet sale item:', error);
+    return null;
+  }
+};
+
+export const deleteOutletSaleItem = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_sale_items')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet sale item:', error);
+    return false;
+  }
+};
+
+export const deleteOutletSaleItemsBySaleId = async (saleId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_sale_items')
+      .delete()
+      .eq('sale_id', saleId);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet sale items:', error);
+    return false;
   }
 };
 
