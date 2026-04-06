@@ -4229,3 +4229,18 @@ export const updateOutletDebt = async (id: string, updates: Partial<OutletDebt>)
     return null;
   }
 };
+
+export const deleteOutletDebt = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_debts')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet debt:', error);
+    return false;
+  }
+};

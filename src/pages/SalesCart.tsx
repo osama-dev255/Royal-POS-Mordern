@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -294,7 +294,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   
   const adjustmentsAmount = parseFloat(adjustments) || 0;
   
-  const total = subtotal - discountAmount + shippingAmount + creditBroughtForward + adjustmentsAmount;
+  const total = subtotal - discountAmount + shippingAmount + adjustmentsAmount;
   
   // Tax is displayed as 18% but doesn't affect calculation (for display purposes only)
   const tax = (subtotal - discountAmount) * 0.18; // 18% tax for display on subtotal after discount
@@ -567,15 +567,44 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }
       }
 
-      // Create debt record for debt transactions only if not fully paid
-      const remainingDebt = totalWithTax - actualAmountPaid;
-      if (paymentMethod === "debt" && selectedCustomer && remainingDebt > 0) {
-        if (outletId) {
-          // Create outlet-specific debt for remaining amount
+      // Handle debt payment and new debt creation
+      if (selectedCustomer && outletId) {
+        // If customer paid toward previous debt, reduce it
+        if (debtPaymentNum > 0) {
+          console.log(`Customer paid ${debtPaymentNum} toward previous debt of ${creditBroughtForward}`);
+          
+          // Get existing debts for this customer
+          const existingDebts = await getOutletDebtsByCustomerId(outletId, selectedCustomer.id);
+          let remainingPayment = debtPaymentNum;
+          
+          // Apply payment to existing debts (oldest first)
+          for (const debt of existingDebts) {
+            if (remainingPayment <= 0) break;
+            
+            const paymentTowardThisDebt = Math.min(remainingPayment, debt.amount);
+            const newDebtAmount = debt.amount - paymentTowardThisDebt;
+            
+            if (newDebtAmount <= 0) {
+              // Fully paid - delete the debt
+              await deleteOutletDebt(debt.id);
+              console.log(`Cleared debt ${debt.id}`);
+            } else {
+              // Partially paid - update amount
+              await updateOutletDebt(debt.id, { amount: newDebtAmount });
+              console.log(`Reduced debt ${debt.id} to ${newDebtAmount}`);
+            }
+            
+            remainingPayment -= paymentTowardThisDebt;
+          }
+        }
+        
+        // Create new debt record for current transaction if not fully paid
+        const remainingNewDebt = totalWithTax - actualAmountPaid;
+        if (paymentMethod === "debt" && remainingNewDebt > 0) {
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
-            amount: remainingDebt,  // Only the remaining unpaid amount
+            amount: remainingNewDebt,  // Only the remaining unpaid amount of new transaction
             description: `Debt for sale ${createdSale.id || 'unknown'}`,
             status: "outstanding" as const,
             due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -585,12 +614,15 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           if (!createdDebt) {
             console.warn("Failed to create outlet debt record for transaction");
           }
-        } else {
-          // Create general debt for remaining amount
+        }
+      } else if (paymentMethod === "debt" && selectedCustomer && !outletId) {
+        // Create general debt for non-outlet sales
+        const remainingNewDebt = totalWithTax - actualAmountPaid;
+        if (remainingNewDebt > 0) {
           const debtData = {
             customer_id: selectedCustomer.id,
             debt_type: "customer",
-            amount: remainingDebt,  // Only the remaining unpaid amount
+            amount: remainingNewDebt,
             description: `Debt for sale ${createdSale.id || 'unknown'}`,
             status: "outstanding",
             due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -680,11 +712,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       
       // Save invoice to localStorage
       try {
-        // Calculate amountDue using the formula: Total - Amount Paid + Credit Brought Forward
-        // For new sales from the terminal, credit brought forward is typically 0
+        // Calculate amountDue using the formula: Total - Amount Paid
         const amountPaid = actualAmountPaid;
-        const creditBroughtForward = 0; // For new sales, credit brought forward is typically 0
-        const amountDue = totalWithTax - amountPaid + creditBroughtForward;
+        const amountDue = totalWithTax - amountPaid;
         
         const invoiceToSave: InvoiceData = {
           id: createdSale.id || Date.now().toString(),
@@ -1213,12 +1243,6 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     <span className="font-medium">{formatCurrency(tax)}</span>
                   </div>
                   
-                  {/* Credit Brought Forward */}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Credit Brought Forward from previous</span>
-                    <span className="font-medium">{formatCurrency(creditBroughtForward)}</span>
-                  </div>
-                  
                   {/* Adjustments */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -1584,6 +1608,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     onChange={(e) => setDebtPaymentAmount(e.target.value)}
                     className="text-lg bg-white"
                   />
+                  <p className="text-xs text-blue-600 mt-1">Additional payment toward previous debt</p>
                 </div>
               </div>
             )}

@@ -33,12 +33,18 @@ interface SavedSale {
   invoiceNumber: string;
   date: string;
   customer: string;
+  customerId?: string;
   items: { name: string; quantity: number; price: number }[];
   subtotal: number;
   tax: number;
   total: number;
+  amountPaid?: number;
+  amountReceived?: number;
   paymentMethod: string;
   status: string;
+  creditBroughtForward?: number;
+  adjustments?: number;
+  adjustmentReason?: string;
 }
 
 export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) => {
@@ -64,12 +70,18 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         invoiceNumber: sale.invoice_number,
         date: sale.sale_date || sale.created_at || '',
         customer: sale.customer || 'Unknown',
+        customerId: sale.customer_id,
         items: sale.items || [],
         subtotal: sale.subtotal,
         tax: sale.tax,
         total: sale.total,
+        amountPaid: sale.amount_received || 0,
+        amountReceived: sale.amount_received || 0,
         paymentMethod: sale.payment_method,
-        status: sale.status
+        status: sale.status,
+        creditBroughtForward: sale.credit_brought_forward || 0,
+        adjustments: sale.adjustments || 0,
+        adjustmentReason: sale.adjustment_reason
       }));
       setSales(mappedSales);
     } catch (error) {
@@ -303,17 +315,73 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5" />
-              Debt Details
+              Transaction Details
             </DialogTitle>
           </DialogHeader>
           {selectedSale && (
             <div className="space-y-4">
+              {/* Payment Reality Banner */}
+              {(() => {
+                const amountPaid = selectedSale.amountPaid || 0;
+                const total = selectedSale.total || 0;
+                const remaining = total - amountPaid;
+                
+                if (amountPaid === 0) {
+                  return (
+                    <div className="p-3 bg-red-100 border border-red-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-red-800">UNPAID - Full Debt</span>
+                        <Badge className="bg-red-600 text-white">Outstanding</Badge>
+                      </div>
+                      <p className="text-sm text-red-700 mt-1">No payment received</p>
+                    </div>
+                  );
+                } else if (amountPaid > total) {
+                  const overpayment = amountPaid - total;
+                  return (
+                    <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-blue-800">OVERPAID</span>
+                        <Badge className="bg-blue-600 text-white">Credit</Badge>
+                      </div>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Paid: {formatCurrency(amountPaid)} / Overpayment: {formatCurrency(overpayment)}
+                      </p>
+                    </div>
+                  );
+                } else if (remaining === 0) {
+                  return (
+                    <div className="p-3 bg-green-100 border border-green-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-green-800">FULLY PAID</span>
+                        <Badge className="bg-green-600 text-white">Completed</Badge>
+                      </div>
+                      <p className="text-sm text-green-700 mt-1">Payment completed</p>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-yellow-800">PARTIALLY PAID</span>
+                        <Badge className="bg-yellow-600 text-white">Partial</Badge>
+                      </div>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Paid: {formatCurrency(amountPaid)} / Remaining: {formatCurrency(remaining)}
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
+
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div>
                   <p className="text-sm text-muted-foreground">Invoice Number</p>
                   <p className="font-semibold">{selectedSale.invoiceNumber}</p>
                 </div>
-                <Badge className="bg-red-100 text-red-800">{selectedSale.status}</Badge>
+                <Badge className={selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  {selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'Paid' : selectedSale.status}
+                </Badge>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -371,17 +439,53 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   <span className="text-muted-foreground">Tax (18%)</span>
                   <span>{formatCurrency(selectedSale.tax)}</span>
                 </div>
+                {selectedSale.creditBroughtForward > 0 && (
+                  <div className="flex justify-between text-sm text-orange-600">
+                    <span>Credit Brought Forward</span>
+                    <span>{formatCurrency(selectedSale.creditBroughtForward)}</span>
+                  </div>
+                )}
+                {selectedSale.adjustments !== 0 && (
+                  <div className="flex justify-between text-sm text-blue-600">
+                    <span>Adjustments {selectedSale.adjustmentReason && `(${selectedSale.adjustmentReason})`}</span>
+                    <span>{formatCurrency(selectedSale.adjustments)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                  <span>Total Debt</span>
-                  <span className="text-red-600">{formatCurrency(selectedSale.total)}</span>
+                  <span>Total Amount</span>
+                  <span>{formatCurrency(selectedSale.total)}</span>
+                </div>
+                
+                {/* Payment Breakdown */}
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg space-y-2">
+                  <p className="font-medium text-sm text-gray-700">Payment Breakdown</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Amount Paid</span>
+                    <span className="font-medium text-green-600">{formatCurrency(selectedSale.amountPaid || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {selectedSale.amountPaid > selectedSale.total ? 'Credit Balance' : 'Remaining Balance'}
+                    </span>
+                    <span className={
+                      selectedSale.amountPaid > selectedSale.total ? 'font-medium text-blue-600' :
+                      selectedSale.total - (selectedSale.amountPaid || 0) > 0 ? 'font-medium text-red-600' : 
+                      'font-medium text-green-600'
+                    }>
+                      {selectedSale.amountPaid > selectedSale.total 
+                        ? formatCurrency(selectedSale.amountPaid - selectedSale.total)
+                        : formatCurrency(Math.max(0, selectedSale.total - (selectedSale.amountPaid || 0)))
+                      }
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm font-medium">Payment Method</span>
-                <Badge className="bg-red-100 text-red-800">
+                <Badge className={selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                   <FileText className="h-3 w-3 mr-1" />
-                  Debt
+                  {selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'Paid (was Debt)' : 'Debt'}
                 </Badge>
               </div>
             </div>
