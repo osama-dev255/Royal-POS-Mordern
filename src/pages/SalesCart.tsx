@@ -544,6 +544,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const outletSaleItemData = {
             sale_id: createdSale.id || '',
             product_id: isValidUuid ? item.id : null,
+            product_name: item.name, // Store product name directly for display
             quantity: item.quantity,
             unit_price: item.price,
             discount_amount: 0,

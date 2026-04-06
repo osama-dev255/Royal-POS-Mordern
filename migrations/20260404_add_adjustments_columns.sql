@@ -28,6 +28,13 @@ COMMENT ON COLUMN saved_sales.adjustments IS 'Adjustment amount (can be positive
 COMMENT ON COLUMN saved_sales.adjustment_reason IS 'Required reason when adjustments is non-zero';
 COMMENT ON COLUMN saved_sales.amount_received IS 'The amount received from the customer during payment';
 COMMENT ON COLUMN saved_sales.amount_paid IS 'The amount paid toward the current transaction (excluding debt payments)';
+
+-- Add product_name column to outlet_sale_items for display purposes
+ALTER TABLE outlet_sale_items 
+ADD COLUMN IF NOT EXISTS product_name TEXT;
+
+COMMENT ON COLUMN outlet_sale_items.product_name IS 'Product name stored at time of sale for display purposes';
+
 COMMENT ON COLUMN outlet_sales.adjustments IS 'Adjustment amount (can be positive or negative) applied to the sale total';
 COMMENT ON COLUMN outlet_sales.adjustment_reason IS 'Required reason when adjustments is non-zero';
 COMMENT ON COLUMN outlet_sales.amount_received IS 'The amount received from the customer during payment';

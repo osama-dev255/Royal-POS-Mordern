@@ -4042,6 +4042,7 @@ export interface OutletSaleItem {
   id?: string;
   sale_id: string;
   product_id?: string;
+  product_name?: string; // Stored directly for display purposes
   quantity: number;
   unit_price: number;
   discount_amount: number;

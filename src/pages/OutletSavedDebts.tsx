@@ -78,8 +78,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             }
           }
           
-          // Fetch item count for this sale
+          // Fetch items for this sale
           const saleItems = await getOutletSaleItemsBySaleId(sale.id || '');
+          
+          // Use product_name from the sale item (stored at time of sale)
+          const itemsWithNames = saleItems.map((item) => ({
+            name: item.product_name || 'Unknown Product',
+            quantity: item.quantity,
+            price: item.unit_price
+          }));
           
           return {
             id: sale.id || '',
@@ -87,11 +94,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             date: sale.sale_date || sale.created_at || '',
             customer: customerName,
             customerId: sale.customer_id,
-            items: saleItems.map(item => ({
-              name: '', // Not needed for card view
-              quantity: item.quantity,
-              price: item.unit_price
-            })),
+            items: itemsWithNames,
             subtotal: sale.subtotal,
             tax: sale.tax_amount,
             total: sale.total_amount,
