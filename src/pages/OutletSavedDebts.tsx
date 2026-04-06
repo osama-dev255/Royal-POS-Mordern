@@ -21,7 +21,7 @@ import {
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt } from "@/services/databaseService";
 
 interface OutletSavedDebtsProps {
   onBack: () => void;
@@ -213,14 +213,27 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleDelete = async (saleId: string) => {
     console.log('handleDelete called with saleId:', saleId);
     try {
+      // First, find and delete any associated debt records
+      const debts = await getOutletDebtsBySaleId(saleId);
+      console.log('Found debts to delete:', debts);
+      
+      for (const debt of debts) {
+        if (debt.id) {
+          await deleteOutletDebt(debt.id);
+          console.log('Deleted debt:', debt.id);
+        }
+      }
+      
+      // Then delete the sale
       const success = await deleteOutletSale(saleId);
-      console.log('deleteSavedSale result:', success);
+      console.log('deleteOutletSale result:', success);
+      
       if (success) {
         const updatedSales = sales.filter(s => s.id !== saleId);
         setSales(updatedSales);
         toast({
           title: "Debt Deleted",
-          description: "The debt record has been removed"
+          description: `The debt record and ${debts.length} associated debt entries have been removed`
         });
         // Refresh the list to ensure sync with database
         await fetchSavedDebts();

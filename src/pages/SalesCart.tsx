@@ -605,6 +605,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
+            sale_id: createdSale.id, // Link debt to the sale for proper deletion
             amount: remainingNewDebt,  // Only the remaining unpaid amount of new transaction
             description: `Debt for sale ${createdSale.id || 'unknown'}`,
             status: "outstanding" as const,

@@ -35,6 +35,12 @@ ADD COLUMN IF NOT EXISTS product_name TEXT;
 
 COMMENT ON COLUMN outlet_sale_items.product_name IS 'Product name stored at time of sale for display purposes';
 
+-- Add sale_id column to outlet_debts for linking debts to sales
+ALTER TABLE outlet_debts 
+ADD COLUMN IF NOT EXISTS sale_id UUID REFERENCES outlet_sales(id) ON DELETE CASCADE;
+
+COMMENT ON COLUMN outlet_debts.sale_id IS 'Reference to the sale that created this debt';
+
 COMMENT ON COLUMN outlet_sales.adjustments IS 'Adjustment amount (can be positive or negative) applied to the sale total';
 COMMENT ON COLUMN outlet_sales.adjustment_reason IS 'Required reason when adjustments is non-zero';
 COMMENT ON COLUMN outlet_sales.amount_received IS 'The amount received from the customer during payment';

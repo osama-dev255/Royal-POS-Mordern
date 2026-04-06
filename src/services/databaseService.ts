@@ -4165,6 +4165,7 @@ export interface OutletDebt {
   id?: string;
   outlet_id: string;
   customer_id?: string;
+  sale_id?: string; // Reference to the sale that created this debt
   amount: number;
   description?: string;
   status: 'outstanding' | 'paid' | 'partial';
@@ -4225,6 +4226,21 @@ export const getOutletDebtsByCustomerId = async (outletId: string, customerId: s
     return data || [];
   } catch (error) {
     console.error('Error fetching outlet debts by customer:', error);
+    return [];
+  }
+};
+
+export const getOutletDebtsBySaleId = async (saleId: string): Promise<OutletDebt[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debts')
+      .select('*')
+      .eq('sale_id', saleId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet debts by sale ID:', error);
     return [];
   }
 };
