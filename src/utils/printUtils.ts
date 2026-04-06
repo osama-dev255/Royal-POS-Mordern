@@ -3339,164 +3339,169 @@ export class PrintUtils {
             @media print {
               body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
             }
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
             body {
               font-family: Arial, sans-serif;
-              margin: 40px;
+              margin: 0;
+              padding: 10mm;
               color: #333;
-              font-size: 14px;
-              line-height: 1.4;
+              font-size: 12px;
+              line-height: 1.3;
+              max-width: 180mm;
             }
             .invoice-header {
               text-align: center;
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .invoice-title {
-              font-size: 28px;
+              font-size: 24px;
               font-weight: bold;
-              margin-bottom: 10px;
-              letter-spacing: 2px;
+              margin-bottom: 5px;
+              letter-spacing: 1px;
             }
             .invoice-number {
-              font-size: 16px;
+              font-size: 14px;
               font-weight: bold;
-              margin-bottom: 5px;
+              margin-bottom: 3px;
             }
             .generated-date {
-              font-size: 12px;
+              font-size: 10px;
               color: #666;
-              margin-bottom: 5px;
+              margin-bottom: 3px;
             }
             .amount-due-label {
-              font-size: 14px;
-              margin-bottom: 5px;
+              font-size: 12px;
+              margin-bottom: 3px;
             }
             .amount-due {
-              font-size: 32px;
+              font-size: 28px;
               font-weight: bold;
               color: #dc2626;
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .info-section {
               display: flex;
               justify-content: space-between;
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .info-box {
-              width: 45%;
+              width: 48%;
             }
             .info-label {
               font-weight: bold;
-              font-size: 14px;
-              margin-bottom: 10px;
+              font-size: 11px;
+              margin-bottom: 5px;
               text-transform: uppercase;
             }
             .info-content {
-              font-size: 13px;
-              line-height: 1.6;
+              font-size: 11px;
+              line-height: 1.4;
             }
             .dates-section {
               display: flex;
               justify-content: space-between;
-              margin-bottom: 30px;
-              border-top: 1px solid #ddd;
-              border-bottom: 1px solid #ddd;
-              padding: 15px 0;
+              margin-bottom: 15px;
+              padding: 8px 0;
             }
             .date-item {
               display: flex;
               align-items: center;
-              gap: 20px;
+              gap: 10px;
             }
             .date-label {
               font-weight: bold;
-              font-size: 13px;
+              font-size: 12px;
             }
             .date-value {
-              font-size: 13px;
+              font-size: 12px;
             }
             .section-title {
               font-weight: bold;
-              font-size: 14px;
-              margin-bottom: 15px;
+              font-size: 11px;
+              margin-bottom: 8px;
               text-transform: uppercase;
             }
             .items-table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .items-table th {
               background-color: #f5f5f5;
-              padding: 10px;
+              padding: 6px 8px;
               text-align: left;
               font-weight: bold;
-              font-size: 13px;
-              border: 1px solid #ddd;
+              font-size: 10px;
+              border-bottom: 1px solid #ddd;
             }
             .items-table td {
-              padding: 10px;
-              border: 1px solid #ddd;
-              font-size: 13px;
+              padding: 5px 8px;
+              border-bottom: 1px solid #eee;
+              font-size: 10px;
             }
             .notes-section {
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .notes-label {
               font-weight: bold;
-              font-size: 14px;
-              margin-bottom: 10px;
+              font-size: 11px;
+              margin-bottom: 5px;
             }
             .notes-content {
-              font-size: 13px;
+              font-size: 10px;
               font-style: italic;
             }
             .payment-options {
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .payment-label {
               font-weight: bold;
-              font-size: 14px;
-              margin-bottom: 10px;
+              font-size: 11px;
+              margin-bottom: 5px;
             }
             .payment-methods {
-              font-size: 13px;
+              font-size: 10px;
             }
             .summary-section {
-              width: 350px;
+              width: 280px;
               margin-left: auto;
-              margin-bottom: 30px;
+              margin-bottom: 15px;
             }
             .summary-row {
               display: flex;
               justify-content: space-between;
-              padding: 8px 0;
+              padding: 4px 0;
               border-bottom: 1px solid #eee;
+              font-size: 10px;
             }
             .summary-row:last-child {
               border-bottom: none;
             }
             .summary-row.total {
               font-weight: bold;
-              font-size: 15px;
-              border-top: 2px solid #333;
-              margin-top: 10px;
-              padding-top: 10px;
+              font-size: 12px;
+              border-top: 1px solid #333;
+              margin-top: 5px;
+              padding-top: 5px;
             }
             .summary-row.amount-due-final {
               font-weight: bold;
-              font-size: 16px;
+              font-size: 13px;
               color: #dc2626;
-              border-top: 2px solid #333;
-              margin-top: 10px;
-              padding-top: 10px;
+              border-top: 1px solid #333;
+              margin-top: 5px;
+              padding-top: 5px;
             }
             .summary-label {
               font-weight: 600;
             }
             .footer {
               text-align: center;
-              margin-top: 50px;
-              font-size: 12px;
+              margin-top: 20px;
+              font-size: 9px;
               color: #666;
             }
           </style>
