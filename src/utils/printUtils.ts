@@ -3593,21 +3593,34 @@ export class PrintUtils {
               <span>${formatCurrency(total)}</span>
             </div>
             <div class="summary-row">
-              <span class="summary-label">Amount Paid:</span>
-              <span>${formatCurrency(0)}</span>
+              <span class="summary-label">Amount Paid (Current):</span>
+              <span>${formatCurrency(transaction.amountPaid || 0)}</span>
             </div>
+            ${transaction.debtPaymentAmount > 0 ? `
+            <div class="summary-row">
+              <span class="summary-label">Debt Payment (Previous):</span>
+              <span>${formatCurrency(transaction.debtPaymentAmount)}</span>
+            </div>
+            ` : ''}
             <div class="summary-row">
               <span class="summary-label">Shipping:</span>
-              <span>${formatCurrency(0)}</span>
+              <span>${formatCurrency(transaction.shipping || 0)}</span>
             </div>
+            ${transaction.adjustments !== 0 ? `
             <div class="summary-row">
-              <span class="summary-label">Credit Brought Forward from previous:</span>
-              <span>${formatCurrency(0)}</span>
+              <span class="summary-label">Adjustments ${transaction.adjustmentReason ? `(${transaction.adjustmentReason})` : ''}:</span>
+              <span>${formatCurrency(transaction.adjustments || 0)}</span>
             </div>
+            ` : ''}
             <div class="summary-row amount-due-final">
               <span class="summary-label">AMOUNT DUE:</span>
-              <span>${formatCurrency(total)}</span>
+              <span>${formatCurrency(total - (transaction.amountPaid || 0))}</span>
             </div>
+            ${transaction.amountPaid > 0 ? `
+            <div class="summary-row" style="color: #666; font-size: 12px;">
+              <span>Payment Status: ${transaction.amountPaid >= total ? 'FULLY PAID' : 'PARTIALLY PAID'}</span>
+            </div>
+            ` : ''}
           </div>
           
           <div class="footer">

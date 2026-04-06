@@ -697,11 +697,19 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         subtotal: subtotal,
         tax: tax, // Display only tax (18%)
         discount: discountAmount,
+        shipping: parseFloat(shippingCost) || 0,
+        adjustments: adjustmentsAmount,
+        adjustmentReason: adjustmentReason,
         total: totalWithTax, // Actual total without tax effect
         paymentMethod: paymentMethod,
-        amountReceived: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) : (parseFloat(amountReceived) || 0),
-        change: paymentMethod === "debt" ? (parseFloat(amountReceived) || 0) - totalWithTax : change,
-        customer: selectedCustomer // Include customer information
+        amountPaid: actualAmountPaid, // Amount paid for current transaction
+        amountReceived: totalAmountReceived, // Total cash received (current + debt payment)
+        debtPaymentAmount: debtPaymentNum, // Payment toward previous debt
+        previousDebtBalance: creditBroughtForward, // Previous debt before payment
+        change: change,
+        customer: selectedCustomer, // Include customer information
+        paymentStatus: paymentMethod === "debt" && actualAmountPaid < totalWithTax ? "partial" : 
+                      paymentMethod === "debt" && actualAmountPaid >= totalWithTax ? "paid" : "completed"
       };
 
       // Store transaction for potential printing
