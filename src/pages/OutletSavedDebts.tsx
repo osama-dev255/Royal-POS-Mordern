@@ -752,7 +752,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                                       <div>
                                         <p className="font-medium">{product.name}</p>
                                         <p className="text-xs text-muted-foreground">
-                                          Stock: {product.quantity} | {formatCurrency(product.selling_price)}
+                                          Stock: {product.available_quantity ?? product.quantity} | {formatCurrency(product.selling_price)}
                                         </p>
                                       </div>
                                     </div>
