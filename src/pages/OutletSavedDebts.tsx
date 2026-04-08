@@ -635,7 +635,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
       {/* Edit Debt Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="h-5 w-5" />
@@ -667,54 +667,54 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   </Button>
                 </div>
                 <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
+                  <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left py-2 px-2">Item Name</th>
-                        <th className="text-right py-2 px-2 w-20">Qty</th>
-                        <th className="text-right py-2 px-2 w-24">Price</th>
-                        <th className="text-right py-2 px-2 w-24">Total</th>
-                        <th className="text-center py-2 px-2 w-10"></th>
+                        <th className="text-left py-3 px-3">Item Name</th>
+                        <th className="text-right py-3 px-3 w-24">Qty</th>
+                        <th className="text-right py-3 px-3 w-32">Price</th>
+                        <th className="text-right py-3 px-3 w-32">Total</th>
+                        <th className="text-center py-3 px-3 w-12"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {(editFormData.items || []).map((item, index) => (
                         <tr key={index} className="border-t">
-                          <td className="py-1 px-2">
+                          <td className="py-2 px-3">
                             <Input
                               value={item.name}
                               onChange={(e) => handleItemChange(index, 'name', e.target.value)}
-                              className="h-8 text-sm"
+                              className="h-9"
                               placeholder="Item name"
                             />
                           </td>
-                          <td className="py-1 px-2">
+                          <td className="py-2 px-3">
                             <Input
                               type="number"
                               value={item.quantity}
                               onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                              className="h-8 text-sm text-right"
+                              className="h-9 text-right"
                               min="1"
                             />
                           </td>
-                          <td className="py-1 px-2">
+                          <td className="py-2 px-3">
                             <Input
                               type="number"
                               value={item.price}
                               onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
-                              className="h-8 text-sm text-right"
+                              className="h-9 text-right"
                               min="0"
                             />
                           </td>
-                          <td className="py-1 px-2 text-right text-sm">
+                          <td className="py-2 px-3 text-right font-medium">
                             {formatCurrency(item.quantity * item.price)}
                           </td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2 px-3 text-center">
                             <Button
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="h-6 w-6 p-0 text-red-500"
+                              className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
                               onClick={() => handleRemoveItem(index)}
                             >
                               ×
@@ -727,8 +727,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 </div>
               </div>
               
-              {/* Subtotal, Tax, Credit, Adjustments */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Subtotal, Tax, Credit, Adjustments - 4 columns */}
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="editSubtotal">Subtotal</Label>
                   <Input
@@ -747,11 +747,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     onChange={(e) => setEditFormData({...editFormData, tax: parseFloat(e.target.value) || 0})}
                   />
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="editCredit">Credit Brought Forward</Label>
+                  <Label htmlFor="editCredit">Credit B/F</Label>
                   <Input
                     id="editCredit"
                     type="number"
@@ -782,7 +779,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 </div>
               )}
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="editTotal">Total Amount</Label>
                   <Input
@@ -802,20 +799,20 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     onChange={(e) => setEditFormData({...editFormData, amountPaid: parseFloat(e.target.value) || 0})}
                   />
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="editStatus">Status</Label>
-                <select
-                  id="editStatus"
-                  className="w-full p-2 border rounded-md"
-                  value={editFormData.status || 'outstanding'}
-                  onChange={(e) => setEditFormData({...editFormData, status: e.target.value})}
-                >
-                  <option value="outstanding">Outstanding</option>
-                  <option value="partial">Partial</option>
-                  <option value="paid">Paid</option>
-                </select>
+                
+                <div>
+                  <Label htmlFor="editStatus">Status</Label>
+                  <select
+                    id="editStatus"
+                    className="w-full p-2 border rounded-md h-9"
+                    value={editFormData.status || 'outstanding'}
+                    onChange={(e) => setEditFormData({...editFormData, status: e.target.value})}
+                  >
+                    <option value="outstanding">Outstanding</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </div>
               </div>
               
               <div className="p-3 bg-blue-50 rounded-lg">
