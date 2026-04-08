@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletSavedDebtsProps {
@@ -61,10 +61,24 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<SavedSale>>({});
+  const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
+  const [itemSearchTerms, setItemSearchTerms] = useState<Record<number, string>>({});
+  const [showItemDropdown, setShowItemDropdown] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     fetchSavedDebts();
+    fetchInventoryProducts();
   }, [outletId]);
+
+  const fetchInventoryProducts = async () => {
+    if (!outletId) return;
+    try {
+      const products = await getInventoryProductsByOutlet(outletId);
+      setInventoryProducts(products);
+    } catch (error) {
+      console.error('Error fetching inventory products:', error);
+    }
+  };
 
   const fetchSavedDebts = async () => {
     if (!outletId) return;
@@ -189,6 +203,37 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
       return { ...prev, items: newItems, total: newTotal };
     });
+  };
+
+  const getFilteredProducts = (searchTerm: string) => {
+    if (!searchTerm) return inventoryProducts.slice(0, 10);
+    return inventoryProducts
+      .filter(product => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+      .slice(0, 10);
+  };
+
+  const handleProductSelect = (index: number, product: InventoryProduct) => {
+    setEditFormData(prev => {
+      const newItems = [...(prev.items || [])];
+      newItems[index] = { 
+        ...newItems[index], 
+        name: product.name, 
+        price: product.selling_price || 0 
+      };
+      const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      return { ...prev, items: newItems, total: newTotal };
+    });
+    setItemSearchTerms(prev => ({ ...prev, [index]: '' }));
+    setShowItemDropdown(prev => ({ ...prev, [index]: false }));
+  };
+
+  const handleItemSearchChange = (index: number, value: string) => {
+    setItemSearchTerms(prev => ({ ...prev, [index]: value }));
+    handleItemChange(index, 'name', value);
+    setShowItemDropdown(prev => ({ ...prev, [index]: true }));
   };
 
   const handleUpdate = async () => {
@@ -643,7 +688,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             </DialogTitle>
           </DialogHeader>
           {selectedSale && (
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="space-y-4">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Invoice Number</p>
                 <p className="font-semibold">{selectedSale.invoiceNumber}</p>
@@ -666,7 +711,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     + Add Item
                   </Button>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-visible">
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
@@ -680,13 +725,45 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     <tbody>
                       {(editFormData.items || []).map((item, index) => (
                         <tr key={index} className="border-t">
-                          <td className="py-2 px-3">
+                          <td className="py-2 px-3 relative">
                             <Input
                               value={item.name}
-                              onChange={(e) => handleItemChange(index, 'name', e.target.value)}
+                              onChange={(e) => handleItemSearchChange(index, e.target.value)}
+                              onFocus={() => setShowItemDropdown(prev => ({ ...prev, [index]: true }))}
+                              onBlur={(e) => {
+                                // Delay to allow click on dropdown items
+                                setTimeout(() => {
+                                  setShowItemDropdown(prev => ({ ...prev, [index]: false }));
+                                }, 200);
+                              }}
                               className="h-9"
-                              placeholder="Item name"
+                              placeholder="Type to search items..."
                             />
+                            {showItemDropdown[index] && (
+                              <div className="absolute z-[100] top-full left-0 w-80 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {getFilteredProducts(itemSearchTerms[index] || item.name).length > 0 ? (
+                                  getFilteredProducts(itemSearchTerms[index] || item.name).map((product) => (
+                                    <div
+                                      key={product.id}
+                                      className="flex items-center justify-between p-2 hover:bg-accent cursor-pointer text-sm border-b last:border-0"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => handleProductSelect(index, product)}
+                                    >
+                                      <div>
+                                        <p className="font-medium">{product.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Stock: {product.quantity} | {formatCurrency(product.selling_price)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="p-3 text-sm text-muted-foreground text-center">
+                                    No products found
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2 px-3">
                             <Input
