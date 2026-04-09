@@ -74,6 +74,16 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [otherReceiptDate, setOtherReceiptDate] = useState(new Date().toISOString().split('T')[0]);
   const [otherReceiptPaymentMethod, setOtherReceiptPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash');
   const [otherReceiptNotes, setOtherReceiptNotes] = useState('');
+  
+  // Customer Settlement Receipt form
+  const [settlementCustomerName, setSettlementCustomerName] = useState('');
+  const [settlementCustomerPhone, setSettlementCustomerPhone] = useState('');
+  const [settlementInvoiceNumber, setSettlementInvoiceNumber] = useState('');
+  const [settlementPreviousBalance, setSettlementPreviousBalance] = useState(0);
+  const [settlementPaymentAmount, setSettlementPaymentAmount] = useState(0);
+  const [settlementPaymentMethod, setSettlementPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash');
+  const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0]);
+  const [settlementNotes, setSettlementNotes] = useState('');
 
   useEffect(() => {
     fetchReceipts();
@@ -138,8 +148,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       // Load other receipts from localStorage
       const otherReceipts = JSON.parse(localStorage.getItem('other_receipts') || '[]');
       
+      // Load customer settlement receipts from localStorage
+      const customerSettlements = JSON.parse(localStorage.getItem('customer_settlements') || '[]');
+      
       // Combine all receipts
-      const allReceipts = [...enrichedSales, ...commissionReceipts, ...otherReceipts];
+      const allReceipts = [...enrichedSales, ...customerSettlements, ...commissionReceipts, ...otherReceipts];
       
       // Sort by date (newest first)
       allReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -331,6 +344,99 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       setSaving(false);
     }
   };
+  
+  // Customer Settlement Receipt save function
+  const handleSaveSettlementReceipt = async () => {
+    // Validate required fields
+    if (!settlementCustomerName) {
+      toast({
+        title: "Error",
+        description: "Customer name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!settlementPaymentMethod) {
+      toast({
+        title: "Error",
+        description: "Payment method is mandatory",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (settlementPaymentAmount <= 0) {
+      toast({
+        title: "Error",
+        description: "Payment amount must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSaving(true);
+    
+    try {
+      const newBalance = Math.max(0, settlementPreviousBalance - settlementPaymentAmount);
+      
+      // Create settlement receipt
+      const settlementReceipt = {
+        id: `SETTLE-${Date.now()}`,
+        invoiceNumber: settlementInvoiceNumber || `SETTLE-${Date.now()}`,
+        date: settlementDate,
+        customer: settlementCustomerName,
+        items: [{ 
+          name: 'Debt Payment', 
+          quantity: 1, 
+          price: settlementPaymentAmount 
+        }],
+        subtotal: settlementPaymentAmount,
+        tax: 0,
+        total: settlementPaymentAmount,
+        amountPaid: settlementPaymentAmount,
+        paymentMethod: settlementPaymentMethod,
+        status: 'paid',
+        type: 'sales' as const,
+        previousBalance: settlementPreviousBalance,
+        newBalance: newBalance,
+        notes: settlementNotes
+      };
+      
+      // Save to localStorage
+      const existingSettlements = JSON.parse(localStorage.getItem('customer_settlements') || '[]');
+      existingSettlements.push(settlementReceipt);
+      localStorage.setItem('customer_settlements', JSON.stringify(existingSettlements));
+      
+      toast({
+        title: "Success",
+        description: `Customer settlement receipt saved. New balance: ${formatCurrency(newBalance)}`,
+      });
+      
+      // Reset form
+      setSettlementCustomerName('');
+      setSettlementCustomerPhone('');
+      setSettlementInvoiceNumber('');
+      setSettlementPreviousBalance(0);
+      setSettlementPaymentAmount(0);
+      setSettlementPaymentMethod('cash');
+      setSettlementDate(new Date().toISOString().split('T')[0]);
+      setSettlementNotes('');
+      setShowNewForm(false);
+      
+      // Refresh receipts list
+      await fetchReceipts();
+    } catch (error) {
+      console.error('Error saving settlement receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settlement receipt",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Filter receipts by type
   const filteredReceipts = activeTab === 'all' 
@@ -372,6 +478,197 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <Plus className="h-4 w-4 mr-2" />
           New {activeTab === 'all' ? 'Receipt' : activeTab === 'sales' ? 'Sale' : activeTab === 'commission' ? 'Commission' : 'Receipt'}
         </Button>
+      )}
+
+      {/* Customer Settlement Receipt Form */}
+      {showNewForm && activeTab === 'sales' && (
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-8 w-1 bg-blue-600 rounded"></div>
+              <h2 className="text-xl font-bold">Customer Settlement Receipt</h2>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Customer Information Section */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Customer Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="settlementCustomerName">Customer Name *</Label>
+                    <Input
+                      id="settlementCustomerName"
+                      value={settlementCustomerName}
+                      onChange={(e) => setSettlementCustomerName(e.target.value)}
+                      placeholder="Enter customer name"
+                      className="mt-1"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="settlementCustomerPhone">Phone Number</Label>
+                    <Input
+                      id="settlementCustomerPhone"
+                      value={settlementCustomerPhone}
+                      onChange={(e) => setSettlementCustomerPhone(e.target.value)}
+                      placeholder="Customer phone"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Payment Details Section */}
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Payment Details
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="settlementInvoiceNumber">Receipt/Invoice Number (Optional)</Label>
+                    <Input
+                      id="settlementInvoiceNumber"
+                      value={settlementInvoiceNumber}
+                      onChange={(e) => setSettlementInvoiceNumber(e.target.value)}
+                      placeholder="Auto-generated if empty"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="settlementPreviousBalance">Previous Balance Outstanding</Label>
+                      <Input
+                        id="settlementPreviousBalance"
+                        type="number"
+                        value={settlementPreviousBalance || ''}
+                        onChange={(e) => setSettlementPreviousBalance(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Total amount customer owed</p>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="settlementPaymentAmount">Payment Amount *</Label>
+                      <Input
+                        id="settlementPaymentAmount"
+                        type="number"
+                        value={settlementPaymentAmount || ''}
+                        onChange={(e) => setSettlementPaymentAmount(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        className="mt-1"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Amount being paid now</p>
+                    </div>
+                  </div>
+                  
+                  {/* Balance Summary */}
+                  {(settlementPreviousBalance > 0 || settlementPaymentAmount > 0) && (
+                    <div className="p-4 bg-white rounded-lg border-2 border-green-300">
+                      <h4 className="text-sm font-semibold mb-2">Balance Summary</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Previous Balance:</span>
+                          <span className="font-medium text-red-600">{formatCurrency(settlementPreviousBalance)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Payment Amount:</span>
+                          <span className="font-medium text-green-600">- {formatCurrency(settlementPaymentAmount)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                          <span>Remaining Balance:</span>
+                          <span className={settlementPreviousBalance - settlementPaymentAmount <= 0 ? "text-green-600" : "text-orange-600"}>
+                            {formatCurrency(Math.max(0, settlementPreviousBalance - settlementPaymentAmount))}
+                          </span>
+                        </div>
+                        {settlementPreviousBalance - settlementPaymentAmount <= 0 && settlementPreviousBalance > 0 && (
+                          <div className="text-center text-sm text-green-600 font-semibold mt-2">
+                            ✓ Account Settled in Full
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <Label htmlFor="settlementPaymentMethod">Payment Method *</Label>
+                    <select
+                      id="settlementPaymentMethod"
+                      className="w-full p-2 border rounded-md h-9 mt-1"
+                      value={settlementPaymentMethod}
+                      onChange={(e) => setSettlementPaymentMethod(e.target.value as 'cash' | 'card' | 'mobile')}
+                      required
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="mobile">Mobile Money</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">Payment method is mandatory</p>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="settlementDate">Payment Date</Label>
+                    <Input
+                      id="settlementDate"
+                      type="date"
+                      value={settlementDate}
+                      onChange={(e) => setSettlementDate(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Notes Section */}
+              <div>
+                <Label htmlFor="settlementNotes">Notes (Optional)</Label>
+                <Textarea
+                  id="settlementNotes"
+                  value={settlementNotes}
+                  onChange={(e) => setSettlementNotes(e.target.value)}
+                  placeholder="Additional notes about this settlement"
+                  className="mt-1"
+                />
+              </div>
+              
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button 
+                  className="flex-1" 
+                  onClick={handleSaveSettlementReceipt}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Settlement Receipt
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setShowNewForm(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Commission Receipt Form */}
