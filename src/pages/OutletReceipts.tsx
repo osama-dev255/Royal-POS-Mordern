@@ -25,7 +25,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletReceiptsProps {
@@ -78,16 +78,62 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   // Customer Settlement Receipt form
   const [settlementCustomerName, setSettlementCustomerName] = useState('');
   const [settlementCustomerPhone, setSettlementCustomerPhone] = useState('');
+  const [settlementCustomerId, setSettlementCustomerId] = useState<string>('');
+  const [settlementCustomerBalance, setSettlementCustomerBalance] = useState(0);
   const [settlementInvoiceNumber, setSettlementInvoiceNumber] = useState('');
   const [settlementPreviousBalance, setSettlementPreviousBalance] = useState(0);
   const [settlementPaymentAmount, setSettlementPaymentAmount] = useState(0);
   const [settlementPaymentMethod, setSettlementPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash');
   const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0]);
   const [settlementNotes, setSettlementNotes] = useState('');
+  
+  // Customer search state
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchReceipts();
+    loadCustomers();
   }, [outletId, activeTab]);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('#settlementCustomerSearch')) {
+        setShowCustomerDropdown(false);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+  
+  // Load customers when component mounts or tab changes
+  const loadCustomers = async () => {
+    if (!outletId) return;
+    try {
+      const customers = await getOutletCustomers(outletId);
+      setAllCustomers(customers || []);
+    } catch (error) {
+      console.error('Error loading customers:', error);
+    }
+  };
+  
+  // Fetch customer balance from outlet_debts
+  const fetchCustomerBalance = async (customerId: string) => {
+    if (!outletId || !customerId) return;
+    try {
+      const debts = await getOutletDebtsByCustomerId(outletId, customerId);
+      const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+      setSettlementCustomerBalance(totalBalance);
+      setSettlementPreviousBalance(totalBalance);
+    } catch (error) {
+      console.error('Error fetching customer balance:', error);
+    }
+  };
 
   const fetchReceipts = async () => {
     if (!outletId) return;
@@ -345,6 +391,39 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     }
   };
   
+  // Customer search handler
+  const handleCustomerSearch = (query: string) => {
+    setCustomerSearchQuery(query);
+    setSettlementCustomerName(query);
+    
+    if (query.trim()) {
+      const filtered = allCustomers.filter(customer => {
+        const fullName = `${customer.first_name} ${customer.last_name}`.toLowerCase();
+        const phone = (customer.phone || '').toLowerCase();
+        const searchLower = query.toLowerCase();
+        return fullName.includes(searchLower) || phone.includes(searchLower);
+      });
+      setFilteredCustomers(filtered);
+      setShowCustomerDropdown(filtered.length > 0);
+    } else {
+      setFilteredCustomers([]);
+      setShowCustomerDropdown(false);
+    }
+  };
+  
+  // Customer selection handler
+  const handleCustomerSelect = async (customer: any) => {
+    const fullName = `${customer.first_name} ${customer.last_name}`.trim();
+    setSettlementCustomerId(customer.id || '');
+    setSettlementCustomerName(fullName);
+    setSettlementCustomerPhone(customer.phone || '');
+    setCustomerSearchQuery(fullName);
+    setShowCustomerDropdown(false);
+    
+    // Fetch customer's outstanding balance
+    await fetchCustomerBalance(customer.id);
+  };
+  
   // Customer Settlement Receipt save function
   const handleSaveSettlementReceipt = async () => {
     // Validate required fields
@@ -496,29 +575,69 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   <User className="h-4 w-4" />
                   Customer Information
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="settlementCustomerName">Customer Name *</Label>
+                <div className="space-y-4">
+                  {/* Customer Search Dropdown */}
+                  <div className="relative">
+                    <Label htmlFor="settlementCustomerSearch">Search Customer *</Label>
                     <Input
-                      id="settlementCustomerName"
-                      value={settlementCustomerName}
-                      onChange={(e) => setSettlementCustomerName(e.target.value)}
-                      placeholder="Enter customer name"
+                      id="settlementCustomerSearch"
+                      value={customerSearchQuery}
+                      onChange={(e) => handleCustomerSearch(e.target.value)}
+                      onFocus={() => {
+                        if (filteredCustomers.length > 0) {
+                          setShowCustomerDropdown(true);
+                        }
+                      }}
+                      placeholder="Type customer name or phone..."
                       className="mt-1"
-                      required
+                      autoComplete="off"
                     />
+                    
+                    {/* Customer Dropdown */}
+                    {showCustomerDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {filteredCustomers.map((customer) => {
+                          const fullName = `${customer.first_name} ${customer.last_name}`.trim();
+                          return (
+                            <div
+                              key={customer.id}
+                              className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => handleCustomerSelect(customer)}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">{fullName}</p>
+                                  <p className="text-sm text-gray-600">{customer.phone || 'No phone'}</p>
+                                </div>
+                                <div className="text-right ml-4">
+                                  <p className="text-xs text-gray-500">Balance</p>
+                                  <p className="text-sm font-semibold text-red-600">
+                                    {formatCurrency(customer.total_debt || 0)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   
-                  <div>
-                    <Label htmlFor="settlementCustomerPhone">Phone Number</Label>
-                    <Input
-                      id="settlementCustomerPhone"
-                      value={settlementCustomerPhone}
-                      onChange={(e) => setSettlementCustomerPhone(e.target.value)}
-                      placeholder="Customer phone"
-                      className="mt-1"
-                    />
-                  </div>
+                  {/* Selected Customer Info */}
+                  {settlementCustomerId && (
+                    <div className="p-3 bg-white rounded-lg border border-blue-300">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{settlementCustomerName}</p>
+                          <p className="text-sm text-gray-600">{settlementCustomerPhone}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">Outstanding Balance</p>
+                          <p className="text-lg font-bold text-red-600">{formatCurrency(settlementCustomerBalance)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               
