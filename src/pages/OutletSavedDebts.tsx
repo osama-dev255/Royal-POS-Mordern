@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletSavedDebtsProps {
@@ -237,10 +237,35 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   };
 
   const handleUpdate = async () => {
-    if (!selectedSale || !selectedSale.id) return;
+    if (!selectedSale || !selectedSale.id) {
+      console.error('❌ No sale selected for update');
+      return;
+    }
+    
+    if (!outletId) {
+      console.error('❌ No outlet ID available for inventory update');
+      return;
+    }
     
     try {
-      // Update the sale record with all fields
+      console.log('💾 Starting debt record update...', selectedSale.id);
+      console.log('📝 Update form data:', editFormData);
+      
+      // Step 1: Get the OLD items before deletion to reverse their sold quantities
+      console.log('📋 Fetching existing sale items to reverse inventory...');
+      const oldItems = await getOutletSaleItemsBySaleId(selectedSale.id);
+      console.log(`  Found ${oldItems.length} existing items`);
+      
+      // Step 2: Reverse the old sold quantities (subtract old quantities from inventory)
+      console.log('🔄 Reversing old inventory sold quantities...');
+      for (const oldItem of oldItems) {
+        console.log(`  - Reversing: ${oldItem.product_name}, qty: ${oldItem.quantity}`);
+        // Subtract by adding negative quantity
+        await incrementSoldQuantity(outletId, oldItem.product_name, -oldItem.quantity);
+      }
+      console.log('✅ Old inventory quantities reversed');
+      
+      // Step 3: Update the sale record with all fields
       const updatedSale = await updateOutletSale(selectedSale.id, {
         subtotal: editFormData.subtotal,
         tax_amount: editFormData.tax,
@@ -253,39 +278,60 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       });
       
       if (updatedSale) {
-        // Delete existing items and recreate them
+        console.log('✅ Sale record updated successfully');
+        
+        // Step 4: Delete existing items
+        console.log('🗑️ Deleting existing sale items...');
         await deleteOutletSaleItemsBySaleId(selectedSale.id);
         
-        // Create new items
+        // Step 5: Create new items and update inventory
+        console.log('➕ Creating new sale items and updating inventory...', editFormData.items?.length || 0, 'items');
         for (const item of (editFormData.items || [])) {
+          const itemTotal = item.quantity * item.price;
+          console.log(`  - Creating item: ${item.name}, qty: ${item.quantity}, price: ${item.price}, total: ${itemTotal}`);
+          
           await createOutletSaleItem({
             sale_id: selectedSale.id,
             product_name: item.name,
             quantity: item.quantity,
             unit_price: item.price,
             discount_amount: 0,
-            total_price: item.quantity * item.price
+            total_price: itemTotal
           });
+          
+          // Update inventory sold quantity for the new item
+          console.log(`  📦 Updating inventory for: ${item.name}, qty: ${item.quantity}`);
+          const inventoryUpdated = await incrementSoldQuantity(outletId, item.name, item.quantity);
+          if (inventoryUpdated) {
+            console.log(`    ✅ Inventory updated for ${item.name}`);
+          } else {
+            console.warn(`    ⚠️ Failed to update inventory for ${item.name} - product may not exist in inventory`);
+          }
         }
+        
+        console.log('✅ All items created and inventory updated successfully');
         
         toast({
           title: "Success",
-          description: "Debt record updated successfully"
+          description: "Debt record updated successfully and inventory recalculated"
         });
         setIsEditDialogOpen(false);
         fetchSavedDebts(); // Refresh the list
+        fetchInventoryProducts(); // Refresh inventory products
       } else {
+        console.error('❌ updateOutletSale returned null');
         toast({
           title: "Error",
-          description: "Failed to update debt record",
+          description: "Failed to update debt record - database returned null",
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error('Error updating debt:', error);
+      console.error('❌ Error updating debt:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: "Error",
-        description: "An error occurred while updating",
+        description: `Failed to update debt record: ${errorMessage}`,
         variant: "destructive"
       });
     }

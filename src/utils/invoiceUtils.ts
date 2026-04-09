@@ -171,6 +171,8 @@ export const deleteInvoice = async (invoiceId: string): Promise<void> => {
 
 export const updateInvoice = async (updatedInvoice: InvoiceData): Promise<void> => {
   try {
+    console.log('🔄 Starting invoice update...', updatedInvoice.id);
+    
     const savedInvoices = await getSavedInvoices();
     const updatedInvoices = savedInvoices.map(invoice => 
       invoice.id === updatedInvoice.id ? updatedInvoice : invoice
@@ -180,6 +182,8 @@ export const updateInvoice = async (updatedInvoice: InvoiceData): Promise<void> 
     // Also update in database
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      console.log('👤 User authenticated:', user.id);
+      
       // Check if user is admin to determine update scope
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -187,41 +191,61 @@ export const updateInvoice = async (updatedInvoice: InvoiceData): Promise<void> 
         .eq('id', user.id)
         .single();
       
-      let query = supabase.from('saved_invoices').update({
+      console.log('📝 User role:', userData?.role);
+      
+      // Validate numeric fields to prevent NaN serialization errors
+      const updateData = {
         invoice_number: updatedInvoice.invoiceNumber,
         date: updatedInvoice.date,
         customer: updatedInvoice.customer,
-        items: updatedInvoice.items,
-        total: updatedInvoice.total,
+        items: updatedInvoice.items || 0,
+        total: updatedInvoice.total || 0,
         payment_method: updatedInvoice.paymentMethod,
         status: updatedInvoice.status,
         items_list: updatedInvoice.itemsList,
-        subtotal: updatedInvoice.subtotal,
-        tax: updatedInvoice.tax,
-        discount: updatedInvoice.discount,
-        amount_received: updatedInvoice.amountReceived,
-        change: updatedInvoice.change,
-        amount_paid: updatedInvoice.amountPaid,
-        credit_brought_forward: updatedInvoice.creditBroughtForward,
-        amount_due: updatedInvoice.amountDue,
-        adjustments: updatedInvoice.adjustments,
+        subtotal: updatedInvoice.subtotal || 0,
+        tax: updatedInvoice.tax || 0,
+        discount: updatedInvoice.discount || 0,
+        amount_received: updatedInvoice.amountReceived || 0,
+        change: updatedInvoice.change || 0,
+        amount_paid: updatedInvoice.amountPaid || 0,
+        credit_brought_forward: updatedInvoice.creditBroughtForward || 0,
+        amount_due: updatedInvoice.amountDue || 0,
+        adjustments: updatedInvoice.adjustments || 0,
         adjustment_reason: updatedInvoice.adjustmentReason
-      });
+      };
+      
+      console.log('📦 Update data:', JSON.stringify(updateData, null, 2));
+      
+      let query = supabase.from('saved_invoices').update(updateData);
       
       // Admins can update any invoice, others can only update their own
       if (userData?.role !== 'admin') {
         query = query.eq('user_id', user.id);
+        console.log('🔒 Non-admin user: filtering by user_id');
+      } else {
+        console.log('🔓 Admin user: can update any invoice');
       }
       
       const { error } = await query.eq('id', updatedInvoice.id);
         
       if (error) {
-        console.error('Error updating invoice in database:', error);
-        // Don't throw error - still have local storage backup
+        console.error('❌ Error updating invoice in database:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Database update failed: ${error.message}`);
+      } else {
+        console.log('✅ Database update successful');
       }
+    } else {
+      console.warn('⚠️ No authenticated user found');
     }
   } catch (error) {
-    console.error('Error updating invoice:', error);
+    console.error('❌ Error updating invoice:', error);
     throw new Error('Failed to update invoice');
   }
 };

@@ -265,11 +265,15 @@ export const deleteDelivery = async (deliveryId: string): Promise<void> => {
 
 export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<void> => {
   try {
+    console.log('🔄 Starting delivery update...', updatedDelivery.id);
+    
     // Update database first (source of truth)
     const { data: { user } } = await supabase.auth.getUser();
     let dbUpdateSuccessful = false;
     
     if (user) {
+      console.log('👤 User authenticated:', user.id);
+      
       // Check if user is admin to determine update scope
       const { data: userData } = await supabase
         .from('users')
@@ -277,38 +281,58 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         .eq('id', user.id)
         .single();
       
-      let query = supabase.from('saved_delivery_notes').update({
+      console.log('📝 User role:', userData?.role);
+      
+      // Validate numeric fields to prevent NaN serialization errors
+      const updateData = {
         delivery_note_number: updatedDelivery.deliveryNoteNumber,
         date: updatedDelivery.date,
         customer: updatedDelivery.customer,
-        items: updatedDelivery.items,
-        total: updatedDelivery.total,
+        items: updatedDelivery.items || 0,
+        total: updatedDelivery.total || 0,
         payment_method: updatedDelivery.paymentMethod,
         status: updatedDelivery.status,
         items_list: updatedDelivery.itemsList,
-        subtotal: updatedDelivery.subtotal,
-        tax: updatedDelivery.tax,
-        discount: updatedDelivery.discount,
-        amount_received: updatedDelivery.amountReceived,
-        change: updatedDelivery.change,
+        subtotal: updatedDelivery.subtotal || 0,
+        tax: updatedDelivery.tax || 0,
+        discount: updatedDelivery.discount || 0,
+        amount_received: updatedDelivery.amountReceived || 0,
+        change: updatedDelivery.change || 0,
         vehicle: updatedDelivery.vehicle,
         driver: updatedDelivery.driver,
         delivery_notes: updatedDelivery.deliveryNotes,
         outlet_id: updatedDelivery.outletId
-      });
+      };
+      
+      console.log('📦 Update data:', JSON.stringify(updateData, null, 2));
+      
+      let query = supabase.from('saved_delivery_notes').update(updateData);
       
       // Admins can update any delivery, others can only update their own
       if (userData?.role !== 'admin') {
         query = query.eq('user_id', user.id);
+        console.log('🔒 Non-admin user: filtering by user_id');
+      } else {
+        console.log('🔓 Admin user: can update any delivery');
       }
       
       const { error } = await query.eq('id', updatedDelivery.id);
         
       if (error) {
-        console.error('Error updating delivery in database:', error);
+        console.error('❌ Error updating delivery in database:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Database update failed: ${error.message}`);
       } else {
+        console.log('✅ Database update successful');
         dbUpdateSuccessful = true;
       }
+    } else {
+      console.warn('⚠️ No authenticated user found');
     }
     
     // Update localStorage after successful DB update or as fallback

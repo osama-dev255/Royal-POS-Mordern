@@ -4095,40 +4095,81 @@ export const deleteOutletSale = async (id: string): Promise<boolean> => {
 
 export const updateOutletSale = async (id: string, updates: Partial<OutletSale>): Promise<OutletSale | null> => {
   try {
+    console.log('🔄 Starting outlet sale update...', id);
+    console.log('📦 Update data:', JSON.stringify(updates, null, 2));
+    
+    // Validate numeric fields to prevent NaN serialization errors
+    const validatedUpdates = {
+      ...updates,
+      subtotal: updates.subtotal || 0,
+      tax_amount: updates.tax_amount || 0,
+      credit_brought_forward: updates.credit_brought_forward || 0,
+      adjustments: updates.adjustments || 0,
+      total_amount: updates.total_amount || 0,
+      amount_paid: updates.amount_paid || 0,
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('✅ Validated update data:', JSON.stringify(validatedUpdates, null, 2));
+    
     const { data, error } = await supabase
       .from('outlet_sales')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(validatedUpdates)
       .eq('id', id)
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error updating outlet sale:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
+    
+    console.log('✅ Outlet sale update successful');
     return data || null;
   } catch (error) {
-    console.error('Error updating outlet sale:', error);
-    return null;
+    console.error('❌ Error updating outlet sale:', error);
+    throw error; // Re-throw to let the caller handle it
   }
 };
 
 export const createOutletSaleItem = async (saleItem: Omit<OutletSaleItem, 'id'>): Promise<OutletSaleItem | null> => {
   try {
+    console.log('📦 Creating outlet sale item:', saleItem.product_name);
+    
+    // Validate numeric fields to prevent NaN serialization errors
+    const validatedItem = {
+      ...saleItem,
+      quantity: saleItem.quantity || 0,
+      unit_price: saleItem.unit_price || 0,
+      discount_amount: saleItem.discount_amount || 0,
+      total_price: saleItem.total_price || 0,
+      created_at: new Date().toISOString()
+    };
+    
+    console.log('✅ Validated item data:', JSON.stringify(validatedItem, null, 2));
+    
     const { data, error } = await supabase
       .from('outlet_sale_items')
-      .insert([{
-        ...saleItem,
-        created_at: new Date().toISOString()
-      }])
+      .insert([validatedItem])
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error creating outlet sale item:', error);
+      throw error;
+    }
+    
+    console.log('✅ Outlet sale item created successfully');
     return data || null;
   } catch (error) {
-    console.error('Error creating outlet sale item:', error);
-    return null;
+    console.error('❌ Error creating outlet sale item:', error);
+    throw error;
   }
 };
 

@@ -238,14 +238,20 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
     if (!editingDelivery) return;
     
     try {
+      console.log('💾 Saving edited delivery...', editingDelivery.id);
+      
       // Calculate subtotal from items - sum of (quantity * price) for each item
       const calculatedSubtotal = editableItems.reduce((sum, item) => {
         const itemTotal = (item.price || 0) * (item.quantity || 0);
         return sum + itemTotal;
       }, 0);
       
+      console.log('📊 Calculated subtotal:', calculatedSubtotal);
+      
       // Calculate total based on subtotal, tax, and discount
       const calculatedTotal = calculatedSubtotal + (editingDelivery.tax || 0) - (editingDelivery.discount || 0);
+      
+      console.log('💰 Calculated total:', calculatedTotal);
       
       // Update the delivery with edited data
       const updatedDelivery: DeliveryData = {
@@ -259,6 +265,8 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
         outletId: editingDelivery.outletId // Preserve the outlet ID
       };
       
+      console.log('📦 Final updated delivery:', updatedDelivery);
+      
       await updateDelivery(updatedDelivery);
       
       // Update the state to reflect the changes
@@ -269,10 +277,11 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
       setEditingDelivery(null);
       setEditableItems([]);
       
-      alert('Delivery updated successfully!');
+      alert('✅ Delivery updated successfully!');
     } catch (error) {
-      console.error('Error updating delivery:', error);
-      alert('Error updating delivery. Please try again.');
+      console.error('❌ Error updating delivery:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`❌ Error updating delivery: ${errorMessage}\n\nPlease check the console for more details.`);
     }
   };
 
