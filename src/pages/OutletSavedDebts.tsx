@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, updateOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletSavedDebtsProps {
@@ -51,6 +51,7 @@ interface SavedSale {
   creditBroughtForward?: number;
   adjustments?: number;
   adjustmentReason?: string;
+  isEdited?: boolean; // Flag to track if transaction has been edited
 }
 
 export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) => {
@@ -266,6 +267,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       console.log('✅ Old inventory quantities reversed');
       
       // Step 3: Update the sale record with all fields
+      // Map status to valid payment_status values: unpaid, partial, paid, refunded
+      const validPaymentStatus = editFormData.status === 'outstanding' ? 'unpaid' : editFormData.status;
+      
       const updatedSale = await updateOutletSale(selectedSale.id, {
         subtotal: editFormData.subtotal,
         tax_amount: editFormData.tax,
@@ -274,7 +278,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         adjustment_reason: editFormData.adjustmentReason,
         total_amount: editFormData.total,
         amount_paid: editFormData.amountPaid,
-        payment_status: editFormData.status
+        payment_status: validPaymentStatus
       });
       
       if (updatedSale) {
@@ -310,6 +314,61 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         }
         
         console.log('✅ All items created and inventory updated successfully');
+        
+        // Step 6: Update the outlet_debts table to sync customer balances
+        console.log('💰 Updating outlet_debts table to sync customer balances...');
+        const relatedDebts = await getOutletDebtsBySaleId(selectedSale.id);
+        
+        if (relatedDebts && relatedDebts.length > 0) {
+          console.log(`  Found ${relatedDebts.length} related debt record(s)`);
+          
+          // Calculate the new outstanding amount
+          const newTotal = editFormData.total || 0;
+          const newAmountPaid = editFormData.amountPaid || 0;
+          const newOutstanding = Math.max(0, newTotal - newAmountPaid);
+          
+          // Determine the new status for outlet_debts
+          let newDebtStatus: 'outstanding' | 'paid' | 'partial';
+          if (newOutstanding === 0) {
+            newDebtStatus = 'paid';
+          } else if (newAmountPaid > 0) {
+            newDebtStatus = 'partial';
+          } else {
+            newDebtStatus = 'outstanding'; // This is OK for outlet_debts table
+          }
+          
+          // Determine the new payment_status for outlet_sales (must be: paid, partial, unpaid, refunded)
+          let newPaymentStatus: string;
+          if (newOutstanding === 0) {
+            newPaymentStatus = 'paid';
+          } else if (newAmountPaid > 0) {
+            newPaymentStatus = 'partial';
+          } else {
+            newPaymentStatus = 'unpaid'; // Changed from 'outstanding' to 'unpaid'
+          }
+          
+          // Update each related debt record
+          for (const debt of relatedDebts) {
+            console.log(`  - Updating debt ${debt.id}: amount=${newOutstanding}, status=${newDebtStatus}`);
+            await updateOutletDebt(debt.id || '', {
+              amount: newOutstanding,
+              status: newDebtStatus,
+              paid_amount: newAmountPaid,
+              updated_at: new Date().toISOString()
+            });
+          }
+          console.log('✅ Outlet debts updated successfully');
+        } else {
+          console.log('  ℹ️ No related debt records found - debt may have been deleted already');
+        }
+        
+        // Mark the sale as edited
+        const editedSale = {
+          ...selectedSale,
+          ...editFormData,
+          isEdited: true
+        };
+        setSelectedSale(editedSale);
         
         toast({
           title: "Success",
@@ -364,7 +423,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       },
       salesman: 'Not Assigned',
       driver: 'Not Assigned',
-      dueDate: sale.date // Use sale date as due date if not specified
+      dueDate: sale.date, // Use sale date as due date if not specified
+      isEdited: sale.isEdited || false // Pass the edited flag
     };
     
     PrintUtils.printDebtInvoice(transaction);
@@ -928,12 +988,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   <select
                     id="editStatus"
                     className="w-full p-2 border rounded-md h-9"
-                    value={editFormData.status || 'outstanding'}
+                    value={editFormData.status || 'unpaid'}
                     onChange={(e) => setEditFormData({...editFormData, status: e.target.value})}
                   >
-                    <option value="outstanding">Outstanding</option>
+                    <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
+                    <option value="refunded">Refunded</option>
                   </select>
                 </div>
               </div>

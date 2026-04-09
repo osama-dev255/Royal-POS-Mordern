@@ -3325,6 +3325,7 @@ export class PrintUtils {
     const subtotal = transaction.subtotal || 0;
     const total = transaction.total || 0;
     const totalQuantity = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+    const isEdited = transaction.isEdited || false; // Check if transaction has been edited
     
     const formatCurrency = (amount: number) => {
       return `TSh ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -3355,6 +3356,17 @@ export class PrintUtils {
             .invoice-header {
               text-align: center;
               margin-bottom: 15px;
+            }
+            .edited-badge {
+              display: inline-block;
+              background-color: #fef3c7;
+              color: #92400e;
+              padding: 4px 12px;
+              border-radius: 4px;
+              font-size: 11px;
+              font-weight: bold;
+              margin-bottom: 8px;
+              border: 1px solid #f59e0b;
             }
             .invoice-title {
               font-size: 24px;
@@ -3508,6 +3520,7 @@ export class PrintUtils {
         </head>
         <body>
           <div class="invoice-header">
+            ${isEdited ? '<div class="edited-badge">Edited transaction</div>' : ''}
             <div class="invoice-title">INVOICE</div>
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
