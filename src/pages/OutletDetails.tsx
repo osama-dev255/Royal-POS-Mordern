@@ -32,7 +32,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Receipt
 } from "lucide-react";
 import { getOutlets, Outlet } from "@/services/databaseService";
 import { format } from "date-fns";
@@ -450,6 +451,14 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                 >
                   <PackageCheck className="h-6 w-6" />
                   <span className="text-sm">GRN</span>
+                </Button>
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = `#/outlet-receipts-${outlet?.id}`}
+                >
+                  <Receipt className="h-6 w-6" />
+                  <span className="text-sm">Receipts</span>
                 </Button>
                 <Button 
                   className="h-auto py-4 flex flex-col items-center gap-2" 

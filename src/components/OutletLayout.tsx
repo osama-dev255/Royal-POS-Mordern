@@ -17,7 +17,8 @@ import {
   Users,
   CreditCard,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Receipt
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'grn' | 'reports' | 'settings' | 'back';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
@@ -83,6 +84,12 @@ export const OutletLayout = ({
       title: "Payments",
       icon: <CreditCard className="h-5 w-5" />,
       view: `outlet-payments-${outletId}`
+    },
+    {
+      id: "receipts",
+      title: "Receipts",
+      icon: <Receipt className="h-5 w-5" />,
+      view: `outlet-receipts-${outletId}`
     },
     {
       id: "grn",
