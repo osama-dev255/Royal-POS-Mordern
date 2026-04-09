@@ -25,7 +25,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, updateOutletDebt } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletReceiptsProps {
@@ -116,7 +116,22 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     if (!outletId) return;
     try {
       const customers = await getOutletCustomers(outletId);
-      setAllCustomers(customers || []);
+      
+      // Fetch actual balance for each customer from outlet_debts
+      const customersWithBalances = await Promise.all(
+        (customers || []).map(async (customer) => {
+          try {
+            const debts = await getOutletDebtsByCustomerId(outletId, customer.id || '');
+            const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+            return { ...customer, total_debt: totalBalance };
+          } catch (error) {
+            console.error(`Error fetching balance for customer ${customer.id}:`, error);
+            return { ...customer, total_debt: 0 };
+          }
+        })
+      );
+      
+      setAllCustomers(customersWithBalances);
     } catch (error) {
       console.error('Error loading customers:', error);
     }
@@ -459,12 +474,14 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     try {
       const newBalance = Math.max(0, settlementPreviousBalance - settlementPaymentAmount);
       
-      // Create settlement receipt
+      // TODO: Save to database when ready
+      // For now, save to localStorage
       const settlementReceipt = {
         id: `SETTLE-${Date.now()}`,
         invoiceNumber: settlementInvoiceNumber || `SETTLE-${Date.now()}`,
         date: settlementDate,
         customer: settlementCustomerName,
+        customerId: settlementCustomerId,
         items: [{ 
           name: 'Debt Payment', 
           quantity: 1, 
@@ -487,6 +504,56 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       existingSettlements.push(settlementReceipt);
       localStorage.setItem('customer_settlements', JSON.stringify(existingSettlements));
       
+      // IMPORTANT: Update the customer's debt in the database
+      if (settlementCustomerId && outletId) {
+        console.log('🔄 Updating customer debt in database...');
+        console.log('  Customer ID:', settlementCustomerId);
+        console.log('  Previous Balance:', settlementPreviousBalance);
+        console.log('  Payment Amount:', settlementPaymentAmount);
+        console.log('  New Balance:', newBalance);
+        
+        // Fetch all outstanding debts for this customer
+        const outstandingDebts = await getOutletDebtsByCustomerId(outletId, settlementCustomerId);
+        
+        if (outstandingDebts && outstandingDebts.length > 0) {
+          let remainingPayment = settlementPaymentAmount;
+          
+          // Update each debt record, paying off oldest first
+          for (const debt of outstandingDebts) {
+            if (remainingPayment <= 0) break;
+            
+            const currentDebtAmount = debt.amount || 0;
+            const paidAmount = debt.paid_amount || 0;
+            
+            if (remainingPayment >= currentDebtAmount) {
+              // Pay off this debt completely
+              console.log(`  ✓ Paying off debt ${debt.id} completely (${currentDebtAmount})`);
+              await updateOutletDebt(debt.id || '', {
+                amount: 0,
+                paid_amount: currentDebtAmount + paidAmount,
+                status: 'paid',
+                updated_at: new Date().toISOString()
+              });
+              remainingPayment -= currentDebtAmount;
+            } else {
+              // Partially pay this debt
+              console.log(`  ◐ Partially paying debt ${debt.id} (${remainingPayment} of ${currentDebtAmount})`);
+              await updateOutletDebt(debt.id || '', {
+                amount: currentDebtAmount - remainingPayment,
+                paid_amount: paidAmount + remainingPayment,
+                status: 'partial',
+                updated_at: new Date().toISOString()
+              });
+              remainingPayment = 0;
+            }
+          }
+          
+          console.log('✅ Customer debt updated in database successfully');
+        } else {
+          console.log('⚠ No outstanding debts found for this customer');
+        }
+      }
+      
       toast({
         title: "Success",
         description: `Customer settlement receipt saved. New balance: ${formatCurrency(newBalance)}`,
@@ -495,6 +562,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       // Reset form
       setSettlementCustomerName('');
       setSettlementCustomerPhone('');
+      setSettlementCustomerId('');
+      setSettlementCustomerBalance(0);
       setSettlementInvoiceNumber('');
       setSettlementPreviousBalance(0);
       setSettlementPaymentAmount(0);
@@ -502,9 +571,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       setSettlementDate(new Date().toISOString().split('T')[0]);
       setSettlementNotes('');
       setShowNewForm(false);
+      setCustomerSearchQuery('');
       
-      // Refresh receipts list
+      // Refresh receipts list and customer balances
       await fetchReceipts();
+      await loadCustomers(); // Reload customers with updated balances
     } catch (error) {
       console.error('Error saving settlement receipt:', error);
       toast({
