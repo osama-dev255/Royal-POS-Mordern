@@ -286,6 +286,14 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const removeItem = (id: string) => {
     setCart(cart.filter(item => item.id !== id));
   };
+  
+  const updatePrice = (id: string, newPrice: number) => {
+    setCart(cart.map(item => 
+      item.id === id 
+        ? { ...item, price: Math.max(0, newPrice) } 
+        : item
+    ));
+  };
 
   const subtotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   
@@ -1087,12 +1095,28 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                       <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-responsive-base truncate">{item.name}</p>
-                          <p className="text-muted-foreground text-sm">
-                            {formatCurrency(item.price)} × {item.quantity}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-muted-foreground text-sm">Qty:</span>
+                            <span className="text-sm font-medium">{item.quantity}</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 xs:gap-3">
-                          <div className="flex items-center gap-1 xs:gap-2">
+                          {/* Editable Price Field */}
+                          <div className="flex flex-col items-end">
+                            <Label className="text-xs text-muted-foreground mb-1">Price</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="100"
+                              value={item.price}
+                              onChange={(e) => updatePrice(item.id, parseFloat(e.target.value) || 0)}
+                              className="w-24 h-8 xs:h-9 text-right"
+                            />
+                          </div>
+                                              
+                          {/* Quantity Field */}
+                          <div className="flex flex-col items-end">
+                            <Label className="text-xs text-muted-foreground mb-1">Qty</Label>
                             <Input
                               type="number"
                               min="0"
@@ -1101,7 +1125,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                                 const newQuantity = Math.max(0, parseInt(e.target.value) || 0);
                                 // Find the product to check stock availability
                                 const product = products.find(p => p.id === item.id);
-                                
+                                                    
                                 // Check if the new quantity exceeds available stock
                                 if (product && newQuantity > product.stock_quantity) {
                                   toast({
@@ -1110,13 +1134,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                                     variant: "destructive",
                                   });
                                   // Set quantity to maximum available stock
-                                  setCart(cart.map(cartItem => 
+                                  setCart(cart.map(cartItem =>
                                     cartItem.id === item.id 
                                       ? { ...cartItem, quantity: product.stock_quantity } 
                                       : cartItem
                                   ));
                                 } else {
-                                  setCart(cart.map(cartItem => 
+                                  setCart(cart.map(cartItem =>
                                     cartItem.id === item.id 
                                       ? { ...cartItem, quantity: newQuantity } 
                                       : cartItem
@@ -1126,11 +1150,21 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                               className="w-16 h-8 xs:h-9 text-center"
                             />
                           </div>
+                                              
+                          {/* Item Total */}
+                          <div className="flex flex-col items-end min-w-[80px]">
+                            <Label className="text-xs text-muted-foreground mb-1">Total</Label>
+                            <p className="text-sm font-semibold text-green-600">
+                              {formatCurrency(item.price * item.quantity)}
+                            </p>
+                          </div>
+                                              
+                          {/* Remove Button */}
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => removeItem(item.id)}
-                            className="h-8 w-8 xs:h-9 xs:w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 btn-touch"
+                            className="h-8 xs:h-9 p-2 text-destructive hover:text-destructive hover:bg-destructive/10 btn-touch mt-4"
                           >
                             <Trash2 className="h-4 w-4 xs:h-5 xs:w-5" />
                           </Button>
