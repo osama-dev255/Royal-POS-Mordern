@@ -9,7 +9,13 @@ import {
   DollarSign,
   ShoppingBag,
   Users,
-  Package
+  Package,
+  Warehouse,
+  Receipt,
+  CreditCard,
+  Truck,
+  FileSpreadsheet,
+  ShoppingCart
 } from "lucide-react";
 
 interface OutletReportsProps {
@@ -22,6 +28,16 @@ interface ReportMetric {
   value: string;
   change: number;
   icon: React.ReactNode;
+}
+
+interface ReportCard {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+  borderColor: string;
 }
 
 // Mock data for outlet reports
@@ -70,12 +86,77 @@ const generateMockTopProducts = () => [
   { name: 'Milk Powder 1kg', sales: 56, revenue: 1680000 }
 ];
 
+// Report navigation cards data
+const reportCards: ReportCard[] = [
+  {
+    id: 'inventory',
+    title: 'Inventory Report',
+    description: 'Stock levels, movements & valuation',
+    icon: <Warehouse className="h-8 w-8" />,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200'
+  },
+  {
+    id: 'sales',
+    title: 'Sales Report',
+    description: 'Revenue, transactions & trends',
+    icon: <BarChart3 className="h-8 w-8" />,
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200'
+  },
+  {
+    id: 'payments',
+    title: 'Payments Report',
+    description: 'Payment methods & reconciliation',
+    icon: <CreditCard className="h-8 w-8" />,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200'
+  },
+  {
+    id: 'deliveries',
+    title: 'Deliveries Report',
+    description: 'Delivery status & tracking',
+    icon: <Truck className="h-8 w-8" />,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200'
+  },
+  {
+    id: 'receipts',
+    title: 'Receipts Report',
+    description: 'Transaction receipts & records',
+    icon: <Receipt className="h-8 w-8" />,
+    color: 'text-teal-600',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-200'
+  },
+  {
+    id: 'grn',
+    title: 'GRN Report',
+    description: 'Goods received notes & stock-in',
+    icon: <FileSpreadsheet className="h-8 w-8" />,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200'
+  }
+];
+
 export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [selectedReport, setSelectedReport] = useState<string>('');
   
   const metrics = outletId ? generateMockMetrics(outletId) : [];
   const salesData = generateMockSalesData();
   const topProducts = generateMockTopProducts();
+  
+  const handleReportClick = (reportId: string) => {
+    setSelectedReport(reportId);
+    // TODO: Navigate to specific report page or filter view
+    console.log(`Navigating to ${reportId} report`);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TZ', {
@@ -121,6 +202,36 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
           >
             Monthly
           </Button>
+        </div>
+      </div>
+
+      {/* Report Navigation Cards */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-4 text-muted-foreground">Quick Access Reports</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {reportCards.map((card) => (
+            <Card 
+              key={card.id}
+              className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 border-2 ${
+                selectedReport === card.id 
+                  ? `${card.borderColor} shadow-md` 
+                  : 'border-transparent hover:border-gray-200'
+              }`}
+              onClick={() => handleReportClick(card.id)}
+            >
+              <CardContent className="p-4">
+                <div className="flex flex-col items-center text-center gap-3">
+                  <div className={`p-3 rounded-xl ${card.bgColor} ${card.color} transition-transform duration-200 hover:scale-110`}>
+                    {card.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm text-gray-900">{card.title}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
 
