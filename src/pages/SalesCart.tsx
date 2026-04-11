@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
@@ -77,6 +77,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isTransactionCompleteDialogOpen, setIsTransactionCompleteDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [amountReceived, setAmountReceived] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [transactionId, setTransactionId] = useState("");
@@ -409,6 +410,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       change
     });
     
+    // Prevent double-clicking
+    if (isProcessing) {
+      console.log('Transaction already in progress, ignoring...');
+      return;
+    }
+    
     if (cart.length === 0) {
       toast({
         title: "Error",
@@ -514,6 +521,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       : 0;
 
     try {
+      // Set processing state
+      setIsProcessing(true);
+      
       // Create the sale record in the database
       // Use outlet_sales table for outlet-specific sales, otherwise use general sales table
       let createdSale;
@@ -583,9 +593,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         throw new Error("Failed to create sale record");
       }
 
-      // Create sale items for each product in the cart
+      // Create sale items for each product in the cart - run in parallel for speed
       const itemsWithQuantity = cart.filter(item => item.quantity > 0);
-      for (const item of itemsWithQuantity) {
+      const saleItemPromises = itemsWithQuantity.map(async (item) => {
         // For outlet sales, product_id may not be a valid UUID
         // Only include product_id if it's a valid UUID format
         const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
@@ -602,7 +612,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             total_price: item.price * item.quantity
           };
           
-          await createOutletSaleItem(outletSaleItemData);
+          return createOutletSaleItem(outletSaleItemData);
         } else {
           // Create general sale item
           const saleItemData = {
@@ -615,9 +625,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             total_price: item.price * item.quantity
           };
           
-          await createSaleItem(saleItemData);
+          return createSaleItem(saleItemData);
         }
-      }
+      });
+      
+      // Execute all sale item creations in parallel
+      await Promise.all(saleItemPromises);
 
       // Handle debt payment and new debt creation
       if (selectedCustomer && outletId) {
@@ -688,8 +701,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }
       }
 
-      // Update stock quantities for each item in the cart
-      for (const item of itemsWithQuantity) {
+      // Update stock quantities for each item in the cart - run in parallel for speed
+      const stockUpdatePromises = itemsWithQuantity.map(async (item) => {
         // Find the original product to get current stock
         const product = products.find(p => p.id === item.id);
         if (product) {
@@ -699,13 +712,17 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           // For outlet sales, update sold quantities in database
           if (outletId) {
             // Update sold_quantity in inventory_products table
-            await incrementSoldQuantity(outletId, product.name, item.quantity);
+            return incrementSoldQuantity(outletId, product.name, item.quantity);
           } else {
             // For general sales, update stock in database
-            await updateProductStock(item.id, newStock);
+            return updateProductStock(item.id, newStock);
           }
         }
-      }
+        return Promise.resolve();
+      });
+      
+      // Execute all stock updates in parallel
+      await Promise.all(stockUpdatePromises);
       
       // Reload products to get updated stock quantities
       if (outletId) {
@@ -907,6 +924,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         description: "Failed to complete transaction: " + (error as Error).message,
         variant: "destructive",
       });
+    } finally {
+      // Reset processing state
+      setIsProcessing(false);
     }
   };
 
@@ -1764,9 +1784,16 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               </Button>
               <Button 
                 onClick={completeTransaction}
-                disabled={(paymentMethod !== "debt" && (amountReceivedNum < total || change < 0))}
+                disabled={isProcessing || (paymentMethod !== "debt" && (amountReceivedNum < total || change < 0))}
               >
-                Complete Sale
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Complete Sale"
+                )}
               </Button>
             </div>
           </div>
