@@ -375,6 +375,26 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }
       }
     }
+    
+    // Check if any item's selling price is less than or equal to cost price
+    for (const item of cart) {
+      if (item.quantity > 0) {
+        const product = products.find(p => p.id === item.id);
+        if (product && product.cost_price) {
+          const costPrice = product.cost_price;
+          const sellingPrice = item.price;
+          
+          if (sellingPrice <= costPrice) {
+            toast({
+              title: "Price Alert",
+              description: `${item.name}: Selling price (${formatCurrency(sellingPrice)}) is less than or equal to cost price (${formatCurrency(costPrice)}). Please increase the price to proceed.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+    }
 
     setIsPaymentDialogOpen(true);
   };
@@ -409,6 +429,26 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             variant: "success",
           });
           return;
+        }
+      }
+    }
+    
+    // Check if any item's selling price is less than or equal to cost price
+    for (const item of cart) {
+      if (item.quantity > 0) {
+        const product = products.find(p => p.id === item.id);
+        if (product && product.cost_price) {
+          const costPrice = product.cost_price;
+          const sellingPrice = item.price;
+          
+          if (sellingPrice <= costPrice) {
+            toast({
+              title: "Price Alert",
+              description: `${item.name}: Selling price (${formatCurrency(sellingPrice)}) is less than or equal to cost price (${formatCurrency(costPrice)}). Please increase the price to proceed.`,
+              variant: "destructive",
+            });
+            return;
+          }
         }
       }
     }
