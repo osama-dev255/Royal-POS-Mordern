@@ -25,7 +25,7 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
-import { getAvailableInventoryByOutlet, InventoryProduct } from "@/services/databaseService";
+import { getAvailableInventoryByOutlet, InventoryProduct, getOutletSalesByOutletId, getOutletSaleItemsBySaleId, OutletSale, OutletSaleItem } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletReportsProps {
@@ -51,51 +51,6 @@ interface ReportCard {
 }
 
 // Mock data for outlet reports
-const generateMockMetrics = (outletId: string): ReportMetric[] => [
-  {
-    label: "Today's Sales",
-    value: "1,250,000",
-    change: 12.5,
-    icon: <DollarSign className="h-6 w-6" />
-  },
-  {
-    label: "Weekly Sales",
-    value: "8,750,000",
-    change: 8.2,
-    icon: <TrendingUp className="h-6 w-6" />
-  },
-  {
-    label: "Monthly Sales",
-    value: "35,000,000",
-    change: -2.4,
-    icon: <TrendingDown className="h-6 w-6" />
-  },
-  {
-    label: "Total Transactions",
-    value: "156",
-    change: 15.3,
-    icon: <ShoppingBag className="h-6 w-6" />
-  }
-];
-
-const generateMockSalesData = () => [
-  { day: 'Mon', sales: 850000 },
-  { day: 'Tue', sales: 920000 },
-  { day: 'Wed', sales: 780000 },
-  { day: 'Thu', sales: 1050000 },
-  { day: 'Fri', sales: 1250000 },
-  { day: 'Sat', sales: 1450000 },
-  { day: 'Sun', sales: 1100000 }
-];
-
-const generateMockTopProducts = () => [
-  { name: 'Rice 50kg', sales: 45, revenue: 2250000 },
-  { name: 'Cooking Oil 5L', sales: 78, revenue: 1560000 },
-  { name: 'Sugar 25kg', sales: 32, revenue: 960000 },
-  { name: 'Flour 20kg', sales: 28, revenue: 840000 },
-  { name: 'Milk Powder 1kg', sales: 56, revenue: 1680000 }
-];
-
 // Report navigation cards data
 const reportCards: ReportCard[] = [
   {
@@ -158,13 +113,11 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedReport, setSelectedReport] = useState<string>('');
   const [inventoryData, setInventoryData] = useState<InventoryProduct[]>([]);
+  const [salesData, setSalesData] = useState<OutletSale[]>([]);
+  const [saleItems, setSaleItems] = useState<OutletSaleItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
-  
-  const metrics = outletId ? generateMockMetrics(outletId) : [];
-  const salesData = generateMockSalesData();
-  const topProducts = generateMockTopProducts();
   
   const handleReportClick = (reportId: string) => {
     setSelectedReport(reportId);
@@ -173,6 +126,38 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
     // Load data based on selected report
     if (reportId === 'inventory' && outletId) {
       loadInventoryData();
+    } else if (reportId === 'sales' && outletId) {
+      loadSalesData();
+    }
+  };
+  
+  const loadSalesData = async () => {
+    if (!outletId) return;
+    
+    setLoading(true);
+    try {
+      // Fetch all sales for the outlet
+      const sales = await getOutletSalesByOutletId(outletId);
+      setSalesData(sales);
+      
+      // Fetch all sale items
+      const allItems: OutletSaleItem[] = [];
+      for (const sale of sales) {
+        if (sale.id) {
+          const items = await getOutletSaleItemsBySaleId(sale.id);
+          allItems.push(...items);
+        }
+      }
+      setSaleItems(allItems);
+    } catch (error) {
+      console.error('Error loading sales data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load sales data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -362,8 +347,6 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
     printWindow.document.close();
     printWindow.print();
   };
-
-  const maxSales = Math.max(...salesData.map(d => d.sales));
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -719,247 +702,219 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Sales Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {metrics.map((metric, index) => (
-                  <Card key={index}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">{metric.label}</p>
-                          <p className="text-2xl font-bold mt-1">{metric.value}</p>
-                          <div className={`flex items-center gap-1 mt-2 text-sm ${
-                            metric.change >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {metric.change >= 0 ? (
-                              <TrendingUp className="h-4 w-4" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4" />
-                            )}
-                            <span>{Math.abs(metric.change)}%</span>
-                          </div>
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-muted-foreground">Loading sales data...</p>
+                </div>
+              ) : salesData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <ShoppingBag className="h-16 w-16 text-gray-300 mb-4" />
+                  <p className="text-lg font-medium text-gray-500">No sales data found</p>
+                  <p className="text-sm text-muted-foreground mt-2">Sales transactions will appear here</p>
+                </div>
+              ) : (
+                <>
+                  {/* Calculate metrics from real data */}
+                  {(() => {
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    
+                    const todaySales = salesData.filter(s => new Date(s.sale_date) >= today);
+                    const weekSales = salesData.filter(s => new Date(s.sale_date) >= weekAgo);
+                    const monthSales = salesData.filter(s => new Date(s.sale_date) >= monthAgo);
+                    
+                    const todayRevenue = todaySales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    const weekRevenue = weekSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    const monthRevenue = monthSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    const totalRevenue = salesData.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    
+                    // Calculate product performance from sale items
+                    const productMap = saleItems.reduce((acc, item) => {
+                      const productName = item.product_name || 'Unknown Product';
+                      if (!acc[productName]) {
+                        acc[productName] = { name: productName, quantity: 0, revenue: 0 };
+                      }
+                      acc[productName].quantity += item.quantity || 0;
+                      acc[productName].revenue += (item.quantity || 0) * (item.unit_price || 0);
+                      return acc;
+                    }, {} as Record<string, { name: string; quantity: number; revenue: number }>);
+                    
+                    const topProducts = Object.values(productMap)
+                      .sort((a, b) => b.revenue - a.revenue)
+                      .slice(0, 5);
+                    
+                    // Calculate daily sales for chart (last 7 days)
+                    const dailySales = Array.from({ length: 7 }, (_, i) => {
+                      const date = new Date(today.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+                      const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+                      const daySales = salesData.filter(s => {
+                        const saleDate = new Date(s.sale_date);
+                        return saleDate >= date && saleDate < nextDate;
+                      });
+                      const dayRevenue = daySales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                      return {
+                        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+                        sales: dayRevenue,
+                        count: daySales.length
+                      };
+                    });
+                    
+                    const maxDailySales = Math.max(...dailySales.map(d => d.sales), 1);
+                    
+                    return (
+                      <>
+                        {/* Sales Stats */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Today's Sales</p>
+                                  <p className="text-2xl font-bold mt-1">{formatCurrency(todayRevenue)}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">{todaySales.length} transactions</p>
+                                </div>
+                                <div className="p-2 bg-green-100 rounded-lg">
+                                  <DollarSign className="h-5 w-5 text-green-600" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Weekly Sales</p>
+                                  <p className="text-2xl font-bold mt-1">{formatCurrency(weekRevenue)}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">{weekSales.length} transactions</p>
+                                </div>
+                                <div className="p-2 bg-blue-100 rounded-lg">
+                                  <ShoppingBag className="h-5 w-5 text-blue-600" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Monthly Sales</p>
+                                  <p className="text-2xl font-bold mt-1">{formatCurrency(monthRevenue)}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">{monthSales.length} transactions</p>
+                                </div>
+                                <div className="p-2 bg-purple-100 rounded-lg">
+                                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Total Transactions</p>
+                                  <p className="text-2xl font-bold mt-1">{salesData.length}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">{formatCurrency(totalRevenue)} total</p>
+                                </div>
+                                <div className="p-2 bg-orange-100 rounded-lg">
+                                  <CreditCard className="h-5 w-5 text-orange-600" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                          {metric.icon}
+                        
+                        {/* Sales Chart and Top Products Side by Side */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                          {/* Sales Chart - Takes 2/3 width */}
+                          <Card className="lg:col-span-2">
+                            <CardHeader>
+                              <CardTitle className="text-lg">Sales Overview (Last 7 Days)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-64 flex items-end gap-2">
+                                {dailySales.map((data, index) => (
+                                  <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                                    <div 
+                                      className="w-full bg-green-600/80 rounded-t-md hover:bg-green-600 transition-colors"
+                                      style={{ height: `${(data.sales / maxDailySales) * 200}px` }}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{data.day}</span>
+                                    <span className="text-xs font-medium">{formatCurrency(data.sales)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex justify-between mt-4 pt-4 border-t">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Total Sales</p>
+                                  <p className="text-xl font-bold">
+                                    {formatCurrency(dailySales.reduce((sum, d) => sum + d.sales, 0))}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Average Daily</p>
+                                  <p className="text-xl font-bold">
+                                    {formatCurrency(dailySales.reduce((sum, d) => sum + d.sales, 0) / dailySales.length)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Best Day</p>
+                                  <p className="text-xl font-bold">{formatCurrency(Math.max(...dailySales.map(d => d.sales)))}</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          {/* Top Products - Takes 1/3 width */}
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                <Package className="h-5 w-5" />
+                                Top Products
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {topProducts.length > 0 ? (
+                                <div className="space-y-4">
+                                  {topProducts.map((product, index) => (
+                                    <div key={index} className="flex items-center justify-between">
+                                      <div>
+                                        <p className="font-medium text-sm">{product.name}</p>
+                                        <p className="text-xs text-muted-foreground">{product.quantity} sold</p>
+                                      </div>
+                                      <p className="font-semibold text-green-600 text-sm">{formatCurrency(product.revenue)}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No products sold yet</p>
+                              )}
+                            </CardContent>
+                          </Card>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              
-              {/* Sales Chart and Top Products Side by Side */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                {/* Sales Chart - Takes 2/3 width */}
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Sales Overview</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 flex items-end gap-2">
-                      {salesData.map((data, index) => (
-                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                          <div 
-                            className="w-full bg-green-600/80 rounded-t-md hover:bg-green-600 transition-colors"
-                            style={{ height: `${(data.sales / Math.max(...salesData.map(d => d.sales))) * 200}px` }}
-                          />
-                          <span className="text-xs text-muted-foreground">{data.day}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex justify-between mt-4 pt-4 border-t">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Sales</p>
-                        <p className="text-xl font-bold">
-                          {formatCurrency(salesData.reduce((sum, d) => sum + d.sales, 0))}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Average Daily</p>
-                        <p className="text-xl font-bold">
-                          {formatCurrency(salesData.reduce((sum, d) => sum + d.sales, 0) / salesData.length)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Best Day</p>
-                        <p className="text-xl font-bold">{formatCurrency(Math.max(...salesData.map(d => d.sales)))}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                {/* Top Products - Takes 1/3 width */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      Top Products
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {topProducts.map((product, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-sm">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">{product.sales} sold</p>
-                          </div>
-                          <p className="font-semibold text-green-600 text-sm">{formatCurrency(product.revenue)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Metrics Cards - Only show when no specific report is selected */}
+      {/* Default View - Show when no specific report is selected */}
       {selectedReport === '' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {metrics.map((metric, index) => (
-          <Card key={index}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{metric.label}</p>
-                  <p className="text-2xl font-bold mt-1">{metric.value}</p>
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${
-                    metric.change >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {metric.change >= 0 ? (
-                      <TrendingUp className="h-4 w-4" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4" />
-                    )}
-                    <span>{Math.abs(metric.change)}%</span>
-                    <span className="text-muted-foreground">vs last period</span>
-                  </div>
-                </div>
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  {metric.icon}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      )}
-
-      {/* Sales Chart and Additional Stats - Only show when no specific report is selected */}
-      {selectedReport === '' && (
-        <>
-      {/* Sales Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Sales Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-end gap-2">
-              {salesData.map((data, index) => (
-                <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                  <div 
-                    className="w-full bg-primary/80 rounded-t-md hover:bg-primary transition-colors"
-                    style={{ height: `${(data.sales / maxSales) * 200}px` }}
-                  />
-                  <span className="text-xs text-muted-foreground">{data.day}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-4 pt-4 border-t">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Sales</p>
-                <p className="text-xl font-bold">
-                  {formatCurrency(salesData.reduce((sum, d) => sum + d.sales, 0))}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Average Daily</p>
-                <p className="text-xl font-bold">
-                  {formatCurrency(salesData.reduce((sum, d) => sum + d.sales, 0) / salesData.length)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Best Day</p>
-                <p className="text-xl font-bold">{formatCurrency(maxSales)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Top Products */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Top Products
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">{product.sales} sold</p>
-                  </div>
-                  <p className="font-semibold">{formatCurrency(product.revenue)}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Unique Customers</p>
-                <p className="text-2xl font-bold">89</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <ShoppingBag className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg. Order Value</p>
-                <p className="text-2xl font-bold">{formatCurrency(80128)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Package className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Items Sold</p>
-                <p className="text-2xl font-bold">239</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      </>
+        <div className="flex flex-col items-center justify-center py-20">
+          <BarChart3 className="h-20 w-20 text-gray-300 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-700 mb-2">Welcome to Outlet Reports</h2>
+          <p className="text-muted-foreground text-center max-w-md">
+            Select a report from the navigation cards above to view detailed analytics and insights.
+          </p>
+        </div>
       )}
     </div>
   );
