@@ -23,7 +23,8 @@ import {
   Download,
   AlertTriangle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Calendar
 } from "lucide-react";
 import { getAvailableInventoryByOutlet, InventoryProduct, getOutletSalesByOutletId, getOutletSaleItemsBySaleId, OutletSale, OutletSaleItem } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
@@ -110,13 +111,20 @@ const reportCards: ReportCard[] = [
 ];
 
 export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedReport, setSelectedReport] = useState<string>('');
   const [inventoryData, setInventoryData] = useState<InventoryProduct[]>([]);
   const [salesData, setSalesData] = useState<OutletSale[]>([]);
   const [saleItems, setSaleItems] = useState<OutletSaleItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState<string>(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 6); // 7 days ago
+    return date.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0]; // Today
+  });
   const { toast } = useToast();
   
   const handleReportClick = (reportId: string) => {
@@ -358,29 +366,6 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Outlet Reports</h1>
           <p className="text-muted-foreground">View sales and performance reports for this outlet</p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant={selectedPeriod === 'daily' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedPeriod('daily')}
-          >
-            Daily
-          </Button>
-          <Button 
-            variant={selectedPeriod === 'weekly' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedPeriod('weekly')}
-          >
-            Weekly
-          </Button>
-          <Button 
-            variant={selectedPeriod === 'monthly' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedPeriod('monthly')}
-          >
-            Monthly
-          </Button>
         </div>
       </div>
 
@@ -676,28 +661,23 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                   <BarChart3 className="h-6 w-6 text-green-600" />
                   Sales Report
                 </CardTitle>
-                <div className="flex gap-2">
-                  <Button 
-                    variant={selectedPeriod === 'daily' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedPeriod('daily')}
-                  >
-                    Daily
-                  </Button>
-                  <Button 
-                    variant={selectedPeriod === 'weekly' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedPeriod('weekly')}
-                  >
-                    Weekly
-                  </Button>
-                  <Button 
-                    variant={selectedPeriod === 'monthly' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedPeriod('monthly')}
-                  >
-                    Monthly
-                  </Button>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-40"
+                    />
+                    <span className="text-sm text-muted-foreground">to</span>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-40"
+                    />
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -714,24 +694,46 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                 </div>
               ) : (
                 <>
-                  {/* Calculate metrics from real data */}
+                  {/* Calculate metrics from real data based on selected date range */}
                   {(() => {
-                    const now = new Date();
-                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    const start = new Date(startDate);
+                    start.setHours(0, 0, 0, 0);
+                    const end = new Date(endDate);
+                    end.setHours(23, 59, 59, 999);
                     
-                    const todaySales = salesData.filter(s => new Date(s.sale_date) >= today);
-                    const weekSales = salesData.filter(s => new Date(s.sale_date) >= weekAgo);
-                    const monthSales = salesData.filter(s => new Date(s.sale_date) >= monthAgo);
+                    // Calculate number of days in range
+                    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
                     
-                    const todayRevenue = todaySales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
-                    const weekRevenue = weekSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
-                    const monthRevenue = monthSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    // Filter sales for the selected date range
+                    const periodSales = salesData.filter(s => {
+                      const saleDate = new Date(s.sale_date);
+                      return saleDate >= start && saleDate <= end;
+                    });
+                    const periodRevenue = periodSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    
+                    // Calculate previous period for comparison
+                    const previousEnd = new Date(start.getTime() - 1);
+                    const previousStart = new Date(previousEnd.getTime() - (daysDiff * 24 * 60 * 60 * 1000));
+                    const previousSales = salesData.filter(s => {
+                      const saleDate = new Date(s.sale_date);
+                      return saleDate >= previousStart && saleDate <= previousEnd;
+                    });
+                    const previousRevenue = previousSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    
+                    // Calculate growth percentage
+                    const growthPercentage = previousRevenue > 0 
+                      ? ((periodRevenue - previousRevenue) / previousRevenue) * 100 
+                      : 0;
+                    
+                    // All-time stats
                     const totalRevenue = salesData.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    const totalTransactions = salesData.length;
                     
-                    // Calculate product performance from sale items
-                    const productMap = saleItems.reduce((acc, item) => {
+                    // Calculate product performance from sale items for this period
+                    const periodSaleIds = new Set(periodSales.map(s => s.id));
+                    const periodSaleItems = saleItems.filter(item => periodSaleIds.has(item.sale_id));
+                    
+                    const productMap = periodSaleItems.reduce((acc, item) => {
                       const productName = item.product_name || 'Unknown Product';
                       if (!acc[productName]) {
                         acc[productName] = { name: productName, quantity: 0, revenue: 0 };
@@ -745,23 +747,30 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                       .sort((a, b) => b.revenue - a.revenue)
                       .slice(0, 5);
                     
-                    // Calculate daily sales for chart (last 7 days)
-                    const dailySales = Array.from({ length: 7 }, (_, i) => {
-                      const date = new Date(today.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+                    // Calculate chart data based on date range
+                    const chartData = Array.from({ length: Math.min(daysDiff + 1, 30) }, (_, i) => {
+                      const date = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
                       const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+                      
                       const daySales = salesData.filter(s => {
                         const saleDate = new Date(s.sale_date);
                         return saleDate >= date && saleDate < nextDate;
                       });
                       const dayRevenue = daySales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                      
                       return {
-                        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+                        label: date.toLocaleDateString('en-US', { 
+                          month: 'short',
+                          day: 'numeric'
+                        }),
                         sales: dayRevenue,
                         count: daySales.length
                       };
                     });
                     
-                    const maxDailySales = Math.max(...dailySales.map(d => d.sales), 1);
+                    const maxChartValue = Math.max(...chartData.map(d => d.sales), 1);
+                    
+                    const periodLabel = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
                     
                     return (
                       <>
@@ -771,9 +780,18 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Today's Sales</p>
-                                  <p className="text-2xl font-bold mt-1">{formatCurrency(todayRevenue)}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">{todaySales.length} transactions</p>
+                                  <p className="text-sm text-muted-foreground">{periodLabel} Sales</p>
+                                  <p className="text-2xl font-bold mt-1">{formatCurrency(periodRevenue)}</p>
+                                  <div className={`flex items-center gap-1 mt-2 text-xs ${
+                                    growthPercentage >= 0 ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {growthPercentage >= 0 ? (
+                                      <TrendingUp className="h-3 w-3" />
+                                    ) : (
+                                      <TrendingDown className="h-3 w-3" />
+                                    )}
+                                    <span>{Math.abs(growthPercentage).toFixed(1)}% vs prev</span>
+                                  </div>
                                 </div>
                                 <div className="p-2 bg-green-100 rounded-lg">
                                   <DollarSign className="h-5 w-5 text-green-600" />
@@ -786,9 +804,11 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Weekly Sales</p>
-                                  <p className="text-2xl font-bold mt-1">{formatCurrency(weekRevenue)}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">{weekSales.length} transactions</p>
+                                  <p className="text-sm text-muted-foreground">Transactions</p>
+                                  <p className="text-2xl font-bold mt-1">{periodSales.length}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {periodSales.length > 0 ? formatCurrency(periodRevenue / periodSales.length) + ' avg' : 'No sales'}
+                                  </p>
                                 </div>
                                 <div className="p-2 bg-blue-100 rounded-lg">
                                   <ShoppingBag className="h-5 w-5 text-blue-600" />
@@ -801,12 +821,14 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Monthly Sales</p>
-                                  <p className="text-2xl font-bold mt-1">{formatCurrency(monthRevenue)}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">{monthSales.length} transactions</p>
+                                  <p className="text-sm text-muted-foreground">Items Sold</p>
+                                  <p className="text-2xl font-bold mt-1">
+                                    {periodSaleItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2">{Object.keys(productMap).length} products</p>
                                 </div>
                                 <div className="p-2 bg-purple-100 rounded-lg">
-                                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                                  <Package className="h-5 w-5 text-purple-600" />
                                 </div>
                               </div>
                             </CardContent>
@@ -816,12 +838,12 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Total Transactions</p>
-                                  <p className="text-2xl font-bold mt-1">{salesData.length}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">{formatCurrency(totalRevenue)} total</p>
+                                  <p className="text-sm text-muted-foreground">All-Time Total</p>
+                                  <p className="text-2xl font-bold mt-1">{formatCurrency(totalRevenue)}</p>
+                                  <p className="text-xs text-muted-foreground mt-2">{totalTransactions} total sales</p>
                                 </div>
                                 <div className="p-2 bg-orange-100 rounded-lg">
-                                  <CreditCard className="h-5 w-5 text-orange-600" />
+                                  <BarChart3 className="h-5 w-5 text-orange-600" />
                                 </div>
                               </div>
                             </CardContent>
@@ -833,37 +855,40 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                           {/* Sales Chart - Takes 2/3 width */}
                           <Card className="lg:col-span-2">
                             <CardHeader>
-                              <CardTitle className="text-lg">Sales Overview (Last 7 Days)</CardTitle>
+                              <CardTitle className="text-lg">
+                                Sales Overview ({periodLabel})
+                              </CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <div className="h-64 flex items-end gap-2">
-                                {dailySales.map((data, index) => (
-                                  <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                              <div className="h-64 flex items-end gap-1">
+                                {chartData.map((data, index) => (
+                                  <div key={index} className="flex-1 flex flex-col items-center gap-1">
                                     <div 
                                       className="w-full bg-green-600/80 rounded-t-md hover:bg-green-600 transition-colors"
-                                      style={{ height: `${(data.sales / maxDailySales) * 200}px` }}
+                                      style={{ height: `${(data.sales / maxChartValue) * 200}px` }}
                                     />
-                                    <span className="text-xs text-muted-foreground">{data.day}</span>
-                                    <span className="text-xs font-medium">{formatCurrency(data.sales)}</span>
+                                    <span className="text-xs text-muted-foreground truncate w-full text-center">
+                                      {data.label}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
                               <div className="flex justify-between mt-4 pt-4 border-t">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Total Sales</p>
+                                  <p className="text-sm text-muted-foreground">Total {periodLabel}</p>
                                   <p className="text-xl font-bold">
-                                    {formatCurrency(dailySales.reduce((sum, d) => sum + d.sales, 0))}
+                                    {formatCurrency(chartData.reduce((sum, d) => sum + d.sales, 0))}
                                   </p>
                                 </div>
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Average Daily</p>
+                                  <p className="text-sm text-muted-foreground">Average</p>
                                   <p className="text-xl font-bold">
-                                    {formatCurrency(dailySales.reduce((sum, d) => sum + d.sales, 0) / dailySales.length)}
+                                    {formatCurrency(chartData.reduce((sum, d) => sum + d.sales, 0) / chartData.length)}
                                   </p>
                                 </div>
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Best Day</p>
-                                  <p className="text-xl font-bold">{formatCurrency(Math.max(...dailySales.map(d => d.sales)))}</p>
+                                  <p className="text-sm text-muted-foreground">Peak</p>
+                                  <p className="text-xl font-bold">{formatCurrency(Math.max(...chartData.map(d => d.sales)))}</p>
                                 </div>
                               </div>
                             </CardContent>
