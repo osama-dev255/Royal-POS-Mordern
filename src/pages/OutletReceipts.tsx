@@ -25,7 +25,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, updateOutletDebt, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletReceiptsProps {
@@ -94,6 +94,15 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
+  
+  // Customer settlement statistics
+  const [totalCustomerDebt, setTotalCustomerDebt] = useState(0);
+  const [totalCustomerPaid, setTotalCustomerPaid] = useState(0);
+  
+  // Date range filter
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showDateFilter, setShowDateFilter] = useState(false);
 
   useEffect(() => {
     fetchReceipts();
@@ -171,6 +180,20 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         allSales = [...allSales, ...completedSales];
       }
       
+      // Apply date filter to sales if set
+      if (startDate || endDate) {
+        allSales = allSales.filter(sale => {
+          const saleDate = new Date(sale.sale_date || sale.created_at || '');
+          if (startDate && saleDate < new Date(startDate)) return false;
+          if (endDate) {
+            const endDateTime = new Date(endDate);
+            endDateTime.setHours(23, 59, 59, 999);
+            if (saleDate > endDateTime) return false;
+          }
+          return true;
+        });
+      }
+      
       // Enrich sales data
       const enrichedSales = await Promise.all(
         allSales.map(async (sale: OutletSale) => {
@@ -242,7 +265,23 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       }));
       
       // Load customer settlement receipts from database
-      const customerSettlements = await getOutletCustomerSettlementsByOutletId(outletId);
+      let customerSettlements = await getOutletCustomerSettlementsByOutletId(outletId);
+      
+      // Apply date filter to settlements if set
+      if (startDate || endDate) {
+        customerSettlements = customerSettlements.filter(settlement => {
+          const settlementDate = new Date(settlement.settlement_date || '');
+          if (startDate && settlementDate < new Date(startDate)) return false;
+          if (endDate) {
+            const endDateTime = new Date(endDate);
+            endDateTime.setHours(23, 59, 59, 999);
+            if (settlementDate > endDateTime) return false;
+          }
+          return true;
+        });
+      }
+      
+      console.log('Customer settlements from database:', customerSettlements);
       const customerSettlementsFormatted = customerSettlements.map(s => ({
         id: s.id,
         invoiceNumber: s.invoice_number,
@@ -260,6 +299,18 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         previousBalance: s.previous_balance,
         newBalance: s.new_balance
       }));
+      
+      // Calculate total paid amount from settlements
+      const totalPaid = customerSettlements.reduce((sum, s) => sum + (s.payment_amount || 0), 0);
+      setTotalCustomerPaid(totalPaid);
+      console.log('Total customer paid (from settlements):', totalPaid);
+      
+      // Fetch actual outstanding customer debts from outlet_debts table
+      const allDebts = await getOutletDebtsByOutletId(outletId);
+      const outstandingDebts = allDebts.filter(debt => debt.status === 'outstanding');
+      const totalDebt = outstandingDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+      setTotalCustomerDebt(totalDebt);
+      console.log('Total customer debt (from outlet_debts):', totalDebt, 'Outstanding debts:', outstandingDebts.length);
       
       // Combine all receipts
       const allReceipts = [...enrichedSales, ...customerSettlementsFormatted, ...commissionReceiptsFormatted, ...otherReceiptsFormatted];
@@ -623,7 +674,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   };
 
   // Filter receipts by type
-  const filteredReceipts = activeTab === 'all' 
+  const filteredReceipts = activeTab === 'all'
     ? receipts 
     : receipts.filter(r => r.type === activeTab);
 
@@ -642,6 +693,72 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <p className="text-muted-foreground">Manage all outlet receivables</p>
         </div>
       </div>
+
+      {/* Date Range Filter */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filter by Date:</span>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Label htmlFor="startDate" className="text-xs whitespace-nowrap">From:</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-8"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Label htmlFor="endDate" className="text-xs whitespace-nowrap">To:</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="h-8"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                variant="outline"
+                className="h-8"
+              >
+                Clear
+              </Button>
+              <Button 
+                size="sm"
+                onClick={fetchReceipts}
+                className="h-8"
+              >
+                Apply Filter
+              </Button>
+            </div>
+          </div>
+          
+          {(startDate || endDate) && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground">
+                Showing receivables from 
+                {startDate && <span className="font-medium"> {new Date(startDate).toLocaleDateString()}</span>}
+                {startDate && endDate && <span> to</span>}
+                {endDate && <span className="font-medium"> {new Date(endDate).toLocaleDateString()}</span>}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-6">
@@ -662,6 +779,43 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <Plus className="h-4 w-4 mr-2" />
           New {activeTab === 'sales' ? 'Settlement' : activeTab === 'commission' ? 'Commission' : 'Receivable'}
         </Button>
+      )}
+
+      {/* Customer Settlements Summary Cards - Only show in 'sales' tab */}
+      {activeTab === 'sales' && !showNewForm && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Customers Owe Card */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-1">Customers Owe</p>
+                  <p className="text-xl font-bold text-orange-600">{formatCurrency(totalCustomerDebt)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Outstanding customer balances</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 ml-2">
+                  <TrendingUp className="h-5 w-5 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customers Paid Card */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-1">Customers Paid</p>
+                  <p className="text-xl font-bold text-green-600">{formatCurrency(totalCustomerPaid)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Payments received</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 ml-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Customer Settlement Receipt Form */}
