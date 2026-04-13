@@ -213,6 +213,10 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter(c => c.is_active !== false).length;
   const totalLoyaltyPoints = customers.reduce((sum, c) => sum + (c.loyalty_points || 0), 0);
+  
+  // Calculate total outstanding customer balances
+  const totalOutstandingBalance = Object.values(customerBalances).reduce((sum, balance) => sum + balance, 0);
+  const customersWithDebt = Object.values(customerBalances).filter(balance => balance > 0).length;
 
   if (loading) {
     return (
@@ -255,15 +259,15 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Customers</p>
-                <p className="text-2xl font-bold">{totalCustomers}</p>
+                <p className="text-xs text-muted-foreground mb-1">Total Customers</p>
+                <p className="text-xl font-bold">{totalCustomers}</p>
               </div>
-              <Users className="h-8 w-8 text-primary" />
+              <Users className="h-7 w-7 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -271,11 +275,25 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold">{activeCustomers}</p>
+                <p className="text-xs text-muted-foreground mb-1">Active</p>
+                <p className="text-xl font-bold">{activeCustomers}</p>
               </div>
-              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
+              <div className="h-7 w-7 rounded-full bg-green-100 flex items-center justify-center">
+                <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground mb-1">Outstanding Balance</p>
+                <p className="text-lg font-bold text-red-600 truncate">{formatCurrency(totalOutstandingBalance)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{customersWithDebt} customer{customersWithDebt !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="h-7 w-7 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 ml-2">
+                <span className="text-red-600 text-xs font-bold">TSh</span>
               </div>
             </div>
           </CardContent>
@@ -284,10 +302,10 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Loyalty Points</p>
-                <p className="text-2xl font-bold">{totalLoyaltyPoints.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mb-1">Loyalty Points</p>
+                <p className="text-xl font-bold">{totalLoyaltyPoints.toLocaleString()}</p>
               </div>
-              <Star className="h-8 w-8 text-yellow-500" />
+              <Star className="h-7 w-7 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
@@ -295,10 +313,10 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <p className="text-2xl font-bold text-green-600">Active</p>
+                <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <p className="text-xl font-bold text-green-600">Active</p>
               </div>
-              <ShoppingBag className="h-8 w-8 text-blue-500" />
+              <ShoppingBag className="h-7 w-7 text-blue-500" />
             </div>
           </CardContent>
         </Card>
