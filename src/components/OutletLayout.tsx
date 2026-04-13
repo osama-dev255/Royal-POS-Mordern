@@ -74,6 +74,12 @@ export const OutletLayout = ({
       hash: `#/outlet-sales-management/${outletId}`
     },
     {
+      id: "customers",
+      title: "Customers",
+      icon: <Users className="h-5 w-5" />,
+      view: `outlet-customers-${outletId}`
+    },
+    {
       id: "deliveries",
       title: "Deliveries",
       icon: <Truck className="h-5 w-5" />,
@@ -81,13 +87,13 @@ export const OutletLayout = ({
     },
     {
       id: "payments",
-      title: "Payments",
+      title: "Payables",
       icon: <CreditCard className="h-5 w-5" />,
       view: `outlet-payments-${outletId}`
     },
     {
       id: "receipts",
-      title: "Receipts",
+      title: "Receivables",
       icon: <Receipt className="h-5 w-5" />,
       view: `outlet-receipts-${outletId}`
     },

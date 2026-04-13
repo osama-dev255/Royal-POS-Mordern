@@ -47,6 +47,8 @@ interface ReceiptSale {
   paymentMethod: string;
   status: string;
   type: 'sales' | 'commission' | 'other';
+  previousBalance?: number;
+  newBalance?: number;
 }
 
 export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
@@ -96,6 +98,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   useEffect(() => {
     fetchReceipts();
     loadCustomers();
+    // Reset the new form visibility when tab changes or component mounts
+    setShowNewForm(false);
   }, [outletId, activeTab]);
   
   // Close dropdown when clicking outside
@@ -356,7 +360,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       
       toast({
         title: "Success",
-        description: "Commission receipt saved to database",
+        description: "Commission receivable saved to database",
       });
       
       // Reset form
@@ -418,7 +422,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       
       toast({
         title: "Success",
-        description: "Receipt saved to database",
+        description: "Receivable saved to database",
       });
       
       // Reset form
@@ -633,9 +637,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         <div className="flex-1">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Receipt className="h-6 w-6" />
-            Receipts
+            Receivables
           </h1>
-          <p className="text-muted-foreground">Manage all outlet receipts</p>
+          <p className="text-muted-foreground">Manage all outlet receivables</p>
         </div>
       </div>
 
@@ -643,20 +647,20 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-6">
         <TabsList className="grid grid-cols-4 w-full">
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="sales">Customer Settlements</TabsTrigger>
           <TabsTrigger value="commission">Commission</TabsTrigger>
           <TabsTrigger value="other">Other</TabsTrigger>
         </TabsList>
       </Tabs>
       
-      {/* New Receipt Button */}
-      {!showNewForm && (
+      {/* New Receivable Button - Only show in specific tabs, not in 'All' */}
+      {!showNewForm && activeTab !== 'all' && (
         <Button 
           onClick={() => setShowNewForm(true)} 
           className="mb-6"
         >
           <Plus className="h-4 w-4 mr-2" />
-          New {activeTab === 'all' ? 'Receipt' : activeTab === 'sales' ? 'Sale' : activeTab === 'commission' ? 'Commission' : 'Receipt'}
+          New {activeTab === 'sales' ? 'Settlement' : activeTab === 'commission' ? 'Commission' : 'Receivable'}
         </Button>
       )}
 
@@ -666,7 +670,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-6">
               <div className="h-8 w-1 bg-blue-600 rounded"></div>
-              <h2 className="text-xl font-bold">Customer Settlement Receipt</h2>
+              <h2 className="text-xl font-bold">Customer Settlement Receivable</h2>
             </div>
             
             <div className="space-y-6">
@@ -895,7 +899,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       {showNewForm && activeTab === 'commission' && (
         <Card className="mb-6">
           <CardContent className="p-6">
-            <h2 className="text-xl font-bold mb-4">New Commission Receipt</h2>
+            <h2 className="text-xl font-bold mb-4">New Commission Receivable</h2>
             
             <div className="space-y-4">
               <div>
@@ -984,7 +988,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Save Commission Receipt
+                      Save Commission Receivable
                     </>
                   )}
                 </Button>
@@ -1001,11 +1005,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         </Card>
       )}
 
-      {/* Other Receipt Form */}
+      {/* Other Receivable Form */}
       {showNewForm && activeTab === 'other' && (
         <Card className="mb-6">
           <CardContent className="p-6">
-            <h2 className="text-xl font-bold mb-4">New Receipt</h2>
+            <h2 className="text-xl font-bold mb-4">New Receivable</h2>
             
             <div className="space-y-4">
               <div>
@@ -1094,7 +1098,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Save Receipt
+                      Save Receivable
                     </>
                   )}
                 </Button>
@@ -1117,19 +1121,19 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <Card>
             <CardContent className="py-12 text-center">
               <Loader2 className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-spin" />
-              <h3 className="text-lg font-medium">Loading Receipts...</h3>
-              <p className="text-muted-foreground">Fetching receipts from database</p>
+              <h3 className="text-lg font-medium">Loading Receivables...</h3>
+              <p className="text-muted-foreground">Fetching receivables from database</p>
             </CardContent>
           </Card>
         ) : filteredReceipts.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No Receipts Found</h3>
+              <h3 className="text-lg font-medium">No Receivables Found</h3>
               <p className="text-muted-foreground">
                 {activeTab === 'all' 
-                  ? 'Receipts will appear here once created' 
-                  : `No ${activeTab} receipts found`}
+                  ? 'Receivables will appear here once created' 
+                  : `No ${activeTab} receivables found`}
               </p>
             </CardContent>
           </Card>
@@ -1180,7 +1184,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         )}
       </div>
 
-      {/* View Receipt Dialog */}
+      {/* View Receivable Dialog */}
       {selectedReceipt && (
         <div className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 ${isViewDialogOpen ? '' : 'hidden'}`}>
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
@@ -1188,7 +1192,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Receipt className="h-5 w-5" />
-                  Receipt Details
+                  Receivable Details
                 </h2>
                 <Button variant="outline" size="icon" onClick={() => setIsViewDialogOpen(false)}>
                   <span className="text-xl">×</span>
