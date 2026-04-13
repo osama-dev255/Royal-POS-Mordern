@@ -25,7 +25,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, updateOutletDebt } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, updateOutletDebt, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletReceiptsProps {
@@ -203,17 +203,62 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         })
       );
       
-      // Load commission receipts from localStorage
-      const commissionReceipts = JSON.parse(localStorage.getItem('commission_receipts') || '[]');
+      // Load commission receipts from database
+      const commissionReceipts = await getCommissionReceiptsByOutletId(outletId);
+      const commissionReceiptsFormatted = commissionReceipts.map(r => ({
+        id: r.id,
+        invoiceNumber: r.invoice_number,
+        date: r.receipt_date,
+        customer: r.customer_name,
+        items: [{ name: r.description, quantity: 1, price: r.amount }],
+        subtotal: r.amount,
+        tax: 0,
+        total: r.amount,
+        amountPaid: r.amount,
+        paymentMethod: r.payment_method || 'cash',
+        status: 'paid',
+        type: 'commission' as const
+      }));
       
-      // Load other receipts from localStorage
-      const otherReceipts = JSON.parse(localStorage.getItem('other_receipts') || '[]');
+      // Load other receipts from database
+      const otherReceipts = await getOtherReceiptsByOutletId(outletId);
+      const otherReceiptsFormatted = otherReceipts.map(r => ({
+        id: r.id,
+        invoiceNumber: r.invoice_number,
+        date: r.receipt_date,
+        customer: r.title,
+        items: [{ name: r.description, quantity: 1, price: r.amount }],
+        subtotal: r.amount,
+        tax: 0,
+        total: r.amount,
+        amountPaid: r.amount,
+        paymentMethod: r.payment_method || 'cash',
+        status: 'paid',
+        type: 'other' as const
+      }));
       
-      // Load customer settlement receipts from localStorage
-      const customerSettlements = JSON.parse(localStorage.getItem('customer_settlements') || '[]');
+      // Load customer settlement receipts from database
+      const customerSettlements = await getOutletCustomerSettlementsByOutletId(outletId);
+      const customerSettlementsFormatted = customerSettlements.map(s => ({
+        id: s.id,
+        invoiceNumber: s.invoice_number,
+        date: s.settlement_date,
+        customer: s.customer_name,
+        customerId: s.customer_id,
+        items: [{ name: 'Debt Payment', quantity: 1, price: s.payment_amount }],
+        subtotal: s.payment_amount,
+        tax: 0,
+        total: s.payment_amount,
+        amountPaid: s.payment_amount,
+        paymentMethod: s.payment_method,
+        status: 'paid',
+        type: 'sales' as const,
+        previousBalance: s.previous_balance,
+        newBalance: s.new_balance
+      }));
       
       // Combine all receipts
-      const allReceipts = [...enrichedSales, ...customerSettlements, ...commissionReceipts, ...otherReceipts];
+      const allReceipts = [...enrichedSales, ...customerSettlementsFormatted, ...commissionReceiptsFormatted, ...otherReceiptsFormatted];
       
       // Sort by date (newest first)
       allReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -290,32 +335,28 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     setSaving(true);
     
     try {
-      // TODO: Save to database when commission_receipts table is created
-      // For now, store in localStorage as a temporary solution
-      const commissionReceipt = {
-        id: `COMM-${Date.now()}`,
-        invoiceNumber: `COMM-${Date.now()}`,
-        date: commissionDate,
-        customer: commissionFrom,
-        items: [{ name: commissionDescription, quantity: 1, price: commissionAmount }],
-        subtotal: commissionAmount,
-        tax: 0,
-        total: commissionAmount,
-        amountPaid: commissionAmount,
-        paymentMethod: commissionPaymentMethod,
-        status: 'paid',
-        type: 'commission' as const,
-        notes: commissionNotes
-      };
+      if (!outletId) {
+        throw new Error('Outlet ID is missing');
+      }
       
-      // Save to localStorage
-      const existingCommissions = JSON.parse(localStorage.getItem('commission_receipts') || '[]');
-      existingCommissions.push(commissionReceipt);
-      localStorage.setItem('commission_receipts', JSON.stringify(existingCommissions));
+      const result = await createCommissionReceipt({
+        outlet_id: outletId,
+        invoice_number: `COMM-${Date.now()}`,
+        receipt_date: commissionDate,
+        customer_name: commissionFrom,
+        description: commissionDescription,
+        amount: commissionAmount,
+        payment_method: commissionPaymentMethod,
+        notes: commissionNotes
+      });
+      
+      if (!result) {
+        throw new Error('Failed to save commission receipt');
+      }
       
       toast({
         title: "Success",
-        description: "Commission receipt saved successfully",
+        description: "Commission receipt saved to database",
       });
       
       // Reset form
@@ -355,32 +396,29 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     setSaving(true);
     
     try {
-      // TODO: Save to database when other_receipts table is created
-      // For now, store in localStorage as a temporary solution
-      const otherReceipt = {
-        id: `OTHER-${Date.now()}`,
-        invoiceNumber: `OTHER-${Date.now()}`,
-        date: otherReceiptDate,
-        customer: otherReceiptTitle,
-        items: [{ name: otherReceiptDescription, quantity: 1, price: otherReceiptAmount }],
-        subtotal: otherReceiptAmount,
-        tax: 0,
-        total: otherReceiptAmount,
-        amountPaid: otherReceiptAmount,
-        paymentMethod: otherReceiptPaymentMethod,
-        status: 'paid',
-        type: 'other' as const,
-        notes: otherReceiptNotes
-      };
+      if (!outletId) {
+        throw new Error('Outlet ID is missing');
+      }
       
-      // Save to localStorage
-      const existingOthers = JSON.parse(localStorage.getItem('other_receipts') || '[]');
-      existingOthers.push(otherReceipt);
-      localStorage.setItem('other_receipts', JSON.stringify(existingOthers));
+      const result = await createOtherReceipt({
+        outlet_id: outletId,
+        invoice_number: `OTHER-${Date.now()}`,
+        receipt_date: otherReceiptDate,
+        title: otherReceiptTitle,
+        description: otherReceiptDescription,
+        amount: otherReceiptAmount,
+        payment_method: otherReceiptPaymentMethod,
+        receipt_type: 'general',
+        notes: otherReceiptNotes
+      });
+      
+      if (!result) {
+        throw new Error('Failed to save other receipt');
+      }
       
       toast({
         title: "Success",
-        description: "Receipt saved successfully",
+        description: "Receipt saved to database",
       });
       
       // Reset form
@@ -472,37 +510,29 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     setSaving(true);
     
     try {
+      if (!outletId) {
+        throw new Error('Outlet ID is missing');
+      }
+      
       const newBalance = Math.max(0, settlementPreviousBalance - settlementPaymentAmount);
       
-      // TODO: Save to database when ready
-      // For now, save to localStorage
-      const settlementReceipt = {
-        id: `SETTLE-${Date.now()}`,
-        invoiceNumber: settlementInvoiceNumber || `SETTLE-${Date.now()}`,
-        date: settlementDate,
-        customer: settlementCustomerName,
-        customerId: settlementCustomerId,
-        items: [{ 
-          name: 'Debt Payment', 
-          quantity: 1, 
-          price: settlementPaymentAmount 
-        }],
-        subtotal: settlementPaymentAmount,
-        tax: 0,
-        total: settlementPaymentAmount,
-        amountPaid: settlementPaymentAmount,
-        paymentMethod: settlementPaymentMethod,
-        status: 'paid',
-        type: 'sales' as const,
-        previousBalance: settlementPreviousBalance,
-        newBalance: newBalance,
+      // Save settlement to database
+      const result = await createOutletCustomerSettlement({
+        outlet_id: outletId,
+        customer_id: settlementCustomerId || undefined,
+        invoice_number: settlementInvoiceNumber || `SETTLE-${Date.now()}`,
+        settlement_date: settlementDate,
+        customer_name: settlementCustomerName,
+        payment_amount: settlementPaymentAmount,
+        payment_method: settlementPaymentMethod,
+        previous_balance: settlementPreviousBalance,
+        new_balance: newBalance,
         notes: settlementNotes
-      };
+      });
       
-      // Save to localStorage
-      const existingSettlements = JSON.parse(localStorage.getItem('customer_settlements') || '[]');
-      existingSettlements.push(settlementReceipt);
-      localStorage.setItem('customer_settlements', JSON.stringify(existingSettlements));
+      if (!result) {
+        throw new Error('Failed to save customer settlement');
+      }
       
       // IMPORTANT: Update the customer's debt in the database
       if (settlementCustomerId && outletId) {
@@ -556,7 +586,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       
       toast({
         title: "Success",
-        description: `Customer settlement receipt saved. New balance: ${formatCurrency(newBalance)}`,
+        description: `Customer settlement saved to database. New balance: ${formatCurrency(newBalance)}`,
       });
       
       // Reset form

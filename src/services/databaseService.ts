@@ -4387,3 +4387,274 @@ export const deleteOutletDebt = async (id: string): Promise<boolean> => {
     return false;
   }
 };
+
+// ==========================================
+// RECEIPT TABLES - Commission, Other, Customer Settlements
+// ==========================================
+
+// Commission Receipt Interface
+export interface CommissionReceipt {
+  id?: string;
+  outlet_id: string;
+  invoice_number: string;
+  receipt_date: string;
+  customer_name: string;
+  description: string;
+  amount: number;
+  payment_method?: string;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Other Receipt Interface
+export interface OtherReceipt {
+  id?: string;
+  outlet_id: string;
+  invoice_number: string;
+  receipt_date: string;
+  title: string;
+  description: string;
+  amount: number;
+  payment_method?: string;
+  receipt_type?: string;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Outlet Customer Settlement Interface (for outlet-specific settlements)
+export interface OutletCustomerSettlement {
+  id?: string;
+  outlet_id: string;
+  customer_id?: string;
+  invoice_number: string;
+  settlement_date: string;
+  customer_name: string;
+  payment_amount: number;
+  payment_method: string;
+  previous_balance: number;
+  new_balance: number;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Commission Receipt CRUD Operations
+export const createCommissionReceipt = async (receipt: Omit<CommissionReceipt, 'id'>): Promise<CommissionReceipt | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('commission_receipts')
+      .insert([{
+        ...receipt,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating commission receipt:', error);
+    return null;
+  }
+};
+
+export const getCommissionReceiptsByOutletId = async (outletId: string): Promise<CommissionReceipt[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('commission_receipts')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('receipt_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching commission receipts:', error);
+    return [];
+  }
+};
+
+export const updateCommissionReceipt = async (id: string, updates: Partial<CommissionReceipt>): Promise<CommissionReceipt | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('commission_receipts')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating commission receipt:', error);
+    return null;
+  }
+};
+
+export const deleteCommissionReceipt = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('commission_receipts')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting commission receipt:', error);
+    return false;
+  }
+};
+
+// Other Receipt CRUD Operations
+export const createOtherReceipt = async (receipt: Omit<OtherReceipt, 'id'>): Promise<OtherReceipt | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('other_receipts')
+      .insert([{
+        ...receipt,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating other receipt:', error);
+    return null;
+  }
+};
+
+export const getOtherReceiptsByOutletId = async (outletId: string): Promise<OtherReceipt[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('other_receipts')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('receipt_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching other receipts:', error);
+    return [];
+  }
+};
+
+export const updateOtherReceipt = async (id: string, updates: Partial<OtherReceipt>): Promise<OtherReceipt | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('other_receipts')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating other receipt:', error);
+    return null;
+  }
+};
+
+export const deleteOtherReceipt = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('other_receipts')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting other receipt:', error);
+    return false;
+  }
+};
+
+// Outlet Customer Settlement CRUD Operations
+export const createOutletCustomerSettlement = async (settlement: Omit<OutletCustomerSettlement, 'id'>): Promise<OutletCustomerSettlement | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_settlements')
+      .insert([{
+        ...settlement,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating outlet customer settlement:', error);
+    return null;
+  }
+};
+
+export const getOutletCustomerSettlementsByOutletId = async (outletId: string): Promise<OutletCustomerSettlement[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_settlements')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('settlement_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet customer settlements:', error);
+    return [];
+  }
+};
+
+export const updateOutletCustomerSettlement = async (id: string, updates: Partial<OutletCustomerSettlement>): Promise<OutletCustomerSettlement | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_settlements')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet customer settlement:', error);
+    return null;
+  }
+};
+
+export const deleteOutletCustomerSettlement = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('customer_settlements')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet customer settlement:', error);
+    return false;
+  }
+};

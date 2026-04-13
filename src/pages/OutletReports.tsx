@@ -144,19 +144,31 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
     
     setLoading(true);
     try {
+      console.log('Loading sales data for outlet:', outletId);
+      
       // Fetch all sales for the outlet
       const sales = await getOutletSalesByOutletId(outletId);
+      console.log('Fetched sales count:', sales.length);
       setSalesData(sales);
       
       // Fetch all sale items
       const allItems: OutletSaleItem[] = [];
+      console.log('Fetching sale items for', sales.length, 'sales');
+      
       for (const sale of sales) {
         if (sale.id) {
           const items = await getOutletSaleItemsBySaleId(sale.id);
           allItems.push(...items);
         }
       }
+      
+      console.log('Total sale items fetched:', allItems.length);
       setSaleItems(allItems);
+      
+      toast({
+        title: "Sales Data Loaded",
+        description: `Loaded ${sales.length} sales with ${allItems.length} items`,
+      });
     } catch (error) {
       console.error('Error loading sales data:', error);
       toast({
@@ -662,6 +674,14 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                   Sales Report
                 </CardTitle>
                 <div className="flex items-center gap-3">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={loadSalesData}
+                    disabled={loading}
+                  >
+                    {loading ? 'Loading...' : 'Refresh Data'}
+                  </Button>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <Input
@@ -772,6 +792,15 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                     
                     const periodLabel = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
                     
+                    // Calculate payment status breakdown
+                    const debtSales = periodSales.filter(s => s.payment_status === 'debt' || s.payment_status === 'unpaid');
+                    const paidSales = periodSales.filter(s => s.payment_status === 'paid');
+                    const partialSales = periodSales.filter(s => s.payment_status === 'partial');
+                    
+                    const debtAmount = debtSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    const paidAmount = paidSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    const partialAmount = partialSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    
                     return (
                       <>
                         {/* Sales Stats */}
@@ -849,6 +878,87 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                             </CardContent>
                           </Card>
                         </div>
+                        
+                        {/* Payment Status Breakdown */}
+                        <Card className="mb-6">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Payment Status Breakdown</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Paid Transactions */}
+                              <div className="relative">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                    <span className="text-sm font-medium">Paid Transactions</span>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">{paidSales.length} sales</span>
+                                </div>
+                                <p className="text-2xl font-bold text-green-600">{formatCurrency(paidAmount)}</p>
+                                <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-green-500 h-2 rounded-full transition-all" 
+                                    style={{ width: `${periodRevenue > 0 ? (paidAmount / periodRevenue) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {periodRevenue > 0 ? ((paidAmount / periodRevenue) * 100).toFixed(1) : 0}% of total
+                                </p>
+                              </div>
+                              
+                              {/* Partial Paid Transactions */}
+                              <div className="relative">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                    <span className="text-sm font-medium">Partial Paid</span>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">{partialSales.length} sales</span>
+                                </div>
+                                <p className="text-2xl font-bold text-yellow-600">{formatCurrency(partialAmount)}</p>
+                                <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-yellow-500 h-2 rounded-full transition-all" 
+                                    style={{ width: `${periodRevenue > 0 ? (partialAmount / periodRevenue) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {periodRevenue > 0 ? ((partialAmount / periodRevenue) * 100).toFixed(1) : 0}% of total
+                                </p>
+                              </div>
+                              
+                              {/* Debt Transactions */}
+                              <div className="relative">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                    <span className="text-sm font-medium">Debt Transactions</span>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">{debtSales.length} sales</span>
+                                </div>
+                                <p className="text-2xl font-bold text-red-600">{formatCurrency(debtAmount)}</p>
+                                <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-red-500 h-2 rounded-full transition-all" 
+                                    style={{ width: `${periodRevenue > 0 ? (debtAmount / periodRevenue) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {periodRevenue > 0 ? ((debtAmount / periodRevenue) * 100).toFixed(1) : 0}% of total
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Summary */}
+                            <div className="mt-4 pt-4 border-t">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Total Verified</span>
+                                <span className="text-lg font-bold">{formatCurrency(paidAmount + partialAmount + debtAmount)}</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
                         
                         {/* Sales Chart and Top Products Side by Side */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
