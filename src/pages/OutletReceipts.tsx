@@ -25,7 +25,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletReceiptsProps {
@@ -652,6 +652,18 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                 status: 'paid',
                 updated_at: new Date().toISOString()
               });
+              
+              // Update the corresponding sale (Saved Debt) if sale_id exists
+              if (debt.sale_id) {
+                console.log(`    🔄 Updating saved debt sale ${debt.sale_id}`);
+                await updateOutletSale(debt.sale_id, {
+                  amount_paid: currentDebtAmount + paidAmount,
+                  payment_status: 'paid',
+                  updated_at: new Date().toISOString()
+                });
+                console.log(`    ✅ Saved debt sale updated`);
+              }
+              
               remainingPayment -= currentDebtAmount;
             } else {
               // Partially pay this debt
@@ -662,6 +674,18 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                 status: 'partial',
                 updated_at: new Date().toISOString()
               });
+              
+              // Update the corresponding sale (Saved Debt) if sale_id exists
+              if (debt.sale_id) {
+                console.log(`    🔄 Updating saved debt sale ${debt.sale_id} (partial)`);
+                await updateOutletSale(debt.sale_id, {
+                  amount_paid: paidAmount + remainingPayment,
+                  payment_status: 'partial',
+                  updated_at: new Date().toISOString()
+                });
+                console.log(`    ✅ Saved debt sale updated (partial)`);
+              }
+              
               remainingPayment = 0;
             }
           }
