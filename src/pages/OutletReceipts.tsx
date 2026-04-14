@@ -154,8 +154,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const fetchCustomerBalance = async (customerId: string) => {
     if (!outletId || !customerId) return;
     try {
+      console.log('🔍 Fetching balance for customer:', customerId);
       const debts = await getOutletDebtsByCustomerId(outletId, customerId);
+      console.log('  Debts found:', debts);
       const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+      console.log('  Total balance:', totalBalance);
       setSettlementCustomerBalance(totalBalance);
       setSettlementPreviousBalance(totalBalance);
     } catch (error) {
@@ -307,10 +310,13 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       
       // Fetch actual outstanding customer debts from outlet_debts table
       const allDebts = await getOutletDebtsByOutletId(outletId);
-      const outstandingDebts = allDebts.filter(debt => debt.status === 'outstanding');
+      // Include both 'outstanding' and 'partial' status debts (both have remaining balance)
+      const outstandingDebts = allDebts.filter(debt => 
+        debt.status === 'outstanding' || debt.status === 'partial'
+      );
       const totalDebt = outstandingDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
       setTotalCustomerDebt(totalDebt);
-      console.log('Total customer debt (from outlet_debts):', totalDebt, 'Outstanding debts:', outstandingDebts.length);
+      console.log('Total customer debt (from outlet_debts):', totalDebt, 'Outstanding debts:', outstandingDebts.length, 'All debts:', allDebts.length);
       
       // Combine all receipts
       const allReceipts = [...enrichedSales, ...customerSettlementsFormatted, ...commissionReceiptsFormatted, ...otherReceiptsFormatted];
@@ -571,6 +577,19 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       
       const newBalance = Math.max(0, settlementPreviousBalance - settlementPaymentAmount);
       
+      console.log('💾 Saving settlement to database:', {
+        outlet_id: outletId,
+        customer_id: settlementCustomerId,
+        invoice_number: settlementInvoiceNumber || `SETTLE-${Date.now()}`,
+        settlement_date: settlementDate,
+        customer_name: settlementCustomerName,
+        payment_amount: settlementPaymentAmount,
+        payment_method: settlementPaymentMethod,
+        previous_balance: settlementPreviousBalance,
+        new_balance: newBalance,
+        notes: settlementNotes
+      });
+      
       // Save settlement to database
       const result = await createOutletCustomerSettlement({
         outlet_id: outletId,
@@ -658,9 +677,20 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       setShowNewForm(false);
       setCustomerSearchQuery('');
       
-      // Refresh receipts list and customer balances
+      // Refresh receipts to show the new settlement
       await fetchReceipts();
-      await loadCustomers(); // Reload customers with updated balances
+      
+      // Wait a moment for database to fully update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Reload customers to update their balances
+      await loadCustomers();
+      
+      // If a customer was selected, refresh their specific balance
+      if (settlementCustomerId) {
+        await fetchCustomerBalance(settlementCustomerId);
+        console.log('✅ Refreshed customer balance after settlement');
+      }
     } catch (error) {
       console.error('Error saving settlement receipt:', error);
       toast({

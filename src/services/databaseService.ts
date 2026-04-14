@@ -4590,6 +4590,8 @@ export const deleteOtherReceipt = async (id: string): Promise<boolean> => {
 // Outlet Customer Settlement CRUD Operations
 export const createOutletCustomerSettlement = async (settlement: Omit<OutletCustomerSettlement, 'id'>): Promise<OutletCustomerSettlement | null> => {
   try {
+    console.log('📝 createOutletCustomerSettlement called with:', settlement);
+    
     const { data, error } = await supabase
       .from('customer_settlements')
       .insert([{
@@ -4600,7 +4602,12 @@ export const createOutletCustomerSettlement = async (settlement: Omit<OutletCust
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase error:', error);
+      throw error;
+    }
+    
+    console.log('✅ Settlement saved successfully:', data);
     return data || null;
   } catch (error) {
     console.error('Error creating outlet customer settlement:', error);
