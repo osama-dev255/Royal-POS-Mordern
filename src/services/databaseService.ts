@@ -4322,12 +4322,13 @@ export const getOutletDebtsByOutletId = async (outletId: string): Promise<Outlet
 
 export const getOutletDebtsByCustomerId = async (outletId: string, customerId: string): Promise<OutletDebt[]> => {
   try {
+    // Fetch both outstanding and partial debts (both have remaining balance)
     const { data, error } = await supabase
       .from('outlet_debts')
       .select('*')
       .eq('outlet_id', outletId)
       .eq('customer_id', customerId)
-      .eq('status', 'outstanding')
+      .in('status', ['outstanding', 'partial'])
       .order('created_at', { ascending: false });
       
     if (error) throw error;

@@ -134,8 +134,13 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       const customersWithBalances = await Promise.all(
         (customers || []).map(async (customer) => {
           try {
+            // getOutletDebtsByCustomerId now only returns outstanding + partial debts
             const debts = await getOutletDebtsByCustomerId(outletId, customer.id || '');
             const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+            console.log(`  Customer ${customer.first_name} ${customer.last_name}:`, {
+              totalDebts: debts.length,
+              balance: totalBalance
+            });
             return { ...customer, total_debt: totalBalance };
           } catch (error) {
             console.error(`Error fetching balance for customer ${customer.id}:`, error);
@@ -155,8 +160,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     if (!outletId || !customerId) return;
     try {
       console.log('🔍 Fetching balance for customer:', customerId);
+      // getOutletDebtsByCustomerId now only returns outstanding + partial debts
       const debts = await getOutletDebtsByCustomerId(outletId, customerId);
-      console.log('  Debts found:', debts);
+      console.log('  Active debts found:', debts.length);
       const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
       console.log('  Total balance:', totalBalance);
       setSettlementCustomerBalance(totalBalance);
@@ -505,23 +511,31 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     }
   };
   
-  // Customer search handler
+  // Customer search handler - only show customers with outstanding balances
   const handleCustomerSearch = (query: string) => {
     setCustomerSearchQuery(query);
     setSettlementCustomerName(query);
     
     if (query.trim()) {
+      // Filter customers who have outstanding balances AND match the search query
       const filtered = allCustomers.filter(customer => {
         const fullName = `${customer.first_name} ${customer.last_name}`.toLowerCase();
         const phone = (customer.phone || '').toLowerCase();
         const searchLower = query.toLowerCase();
-        return fullName.includes(searchLower) || phone.includes(searchLower);
+        const hasBalance = (customer.total_debt || 0) > 0;
+        
+        // Only show customers with outstanding balances
+        return hasBalance && (fullName.includes(searchLower) || phone.includes(searchLower));
       });
       setFilteredCustomers(filtered);
       setShowCustomerDropdown(filtered.length > 0);
     } else {
-      setFilteredCustomers([]);
-      setShowCustomerDropdown(false);
+      // When search is empty, show only customers with balances
+      const customersWithBalance = allCustomers.filter(customer => 
+        (customer.total_debt || 0) > 0
+      );
+      setFilteredCustomers(customersWithBalance);
+      setShowCustomerDropdown(customersWithBalance.length > 0);
     }
   };
   
@@ -877,7 +891,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                           setShowCustomerDropdown(true);
                         }
                       }}
-                      placeholder="Type customer name or phone..."
+                      placeholder="Search customers with outstanding balances..."
                       className="mt-1"
                       autoComplete="off"
                     />
@@ -885,6 +899,13 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                     {/* Customer Dropdown */}
                     {showCustomerDropdown && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {/* Header showing count */}
+                        <div className="p-2 bg-blue-50 border-b border-blue-200">
+                          <p className="text-xs text-blue-700 font-medium">
+                            {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''} with outstanding balance
+                          </p>
+                        </div>
+                        
                         {filteredCustomers.map((customer) => {
                           const fullName = `${customer.first_name} ${customer.last_name}`.trim();
                           return (
