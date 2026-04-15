@@ -26,7 +26,7 @@ import {
   XCircle,
   Calendar
 } from "lucide-react";
-import { getAvailableInventoryByOutlet, InventoryProduct, getOutletSalesByOutletId, getOutletSaleItemsBySaleId, OutletSale, OutletSaleItem } from "@/services/databaseService";
+import { getAvailableInventoryByOutlet, InventoryProduct, getOutletSalesByOutletId, getOutletSaleItemsBySaleId, OutletSale, OutletSaleItem, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletReportsProps {
@@ -115,6 +115,7 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
   const [inventoryData, setInventoryData] = useState<InventoryProduct[]>([]);
   const [salesData, setSalesData] = useState<OutletSale[]>([]);
   const [saleItems, setSaleItems] = useState<OutletSaleItem[]>([]);
+  const [settlements, setSettlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState<string>(() => {
@@ -150,6 +151,11 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
       const sales = await getOutletSalesByOutletId(outletId);
       console.log('Fetched sales count:', sales.length);
       setSalesData(sales);
+      
+      // Fetch customer settlements for the outlet
+      const customerSettlements = await getOutletCustomerSettlementsByOutletId(outletId);
+      console.log('Fetched settlements count:', customerSettlements.length);
+      setSettlements(customerSettlements);
       
       // Fetch all sale items
       const allItems: OutletSaleItem[] = [];
@@ -797,9 +803,27 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                     const paidSales = periodSales.filter(s => s.payment_status === 'paid');
                     const partialSales = periodSales.filter(s => s.payment_status === 'partial');
                     
+                    // Filter settlements for the period
+                    const periodSettlements = settlements.filter(s => {
+                      const settlementDate = new Date(s.settlement_date);
+                      return settlementDate >= start && settlementDate <= end;
+                    });
+                    
                     const debtAmount = debtSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
                     const paidAmount = paidSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
                     const partialAmount = partialSales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+                    
+                    // Add settlement payments to paid amount
+                    const settlementAmount = periodSettlements.reduce((sum, s) => sum + (s.payment_amount || 0), 0);
+                    const totalPaidAmount = paidAmount + settlementAmount;
+                    
+                    console.log('💰 Payment Breakdown:', {
+                      paidSales: paidSales.length,
+                      paidAmount,
+                      settlements: periodSettlements.length,
+                      settlementAmount,
+                      totalPaidAmount
+                    });
                     
                     return (
                       <>
@@ -893,17 +917,17 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                                     <span className="text-sm font-medium">Paid Transactions</span>
                                   </div>
-                                  <span className="text-xs text-muted-foreground">{paidSales.length} sales</span>
+                                  <span className="text-xs text-muted-foreground">{paidSales.length} sales + {periodSettlements.length} settlements</span>
                                 </div>
-                                <p className="text-2xl font-bold text-green-600">{formatCurrency(paidAmount)}</p>
+                                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalPaidAmount)}</p>
                                 <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                                   <div 
                                     className="bg-green-500 h-2 rounded-full transition-all" 
-                                    style={{ width: `${periodRevenue > 0 ? (paidAmount / periodRevenue) * 100 : 0}%` }}
+                                    style={{ width: `${periodRevenue > 0 ? (totalPaidAmount / periodRevenue) * 100 : 0}%` }}
                                   />
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {periodRevenue > 0 ? ((paidAmount / periodRevenue) * 100).toFixed(1) : 0}% of total
+                                  {periodRevenue > 0 ? ((totalPaidAmount / periodRevenue) * 100).toFixed(1) : 0}% of total
                                 </p>
                               </div>
                               

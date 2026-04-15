@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,8 @@ import {
   User,
   ShoppingCart,
   Printer,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSavedSalesByOutletAndPaymentMethod, deleteSavedSale, SavedSale as DatabaseSavedSale } from "@/services/databaseService";
@@ -47,6 +49,10 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
   const [selectedSale, setSelectedSale] = useState<SavedSale | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Date range filter
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     fetchSavedMobileSales();
@@ -214,6 +220,44 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
       </div>
 
       <div className="space-y-4">
+        {/* Date Range Filter - Right Aligned */}
+        <div className="flex justify-end">
+          <Card className="w-auto">
+            <CardContent className="p-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-8 w-[140px]"
+                  placeholder="From"
+                />
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-8 w-[140px]"
+                  placeholder="To"
+                />
+                {(startDate || endDate) && (
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
         {loading ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -231,7 +275,33 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
             </CardContent>
           </Card>
         ) : (
-          sales.map((sale) => (
+          // Filter sales by date range if set
+          (() => {
+            const filteredSales = sales.filter(sale => {
+              if (!startDate && !endDate) return true;
+              
+              const saleDate = new Date(sale.date);
+              
+              if (startDate && saleDate < new Date(startDate)) return false;
+              if (endDate) {
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999);
+                if (saleDate > endDateTime) return false;
+              }
+              
+              return true;
+            });
+            
+            return filteredSales.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No sales found for selected period</h3>
+                  <p className="text-muted-foreground">Try adjusting the date range</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredSales.map((sale) => (
             <Card key={sale.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -281,6 +351,8 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
               </CardContent>
             </Card>
           ))
+            )
+          })()
         )}
       </div>
 

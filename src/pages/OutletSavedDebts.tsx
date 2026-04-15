@@ -65,6 +65,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
   const [itemSearchTerms, setItemSearchTerms] = useState<Record<number, string>>({});
   const [showItemDropdown, setShowItemDropdown] = useState<Record<number, boolean>>({});
+  
+  // Date range filter
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     fetchSavedDebts();
@@ -88,6 +92,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     try {
       // Fetch from outlet_sales table which has accurate payment data
       const data = await getOutletSalesByOutletAndPaymentMethod(outletId, 'debt');
+      
+      console.log('📊 Fetched saved debts:', data.length);
+      console.log('  Debts by payment_status:', {
+        unpaid: data.filter(d => d.payment_status === 'unpaid').length,
+        partial: data.filter(d => d.payment_status === 'partial').length,
+        paid: data.filter(d => d.payment_status === 'paid').length,
+      });
       
       // Enrich data with customer names and item counts
       const enrichedSales = await Promise.all(
@@ -498,6 +509,44 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       </div>
 
       <div className="space-y-4">
+        {/* Date Range Filter - Right Aligned */}
+        <div className="flex justify-end">
+          <Card className="w-auto">
+            <CardContent className="p-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-8 w-[140px]"
+                  placeholder="From"
+                />
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-8 w-[140px]"
+                  placeholder="To"
+                />
+                {(startDate || endDate) && (
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
         {loading ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -515,7 +564,33 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             </CardContent>
           </Card>
         ) : (
-          sales.map((sale) => {
+          // Filter sales by date range if set
+          (() => {
+            const filteredSales = sales.filter(sale => {
+              if (!startDate && !endDate) return true; // No filter applied
+              
+              const saleDate = new Date(sale.date);
+              
+              if (startDate && saleDate < new Date(startDate)) return false;
+              if (endDate) {
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999);
+                if (saleDate > endDateTime) return false;
+              }
+              
+              return true;
+            });
+            
+            return filteredSales.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No debts found for selected period</h3>
+                  <p className="text-muted-foreground">Try adjusting the date range</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredSales.map((sale) => {
                 // Calculate payment status
                 const amountPaid = sale.amountPaid || 0;
                 const total = sale.total || 0;
@@ -597,6 +672,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
               </CardContent>
             </Card>
           );})
+            )
+          })()
         )}
       </div>
 

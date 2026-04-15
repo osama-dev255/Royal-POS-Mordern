@@ -22,9 +22,11 @@ import {
   Briefcase,
   Percent,
   FileText,
-  TrendingUp
+  TrendingUp,
+  X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
@@ -656,12 +658,28 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               // Update the corresponding sale (Saved Debt) if sale_id exists
               if (debt.sale_id) {
                 console.log(`    🔄 Updating saved debt sale ${debt.sale_id}`);
-                await updateOutletSale(debt.sale_id, {
-                  amount_paid: currentDebtAmount + paidAmount,
-                  payment_status: 'paid',
-                  updated_at: new Date().toISOString()
-                });
-                console.log(`    ✅ Saved debt sale updated`);
+                
+                // Get the current sale to calculate correct amount_paid
+                const { data: sale } = await supabase
+                  .from('outlet_sales')
+                  .select('*')
+                  .eq('id', debt.sale_id)
+                  .single();
+                
+                if (sale) {
+                  const existingPaid = sale.amount_paid || 0;
+                  const saleTotal = sale.total_amount || currentDebtAmount;
+                  
+                  // Calculate new amount_paid (existing + this payment)
+                  const newAmountPaid = Math.min(existingPaid + currentDebtAmount, saleTotal);
+                  
+                  await updateOutletSale(debt.sale_id, {
+                    amount_paid: newAmountPaid,
+                    payment_status: newAmountPaid >= saleTotal ? 'paid' : 'partial',
+                    updated_at: new Date().toISOString()
+                  });
+                  console.log(`    ✅ Saved debt sale updated (paid: ${newAmountPaid} / ${saleTotal})`);
+                }
               }
               
               remainingPayment -= currentDebtAmount;
@@ -678,12 +696,28 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               // Update the corresponding sale (Saved Debt) if sale_id exists
               if (debt.sale_id) {
                 console.log(`    🔄 Updating saved debt sale ${debt.sale_id} (partial)`);
-                await updateOutletSale(debt.sale_id, {
-                  amount_paid: paidAmount + remainingPayment,
-                  payment_status: 'partial',
-                  updated_at: new Date().toISOString()
-                });
-                console.log(`    ✅ Saved debt sale updated (partial)`);
+                
+                // Get the current sale to calculate correct amount_paid
+                const { data: sale } = await supabase
+                  .from('outlet_sales')
+                  .select('*')
+                  .eq('id', debt.sale_id)
+                  .single();
+                
+                if (sale) {
+                  const existingPaid = sale.amount_paid || 0;
+                  const saleTotal = sale.total_amount || currentDebtAmount;
+                  
+                  // Calculate new amount_paid (existing + this partial payment)
+                  const newAmountPaid = Math.min(existingPaid + remainingPayment, saleTotal);
+                  
+                  await updateOutletSale(debt.sale_id, {
+                    amount_paid: newAmountPaid,
+                    payment_status: newAmountPaid >= saleTotal ? 'paid' : 'partial',
+                    updated_at: new Date().toISOString()
+                  });
+                  console.log(`    ✅ Saved debt sale updated partial (paid: ${newAmountPaid} / ${saleTotal})`);
+                }
               }
               
               remainingPayment = 0;
@@ -762,71 +796,43 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         </div>
       </div>
 
-      {/* Date Range Filter */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4 flex-wrap">
+      {/* Date Range Filter - Right Aligned */}
+      <div className="flex justify-end mb-4">
+        <Card className="w-auto">
+          <CardContent className="p-2">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filter by Date:</span>
-            </div>
-            
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Label htmlFor="startDate" className="text-xs whitespace-nowrap">From:</Label>
               <Input
-                id="startDate"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="h-8"
+                className="h-8 w-[140px]"
+                placeholder="From"
               />
-            </div>
-            
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Label htmlFor="endDate" className="text-xs whitespace-nowrap">To:</Label>
               <Input
-                id="endDate"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="h-8"
+                className="h-8 w-[140px]"
+                placeholder="To"
               />
+              {(startDate || endDate) && (
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                onClick={() => {
-                  setStartDate('');
-                  setEndDate('');
-                }}
-                variant="outline"
-                className="h-8"
-              >
-                Clear
-              </Button>
-              <Button 
-                size="sm"
-                onClick={fetchReceipts}
-                className="h-8"
-              >
-                Apply Filter
-              </Button>
-            </div>
-          </div>
-          
-          {(startDate || endDate) && (
-            <div className="mt-3 pt-3 border-t">
-              <p className="text-xs text-muted-foreground">
-                Showing receivables from 
-                {startDate && <span className="font-medium"> {new Date(startDate).toLocaleDateString()}</span>}
-                {startDate && endDate && <span> to</span>}
-                {endDate && <span className="font-medium"> {new Date(endDate).toLocaleDateString()}</span>}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-6">
