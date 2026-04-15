@@ -10,6 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   ArrowLeft, 
   FileText,
@@ -23,11 +29,17 @@ import {
   Loader2,
   Edit,
   Save,
-  X
+  X,
+  Search,
+  Download,
+  Share2,
+  ChevronDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, updateOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface OutletSavedDebtsProps {
   onBack: () => void;
@@ -69,11 +81,568 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   // Date range filter
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  // Search filter
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchSavedDebts();
     fetchInventoryProducts();
   }, [outletId]);
+
+  // Action handlers
+  const handlePrintDebts = () => {
+    // Get filtered sales
+    const filteredSales = sales.filter(sale => {
+      if (startDate || endDate) {
+        const saleDate = new Date(sale.date);
+        if (startDate && saleDate < new Date(startDate)) return false;
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          if (saleDate > endDateTime) return false;
+        }
+      }
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const customerName = (sale.customer || '').toLowerCase();
+        const invoiceNumber = (sale.invoiceNumber || '').toLowerCase();
+        if (!customerName.includes(searchLower) && !invoiceNumber.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (filteredSales.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No debts to print with current filters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calculate statistics
+    const totalAmount = filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+    const totalPaid = filteredSales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+    const totalRemaining = totalAmount - totalPaid;
+    
+    // Generate printable HTML
+    const dateRange = (startDate || endDate) 
+      ? `${startDate || 'Start'} to ${endDate || 'End'}`
+      : 'All Time';
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Print Failed",
+        description: "Please allow popups to print",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Saved Debts Report</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #2980b9;
+            padding-bottom: 20px;
+          }
+          .header h1 {
+            font-size: 28px;
+            color: #2980b9;
+            margin-bottom: 10px;
+          }
+          .header p {
+            font-size: 14px;
+            color: #666;
+          }
+          .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+          }
+          .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2980b9;
+          }
+          .stat-card h3 {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+          }
+          .stat-card p {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2980b9;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          thead {
+            background: #2980b9;
+            color: white;
+          }
+          th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+          }
+          td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+          }
+          tbody tr:nth-child(even) {
+            background: #f8f9fa;
+          }
+          tbody tr:hover {
+            background: #e3f2fd;
+          }
+          .status-unpaid {
+            background: #fee;
+            color: #c33;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+          }
+          .status-partial {
+            background: #ffeaa7;
+            color: #d68910;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+          }
+          .status-paid {
+            background: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          @media print {
+            body {
+              padding: 0;
+            }
+            .no-print {
+              display: none;
+            }
+            @page {
+              margin: 1cm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Saved Debts Report</h1>
+          <p>Period: ${dateRange}</p>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+        </div>
+        
+        <div class="stats">
+          <div class="stat-card">
+            <h3>Total Debts</h3>
+            <p>${filteredSales.length}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Amount</h3>
+            <p>${totalAmount.toFixed(2)}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Paid</h3>
+            <p>${totalPaid.toFixed(2)}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Remaining</h3>
+            <p>${totalRemaining.toFixed(2)}</p>
+          </div>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Remaining</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredSales.map(sale => {
+              const remaining = sale.total - (sale.amountPaid || 0);
+              const status = sale.amountPaid === 0 ? 'Unpaid' : 
+                            (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial';
+              const statusClass = status === 'Unpaid' ? 'status-unpaid' : 
+                                 status === 'Partial' ? 'status-partial' : 'status-paid';
+              return `
+                <tr>
+                  <td>${sale.invoiceNumber}</td>
+                  <td>${sale.date}</td>
+                  <td>${sale.customer || 'Walk-in Customer'}</td>
+                  <td>${sale.total.toFixed(2)}</td>
+                  <td>${(sale.amountPaid || 0).toFixed(2)}</td>
+                  <td>${remaining.toFixed(2)}</td>
+                  <td><span class="${statusClass}">${status}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          <p>Total Debts: ${filteredSales.length} | Total Amount: ${totalAmount.toFixed(2)} | Total Paid: ${totalPaid.toFixed(2)} | Total Remaining: ${totalRemaining.toFixed(2)}</p>
+          <p style="margin-top: 10px;">© ${new Date().getFullYear()} Royal POS System</p>
+        </div>
+        
+        <div class="no-print" style="text-align: center; margin-top: 20px;">
+          <button onclick="window.print()" style="padding: 10px 20px; background: #2980b9; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+            🖨️ Print Report
+          </button>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    toast({
+      title: "Print Ready",
+      description: `Report with ${filteredSales.length} debts ready to print`,
+    });
+  };
+
+  const handleDownload = () => {
+    // Get filtered sales
+    const filteredSales = sales.filter(sale => {
+      if (startDate || endDate) {
+        const saleDate = new Date(sale.date);
+        if (startDate && saleDate < new Date(startDate)) return false;
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          if (saleDate > endDateTime) return false;
+        }
+      }
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const customerName = (sale.customer || '').toLowerCase();
+        const invoiceNumber = (sale.invoiceNumber || '').toLowerCase();
+        if (!customerName.includes(searchLower) && !invoiceNumber.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (filteredSales.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No debts to download with current filters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate PDF using jsPDF
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(18);
+    doc.text('Saved Debts Report', 14, 20);
+    
+    // Date range
+    doc.setFontSize(10);
+    const dateRange = (startDate || endDate) 
+      ? `Period: ${startDate || 'Start'} to ${endDate || 'End'}`
+      : 'All Time';
+    doc.text(dateRange, 14, 28);
+    
+    // Stats
+    const totalAmount = filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+    const totalPaid = filteredSales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+    const totalRemaining = totalAmount - totalPaid;
+    
+    doc.text(`Total Debts: ${filteredSales.length}`, 14, 36);
+    doc.text(`Total Amount: ${totalAmount.toFixed(2)}`, 14, 42);
+    doc.text(`Total Paid: ${totalPaid.toFixed(2)}`, 14, 48);
+    doc.text(`Total Remaining: ${totalRemaining.toFixed(2)}`, 14, 54);
+    
+    // Table
+    const tableData = filteredSales.map(sale => [
+      sale.invoiceNumber,
+      sale.date,
+      sale.customer || 'Walk-in Customer',
+      sale.total.toFixed(2),
+      (sale.amountPaid || 0).toFixed(2),
+      (sale.total - (sale.amountPaid || 0)).toFixed(2),
+      sale.amountPaid === 0 ? 'Unpaid' : 
+        (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial'
+    ]);
+    
+    autoTable(doc, {
+      startY: 60,
+      head: [['Invoice', 'Date', 'Customer', 'Total', 'Paid', 'Remaining', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185] },
+    });
+    
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    doc.setFontSize(10);
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+    }
+    
+    // Save
+    const filename = `saved-debts-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    
+    toast({
+      title: "Download Started",
+      description: `PDF downloaded: ${filename}`,
+    });
+  };
+
+  const handleExportXLS = () => {
+    // Get filtered sales
+    const filteredSales = sales.filter(sale => {
+      if (startDate || endDate) {
+        const saleDate = new Date(sale.date);
+        if (startDate && saleDate < new Date(startDate)) return false;
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          if (saleDate > endDateTime) return false;
+        }
+      }
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const customerName = (sale.customer || '').toLowerCase();
+        const invoiceNumber = (sale.invoiceNumber || '').toLowerCase();
+        if (!customerName.includes(searchLower) && !invoiceNumber.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (filteredSales.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No debts to export with current filters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate Excel-compatible HTML table
+    const totalAmount = filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+    const totalPaid = filteredSales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+    const totalRemaining = totalAmount - totalPaid;
+    
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head>
+        <meta charset="UTF-8">
+        <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+        <x:Name>Saved Debts</x:Name>
+        <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+        </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+        <style>
+          td, th { padding: 5px; border: 1px solid #ccc; }
+          th { background-color: #2980b9; color: white; }
+          .header { font-size: 16px; font-weight: bold; }
+          .stat { font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td class="header" colspan="7">Saved Debts Report</td></tr>
+          <tr><td class="stat" colspan="7">${(startDate || endDate) ? `Period: ${startDate || 'Start'} to ${endDate || 'End'}` : 'All Time'}</td></tr>
+          <tr><td class="stat" colspan="7">Total Debts: ${filteredSales.length} | Total Amount: ${totalAmount.toFixed(2)} | Total Paid: ${totalPaid.toFixed(2)} | Total Remaining: ${totalRemaining.toFixed(2)}</td></tr>
+          <tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Total</th><th>Paid</th><th>Remaining</th><th>Status</th></tr>
+    `;
+    
+    filteredSales.forEach(sale => {
+      const remaining = sale.total - (sale.amountPaid || 0);
+      const status = sale.amountPaid === 0 ? 'Unpaid' : 
+                     (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial';
+      html += `<tr>
+        <td>${sale.invoiceNumber}</td>
+        <td>${sale.date}</td>
+        <td>${sale.customer || 'Walk-in Customer'}</td>
+        <td>${sale.total.toFixed(2)}</td>
+        <td>${(sale.amountPaid || 0).toFixed(2)}</td>
+        <td>${remaining.toFixed(2)}</td>
+        <td>${status}</td>
+      </tr>`;
+    });
+    
+    html += '</table></body></html>';
+    
+    // Download as XLS
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = `saved-debts-${new Date().toISOString().split('T')[0]}.xls`;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export Complete",
+      description: `Excel file downloaded: ${filename}`,
+    });
+  };
+
+  const handleSharePDF = async () => {
+    // Get filtered sales
+    const filteredSales = sales.filter(sale => {
+      if (startDate || endDate) {
+        const saleDate = new Date(sale.date);
+        if (startDate && saleDate < new Date(startDate)) return false;
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          if (saleDate > endDateTime) return false;
+        }
+      }
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const customerName = (sale.customer || '').toLowerCase();
+        const invoiceNumber = (sale.invoiceNumber || '').toLowerCase();
+        if (!customerName.includes(searchLower) && !invoiceNumber.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (filteredSales.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No debts to share with current filters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate PDF
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('Saved Debts Report', 14, 20);
+    
+    doc.setFontSize(10);
+    const dateRange = (startDate || endDate) 
+      ? `Period: ${startDate || 'Start'} to ${endDate || 'End'}`
+      : 'All Time';
+    doc.text(dateRange, 14, 28);
+    
+    const totalAmount = filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+    const totalPaid = filteredSales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+    const totalRemaining = totalAmount - totalPaid;
+    
+    doc.text(`Total Debts: ${filteredSales.length}`, 14, 36);
+    doc.text(`Total Amount: ${totalAmount.toFixed(2)}`, 14, 42);
+    doc.text(`Total Paid: ${totalPaid.toFixed(2)}`, 14, 48);
+    doc.text(`Total Remaining: ${totalRemaining.toFixed(2)}`, 14, 54);
+    
+    const tableData = filteredSales.map(sale => [
+      sale.invoiceNumber,
+      sale.date,
+      sale.customer || 'Walk-in Customer',
+      sale.total.toFixed(2),
+      (sale.amountPaid || 0).toFixed(2),
+      (sale.total - (sale.amountPaid || 0)).toFixed(2),
+      sale.amountPaid === 0 ? 'Unpaid' : 
+        (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial'
+    ]);
+    
+    autoTable(doc, {
+      startY: 60,
+      head: [['Invoice', 'Date', 'Customer', 'Total', 'Paid', 'Remaining', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185] },
+    });
+    
+    // Generate PDF blob
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], 'saved-debts-report.pdf', { type: 'application/pdf' });
+    
+    // Try to share
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: 'Saved Debts Report',
+          text: `Saved Debts Report - ${filteredSales.length} transactions`,
+        });
+        toast({
+          title: "Shared Successfully",
+          description: "PDF shared via native share dialog",
+        });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          // Fallback to download
+          doc.save('saved-debts-report.pdf');
+          toast({
+            title: "Downloaded Instead",
+            description: "Sharing failed, PDF downloaded instead",
+          });
+        }
+      }
+    } else {
+      // Fallback to download
+      doc.save('saved-debts-report.pdf');
+      toast({
+        title: "Downloaded",
+        description: "Sharing not supported, PDF downloaded instead",
+      });
+    }
+  };
 
   const fetchInventoryProducts = async () => {
     if (!outletId) return;
@@ -509,42 +1078,85 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       </div>
 
       <div className="space-y-4">
-        {/* Date Range Filter - Right Aligned */}
-        <div className="flex justify-end">
-          <Card className="w-auto">
-            <CardContent className="p-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-8 w-[140px]"
-                  placeholder="From"
-                />
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-8 w-[140px]"
-                  placeholder="To"
-                />
-                {(startDate || endDate) && (
-                  <Button 
-                    size="sm" 
-                    variant="ghost"
-                    onClick={() => {
-                      setStartDate('');
-                      setEndDate('');
-                    }}
-                    className="h-8 w-8 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Date Range Filter + Search Bar - Side by Side */}
+        <div className="flex gap-4 items-center">
+          {/* Date Range Filter - Right Aligned */}
+          <div className="flex justify-end flex-1">
+            <Card className="w-auto">
+              <CardContent className="p-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-8 w-[140px]"
+                    placeholder="From"
+                  />
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-8 w-[140px]"
+                    placeholder="To"
+                  />
+                  {(startDate || endDate) && (
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => {
+                        setStartDate('');
+                        setEndDate('');
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="relative w-[300px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search by name or invoice..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-8"
+            />
+          </div>
+          
+          {/* Action Button */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-2">
+                <span>Actions</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => handlePrintDebts()}>
+                <Printer className="h-4 w-4 mr-2" />
+                <span>Print</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownload()}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>Download</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportXLS()}>
+                <FileText className="h-4 w-4 mr-2" />
+                <span>Export to XLS</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSharePDF()}>
+                <Share2 className="h-4 w-4 mr-2" />
+                <span>Share as PDF</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         
         {loading ? (
@@ -564,18 +1176,30 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             </CardContent>
           </Card>
         ) : (
-          // Filter sales by date range if set
+          // Filter sales by date range and search term
           (() => {
             const filteredSales = sales.filter(sale => {
-              if (!startDate && !endDate) return true; // No filter applied
+              // Date range filter
+              if (startDate || endDate) {
+                const saleDate = new Date(sale.date);
+                
+                if (startDate && saleDate < new Date(startDate)) return false;
+                if (endDate) {
+                  const endDateTime = new Date(endDate);
+                  endDateTime.setHours(23, 59, 59, 999);
+                  if (saleDate > endDateTime) return false;
+                }
+              }
               
-              const saleDate = new Date(sale.date);
-              
-              if (startDate && saleDate < new Date(startDate)) return false;
-              if (endDate) {
-                const endDateTime = new Date(endDate);
-                endDateTime.setHours(23, 59, 59, 999);
-                if (saleDate > endDateTime) return false;
+              // Search filter
+              if (searchTerm) {
+                const searchLower = searchTerm.toLowerCase();
+                const customerName = (sale.customer || '').toLowerCase();
+                const invoiceNumber = (sale.invoiceNumber || '').toLowerCase();
+                
+                if (!customerName.includes(searchLower) && !invoiceNumber.includes(searchLower)) {
+                  return false;
+                }
               }
               
               return true;
@@ -584,9 +1208,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             return filteredSales.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">No debts found for selected period</h3>
-                  <p className="text-muted-foreground">Try adjusting the date range</p>
+                  <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No debts found</h3>
+                  <p className="text-muted-foreground">Try adjusting your search or date range</p>
                 </CardContent>
               </Card>
             ) : (
