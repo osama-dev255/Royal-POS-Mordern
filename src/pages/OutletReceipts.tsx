@@ -179,67 +179,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     
     setLoading(true);
     try {
-      // Fetch sales receipts from database
-      const allPaymentMethods = ['cash', 'card', 'mobile'];
-      let allSales: OutletSale[] = [];
-      
-      for (const method of allPaymentMethods) {
-        const sales = await getOutletSalesByOutletAndPaymentMethod(outletId, method);
-        const completedSales = sales.filter(sale => 
-          sale.payment_status === 'paid' || sale.sale_status === 'completed'
-        );
-        allSales = [...allSales, ...completedSales];
-      }
-      
-      // Apply date filter to sales if set
-      if (startDate || endDate) {
-        allSales = allSales.filter(sale => {
-          const saleDate = new Date(sale.sale_date || sale.created_at || '');
-          if (startDate && saleDate < new Date(startDate)) return false;
-          if (endDate) {
-            const endDateTime = new Date(endDate);
-            endDateTime.setHours(23, 59, 59, 999);
-            if (saleDate > endDateTime) return false;
-          }
-          return true;
-        });
-      }
-      
-      // Enrich sales data
-      const enrichedSales = await Promise.all(
-        allSales.map(async (sale: OutletSale) => {
-          let customerName = 'Walk-in Customer';
-          if (sale.customer_id) {
-            const customer = await getOutletCustomerById(sale.customer_id);
-            if (customer) {
-              customerName = `${customer.first_name} ${customer.last_name}`.trim();
-            }
-          }
-          
-          const saleItems = await getOutletSaleItemsBySaleId(sale.id || '');
-          const itemsWithNames = saleItems.map((item) => ({
-            name: item.product_name || 'Unknown Product',
-            quantity: item.quantity,
-            price: item.unit_price
-          }));
-          
-          return {
-            id: sale.id || '',
-            invoiceNumber: sale.invoice_number || '',
-            date: sale.sale_date || sale.created_at || '',
-            customer: customerName,
-            customerId: sale.customer_id,
-            items: itemsWithNames,
-            subtotal: sale.subtotal,
-            tax: sale.tax_amount,
-            total: sale.total_amount,
-            amountPaid: sale.amount_paid || 0,
-            paymentMethod: sale.payment_method,
-            status: sale.payment_status,
-            type: 'sales' as const
-          };
-        })
-      );
+      // Receivables should only show debts and payment receipts, not cash/card/mobile sales
+      // Sales are shown in their respective "Saved Cash Sales", "Saved Card Sales", "Saved Mobile Money Sales" pages
+      const enrichedSales: any[] = []; // Empty - no sales in receivables
       
       // Load commission receipts from database
       const commissionReceipts = await getCommissionReceiptsByOutletId(outletId);
