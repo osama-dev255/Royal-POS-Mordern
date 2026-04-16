@@ -762,10 +762,22 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       const newItems = [...(prev.items || [])];
       newItems[index] = { ...newItems[index], [field]: value };
       
-      // Recalculate total if quantity or price changed
+      // Recalculate subtotal, tax, total, and remainingAmount if quantity or price changed
       if (field === 'quantity' || field === 'price') {
-        const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-        return { ...prev, items: newItems, total: newTotal };
+        const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        const newTax = newSubtotal * 0.18; // 18% tax
+        const adjustments = prev.adjustments || 0;
+        const newTotal = newSubtotal + newTax + adjustments; // Include adjustments
+        const amountPaid = prev.amountPaid || 0;
+        const remainingBalance = newTotal - amountPaid;
+        return { 
+          ...prev, 
+          items: newItems, 
+          subtotal: newSubtotal,
+          tax: newTax,
+          total: newTotal,
+          remainingAmount: remainingBalance
+        };
       }
       
       return { ...prev, items: newItems };
@@ -782,8 +794,20 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleRemoveItem = (index: number) => {
     setEditFormData(prev => {
       const newItems = (prev.items || []).filter((_, i) => i !== index);
-      const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      return { ...prev, items: newItems, total: newTotal };
+      const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      const newTax = newSubtotal * 0.18; // 18% tax
+      const adjustments = prev.adjustments || 0;
+      const newTotal = newSubtotal + newTax + adjustments; // Include adjustments
+      const amountPaid = prev.amountPaid || 0;
+      const remainingBalance = newTotal - amountPaid;
+      return { 
+        ...prev, 
+        items: newItems, 
+        subtotal: newSubtotal,
+        tax: newTax,
+        total: newTotal,
+        remainingAmount: remainingBalance
+      };
     });
   };
 
@@ -805,8 +829,20 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         name: product.name, 
         price: product.selling_price || 0 
       };
-      const newTotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      return { ...prev, items: newItems, total: newTotal };
+      const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      const newTax = newSubtotal * 0.18; // 18% tax
+      const adjustments = prev.adjustments || 0;
+      const newTotal = newSubtotal + newTax + adjustments; // Include adjustments
+      const amountPaid = prev.amountPaid || 0;
+      const remainingBalance = newTotal - amountPaid;
+      return { 
+        ...prev, 
+        items: newItems, 
+        subtotal: newSubtotal,
+        tax: newTax,
+        total: newTotal,
+        remainingAmount: remainingBalance
+      };
     });
     setItemSearchTerms(prev => ({ ...prev, [index]: '' }));
     setShowItemDropdown(prev => ({ ...prev, [index]: false }));
@@ -1619,15 +1655,16 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 </div>
               </div>
               
-              {/* Subtotal, Tax, Credit, Adjustments - 4 columns */}
-              <div className="grid grid-cols-4 gap-4">
+              {/* Subtotal, Tax, Adjustments - 3 columns */}
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="editSubtotal">Subtotal</Label>
                   <Input
                     id="editSubtotal"
                     type="number"
                     value={editFormData.subtotal || 0}
-                    onChange={(e) => setEditFormData({...editFormData, subtotal: parseFloat(e.target.value) || 0})}
+                    readOnly
+                    className="bg-muted cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1636,16 +1673,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     id="editTax"
                     type="number"
                     value={editFormData.tax || 0}
-                    onChange={(e) => setEditFormData({...editFormData, tax: parseFloat(e.target.value) || 0})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editCredit">Credit B/F</Label>
-                  <Input
-                    id="editCredit"
-                    type="number"
-                    value={editFormData.creditBroughtForward || 0}
-                    onChange={(e) => setEditFormData({...editFormData, creditBroughtForward: parseFloat(e.target.value) || 0})}
+                    readOnly
+                    className="bg-muted cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1654,7 +1683,17 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     id="editAdjustments"
                     type="number"
                     value={editFormData.adjustments || 0}
-                    onChange={(e) => setEditFormData({...editFormData, adjustments: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => {
+                      const adjustmentsValue = parseFloat(e.target.value) || 0;
+                      const newTotal = editFormData.subtotal + editFormData.tax + adjustmentsValue;
+                      const remainingBalance = newTotal - (editFormData.amountPaid || 0);
+                      setEditFormData({
+                        ...editFormData, 
+                        adjustments: adjustmentsValue,
+                        total: newTotal,
+                        remainingAmount: remainingBalance
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -1678,7 +1717,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     id="editTotal"
                     type="number"
                     value={editFormData.total || 0}
-                    onChange={(e) => setEditFormData({...editFormData, total: parseFloat(e.target.value) || 0})}
+                    readOnly
+                    className="bg-muted cursor-not-allowed"
                   />
                 </div>
                 
@@ -1688,7 +1728,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     id="editAmountPaid"
                     type="number"
                     value={editFormData.amountPaid || 0}
-                    onChange={(e) => setEditFormData({...editFormData, amountPaid: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => {
+                      const amountPaidValue = parseFloat(e.target.value) || 0;
+                      const remainingBalance = (editFormData.total || 0) - amountPaidValue;
+                      setEditFormData({
+                        ...editFormData,
+                        amountPaid: amountPaidValue,
+                        remainingAmount: remainingBalance
+                      });
+                    }}
                   />
                 </div>
                 

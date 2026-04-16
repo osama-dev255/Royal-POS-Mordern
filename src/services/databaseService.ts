@@ -4096,6 +4096,115 @@ export interface OutletDebtPayment {
   created_at?: string;
 }
 
+// ============================================
+// Outlet Cash Sales Interfaces
+// ============================================
+export interface OutletCashSale {
+  id?: string;
+  outlet_id: string;
+  customer_id?: string;
+  user_id?: string;
+  invoice_number: string;
+  sale_date?: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  change_amount: number;
+  payment_method: string;
+  notes?: string;
+  reference_number?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OutletCashSaleItem {
+  id?: string;
+  sale_id: string;
+  product_id?: string;
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  total_price: number;
+  created_at?: string;
+}
+
+// ============================================
+// Outlet Card Sales Interfaces
+// ============================================
+export interface OutletCardSale {
+  id?: string;
+  outlet_id: string;
+  customer_id?: string;
+  user_id?: string;
+  invoice_number: string;
+  sale_date?: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  card_type?: string;
+  card_last_four?: string;
+  transaction_id?: string;
+  payment_method: string;
+  notes?: string;
+  reference_number?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OutletCardSaleItem {
+  id?: string;
+  sale_id: string;
+  product_id?: string;
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  total_price: number;
+  created_at?: string;
+}
+
+// ============================================
+// Outlet Mobile Sales Interfaces
+// ============================================
+export interface OutletMobileSale {
+  id?: string;
+  outlet_id: string;
+  customer_id?: string;
+  user_id?: string;
+  invoice_number: string;
+  sale_date?: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  mobile_provider?: string;
+  mobile_number?: string;
+  transaction_id?: string;
+  payment_method: string;
+  notes?: string;
+  reference_number?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OutletMobileSaleItem {
+  id?: string;
+  sale_id: string;
+  product_id?: string;
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  total_price: number;
+  created_at?: string;
+}
+
 export const createOutletSale = async (sale: Omit<OutletSale, 'id'>): Promise<OutletSale | null> => {
   try {
     console.log('createOutletSale received:', sale);
@@ -4782,6 +4891,372 @@ export const deleteOutletDebtPayment = async (id: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error deleting outlet debt payment:', error);
+    return false;
+  }
+};
+
+// ============================================
+// OUTLET CASH SALES CRUD FUNCTIONS
+// ============================================
+
+export const createOutletCashSale = async (sale: Omit<OutletCashSale, 'id'>): Promise<OutletCashSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_cash_sales')
+      .insert([{
+        ...sale,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet cash sale:', error);
+    return null;
+  }
+};
+
+export const getOutletCashSalesByOutletId = async (outletId: string): Promise<OutletCashSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_cash_sales')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet cash sales:', error);
+    return [];
+  }
+};
+
+export const updateOutletCashSale = async (id: string, updates: Partial<OutletCashSale>): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_cash_sales')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating outlet cash sale:', error);
+    return false;
+  }
+};
+
+export const deleteOutletCashSale = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_cash_sales')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet cash sale:', error);
+    return false;
+  }
+};
+
+export const createOutletCashSaleItem = async (item: Omit<OutletCashSaleItem, 'id'>): Promise<OutletCashSaleItem | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_cash_sale_items')
+      .insert([{
+        ...item,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet cash sale item:', error);
+    return null;
+  }
+};
+
+export const getOutletCashSaleItemsBySaleId = async (saleId: string): Promise<OutletCashSaleItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_cash_sale_items')
+      .select('*')
+      .eq('sale_id', saleId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet cash sale items:', error);
+    return [];
+  }
+};
+
+export const deleteOutletCashSaleItem = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_cash_sale_items')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet cash sale item:', error);
+    return false;
+  }
+};
+
+// ============================================
+// OUTLET CARD SALES CRUD FUNCTIONS
+// ============================================
+
+export const createOutletCardSale = async (sale: Omit<OutletCardSale, 'id'>): Promise<OutletCardSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_card_sales')
+      .insert([{
+        ...sale,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet card sale:', error);
+    return null;
+  }
+};
+
+export const getOutletCardSalesByOutletId = async (outletId: string): Promise<OutletCardSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_card_sales')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet card sales:', error);
+    return [];
+  }
+};
+
+export const updateOutletCardSale = async (id: string, updates: Partial<OutletCardSale>): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_card_sales')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating outlet card sale:', error);
+    return false;
+  }
+};
+
+export const deleteOutletCardSale = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_card_sales')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet card sale:', error);
+    return false;
+  }
+};
+
+export const createOutletCardSaleItem = async (item: Omit<OutletCardSaleItem, 'id'>): Promise<OutletCardSaleItem | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_card_sale_items')
+      .insert([{
+        ...item,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet card sale item:', error);
+    return null;
+  }
+};
+
+export const getOutletCardSaleItemsBySaleId = async (saleId: string): Promise<OutletCardSaleItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_card_sale_items')
+      .select('*')
+      .eq('sale_id', saleId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet card sale items:', error);
+    return [];
+  }
+};
+
+export const deleteOutletCardSaleItem = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_card_sale_items')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet card sale item:', error);
+    return false;
+  }
+};
+
+// ============================================
+// OUTLET MOBILE SALES CRUD FUNCTIONS
+// ============================================
+
+export const createOutletMobileSale = async (sale: Omit<OutletMobileSale, 'id'>): Promise<OutletMobileSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_mobile_sales')
+      .insert([{
+        ...sale,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet mobile sale:', error);
+    return null;
+  }
+};
+
+export const getOutletMobileSalesByOutletId = async (outletId: string): Promise<OutletMobileSale[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_mobile_sales')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet mobile sales:', error);
+    return [];
+  }
+};
+
+export const updateOutletMobileSale = async (id: string, updates: Partial<OutletMobileSale>): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_mobile_sales')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating outlet mobile sale:', error);
+    return false;
+  }
+};
+
+export const deleteOutletMobileSale = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_mobile_sales')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet mobile sale:', error);
+    return false;
+  }
+};
+
+export const createOutletMobileSaleItem = async (item: Omit<OutletMobileSaleItem, 'id'>): Promise<OutletMobileSaleItem | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_mobile_sale_items')
+      .insert([{
+        ...item,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet mobile sale item:', error);
+    return null;
+  }
+};
+
+export const getOutletMobileSaleItemsBySaleId = async (saleId: string): Promise<OutletMobileSaleItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_mobile_sale_items')
+      .select('*')
+      .eq('sale_id', saleId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet mobile sale items:', error);
+    return [];
+  }
+};
+
+export const deleteOutletMobileSaleItem = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_mobile_sale_items')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet mobile sale item:', error);
     return false;
   }
 };

@@ -34,7 +34,14 @@ import {
   FileText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getSavedSalesByOutletAndPaymentMethod, deleteSavedSale, SavedSale as DatabaseSavedSale } from "@/services/databaseService";
+import { 
+  getOutletMobileSalesByOutletId, 
+  deleteOutletMobileSale,
+  getOutletMobileSaleItemsBySaleId,
+  getOutletCustomerById,
+  OutletMobileSale,
+  OutletMobileSaleItem
+} from "@/services/databaseService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -304,21 +311,49 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
     
     setLoading(true);
     try {
-      const data = await getSavedSalesByOutletAndPaymentMethod(outletId, 'mobile');
-      // Map database format to component format
-      const mappedSales: SavedSale[] = data.map((sale: DatabaseSavedSale) => ({
-        id: sale.id || '',
-        invoiceNumber: sale.invoice_number,
-        date: sale.sale_date || sale.created_at || '',
-        customer: sale.customer || 'Unknown',
-        items: sale.items || [],
-        subtotal: sale.subtotal,
-        tax: sale.tax,
-        total: sale.total,
-        paymentMethod: sale.payment_method,
-        status: sale.status
-      }));
-      setSales(mappedSales);
+      // Fetch from outlet_mobile_sales table
+      const data = await getOutletMobileSalesByOutletId(outletId);
+      
+      // Enrich with customer names and items
+      const enrichedSales = await Promise.all(
+        data.map(async (sale: OutletMobileSale) => {
+          let customerName = 'Walk-in Customer';
+          if (sale.customer_id) {
+            const customer = await getOutletCustomerById(sale.customer_id);
+            if (customer) {
+              customerName = `${customer.first_name} ${customer.last_name}`.trim();
+            }
+          }
+          
+          // Fetch sale items
+          const saleItems = await getOutletMobileSaleItemsBySaleId(sale.id || '');
+          const itemsWithNames = saleItems.map((item: OutletMobileSaleItem) => ({
+            name: item.product_name || 'Unknown Product',
+            quantity: item.quantity,
+            price: item.unit_price
+          }));
+          
+          return {
+            id: sale.id || '',
+            invoiceNumber: sale.invoice_number || '',
+            date: sale.sale_date || sale.created_at || '',
+            customer: customerName,
+            customerId: sale.customer_id,
+            items: itemsWithNames,
+            subtotal: sale.subtotal,
+            tax: sale.tax_amount,
+            total: sale.total_amount,
+            amountPaid: sale.amount_paid,
+            mobileProvider: sale.mobile_provider,
+            mobileNumber: sale.mobile_number,
+            transactionId: sale.transaction_id,
+            paymentMethod: 'mobile',
+            status: 'completed'
+          };
+        })
+      );
+      
+      setSales(enrichedSales);
     } catch (error) {
       console.error('Error fetching saved mobile sales:', error);
       toast({
@@ -417,7 +452,7 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
 
   const handleDelete = async (saleId: string) => {
     try {
-      const success = await deleteSavedSale(saleId);
+      const success = await deleteOutletMobileSale(saleId);
       if (success) {
         const updatedSales = sales.filter(s => s.id !== saleId);
         setSales(updatedSales);
