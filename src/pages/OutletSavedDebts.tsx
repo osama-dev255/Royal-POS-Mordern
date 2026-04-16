@@ -36,7 +36,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletSalesByOutletAndPaymentMethod, deleteOutletSale, updateOutletSale, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletDebtsBySaleId, deleteOutletDebt, updateOutletDebt, deleteOutletSaleItemsBySaleId, createOutletSaleItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -50,6 +50,7 @@ interface SavedSale {
   id: string;
   invoiceNumber: string;
   date: string;
+  dueDate?: string;
   customer: string;
   customerId?: string;
   items: { name: string; quantity: number; price: number }[];
@@ -57,7 +58,7 @@ interface SavedSale {
   tax: number;
   total: number;
   amountPaid?: number;
-  amountReceived?: number;
+  remainingAmount?: number;
   paymentMethod: string;
   status: string;
   creditBroughtForward?: number;
@@ -659,8 +660,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     
     setLoading(true);
     try {
-      // Fetch from outlet_sales table which has accurate payment data
-      const data = await getOutletSalesByOutletAndPaymentMethod(outletId, 'debt');
+      // Fetch from outlet_debts table
+      const data = await getOutletDebtsByOutletId(outletId);
       
       console.log('📊 Fetched saved debts:', data.length);
       console.log('  Debts by payment_status:', {
@@ -671,43 +672,43 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       
       // Enrich data with customer names and item counts
       const enrichedSales = await Promise.all(
-        data.map(async (sale: OutletSale) => {
+        data.map(async (debt: OutletDebt) => {
           // Fetch customer name if customer_id exists
           let customerName = 'Walk-in Customer';
-          if (sale.customer_id) {
-            const customer = await getOutletCustomerById(sale.customer_id);
+          if (debt.customer_id) {
+            const customer = await getOutletCustomerById(debt.customer_id);
             if (customer) {
               customerName = `${customer.first_name} ${customer.last_name}`.trim();
             }
           }
           
-          // Fetch items for this sale
-          const saleItems = await getOutletSaleItemsBySaleId(sale.id || '');
+          // Fetch items for this debt
+          const debtItems = await getOutletDebtItemsByDebtId(debt.id || '');
           
-          // Use product_name from the sale item (stored at time of sale)
-          const itemsWithNames = saleItems.map((item) => ({
+          // Use product_name from the debt item (stored at time of debt creation)
+          const itemsWithNames = debtItems.map((item) => ({
             name: item.product_name || 'Unknown Product',
             quantity: item.quantity,
             price: item.unit_price
           }));
           
           return {
-            id: sale.id || '',
-            invoiceNumber: sale.invoice_number || '',
-            date: sale.sale_date || sale.created_at || '',
+            id: debt.id || '',
+            invoiceNumber: debt.invoice_number || '',
+            date: debt.debt_date || debt.created_at || '',
+            dueDate: debt.due_date,
             customer: customerName,
-            customerId: sale.customer_id,
+            customerId: debt.customer_id,
             items: itemsWithNames,
-            subtotal: sale.subtotal,
-            tax: sale.tax_amount,
-            total: sale.total_amount,
-            amountPaid: sale.amount_paid || 0,
-            amountReceived: sale.amount_received || 0,
-            paymentMethod: sale.payment_method,
-            status: sale.payment_status,
-            creditBroughtForward: sale.credit_brought_forward || 0,
-            adjustments: sale.adjustments || 0,
-            adjustmentReason: sale.adjustment_reason
+            subtotal: debt.subtotal,
+            tax: debt.tax_amount,
+            total: debt.total_amount,
+            amountPaid: debt.amount_paid || 0,
+            remainingAmount: debt.remaining_amount,
+            paymentMethod: 'debt',
+            status: debt.payment_status,
+            creditBroughtForward: 0,
+            adjustments: 0
           };
         })
       );
@@ -833,8 +834,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       console.log('📝 Update form data:', editFormData);
       
       // Step 1: Get the OLD items before deletion to reverse their sold quantities
-      console.log('📋 Fetching existing sale items to reverse inventory...');
-      const oldItems = await getOutletSaleItemsBySaleId(selectedSale.id);
+      console.log('📋 Fetching existing debt items to reverse inventory...');
+      const oldItems = await getOutletDebtItemsByDebtId(selectedSale.id);
       console.log(`  Found ${oldItems.length} existing items`);
       
       // Step 2: Reverse the old sold quantities (subtract old quantities from inventory)
@@ -842,40 +843,42 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       for (const oldItem of oldItems) {
         console.log(`  - Reversing: ${oldItem.product_name}, qty: ${oldItem.quantity}`);
         // Subtract by adding negative quantity
-        await incrementSoldQuantity(outletId, oldItem.product_name, -oldItem.quantity);
+        await incrementSoldQuantity(outletId, oldItem.product_name || '', -oldItem.quantity);
       }
       console.log('✅ Old inventory quantities reversed');
       
-      // Step 3: Update the sale record with all fields
-      // Map status to valid payment_status values: unpaid, partial, paid, refunded
+      // Step 3: Update the debt record with all fields
+      // Map status to valid payment_status values: unpaid, partial, paid
       const validPaymentStatus = editFormData.status === 'outstanding' ? 'unpaid' : editFormData.status;
       
-      const updatedSale = await updateOutletSale(selectedSale.id, {
+      const updatedDebt = await updateOutletDebt(selectedSale.id, {
         subtotal: editFormData.subtotal,
         tax_amount: editFormData.tax,
-        credit_brought_forward: editFormData.creditBroughtForward,
-        adjustments: editFormData.adjustments,
-        adjustment_reason: editFormData.adjustmentReason,
         total_amount: editFormData.total,
         amount_paid: editFormData.amountPaid,
+        remaining_amount: (editFormData.total || 0) - (editFormData.amountPaid || 0),
         payment_status: validPaymentStatus
       });
       
-      if (updatedSale) {
-        console.log('✅ Sale record updated successfully');
+      if (updatedDebt) {
+        console.log('✅ Debt record updated successfully');
         
         // Step 4: Delete existing items
-        console.log('🗑️ Deleting existing sale items...');
-        await deleteOutletSaleItemsBySaleId(selectedSale.id);
+        console.log('🗑️ Deleting existing debt items...');
+        for (const oldItem of oldItems) {
+          if (oldItem.id) {
+            await deleteOutletDebtItem(oldItem.id);
+          }
+        }
         
         // Step 5: Create new items and update inventory
-        console.log('➕ Creating new sale items and updating inventory...', editFormData.items?.length || 0, 'items');
+        console.log('➕ Creating new debt items and updating inventory...', editFormData.items?.length || 0, 'items');
         for (const item of (editFormData.items || [])) {
           const itemTotal = item.quantity * item.price;
           console.log(`  - Creating item: ${item.name}, qty: ${item.quantity}, price: ${item.price}, total: ${itemTotal}`);
           
-          await createOutletSaleItem({
-            sale_id: selectedSale.id,
+          await createOutletDebtItem({
+            debt_id: selectedSale.id,
             product_name: item.name,
             quantity: item.quantity,
             unit_price: item.price,
@@ -895,54 +898,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         
         console.log('✅ All items created and inventory updated successfully');
         
-        // Step 6: Update the outlet_debts table to sync customer balances
-        console.log('💰 Updating outlet_debts table to sync customer balances...');
-        const relatedDebts = await getOutletDebtsBySaleId(selectedSale.id);
-        
-        if (relatedDebts && relatedDebts.length > 0) {
-          console.log(`  Found ${relatedDebts.length} related debt record(s)`);
-          
-          // Calculate the new outstanding amount
-          const newTotal = editFormData.total || 0;
-          const newAmountPaid = editFormData.amountPaid || 0;
-          const newOutstanding = Math.max(0, newTotal - newAmountPaid);
-          
-          // Determine the new status for outlet_debts
-          let newDebtStatus: 'outstanding' | 'paid' | 'partial';
-          if (newOutstanding === 0) {
-            newDebtStatus = 'paid';
-          } else if (newAmountPaid > 0) {
-            newDebtStatus = 'partial';
-          } else {
-            newDebtStatus = 'outstanding'; // This is OK for outlet_debts table
-          }
-          
-          // Determine the new payment_status for outlet_sales (must be: paid, partial, unpaid, refunded)
-          let newPaymentStatus: string;
-          if (newOutstanding === 0) {
-            newPaymentStatus = 'paid';
-          } else if (newAmountPaid > 0) {
-            newPaymentStatus = 'partial';
-          } else {
-            newPaymentStatus = 'unpaid'; // Changed from 'outstanding' to 'unpaid'
-          }
-          
-          // Update each related debt record
-          for (const debt of relatedDebts) {
-            console.log(`  - Updating debt ${debt.id}: amount=${newOutstanding}, status=${newDebtStatus}`);
-            await updateOutletDebt(debt.id || '', {
-              amount: newOutstanding,
-              status: newDebtStatus,
-              paid_amount: newAmountPaid,
-              updated_at: new Date().toISOString()
-            });
-          }
-          console.log('✅ Outlet debts updated successfully');
-        } else {
-          console.log('  ℹ️ No related debt records found - debt may have been deleted already');
-        }
-        
-        // Mark the sale as edited
+        // Mark the debt as edited
         const editedSale = {
           ...selectedSale,
           ...editFormData,
@@ -958,7 +914,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         fetchSavedDebts(); // Refresh the list
         fetchInventoryProducts(); // Refresh inventory products
       } else {
-        console.error('❌ updateOutletSale returned null');
+        console.error('❌ updateOutletDebt returned null');
         toast({
           title: "Error",
           description: "Failed to update debt record - database returned null",
@@ -991,7 +947,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       total: sale.total,
       paymentMethod: 'debt',
       amountPaid: sale.amountPaid || 0,
-      amountReceived: sale.amountReceived || 0,
+      remainingAmount: sale.remainingAmount || 0,
       debtPaymentAmount: 0,
       previousDebtBalance: sale.creditBroughtForward || 0,
       change: 0,
@@ -1010,33 +966,45 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     PrintUtils.printDebtInvoice(transaction);
   };
 
-  const handleDelete = async (saleId: string) => {
-    console.log('handleDelete called with saleId:', saleId);
+  const handleDelete = async (debtId: string) => {
+    console.log('handleDelete called with debtId:', debtId);
     try {
-      // First, find and delete any associated debt records
-      const debts = await getOutletDebtsBySaleId(saleId);
-      console.log('Found debts to delete:', debts);
+      // Step 1: Get the debt items before deletion to reverse inventory
+      console.log('📋 Fetching debt items to reverse inventory...');
+      const debtItems = await getOutletDebtItemsByDebtId(debtId);
+      console.log(`  Found ${debtItems.length} items`);
       
-      for (const debt of debts) {
-        if (debt.id) {
-          await deleteOutletDebt(debt.id);
-          console.log('Deleted debt:', debt.id);
+      // Step 2: Reverse the sold quantities (subtract from inventory)
+      console.log('🔄 Reversing inventory sold quantities...');
+      let reversedCount = 0;
+      for (const item of debtItems) {
+        console.log(`  - Reversing: ${item.product_name}, qty: ${item.quantity}`);
+        // Subtract by adding negative quantity
+        const success = await incrementSoldQuantity(outletId, item.product_name || '', -item.quantity);
+        if (success) {
+          reversedCount++;
+          console.log(`    ✅ Reversed ${item.product_name}`);
+        } else {
+          console.warn(`    ⚠️ Failed to reverse ${item.product_name} - product may not exist in inventory`);
         }
       }
+      console.log(`✅ Reversed ${reversedCount}/${debtItems.length} items`);
       
-      // Then delete the sale
-      const success = await deleteOutletSale(saleId);
-      console.log('deleteOutletSale result:', success);
+      // Step 3: Delete the debt (cascade will delete items and payments)
+      console.log('🗑️ Deleting debt record...');
+      const success = await deleteOutletDebt(debtId);
+      console.log('deleteOutletDebt result:', success);
       
       if (success) {
-        const updatedSales = sales.filter(s => s.id !== saleId);
+        const updatedSales = sales.filter(s => s.id !== debtId);
         setSales(updatedSales);
         toast({
           title: "Debt Deleted",
-          description: `The debt record and ${debts.length} associated debt entries have been removed`
+          description: `The debt record and ${debtItems.length} items have been removed, ${reversedCount} inventory items updated`
         });
         // Refresh the list to ensure sync with database
         await fetchSavedDebts();
+        await fetchInventoryProducts(); // Refresh inventory products
       } else {
         toast({
           title: "Error",
@@ -1054,7 +1022,33 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     }
   };
 
-  const totalDebt = sales.reduce((sum, sale) => sum + sale.total, 0);
+  // Calculate filtered sales for header statistics
+  const filteredSales = sales.filter(sale => {
+    // Date range filter
+    if (startDate || endDate) {
+      const saleDate = new Date(sale.date);
+      if (startDate && saleDate < new Date(startDate)) return false;
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        if (saleDate > endDateTime) return false;
+      }
+    }
+    // Search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const customerName = (sale.customer || '').toLowerCase();
+      const invoiceNumber = (sale.invoiceNumber || '').toLowerCase();
+      if (!customerName.includes(searchLower) && !invoiceNumber.includes(searchLower)) {
+        return false;
+      }
+    }
+    return true;
+  });
+  
+  const totalDebt = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalPaid = filteredSales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+  const totalRemaining = totalDebt - totalPaid;
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -1071,9 +1065,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         </div>
         <div className="text-right">
           <Badge variant="outline" className="text-lg px-4 py-2">
-            {sales.length} Debts
+            {filteredSales.length} Debts
           </Badge>
-          <p className="text-sm text-muted-foreground mt-1">Total: {formatCurrency(totalDebt)}</p>
+          <div className="mt-2 space-y-1">
+            <p className="text-sm text-muted-foreground">Total: {formatCurrency(totalDebt)}</p>
+            <p className="text-xs text-green-600">Paid: {formatCurrency(totalPaid)}</p>
+            <p className="text-xs text-red-600">Remaining: {formatCurrency(totalRemaining)}</p>
+          </div>
         </div>
       </div>
 
@@ -1371,8 +1369,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   <p className="text-sm text-muted-foreground">Invoice Number</p>
                   <p className="font-semibold">{selectedSale.invoiceNumber}</p>
                 </div>
-                <Badge className={selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                  {selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'Paid' : selectedSale.status}
+                <Badge className={
+                  selectedSale.amountPaid === 0 ? 'bg-red-100 text-red-800' :
+                  selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }>
+                  {selectedSale.amountPaid === 0 ? 'Unpaid' :
+                   selectedSale.amountPaid >= selectedSale.total ? 'Paid' : 'Partial'}
                 </Badge>
               </div>
 
@@ -1475,9 +1478,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm font-medium">Payment Method</span>
-                <Badge className={selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                <Badge className={
+                  selectedSale.amountPaid === 0 ? 'bg-red-100 text-red-800' :
+                  selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }>
                   <FileText className="h-3 w-3 mr-1" />
-                  {selectedSale.amountPaid && selectedSale.amountPaid >= selectedSale.total ? 'Paid (was Debt)' : 'Debt'}
+                  {selectedSale.amountPaid === 0 ? 'Unpaid Debt' :
+                   selectedSale.amountPaid >= selectedSale.total ? 'Paid (was Debt)' : 'Partial Payment'}
                 </Badge>
               </div>
             </div>

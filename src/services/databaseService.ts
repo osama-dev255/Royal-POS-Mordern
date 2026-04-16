@@ -4050,6 +4050,52 @@ export interface OutletSaleItem {
   created_at?: string;
 }
 
+// New Debt-specific interfaces
+export interface OutletDebt {
+  id?: string;
+  outlet_id: string;
+  customer_id?: string;
+  user_id?: string;
+  invoice_number: string;
+  debt_date?: string;
+  due_date?: string;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  remaining_amount: number;
+  payment_status: string; // 'unpaid', 'partial', 'paid'
+  notes?: string;
+  reference_number?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OutletDebtItem {
+  id?: string;
+  debt_id: string;
+  product_id?: string;
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  total_price: number;
+  created_at?: string;
+}
+
+export interface OutletDebtPayment {
+  id?: string;
+  debt_id: string;
+  payment_date?: string;
+  amount: number;
+  payment_method: string;
+  reference_number?: string;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
 export const createOutletSale = async (sale: Omit<OutletSale, 'id'>): Promise<OutletSale | null> => {
   try {
     console.log('createOutletSale received:', sale);
@@ -4269,21 +4315,6 @@ export const getOutletSaleItemsBySaleId = async (saleId: string): Promise<Outlet
 };
 
 // Outlet Debts CRUD operations - completely separate from general debts
-export interface OutletDebt {
-  id?: string;
-  outlet_id: string;
-  customer_id?: string;
-  sale_id?: string; // Reference to the sale that created this debt
-  amount: number;
-  description?: string;
-  status: 'outstanding' | 'paid' | 'partial';
-  due_date?: string;
-  paid_amount?: number;
-  paid_date?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
 export const createOutletDebt = async (debt: Omit<OutletDebt, 'id'>): Promise<OutletDebt | null> => {
   try {
     const { data, error } = await supabase
@@ -4322,34 +4353,19 @@ export const getOutletDebtsByOutletId = async (outletId: string): Promise<Outlet
 
 export const getOutletDebtsByCustomerId = async (outletId: string, customerId: string): Promise<OutletDebt[]> => {
   try {
-    // Fetch both outstanding and partial debts (both have remaining balance)
+    // Fetch both unpaid and partial debts (both have remaining balance)
     const { data, error } = await supabase
       .from('outlet_debts')
       .select('*')
       .eq('outlet_id', outletId)
       .eq('customer_id', customerId)
-      .in('status', ['outstanding', 'partial'])
+      .in('payment_status', ['unpaid', 'partial'])
       .order('created_at', { ascending: false });
       
     if (error) throw error;
     return data || [];
   } catch (error) {
     console.error('Error fetching outlet debts by customer:', error);
-    return [];
-  }
-};
-
-export const getOutletDebtsBySaleId = async (saleId: string): Promise<OutletDebt[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('outlet_debts')
-      .select('*')
-      .eq('sale_id', saleId);
-      
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching outlet debts by sale ID:', error);
     return [];
   }
 };
@@ -4663,6 +4679,109 @@ export const deleteOutletCustomerSettlement = async (id: string): Promise<boolea
     return true;
   } catch (error) {
     console.error('Error deleting outlet customer settlement:', error);
+    return false;
+  }
+};
+
+// ============================================
+// Outlet Debt Items & Payments CRUD Operations
+// ============================================
+
+export const createOutletDebtItem = async (item: Omit<OutletDebtItem, 'id'>): Promise<OutletDebtItem | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debt_items')
+      .insert([{
+        ...item,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet debt item:', error);
+    return null;
+  }
+};
+
+export const createOutletDebtPayment = async (payment: Omit<OutletDebtPayment, 'id'>): Promise<OutletDebtPayment | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debt_payments')
+      .insert([{
+        ...payment,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet debt payment:', error);
+    return null;
+  }
+};
+
+export const getOutletDebtItemsByDebtId = async (debtId: string): Promise<OutletDebtItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debt_items')
+      .select('*')
+      .eq('debt_id', debtId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet debt items:', error);
+    return [];
+  }
+};
+
+export const getOutletDebtPaymentsByDebtId = async (debtId: string): Promise<OutletDebtPayment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debt_payments')
+      .select('*')
+      .eq('debt_id', debtId)
+      .order('payment_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet debt payments:', error);
+    return [];
+  }
+};
+
+export const deleteOutletDebtItem = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_debt_items')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet debt item:', error);
+    return false;
+  }
+};
+
+export const deleteOutletDebtPayment = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_debt_payments')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet debt payment:', error);
     return false;
   }
 };

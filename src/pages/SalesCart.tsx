@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -191,8 +191,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const debts = await getOutletDebtsByOutletId(outletId);
           const balances: Record<string, number> = {};
           debts.forEach(debt => {
-            if (debt.customer_id && debt.status === 'outstanding') {
-              balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.amount || 0);
+            if (debt.customer_id && (debt.payment_status === 'unpaid' || debt.payment_status === 'partial')) {
+              balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
             }
           });
           setCustomerBalances(balances);
@@ -646,17 +646,22 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           for (const debt of existingDebts) {
             if (remainingPayment <= 0) break;
             
-            const paymentTowardThisDebt = Math.min(remainingPayment, debt.amount);
-            const newDebtAmount = debt.amount - paymentTowardThisDebt;
+            const paymentTowardThisDebt = Math.min(remainingPayment, debt.remaining_amount);
+            const newRemainingAmount = debt.remaining_amount - paymentTowardThisDebt;
+            const newAmountPaid = debt.amount_paid + paymentTowardThisDebt;
             
-            if (newDebtAmount <= 0) {
+            if (newRemainingAmount <= 0) {
               // Fully paid - delete the debt
               await deleteOutletDebt(debt.id);
               console.log(`Cleared debt ${debt.id}`);
             } else {
-              // Partially paid - update amount
-              await updateOutletDebt(debt.id, { amount: newDebtAmount });
-              console.log(`Reduced debt ${debt.id} to ${newDebtAmount}`);
+              // Partially paid - update amounts
+              await updateOutletDebt(debt.id, { 
+                amount_paid: newAmountPaid,
+                remaining_amount: newRemainingAmount,
+                payment_status: 'partial'
+              });
+              console.log(`Reduced debt ${debt.id} remaining to ${newRemainingAmount}`);
             }
             
             remainingPayment -= paymentTowardThisDebt;
@@ -669,16 +674,60 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
-            sale_id: createdSale.id, // Link debt to the sale for proper deletion
-            amount: remainingNewDebt,  // Only the remaining unpaid amount of new transaction
-            description: `Debt for sale ${createdSale.id || 'unknown'}`,
-            status: "outstanding" as const,
-            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            invoice_number: `INV-${Date.now()}`, // Generate unique invoice number
+            debt_date: new Date().toISOString(),
+            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            subtotal: subtotal,
+            discount_amount: discountAmount,
+            tax_amount: tax,
+            total_amount: totalWithTax,
+            amount_paid: actualAmountPaid,
+            remaining_amount: remainingNewDebt,
+            payment_status: 'unpaid' as const,
+            notes: `Debt for sale ${createdSale.id || 'unknown'}`
           };
 
           const createdDebt = await createOutletDebt(outletDebtData);
           if (!createdDebt) {
             console.warn("Failed to create outlet debt record for transaction");
+          } else {
+            // Create debt items for each cart item
+            console.log('📦 Creating debt items...', itemsWithQuantity.length, 'items');
+            
+            for (const item of itemsWithQuantity) {
+              const product = products.find(p => p.id === item.id);
+              const itemTotal = item.quantity * item.price;
+              const productName = product?.name || item.name;
+              
+              console.log(`  Creating item: ${productName}, qty: ${item.quantity}`);
+              console.log(`  Product object:`, product);
+              
+              // Validate product_id is a proper UUID (standard format: 8-4-4-4-12)
+              let validProductId: string | null = null;
+              if (product?.id) {
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (uuidRegex.test(product.id)) {
+                  validProductId = product.id;
+                  console.log(`  ✅ Valid UUID: ${product.id}`);
+                } else {
+                  console.warn(`  ⚠️ Invalid UUID format: ${product.id}`);
+                  validProductId = null;
+                }
+              }
+              
+              await createOutletDebtItem({
+                debt_id: createdDebt.id!,
+                product_id: validProductId,
+                product_name: productName,
+                quantity: item.quantity,
+                unit_price: item.price,
+                discount_amount: 0,
+                total_price: itemTotal
+              });
+              
+              console.log(`  ✅ Created debt item: ${productName}, qty: ${item.quantity}`);
+            }
+            console.log('✅ All debt items created');
           }
         }
       } else if (paymentMethod === "debt" && selectedCustomer && !outletId) {
@@ -1522,7 +1571,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                           if (outletId) {
                             // Get outlet-specific debts from database only
                             const outletDebts = await getOutletDebtsByCustomerId(outletId, customer.id);
-                            totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+                            totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
                           } else {
                             // Get general debts from database
                             const dbDebts = await getDebtsByCustomerId(customer.id);
