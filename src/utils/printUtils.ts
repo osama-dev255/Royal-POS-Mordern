@@ -3296,6 +3296,210 @@ export class PrintUtils {
   }
 
   // Print invoice for Debt payment transactions
+  static printSettlementReceipt(transaction: any) {
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) return;
+    
+    const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+    const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
+    const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
+    
+    const receiptNumber = transaction.receiptNumber || `SETTLE-${Date.now()}`;
+    const receiptDate = new Date(transaction.date || new Date());
+    const dateStr = receiptDate.toLocaleDateString();
+    const timeStr = receiptDate.toLocaleTimeString();
+    
+    const customerName = transaction.customer?.name || 'Walk-in Customer';
+    const paymentMethod = (transaction.paymentMethod || 'Cash').toUpperCase();
+    
+    const previousBalance = transaction.previousDebtBalance || 0;
+    const amountPaid = transaction.debtPaymentAmount || transaction.amountPaid || 0;
+    const newBalance = transaction.newBalance || (previousBalance - amountPaid);
+    
+    const formatCurrency = (amount: number) => {
+      return `TSh ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+    
+    const reportContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Settlement Receipt ${receiptNumber}</title>
+          <style>
+            @media print {
+              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            }
+            @page {
+              size: 80mm auto;
+              margin: 5mm;
+            }
+            body {
+              font-family: 'Courier New', monospace;
+              margin: 0;
+              padding: 10px;
+              color: #000;
+              font-size: 12px;
+              line-height: 1.4;
+              max-width: 70mm;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 15px;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 10px;
+            }
+            .business-name {
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .business-info {
+              font-size: 9px;
+              margin-bottom: 2px;
+            }
+            .receipt-title {
+              font-size: 14px;
+              font-weight: bold;
+              margin: 10px 0 5px 0;
+              text-transform: uppercase;
+            }
+            .receipt-number {
+              font-size: 11px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .datetime {
+              font-size: 10px;
+              margin-bottom: 2px;
+            }
+            .section {
+              margin: 10px 0;
+              border-bottom: 1px dashed #ccc;
+              padding-bottom: 8px;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 10px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 3px;
+              font-size: 10px;
+            }
+            .info-label {
+              font-weight: bold;
+            }
+            .settlement-box {
+              background-color: #f5f5f5;
+              padding: 10px;
+              border-radius: 4px;
+              margin: 10px 0;
+            }
+            .settlement-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 8px;
+              font-size: 11px;
+            }
+            .settlement-row.total {
+              font-weight: bold;
+              font-size: 13px;
+              border-top: 2px solid #000;
+              padding-top: 8px;
+              margin-top: 8px;
+            }
+            .payment-badge {
+              display: inline-block;
+              background-color: #000;
+              color: #fff;
+              padding: 3px 8px;
+              border-radius: 3px;
+              font-size: 10px;
+              font-weight: bold;
+              margin-top: 5px;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              font-size: 9px;
+              border-top: 2px dashed #000;
+              padding-top: 10px;
+            }
+            .thank-you {
+              font-size: 11px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="business-name">${businessName}</div>
+            <div class="business-info">${businessAddress}</div>
+            <div class="business-info">Tel: ${businessPhone}</div>
+            
+            <div class="receipt-title">Customer Settlement Receipt</div>
+            <div class="receipt-number">#${receiptNumber}</div>
+            <div class="datetime">Date: ${dateStr}</div>
+            <div class="datetime">Time: ${timeStr}</div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Customer Information</div>
+            <div class="info-row">
+              <span class="info-label">Name:</span>
+              <span>${customerName}</span>
+            </div>
+          </div>
+          
+          <div class="settlement-box">
+            <div class="section-title" style="margin-bottom: 10px;">Settlement Details</div>
+            
+            <div class="settlement-row">
+              <span>Previous Balance:</span>
+              <span>${formatCurrency(previousBalance)}</span>
+            </div>
+            
+            <div class="settlement-row" style="color: #059669;">
+              <span>Amount Paid:</span>
+              <span>-${formatCurrency(amountPaid)}</span>
+            </div>
+            
+            <div class="settlement-row total">
+              <span>New Balance:</span>
+              <span>${formatCurrency(newBalance)}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Payment Information</div>
+            <div class="info-row">
+              <span class="info-label">Payment Method:</span>
+              <span class="payment-badge">${paymentMethod}</span>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <div class="thank-you">Thank you for your payment!</div>
+            <div>We appreciate your business.</div>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    reportWindow.document.write(reportContent);
+    reportWindow.document.close();
+  }
+
   static printDebtInvoice(transaction: any) {
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) return;

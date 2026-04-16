@@ -302,34 +302,54 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   };
 
   const handlePrint = (receipt: ReceiptSale) => {
-    const transaction = {
-      receiptNumber: receipt.invoiceNumber,
-      date: receipt.date,
-      items: receipt.items,
-      subtotal: receipt.subtotal,
-      tax: receipt.tax,
-      discount: 0,
-      shipping: 0,
-      adjustments: 0,
-      total: receipt.total,
-      paymentMethod: receipt.paymentMethod,
-      amountPaid: receipt.amountPaid,
-      amountReceived: receipt.amountPaid,
-      debtPaymentAmount: 0,
-      previousDebtBalance: 0,
-      change: 0,
-      customer: {
-        name: receipt.customer,
-        phone: '',
-        address: '',
-        email: ''
-      },
-      salesman: 'Not Assigned',
-      driver: 'Not Assigned',
-      dueDate: receipt.date
-    };
-    
-    PrintUtils.printReceipt(transaction);
+    // Check if this is a customer settlement
+    if (receipt.type === 'sales' && receipt.previousBalance !== undefined) {
+      // Use professional settlement receipt format
+      const transaction = {
+        receiptNumber: receipt.invoiceNumber,
+        date: receipt.date,
+        customer: {
+          name: receipt.customer
+        },
+        paymentMethod: receipt.paymentMethod,
+        amountPaid: receipt.amountPaid,
+        debtPaymentAmount: receipt.amountPaid,
+        previousDebtBalance: receipt.previousBalance || 0,
+        newBalance: receipt.newBalance || 0
+      };
+      
+      PrintUtils.printSettlementReceipt(transaction);
+    } else {
+      // Use regular receipt format for other types
+      const transaction = {
+        receiptNumber: receipt.invoiceNumber,
+        date: receipt.date,
+        items: receipt.items,
+        subtotal: receipt.subtotal,
+        tax: receipt.tax,
+        discount: 0,
+        shipping: 0,
+        adjustments: 0,
+        total: receipt.total,
+        paymentMethod: receipt.paymentMethod,
+        amountPaid: receipt.amountPaid,
+        amountReceived: receipt.amountPaid,
+        debtPaymentAmount: 0,
+        previousDebtBalance: 0,
+        change: 0,
+        customer: {
+          name: receipt.customer,
+          phone: '',
+          address: '',
+          email: ''
+        },
+        salesman: 'Not Assigned',
+        driver: 'Not Assigned',
+        dueDate: receipt.date
+      };
+      
+      PrintUtils.printReceipt(transaction);
+    }
   };
   
   // Save commission receipt
@@ -1390,7 +1410,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   </div>
                   <div className="flex gap-2">
                     <Badge className="bg-green-100 text-green-800">{selectedReceipt.status}</Badge>
-                    <Badge variant="outline" className="capitalize">{selectedReceipt.type}</Badge>
+                    <Badge variant="outline" className="capitalize">
+                      {selectedReceipt.type === 'sales' && selectedReceipt.previousBalance !== undefined ? 'Customer Settlement' : selectedReceipt.type}
+                    </Badge>
                   </div>
                 </div>
 
@@ -1412,8 +1434,38 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   </div>
                 </div>
 
-                {/* Items */}
-                {selectedReceipt.items.length > 0 && (
+                {/* Settlement-specific fields */}
+                {selectedReceipt.type === 'sales' && selectedReceipt.previousBalance !== undefined && (
+                  <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                    <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Settlement Details
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-blue-700">Previous Balance:</span>
+                        <span className="text-lg font-bold text-blue-900">
+                          {formatCurrency(selectedReceipt.previousBalance || 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-green-700">Amount Paid:</span>
+                        <span className="text-lg font-bold text-green-600">
+                          -{formatCurrency(selectedReceipt.amountPaid)}
+                        </span>
+                      </div>
+                      <div className="border-t-2 border-blue-300 pt-3 flex justify-between items-center">
+                        <span className="text-base font-bold text-blue-900">New Balance:</span>
+                        <span className="text-2xl font-bold text-blue-900">
+                          {formatCurrency(selectedReceipt.newBalance || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Items - Only show for non-settlement types */}
+                {selectedReceipt.type !== 'sales' && selectedReceipt.items.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <ShoppingCart className="h-4 w-4 text-muted-foreground" />
@@ -1444,29 +1496,43 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   </div>
                 )}
 
-                {/* Totals */}
-                <div className="space-y-2 pt-2 border-t">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{formatCurrency(selectedReceipt.subtotal)}</span>
+                {/* Totals - Only show for non-settlement types */}
+                {selectedReceipt.type !== 'sales' && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>{formatCurrency(selectedReceipt.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tax (18%)</span>
+                      <span>{formatCurrency(selectedReceipt.tax)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                      <span>Total</span>
+                      <span className="text-green-600">{formatCurrency(selectedReceipt.total)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax (18%)</span>
-                    <span>{formatCurrency(selectedReceipt.tax)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total</span>
-                    <span className="text-green-600">{formatCurrency(selectedReceipt.total)}</span>
-                  </div>
-                </div>
+                )}
 
-                {/* Payment Method */}
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <span className="text-sm font-medium">Payment Method</span>
-                  <Badge className="bg-green-100 text-green-800 capitalize">
-                    {selectedReceipt.paymentMethod}
-                  </Badge>
-                </div>
+                {/* Payment Method - Only show for non-settlement types */}
+                {selectedReceipt.type !== 'sales' && (
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <span className="text-sm font-medium">Payment Method</span>
+                    <Badge className="bg-green-100 text-green-800 capitalize">
+                      {selectedReceipt.paymentMethod}
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Payment Method for Settlements */}
+                {selectedReceipt.type === 'sales' && selectedReceipt.previousBalance !== undefined && (
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
+                    <span className="text-sm font-medium text-blue-900">Payment Method</span>
+                    <Badge className="bg-blue-900 text-white capitalize text-sm">
+                      {selectedReceipt.paymentMethod}
+                    </Badge>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-4">
