@@ -3297,207 +3297,412 @@ export class PrintUtils {
 
   // Print invoice for Debt payment transactions
   static printSettlementReceipt(transaction: any) {
-    const reportWindow = window.open('', '_blank');
-    if (!reportWindow) return;
+    // Show loading indicator
+    this.showLoadingIndicator('Preparing customer settlement...');
+    
+    // For mobile devices, use the mobile print approach
+    if (this.isMobileDevice()) {
+      return this.printCustomerSettlementMobile(transaction);
+    }
+
+    // For desktop, use a hidden iframe approach to avoid window stacking
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'absolute';
+    printFrame.style.top = '-1000px';
+    printFrame.style.left = '-1000px';
+    document.body.appendChild(printFrame);
+    
+    const printDocument = printFrame.contentDocument || printFrame.contentWindow?.document;
+    if (!printDocument) {
+      this.hideLoadingIndicator();
+      console.error('Could not access print frame document');
+      return;
+    }
     
     const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
     const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
     const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
+    const businessEmail = localStorage.getItem('businessEmail') || '';
     
     const receiptNumber = transaction.receiptNumber || `SETTLE-${Date.now()}`;
     const receiptDate = new Date(transaction.date || new Date());
-    const dateStr = receiptDate.toLocaleDateString();
-    const timeStr = receiptDate.toLocaleTimeString();
+    const dateStr = receiptDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     
     const customerName = transaction.customer?.name || 'Walk-in Customer';
-    const paymentMethod = (transaction.paymentMethod || 'Cash').toUpperCase();
+    const paymentMethod = transaction.paymentMethod || 'Cash';
+    const paymentMethodUpper = paymentMethod.toUpperCase();
     
     const previousBalance = transaction.previousDebtBalance || 0;
     const amountPaid = transaction.debtPaymentAmount || transaction.amountPaid || 0;
     const newBalance = transaction.newBalance || (previousBalance - amountPaid);
     
     const formatCurrency = (amount: number) => {
-      return `TSh ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
     
-    const reportContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Settlement Receipt ${receiptNumber}</title>
-          <style>
-            @media print {
-              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-            }
-            @page {
-              size: 80mm auto;
-              margin: 5mm;
-            }
-            body {
-              font-family: 'Courier New', monospace;
-              margin: 0;
-              padding: 10px;
-              color: #000;
-              font-size: 12px;
-              line-height: 1.4;
-              max-width: 70mm;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 15px;
-              border-bottom: 2px dashed #000;
-              padding-bottom: 10px;
-            }
-            .business-name {
-              font-size: 16px;
-              font-weight: bold;
-              margin-bottom: 3px;
-            }
-            .business-info {
-              font-size: 9px;
-              margin-bottom: 2px;
-            }
-            .receipt-title {
-              font-size: 14px;
-              font-weight: bold;
-              margin: 10px 0 5px 0;
-              text-transform: uppercase;
-            }
-            .receipt-number {
-              font-size: 11px;
-              font-weight: bold;
-              margin-bottom: 5px;
-            }
-            .datetime {
-              font-size: 10px;
-              margin-bottom: 2px;
-            }
-            .section {
-              margin: 10px 0;
-              border-bottom: 1px dashed #ccc;
-              padding-bottom: 8px;
-            }
-            .section-title {
-              font-weight: bold;
-              font-size: 10px;
-              margin-bottom: 5px;
-              text-transform: uppercase;
-            }
-            .info-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 3px;
-              font-size: 10px;
-            }
-            .info-label {
-              font-weight: bold;
-            }
-            .settlement-box {
-              background-color: #f5f5f5;
-              padding: 10px;
-              border-radius: 4px;
-              margin: 10px 0;
-            }
-            .settlement-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 8px;
-              font-size: 11px;
-            }
-            .settlement-row.total {
-              font-weight: bold;
-              font-size: 13px;
-              border-top: 2px solid #000;
-              padding-top: 8px;
-              margin-top: 8px;
-            }
-            .payment-badge {
-              display: inline-block;
-              background-color: #000;
-              color: #fff;
-              padding: 3px 8px;
-              border-radius: 3px;
-              font-size: 10px;
-              font-weight: bold;
-              margin-top: 5px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 15px;
-              font-size: 9px;
-              border-top: 2px dashed #000;
-              padding-top: 10px;
-            }
-            .thank-you {
-              font-size: 11px;
-              font-weight: bold;
-              margin-bottom: 5px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="business-name">${businessName}</div>
-            <div class="business-info">${businessAddress}</div>
-            <div class="business-info">Tel: ${businessPhone}</div>
-            
-            <div class="receipt-title">Customer Settlement Receipt</div>
-            <div class="receipt-number">#${receiptNumber}</div>
-            <div class="datetime">Date: ${dateStr}</div>
-            <div class="datetime">Time: ${timeStr}</div>
-          </div>
-          
-          <div class="section">
-            <div class="section-title">Customer Information</div>
-            <div class="info-row">
-              <span class="info-label">Name:</span>
-              <span>${customerName}</span>
-            </div>
-          </div>
-          
-          <div class="settlement-box">
-            <div class="section-title" style="margin-bottom: 10px;">Settlement Details</div>
-            
-            <div class="settlement-row">
-              <span>Previous Balance:</span>
-              <span>${formatCurrency(previousBalance)}</span>
-            </div>
-            
-            <div class="settlement-row" style="color: #059669;">
-              <span>Amount Paid:</span>
-              <span>-${formatCurrency(amountPaid)}</span>
-            </div>
-            
-            <div class="settlement-row total">
-              <span>New Balance:</span>
-              <span>${formatCurrency(newBalance)}</span>
-            </div>
-          </div>
-          
-          <div class="section">
-            <div class="section-title">Payment Information</div>
-            <div class="info-row">
-              <span class="info-label">Payment Method:</span>
-              <span class="payment-badge">${paymentMethod}</span>
-            </div>
-          </div>
-          
-          <div class="footer">
-            <div class="thank-you">Thank you for your payment!</div>
-            <div>We appreciate your business.</div>
-          </div>
-          
-          <script>
-            window.onload = function() {
-              window.print();
-            }
-          </script>
-        </body>
-      </html>
-    `;
+    // Get status badge
+    const getStatusBadge = () => {
+      if (newBalance === 0) return '✓ FULLY SETTLED';
+      if (amountPaid > 0 && newBalance > 0) return '◐ PARTIAL PAYMENT';
+      return '○ PENDING';
+    };
     
-    reportWindow.document.write(reportContent);
-    reportWindow.document.close();
+    // Format the settlement statement content
+    const settlementContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>Settlement Statement ${receiptNumber}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      @media print {
+        @page {
+          margin: 0;
+          size: A4;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        .no-print {
+          display: none;
+        }
+      }
+      @page {
+        margin: 0;
+        size: A4;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        max-width: 180mm;
+        margin: 0 auto;
+        padding: 15mm;
+        background: #fff;
+        color: #000;
+      }
+      .statement-container {
+        padding: 8px;
+        background: #fff;
+      }
+      .header-section {
+        text-align: center;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+      }
+      .logo-area {
+        font-size: 20px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+      }
+      .business-details {
+        font-size: 8px;
+        line-height: 1.4;
+        margin-bottom: 5px;
+      }
+      .statement-title {
+        background: #000;
+        color: #fff;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 3px;
+        text-align: center;
+        margin: 8px 0;
+        text-transform: uppercase;
+      }
+      .meta-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        margin-bottom: 10px;
+        padding: 6px;
+        background: #f5f5f5;
+      }
+      .meta-label {
+        font-weight: 700;
+        display: block;
+        font-size: 7px;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+        color: #666;
+      }
+      .meta-value {
+        font-weight: 600;
+      }
+      .customer-section {
+        margin-bottom: 10px;
+        padding: 6px;
+        background: #fafafa;
+      }
+      .section-label {
+        font-size: 8px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+        color: #000;
+      }
+      .customer-name {
+        font-size: 13px;
+        font-weight: 900;
+        margin-bottom: 2px;
+      }
+      .transaction-box {
+        margin: 10px 0;
+        background: #fff;
+      }
+      .transaction-header {
+        background: #000;
+        color: #fff;
+        padding: 4px 6px;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .transaction-body {
+        padding: 8px 6px;
+      }
+      .transaction-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        font-size: 10px;
+      }
+      .transaction-row:last-child {
+        margin-bottom: 0;
+      }
+      .row-label {
+        font-weight: 600;
+        color: #333;
+      }
+      .row-value {
+        font-weight: 700;
+        text-align: right;
+      }
+      .amount-negative {
+        color: #000;
+        text-decoration: line-through;
+      }
+      .calculation-section {
+        margin: 10px 0;
+        background: #f0f0f0;
+      }
+      .calc-header {
+        background: #333;
+        color: #fff;
+        padding: 4px 6px;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .calc-body {
+        padding: 8px 6px;
+      }
+      .calc-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 10px;
+      }
+      .calc-row:last-child {
+        border-bottom: none;
+      }
+      .calc-row.grand-total {
+        border-top: 2px solid #000;
+        margin-top: 4px;
+        padding-top: 6px;
+        font-size: 13px;
+        font-weight: 900;
+        background: #fff;
+        padding: 6px;
+        margin: 4px -6px -8px -6px;
+      }
+      .payment-badge {
+        display: inline-block;
+        background: #000;
+        color: #fff;
+        padding: 3px 8px;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        text-transform: uppercase;
+      }
+      .status-badge {
+        display: block;
+        text-align: center;
+        padding: 6px;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        margin: 10px 0;
+        background: #fff;
+      }
+      .footer-section {
+        margin-top: 10px;
+        padding-top: 8px;
+        text-align: center;
+      }
+      .footer-message {
+        font-size: 9px;
+        font-weight: 700;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .footer-sub {
+        font-size: 8px;
+        color: #666;
+        line-height: 1.3;
+      }
+      .barcode-area {
+        margin-top: 8px;
+        padding: 4px;
+        background: #f5f5f5;
+        font-size: 8px;
+        font-family: 'Libre Barcode 39', cursive;
+        text-align: center;
+      }
+      .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        font-size: 60px;
+        font-weight: 900;
+        color: rgba(0, 0, 0, 0.03);
+        pointer-events: none;
+        z-index: 0;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="statement-container">
+      <div class="watermark">SETTLEMENT</div>
+      
+      <div class="header-section">
+        <div class="logo-area">${businessName}</div>
+        <div class="business-details">
+          ${businessAddress}<br>
+          Tel: ${businessPhone}
+          ${businessEmail ? `<br>${businessEmail}` : ''}
+        </div>
+      </div>
+      
+      <div class="statement-title">Payment Statement</div>
+      
+      <div class="meta-info">
+        <div>
+          <span class="meta-label">Receipt No</span>
+          <span class="meta-value">${receiptNumber}</span>
+        </div>
+        <div style="text-align: right;">
+          <span class="meta-label">Date & Time</span>
+          <span class="meta-value">${dateStr}<br>${timeStr}</span>
+        </div>
+      </div>
+      
+      <div class="customer-section">
+        <div class="section-label">Settled By</div>
+        <div class="customer-name">${customerName}</div>
+      </div>
+      
+      <div class="transaction-box">
+        <div class="transaction-header">Payment Details</div>
+        <div class="transaction-body">
+          <div class="transaction-row">
+            <span class="row-label">Payment Mode</span>
+            <span class="payment-badge">${paymentMethodUpper}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="calculation-section">
+        <div class="calc-header">Account Summary</div>
+        <div class="calc-body">
+          ${previousBalance > 0 ? `
+          <div class="calc-row">
+            <span>Opening Balance</span>
+            <span class="row-value">${formatCurrency(previousBalance)}</span>
+          </div>
+          ` : ''}
+          <div class="calc-row">
+            <span>Payment Received</span>
+            <span class="row-value amount-negative">- ${formatCurrency(amountPaid)}</span>
+          </div>
+          <div class="calc-row grand-total">
+            <span>Closing Balance</span>
+            <span class="row-value">${formatCurrency(newBalance)}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="status-badge">${getStatusBadge()}</div>
+      
+      <div class="footer-section">
+        <div class="footer-message">Thank You For Your Payment</div>
+        <div class="footer-sub">
+          This is a computer-generated statement<br>
+          and does not require signature
+        </div>
+        <div class="barcode-area">
+          *${receiptNumber}*
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      window.onload = function() {
+        setTimeout(function() {
+          window.print();
+        }, 300);
+      }
+    </script>
+  </body>
+</html>`;
+    
+    // Write content to iframe and print
+    printDocument.open();
+    printDocument.write(settlementContent);
+    printDocument.close();
+    
+    // Wait for content to load before printing
+    printFrame.onload = () => {
+      try {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      } catch (error) {
+        console.error('Error during printing:', error);
+      } finally {
+        // Clean up - remove iframe after a short delay to ensure printing started
+        setTimeout(() => {
+          if (printFrame.parentNode) {
+            printFrame.parentNode.removeChild(printFrame);
+          }
+          this.hideLoadingIndicator();
+        }, 1000);
+      }
+    };
+    
+    // Fallback cleanup in case onload doesn't fire
+    setTimeout(() => {
+      if (printFrame.parentNode) {
+        printFrame.parentNode.removeChild(printFrame);
+      }
+      this.hideLoadingIndicator();
+    }, 5000);
   }
 
   static printDebtInvoice(transaction: any) {
