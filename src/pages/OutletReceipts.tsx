@@ -138,7 +138,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           try {
             // getOutletDebtsByCustomerId now only returns outstanding + partial debts
             const debts = await getOutletDebtsByCustomerId(outletId, customer.id || '');
-            const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+            const totalBalance = debts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
             console.log(`  Customer ${customer.first_name} ${customer.last_name}:`, {
               totalDebts: debts.length,
               balance: totalBalance
@@ -165,7 +165,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       // getOutletDebtsByCustomerId now only returns outstanding + partial debts
       const debts = await getOutletDebtsByCustomerId(outletId, customerId);
       console.log('  Active debts found:', debts.length);
-      const totalBalance = debts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+      const totalBalance = debts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
       console.log('  Total balance:', totalBalance);
       setSettlementCustomerBalance(totalBalance);
       setSettlementPreviousBalance(totalBalance);
@@ -318,11 +318,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       
       // Fetch actual outstanding customer debts from outlet_debts table
       const allDebts = await getOutletDebtsByOutletId(outletId);
-      // Include both 'outstanding' and 'partial' status debts (both have remaining balance)
+      // Include both 'unpaid' and 'partial' status debts (both have remaining balance)
       const outstandingDebts = allDebts.filter(debt => 
-        debt.status === 'outstanding' || debt.status === 'partial'
+        debt.payment_status === 'unpaid' || debt.payment_status === 'partial'
       );
-      const totalDebt = outstandingDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
+      const totalDebt = outstandingDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
       setTotalCustomerDebt(totalDebt);
       console.log('Total customer debt (from outlet_debts):', totalDebt, 'Outstanding debts:', outstandingDebts.length, 'All debts:', allDebts.length);
       
@@ -642,16 +642,17 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           for (const debt of outstandingDebts) {
             if (remainingPayment <= 0) break;
             
-            const currentDebtAmount = debt.amount || 0;
-            const paidAmount = debt.paid_amount || 0;
+            const currentDebtAmount = debt.remaining_amount || 0;
+            const totalAmount = debt.total_amount || 0;
+            const alreadyPaid = debt.amount_paid || 0;
             
             if (remainingPayment >= currentDebtAmount) {
               // Pay off this debt completely
               console.log(`  ✓ Paying off debt ${debt.id} completely (${currentDebtAmount})`);
               await updateOutletDebt(debt.id || '', {
-                amount: 0,
-                paid_amount: currentDebtAmount + paidAmount,
-                status: 'paid',
+                amount_paid: totalAmount,
+                remaining_amount: 0,
+                payment_status: 'paid',
                 updated_at: new Date().toISOString()
               });
               
@@ -686,10 +687,14 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
             } else {
               // Partially pay this debt
               console.log(`  ◐ Partially paying debt ${debt.id} (${remainingPayment} of ${currentDebtAmount})`);
+              const newRemainingAmount = currentDebtAmount - remainingPayment;
+              const newAmountPaid = alreadyPaid + remainingPayment;
+              const newPaymentStatus = newRemainingAmount > 0 ? 'partial' : 'paid';
+              
               await updateOutletDebt(debt.id || '', {
-                amount: currentDebtAmount - remainingPayment,
-                paid_amount: paidAmount + remainingPayment,
-                status: 'partial',
+                amount_paid: newAmountPaid,
+                remaining_amount: newRemainingAmount,
+                payment_status: newPaymentStatus,
                 updated_at: new Date().toISOString()
               });
               

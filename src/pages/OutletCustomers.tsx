@@ -83,8 +83,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       
       // Sum up outstanding AND partial debts for each customer (both have remaining balance)
       debts.forEach(debt => {
-        if (debt.customer_id && (debt.status === 'outstanding' || debt.status === 'partial')) {
-          balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.amount || 0);
+        if (debt.customer_id && (debt.payment_status === 'unpaid' || debt.payment_status === 'partial')) {
+          balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
         }
       });
       
