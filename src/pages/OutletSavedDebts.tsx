@@ -865,6 +865,27 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       return;
     }
     
+    // Check if any item's selling price is less than or equal to cost price
+    for (const item of editFormData.items || []) {
+      if (item.quantity > 0) {
+        // Find the product in inventory to get cost price
+        const product = inventoryProducts.find(p => p.name === item.name);
+        if (product && product.unit_cost) {
+          const costPrice = product.unit_cost;
+          const sellingPrice = item.price;
+          
+          if (sellingPrice <= costPrice) {
+            toast({
+              title: "Price Alert",
+              description: `${item.name}: Selling price (${formatCurrency(sellingPrice)}) is less than or equal to cost price (${formatCurrency(costPrice)}). Please increase the price to proceed.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+    }
+    
     try {
       console.log('💾 Starting debt record update...', selectedSale.id);
       console.log('📝 Update form data:', editFormData);
@@ -877,9 +898,17 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       // Step 2: Reverse the old sold quantities (subtract old quantities from inventory)
       console.log('🔄 Reversing old inventory sold quantities...');
       for (const oldItem of oldItems) {
-        console.log(`  - Reversing: ${oldItem.product_name}, qty: ${oldItem.quantity}`);
+        const productName = oldItem.product_name || '';
+        
+        // Skip items without a product name
+        if (!productName.trim()) {
+          console.warn(`    ⚠️ Skipping item without product name`);
+          continue;
+        }
+        
+        console.log(`  - Reversing: ${productName}, qty: ${oldItem.quantity}`);
         // Subtract by adding negative quantity
-        await incrementSoldQuantity(outletId, oldItem.product_name || '', -oldItem.quantity);
+        await incrementSoldQuantity(outletId, productName, -oldItem.quantity);
       }
       console.log('✅ Old inventory quantities reversed');
       
@@ -910,6 +939,12 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         // Step 5: Create new items and update inventory
         console.log('➕ Creating new debt items and updating inventory...', editFormData.items?.length || 0, 'items');
         for (const item of (editFormData.items || [])) {
+          // Skip items without a name
+          if (!item.name || !item.name.trim()) {
+            console.warn(`    ⚠️ Skipping item without name`);
+            continue;
+          }
+          
           const itemTotal = item.quantity * item.price;
           console.log(`  - Creating item: ${item.name}, qty: ${item.quantity}, price: ${item.price}, total: ${itemTotal}`);
           
@@ -1014,14 +1049,22 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       console.log('🔄 Reversing inventory sold quantities...');
       let reversedCount = 0;
       for (const item of debtItems) {
-        console.log(`  - Reversing: ${item.product_name}, qty: ${item.quantity}`);
+        const productName = item.product_name || '';
+        
+        // Skip items without a product name
+        if (!productName.trim()) {
+          console.warn(`    ⚠️ Skipping item without product name`);
+          continue;
+        }
+        
+        console.log(`  - Reversing: ${productName}, qty: ${item.quantity}`);
         // Subtract by adding negative quantity
-        const success = await incrementSoldQuantity(outletId, item.product_name || '', -item.quantity);
+        const success = await incrementSoldQuantity(outletId, productName, -item.quantity);
         if (success) {
           reversedCount++;
-          console.log(`    ✅ Reversed ${item.product_name}`);
+          console.log(`    ✅ Reversed ${productName}`);
         } else {
-          console.warn(`    ⚠️ Failed to reverse ${item.product_name} - product may not exist in inventory`);
+          console.warn(`    ⚠️ Failed to reverse ${productName} - product may not exist in inventory`);
         }
       }
       console.log(`✅ Reversed ${reversedCount}/${debtItems.length} items`);

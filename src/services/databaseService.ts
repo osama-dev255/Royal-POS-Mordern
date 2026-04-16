@@ -1687,6 +1687,12 @@ export const incrementSoldQuantity = async (
   quantity: number
 ): Promise<boolean> => {
   try {
+    // Skip if product name is empty or whitespace
+    if (!productName || !productName.trim()) {
+      console.warn('⚠️ Skipping inventory update: empty product name');
+      return false;
+    }
+
     // First, get the current sold_quantity
     const { data: current, error: fetchError } = await supabase
       .from('inventory_products')
@@ -1696,12 +1702,17 @@ export const incrementSoldQuantity = async (
       .single();
 
     if (fetchError) {
-      console.error('Error fetching current sold_quantity:', fetchError);
+      // Product not found in inventory - this is not a critical error
+      if (fetchError.code === 'PGRST116') {
+        console.warn(`⚠️ Product "${productName}" not found in inventory - skipping inventory update`);
+      } else {
+        console.error('Error fetching current sold_quantity:', fetchError);
+      }
       return false;
     }
 
     if (!current) {
-      console.error('Product not found in inventory_products');
+      console.warn(`⚠️ Product "${productName}" not found in inventory_products`);
       return false;
     }
 

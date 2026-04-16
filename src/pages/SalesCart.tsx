@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -529,8 +529,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       let createdSale;
       
       if (outletId) {
-        // Ensure all numeric values are properly converted to numbers
-        const outletSaleData = {
+        // Create sale in dedicated table based on payment method
+        const saleData = {
           outlet_id: outletId,
           customer_id: selectedCustomer?.id || null,
           user_id: null,
@@ -539,30 +539,51 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           subtotal: Number(subtotal) || 0,
           discount_amount: Number(discountAmount) || 0,
           tax_amount: Number(tax) || 0,
-          shipping_amount: Number(parseFloat(shippingCost) || 0),
-          credit_brought_forward: Number(creditBroughtForward) || 0,
-          adjustments: Number(adjustmentsAmount) || 0,
-          adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
-          amount_received: Number(totalAmountReceived),  // Total cash received (current + debt payment)
           total_amount: Number(totalWithTax) || 0,
-          amount_paid: Number(actualAmountPaid),  // Payment for current transaction only
+          amount_paid: Number(actualAmountPaid),
           change_amount: Number(paymentMethod === "debt" ? 0 : change),
-          payment_method: paymentMethod,
-          payment_status: paymentMethod === "debt" ? "unpaid" : "paid",
-          sale_status: "completed",
           notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
         };
         
-        console.log('Creating outlet sale with data:', outletSaleData);
-        console.log('amount_paid value:', outletSaleData.amount_paid, 'type:', typeof outletSaleData.amount_paid);
+        console.log(`Creating outlet ${paymentMethod} sale...`, saleData);
         
-        createdSale = await createOutletSale(outletSaleData);
+        // Create sale in the correct dedicated table
+        if (paymentMethod === 'cash') {
+          createdSale = await createOutletCashSale({
+            ...saleData,
+            change_amount: Number(change),
+            payment_method: 'cash'
+          });
+        } else if (paymentMethod === 'card') {
+          createdSale = await createOutletCardSale({
+            ...saleData,
+            payment_method: 'card'
+          });
+        } else if (paymentMethod === 'mobile') {
+          createdSale = await createOutletMobileSale({
+            ...saleData,
+            payment_method: 'mobile'
+          });
+        } else if (paymentMethod === 'debt') {
+          // Debt sales still use outlet_sales table
+          const outletSaleData = {
+            ...saleData,
+            amount_received: Number(totalAmountReceived),
+            shipping_amount: Number(parseFloat(shippingCost) || 0),
+            credit_brought_forward: Number(creditBroughtForward) || 0,
+            adjustments: Number(adjustmentsAmount) || 0,
+            adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
+            payment_method: 'debt',
+            payment_status: 'unpaid',
+            sale_status: 'completed'
+          };
+          createdSale = await createOutletSale(outletSaleData);
+        }
         
         if (createdSale) {
           console.log('Sale created successfully:', createdSale);
-          console.log('Saved amount_paid:', createdSale.amount_paid);
         } else {
-          console.error('Failed to create sale - createOutletSale returned null');
+          console.error(`Failed to create ${paymentMethod} sale`);
         }
       } else {
         // Create general sale
@@ -601,18 +622,28 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
         
         if (outletId) {
-          // Create outlet sale item
-          const outletSaleItemData = {
+          // Create outlet sale item in the correct dedicated table
+          const itemData = {
             sale_id: createdSale.id || '',
             product_id: isValidUuid ? item.id : null,
-            product_name: item.name, // Store product name directly for display
+            product_name: item.name,
             quantity: item.quantity,
             unit_price: item.price,
             discount_amount: 0,
             total_price: item.price * item.quantity
           };
           
-          return createOutletSaleItem(outletSaleItemData);
+          // Use the correct item table based on payment method
+          if (paymentMethod === 'cash') {
+            return createOutletCashSaleItem(itemData);
+          } else if (paymentMethod === 'card') {
+            return createOutletCardSaleItem(itemData);
+          } else if (paymentMethod === 'mobile') {
+            return createOutletMobileSaleItem(itemData);
+          } else {
+            // Debt sales use outlet_sale_items
+            return createOutletSaleItem(itemData);
+          }
         } else {
           // Create general sale item
           const saleItemData = {
