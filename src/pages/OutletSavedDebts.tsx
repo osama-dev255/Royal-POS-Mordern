@@ -1574,15 +1574,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
       {/* Edit Debt Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Edit className="h-5 w-5" />
               Edit Debt Record
             </DialogTitle>
           </DialogHeader>
           {selectedSale && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Invoice Number</p>
                 <p className="font-semibold">{selectedSale.invoiceNumber}</p>
