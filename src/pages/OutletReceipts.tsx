@@ -23,11 +23,12 @@ import {
   Percent,
   FileText,
   TrendingUp,
-  X
+  X,
+  Edit
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 
 interface OutletReceiptsProps {
@@ -105,6 +106,14 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
+  
+  // Edit settlement state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingSettlement, setEditingSettlement] = useState<ReceiptSale | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState(0);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash');
+  const [editDate, setEditDate] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
     fetchReceipts();
@@ -349,6 +358,126 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       };
       
       PrintUtils.printReceipt(transaction);
+    }
+  };
+  
+  // Handle edit settlement
+  const handleEditSettlement = (receipt: ReceiptSale) => {
+    setEditingSettlement(receipt);
+    setEditPaymentAmount(receipt.amountPaid);
+    setEditPaymentMethod(receipt.paymentMethod as 'cash' | 'card' | 'mobile');
+    setEditDate(receipt.date.split('T')[0]);
+    setEditNotes(''); // Notes might not be in the receipt object, will fetch if needed
+    setIsEditDialogOpen(true);
+  };
+  
+  // Save edited settlement
+  const handleSaveEditedSettlement = async () => {
+    if (!editingSettlement) return;
+    
+    if (editPaymentAmount <= 0) {
+      toast({
+        title: "Error",
+        description: "Payment amount must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSaving(true);
+    
+    try {
+      const newBalance = Math.max(0, (editingSettlement.previousBalance || 0) - editPaymentAmount);
+      
+      // Update the settlement in database
+      const result = await updateOutletCustomerSettlement(editingSettlement.id, {
+        payment_amount: editPaymentAmount,
+        payment_method: editPaymentMethod,
+        settlement_date: editDate,
+        new_balance: newBalance,
+        notes: editNotes || undefined
+      });
+      
+      if (!result) {
+        throw new Error('Failed to update customer settlement');
+      }
+      
+      // IMPORTANT: Recalculate the customer's debt in the database
+      if (editingSettlement.customerId && outletId) {
+        console.log('🔄 Recalculating customer debt after edit...');
+        console.log('  Customer ID:', editingSettlement.customerId);
+        console.log('  Old Payment:', editingSettlement.amountPaid);
+        console.log('  New Payment:', editPaymentAmount);
+        
+        // Get the difference in payment
+        const paymentDiff = editPaymentAmount - editingSettlement.amountPaid;
+        
+        // Fetch all outstanding debts for this customer (including paid ones to recalculate)
+        const { data: allDebts } = await supabase
+          .from('outlet_debts')
+          .select('*')
+          .eq('outlet_id', outletId)
+          .eq('customer_id', editingSettlement.customerId);
+        
+        if (allDebts && allDebts.length > 0) {
+          // Calculate total paid across all debts
+          const totalDebt = allDebts.reduce((sum, debt) => sum + (debt.total_amount || 0), 0);
+          const totalPaid = allDebts.reduce((sum, debt) => sum + (debt.amount_paid || 0), 0);
+          
+          // Calculate new total paid with the edited payment
+          const newTotalPaid = totalPaid + paymentDiff;
+          
+          // Distribute the new payment across debts proportionally
+          let remainingToDistribute = newTotalPaid;
+          
+          for (const debt of allDebts) {
+            const debtTotal = debt.total_amount || 0;
+            const proportion = debtTotal / totalDebt;
+            const allocatedPayment = Math.min(remainingToDistribute, debtTotal * proportion);
+            
+            const newPaid = Math.min(allocatedPayment, debtTotal);
+            const newRemaining = debtTotal - newPaid;
+            const newStatus = newRemaining > 0 ? (newPaid > 0 ? 'partial' : 'unpaid') : 'paid';
+            
+            await updateOutletDebt(debt.id || '', {
+              amount_paid: newPaid,
+              remaining_amount: newRemaining,
+              payment_status: newStatus,
+              updated_at: new Date().toISOString()
+            });
+            
+            remainingToDistribute -= allocatedPayment;
+            
+            if (remainingToDistribute <= 0) break;
+          }
+          
+          console.log('✅ Customer debt recalculated successfully');
+        }
+      }
+      
+      toast({
+        title: "Success",
+        description: `Customer settlement updated successfully. New balance: ${formatCurrency(newBalance)}`,
+      });
+      
+      // Reset edit form
+      setIsEditDialogOpen(false);
+      setEditingSettlement(null);
+      
+      // Refresh receipts to show the updated settlement
+      await fetchReceipts();
+      
+      // Reload customers to update their balances
+      await loadCustomers();
+    } catch (error) {
+      console.error('Error updating settlement:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update customer settlement",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
   };
   
@@ -618,33 +747,6 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                 updated_at: new Date().toISOString()
               });
               
-              // Update the corresponding sale (Saved Debt) if sale_id exists
-              if (debt.sale_id) {
-                console.log(`    🔄 Updating saved debt sale ${debt.sale_id}`);
-                
-                // Get the current sale to calculate correct amount_paid
-                const { data: sale } = await supabase
-                  .from('outlet_sales')
-                  .select('*')
-                  .eq('id', debt.sale_id)
-                  .single();
-                
-                if (sale) {
-                  const existingPaid = sale.amount_paid || 0;
-                  const saleTotal = sale.total_amount || currentDebtAmount;
-                  
-                  // Calculate new amount_paid (existing + this payment)
-                  const newAmountPaid = Math.min(existingPaid + currentDebtAmount, saleTotal);
-                  
-                  await updateOutletSale(debt.sale_id, {
-                    amount_paid: newAmountPaid,
-                    payment_status: newAmountPaid >= saleTotal ? 'paid' : 'partial',
-                    updated_at: new Date().toISOString()
-                  });
-                  console.log(`    ✅ Saved debt sale updated (paid: ${newAmountPaid} / ${saleTotal})`);
-                }
-              }
-              
               remainingPayment -= currentDebtAmount;
             } else {
               // Partially pay this debt
@@ -659,33 +761,6 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                 payment_status: newPaymentStatus,
                 updated_at: new Date().toISOString()
               });
-              
-              // Update the corresponding sale (Saved Debt) if sale_id exists
-              if (debt.sale_id) {
-                console.log(`    🔄 Updating saved debt sale ${debt.sale_id} (partial)`);
-                
-                // Get the current sale to calculate correct amount_paid
-                const { data: sale } = await supabase
-                  .from('outlet_sales')
-                  .select('*')
-                  .eq('id', debt.sale_id)
-                  .single();
-                
-                if (sale) {
-                  const existingPaid = sale.amount_paid || 0;
-                  const saleTotal = sale.total_amount || currentDebtAmount;
-                  
-                  // Calculate new amount_paid (existing + this partial payment)
-                  const newAmountPaid = Math.min(existingPaid + remainingPayment, saleTotal);
-                  
-                  await updateOutletSale(debt.sale_id, {
-                    amount_paid: newAmountPaid,
-                    payment_status: newAmountPaid >= saleTotal ? 'paid' : 'partial',
-                    updated_at: new Date().toISOString()
-                  });
-                  console.log(`    ✅ Saved debt sale updated partial (paid: ${newAmountPaid} / ${saleTotal})`);
-                }
-              }
               
               remainingPayment = 0;
             }
@@ -1369,6 +1444,16 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>
+                      {receipt.type === 'sales' && receipt.previousBalance !== undefined && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleEditSettlement(receipt)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      )}
                       <Button 
                         size="sm" 
                         variant="outline"
@@ -1542,6 +1627,148 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   </Button>
                   <Button variant="outline" className="flex-1" onClick={() => setIsViewDialogOpen(false)}>
                     Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Edit Settlement Dialog */}
+      {isEditDialogOpen && editingSettlement && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Edit className="h-5 w-5" />
+                  Edit Customer Settlement
+                </h2>
+                <Button variant="outline" size="icon" onClick={() => setIsEditDialogOpen(false)}>
+                  <span className="text-xl">×</span>
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Settlement Info */}
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Invoice Number</p>
+                      <p className="font-semibold">{editingSettlement.invoiceNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Customer</p>
+                      <p className="font-semibold">{editingSettlement.customer}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Settlement Details */}
+                <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Settlement Details
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700">Previous Balance:</span>
+                      <span className="text-lg font-bold text-blue-900">
+                        {formatCurrency(editingSettlement.previousBalance || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Editable Fields */}
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="editPaymentAmount">Payment Amount *</Label>
+                    <Input
+                      id="editPaymentAmount"
+                      type="number"
+                      value={editPaymentAmount || ''}
+                      onChange={(e) => setEditPaymentAmount(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="mt-1"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="editPaymentMethod">Payment Method *</Label>
+                    <select
+                      id="editPaymentMethod"
+                      className="w-full p-2 border rounded-md h-9 mt-1"
+                      value={editPaymentMethod}
+                      onChange={(e) => setEditPaymentMethod(e.target.value as 'cash' | 'card' | 'mobile')}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="mobile">Mobile</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="editDate">Settlement Date</Label>
+                    <Input
+                      id="editDate"
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="editNotes">Notes (Optional)</Label>
+                    <Textarea
+                      id="editNotes"
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Additional notes about this settlement"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* New Balance Preview */}
+                <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-green-900">New Balance:</span>
+                    <span className="text-2xl font-bold text-green-700">
+                      {formatCurrency(Math.max(0, (editingSettlement.previousBalance || 0) - editPaymentAmount))}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-4 border-t">
+                  <Button 
+                    className="flex-1" 
+                    onClick={handleSaveEditedSettlement}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setIsEditDialogOpen(false)}
+                  >
+                    Cancel
                   </Button>
                 </div>
               </div>
