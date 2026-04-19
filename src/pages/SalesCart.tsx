@@ -700,7 +700,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }
         
         // Create new debt record for current transaction
-        // Always create a debt record for debt transactions, even if fully paid
+        // Always create a debt record for debt transactions, even if fully paid or overpaid
         const remainingNewDebt = totalWithTax - actualAmountPaid;
         if (paymentMethod === "debt") {
           // Determine payment status based on amount paid
@@ -717,9 +717,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             tax_amount: tax,
             total_amount: totalWithTax,
             amount_paid: actualAmountPaid,
-            remaining_amount: Math.max(0, remainingNewDebt),
+            remaining_amount: remainingNewDebt, // Can be negative for overpayment (credit balance)
             payment_status: paymentStatus,
-            notes: `Debt for sale ${createdSale.id || 'unknown'}`
+            notes: `Debt for sale ${createdSale.id || 'unknown'}${remainingNewDebt < 0 ? ' - OVERPAID' : ''}`
           };
 
           const createdDebt = await createOutletDebt(outletDebtData);
