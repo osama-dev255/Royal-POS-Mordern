@@ -3,6 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Truck, 
   Search, 
@@ -11,10 +17,17 @@ import {
   Package,
   User,
   MapPin,
-  Eye
+  Eye,
+  Printer,
+  Download,
+  Share2,
+  FileText,
+  ChevronDown
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
@@ -206,17 +219,245 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     }
   };
 
+  // Export actions
+  const handlePrintReport = () => {
+    if (filteredDeliveries.length === 0) {
+      toast({ title: "No Data", description: "No deliveries to print", variant: "destructive" });
+      return;
+    }
+
+    const totalValue = filteredDeliveries.reduce((sum, d) => sum + d.total, 0);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: "Print Failed", description: "Please allow popups", variant: "destructive" });
+      return;
+    }
+
+    const rows = filteredDeliveries.map(d => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.deliveryNoteNumber}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.date}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.customer}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;"><span style="padding: 3px 10px; border-radius: 10px; background: ${d.status === 'delivered' ? '#d4edda' : d.status === 'in-transit' ? '#cce5ff' : d.status === 'pending' ? '#fff3cd' : '#f8d7da'}; color: ${d.status === 'delivered' ? '#155724' : d.status === 'in-transit' ? '#004085' : d.status === 'pending' ? '#856404' : '#721c24'}; font-size: 12px;">${d.status}</span></td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${d.items}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${formatCurrency(d.total)}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Deliveries Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #f59e0b; padding-bottom: 20px; }
+          .header h1 { font-size: 28px; color: #f59e0b; margin-bottom: 10px; }
+          .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+          .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; }
+          .stat-card h3 { font-size: 12px; color: #666; margin-bottom: 5px; text-transform: uppercase; }
+          .stat-card p { font-size: 20px; font-weight: bold; color: #f59e0b; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #f59e0b; color: white; padding: 10px; text-align: left; }
+          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>OUTLET DELIVERIES REPORT</h1>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+        </div>
+        <div class="stats">
+          <div class="stat-card">
+            <h3>Total Deliveries</h3>
+            <p>${filteredDeliveries.length}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Items</h3>
+            <p>${filteredDeliveries.reduce((sum, d) => sum + d.items, 0)}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Value</h3>
+            <p>${formatCurrency(totalValue)}</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Note Number</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th style="text-align: center;">Items</th>
+              <th style="text-align: right;">Total Value</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="footer">
+          <p>End of Report</p>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  };
+
+  const handleDownload = () => {
+    if (filteredDeliveries.length === 0) {
+      toast({ title: "No Data", description: "No deliveries to download", variant: "destructive" });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Outlet Deliveries Report', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    
+    const totalValue = filteredDeliveries.reduce((sum, d) => sum + d.total, 0);
+    doc.text(`Total Deliveries: ${filteredDeliveries.length}`, 14, 36);
+    doc.text(`Total Value: ${formatCurrency(totalValue)}`, 14, 42);
+    
+    const tableData = filteredDeliveries.map(d => [
+      d.deliveryNoteNumber, d.date, d.customer, d.status, d.items.toString(), formatCurrency(d.total)
+    ]);
+    
+    autoTable(doc, {
+      startY: 50,
+      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+    
+    const filename = `deliveries-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    toast({ title: "Downloaded", description: `PDF: ${filename}` });
+  };
+
+  const handleExportXLS = () => {
+    if (filteredDeliveries.length === 0) {
+      toast({ title: "No Data", description: "No deliveries to export", variant: "destructive" });
+      return;
+    }
+
+    const totalValue = filteredDeliveries.reduce((sum, d) => sum + d.total, 0);
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head><meta charset="UTF-8"><style>td, th { padding: 5px; border: 1px solid #ccc; } th { background: #f59e0b; color: white; }</style></head>
+      <body><table>
+        <tr><td colspan="6" style="font-weight: bold;">Outlet Deliveries Report</td></tr>
+        <tr><td colspan="6">Total Deliveries: ${filteredDeliveries.length} | Total Value: ${formatCurrency(totalValue)}</td></tr>
+        <tr><th>Note Number</th><th>Date</th><th>Customer</th><th>Status</th><th>Items</th><th>Total Value</th></tr>
+    `;
+    
+    filteredDeliveries.forEach(d => {
+      html += `<tr><td>${d.deliveryNoteNumber}</td><td>${d.date}</td><td>${d.customer}</td><td>${d.status}</td><td>${d.items}</td><td>${d.total}</td></tr>`;
+    });
+    
+    html += '</table></body></html>';
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = `deliveries-${new Date().toISOString().split('T')[0]}.xls`;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: `Excel: ${filename}` });
+  };
+
+  const handleSharePDF = async () => {
+    if (filteredDeliveries.length === 0) {
+      toast({ title: "No Data", description: "No deliveries to share", variant: "destructive" });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Outlet Deliveries Report', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    
+    const totalValue = filteredDeliveries.reduce((sum, d) => sum + d.total, 0);
+    doc.text(`Total Deliveries: ${filteredDeliveries.length}`, 14, 36);
+    doc.text(`Total Value: ${formatCurrency(totalValue)}`, 14, 42);
+    
+    const tableData = filteredDeliveries.map(d => [
+      d.deliveryNoteNumber, d.date, d.customer, d.status, d.items.toString(), formatCurrency(d.total)
+    ]);
+    
+    autoTable(doc, {
+      startY: 50,
+      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+    
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], 'deliveries-report.pdf', { type: 'application/pdf' });
+    
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({ files: [pdfFile], title: 'Outlet Deliveries Report' });
+        toast({ title: "Shared", description: "PDF shared successfully" });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          doc.save('deliveries-report.pdf');
+          toast({ title: "Downloaded", description: "Sharing failed, PDF downloaded" });
+        }
+      }
+    } else {
+      doc.save('deliveries-report.pdf');
+      toast({ title: "Downloaded", description: "Sharing not supported, PDF downloaded" });
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 px-4">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Outlet Deliveries</h1>
-          <p className="text-muted-foreground">Manage deliveries for this outlet</p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Outlet Deliveries</h1>
+            <p className="text-muted-foreground">Manage deliveries for this outlet</p>
+          </div>
         </div>
+        
+        {/* Export Actions Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <FileText className="h-4 w-4 mr-2" />
+              Export
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handlePrintReport}>
+              <Printer className="h-4 w-4 mr-2" />
+              <span>Print</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-2" />
+              <span>Download .pdf</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportXLS}>
+              <FileText className="h-4 w-4 mr-2" />
+              <span>Export .xls</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSharePDF}>
+              <Share2 className="h-4 w-4 mr-2" />
+              <span>Share .pdf</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Stats Cards */}
