@@ -3934,7 +3934,7 @@ export class PrintUtils {
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
             <div class="amount-due-label">AMOUNT DUE</div>
-            <div class="amount-due">${formatCurrency(total)}</div>
+            <div class="amount-due">${formatCurrency(total - (transaction.amountPaid || 0))}</div>
           </div>
           
           <div class="info-section">
