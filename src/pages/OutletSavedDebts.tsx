@@ -36,7 +36,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -692,6 +692,21 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             price: item.unit_price
           }));
           
+          // Calculate customer's previous balance (credit brought forward)
+          // Sum of all other debts for this customer created before this debt
+          let creditBroughtForward = 0;
+          if (debt.customer_id && debt.created_at) {
+            const allCustomerDebts = await getOutletDebtsByCustomerId(outletId, debt.customer_id);
+            // Filter debts created before this one and sum their remaining amounts
+            creditBroughtForward = allCustomerDebts
+              .filter(otherDebt => 
+                otherDebt.id !== debt.id && 
+                otherDebt.created_at && 
+                new Date(otherDebt.created_at) < new Date(debt.created_at!)
+              )
+              .reduce((sum, otherDebt) => sum + (otherDebt.remaining_amount || 0), 0);
+          }
+          
           return {
             id: debt.id || '',
             invoiceNumber: debt.invoice_number || '',
@@ -707,7 +722,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             remainingAmount: debt.remaining_amount,
             paymentMethod: 'debt',
             status: debt.payment_status,
-            creditBroughtForward: 0,
+            creditBroughtForward: creditBroughtForward,
             adjustments: 0
           };
         })

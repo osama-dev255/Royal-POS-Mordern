@@ -4037,6 +4037,18 @@ export class PrintUtils {
               <span class="summary-label">TOTAL:</span>
               <span>${formatCurrency(total)}</span>
             </div>
+            ${transaction.previousDebtBalance > 0 ? `
+            <div class="summary-row" style="color: #f59e0b;">
+              <span class="summary-label">Previous Balance (Credit Brought Forward):</span>
+              <span>${formatCurrency(transaction.previousDebtBalance)}</span>
+            </div>
+            ` : ''}
+            ${transaction.previousDebtBalance < 0 ? `
+            <div class="summary-row" style="color: #10b981;">
+              <span class="summary-label">Previous Credit Balance:</span>
+              <span>-${formatCurrency(Math.abs(transaction.previousDebtBalance))}</span>
+            </div>
+            ` : ''}
             <div class="summary-row">
               <span class="summary-label">Amount Paid (Current):</span>
               <span>${formatCurrency(transaction.amountPaid || 0)}</span>
@@ -4059,7 +4071,7 @@ export class PrintUtils {
             ` : ''}
             <div class="summary-row amount-due-final">
               <span class="summary-label">AMOUNT DUE:</span>
-              <span>${formatCurrency(total - (transaction.amountPaid || 0))}</span>
+              <span>${formatCurrency(total + (transaction.previousDebtBalance > 0 ? transaction.previousDebtBalance : 0) - (transaction.amountPaid || 0))}</span>
             </div>
             ${transaction.amountPaid > 0 ? `
             <div class="summary-row" style="color: #666; font-size: 12px;">
