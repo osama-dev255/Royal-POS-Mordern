@@ -712,7 +712,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             customer_id: selectedCustomer.id,
             invoice_number: `INV-${Date.now()}`, // Generate unique invoice number
             debt_date: new Date().toISOString(),
-            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            due_date: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             subtotal: subtotal,
             discount_amount: discountAmount,
             tax_amount: tax,
@@ -720,7 +720,10 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             amount_paid: actualAmountPaid,
             remaining_amount: remainingNewDebt, // Can be negative for overpayment (credit balance)
             payment_status: paymentStatus,
-            notes: `Debt for sale ${createdSale.id || 'unknown'}${remainingNewDebt < 0 ? ' - OVERPAID' : ''}`
+            notes: `Debt for sale ${createdSale.id || 'unknown'}${remainingNewDebt < 0 ? ' - OVERPAID' : ''}`,
+            salesman: salesman || null,
+            driver: driver || null,
+            truck: truck || null
           };
 
           const createdDebt = await createOutletDebt(outletDebtData);

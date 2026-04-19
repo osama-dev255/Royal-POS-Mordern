@@ -794,6 +794,14 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleViewDelivery(delivery)}
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>

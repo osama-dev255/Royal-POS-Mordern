@@ -4079,6 +4079,9 @@ export interface OutletDebt {
   payment_status: string; // 'unpaid', 'partial', 'paid'
   notes?: string;
   reference_number?: string;
+  salesman?: string;
+  driver?: string;
+  truck?: string;
   created_at?: string;
   updated_at?: string;
 }

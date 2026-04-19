@@ -65,6 +65,9 @@ interface SavedSale {
   adjustments?: number;
   adjustmentReason?: string;
   isEdited?: boolean; // Flag to track if transaction has been edited
+  salesman?: string;
+  driver?: string;
+  truck?: string;
 }
 
 export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) => {
@@ -723,7 +726,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             paymentMethod: 'debt',
             status: debt.payment_status,
             creditBroughtForward: creditBroughtForward,
-            adjustments: 0
+            adjustments: 0,
+            salesman: debt.salesman,
+            driver: debt.driver,
+            truck: debt.truck
           };
         })
       );
@@ -767,6 +773,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       total: sale.total,
       amountPaid: sale.amountPaid,
       status: sale.status,
+      dueDate: sale.dueDate,
+      salesman: sale.salesman,
+      driver: sale.driver,
+      truck: sale.truck,
       items: [...sale.items] // Clone items for editing
     });
     setIsEditDialogOpen(true);
@@ -780,9 +790,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       // Recalculate subtotal, tax, total, and remainingAmount if quantity or price changed
       if (field === 'quantity' || field === 'price') {
         const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-        const newTax = newSubtotal * 0.18; // 18% tax
+        const newTax = newSubtotal * 0.18; // 18% tax (display only)
         const adjustments = prev.adjustments || 0;
-        const newTotal = newSubtotal + newTax + adjustments; // Include adjustments
+        const newTotal = newSubtotal + adjustments; // Exclude tax from total
         const amountPaid = prev.amountPaid || 0;
         const remainingBalance = newTotal - amountPaid;
         return { 
@@ -810,9 +820,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     setEditFormData(prev => {
       const newItems = (prev.items || []).filter((_, i) => i !== index);
       const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      const newTax = newSubtotal * 0.18; // 18% tax
+      const newTax = newSubtotal * 0.18; // 18% tax (display only)
       const adjustments = prev.adjustments || 0;
-      const newTotal = newSubtotal + newTax + adjustments; // Include adjustments
+      const newTotal = newSubtotal + adjustments; // Exclude tax from total
       const amountPaid = prev.amountPaid || 0;
       const remainingBalance = newTotal - amountPaid;
       return { 
@@ -845,9 +855,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         price: product.selling_price || 0 
       };
       const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      const newTax = newSubtotal * 0.18; // 18% tax
+      const newTax = newSubtotal * 0.18; // 18% tax (display only)
       const adjustments = prev.adjustments || 0;
-      const newTotal = newSubtotal + newTax + adjustments; // Include adjustments
+      const newTotal = newSubtotal + adjustments; // Exclude tax from total
       const amountPaid = prev.amountPaid || 0;
       const remainingBalance = newTotal - amountPaid;
       return { 
@@ -937,7 +947,11 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         total_amount: editFormData.total,
         amount_paid: editFormData.amountPaid,
         remaining_amount: (editFormData.total || 0) - (editFormData.amountPaid || 0),
-        payment_status: validPaymentStatus
+        payment_status: validPaymentStatus,
+        salesman: editFormData.salesman,
+        driver: editFormData.driver,
+        truck: editFormData.truck,
+        due_date: editFormData.dueDate ? new Date(editFormData.dueDate).toISOString() : undefined
       });
       
       if (updatedDebt) {
@@ -1395,15 +1409,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
       {/* View Sale Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5" />
               Transaction Details
             </DialogTitle>
           </DialogHeader>
           {selectedSale && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
               {/* Payment Reality Banner */}
               {(() => {
                 const amountPaid = selectedSale.amountPaid || 0;
@@ -1489,6 +1503,36 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   </div>
                 </div>
               </div>
+              
+              {/* Salesman, Driver, Truck, Due Date */}
+              {(selectedSale.salesman || selectedSale.driver || selectedSale.truck || selectedSale.dueDate) && (
+                <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded-lg">
+                  {selectedSale.salesman && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Salesman</p>
+                      <p className="text-sm font-medium">{selectedSale.salesman}</p>
+                    </div>
+                  )}
+                  {selectedSale.driver && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Driver</p>
+                      <p className="text-sm font-medium">{selectedSale.driver}</p>
+                    </div>
+                  )}
+                  {selectedSale.truck && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Truck</p>
+                      <p className="text-sm font-medium">{selectedSale.truck}</p>
+                    </div>
+                  )}
+                  {selectedSale.dueDate && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Due Date</p>
+                      <p className="text-sm font-medium">{new Date(selectedSale.dueDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
@@ -1609,6 +1653,48 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   id="editCustomer"
                   value={editFormData.customer || ''}
                   onChange={(e) => setEditFormData({...editFormData, customer: e.target.value})}
+                />
+              </div>
+              
+              {/* Salesman, Driver, Truck fields */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="editSalesman">Salesman</Label>
+                  <Input
+                    id="editSalesman"
+                    value={editFormData.salesman || ''}
+                    onChange={(e) => setEditFormData({...editFormData, salesman: e.target.value})}
+                    placeholder="Enter salesman"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editDriver">Driver</Label>
+                  <Input
+                    id="editDriver"
+                    value={editFormData.driver || ''}
+                    onChange={(e) => setEditFormData({...editFormData, driver: e.target.value})}
+                    placeholder="Enter driver"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editTruck">Truck</Label>
+                  <Input
+                    id="editTruck"
+                    value={editFormData.truck || ''}
+                    onChange={(e) => setEditFormData({...editFormData, truck: e.target.value})}
+                    placeholder="Enter truck"
+                  />
+                </div>
+              </div>
+              
+              {/* Due Date field */}
+              <div>
+                <Label htmlFor="editDueDate">Due Date</Label>
+                <Input
+                  id="editDueDate"
+                  type="date"
+                  value={editFormData.dueDate ? editFormData.dueDate.split('T')[0] : ''}
+                  onChange={(e) => setEditFormData({...editFormData, dueDate: e.target.value})}
                 />
               </div>
               
@@ -1743,7 +1829,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     value={editFormData.adjustments || 0}
                     onChange={(e) => {
                       const adjustmentsValue = parseFloat(e.target.value) || 0;
-                      const newTotal = editFormData.subtotal + editFormData.tax + adjustmentsValue;
+                      const newTotal = editFormData.subtotal + adjustmentsValue; // Exclude tax
                       const remainingBalance = newTotal - (editFormData.amountPaid || 0);
                       setEditFormData({
                         ...editFormData, 
