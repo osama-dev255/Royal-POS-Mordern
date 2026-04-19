@@ -219,6 +219,157 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     }
   };
 
+  // Individual delivery export actions
+  const handlePrintDelivery = (delivery: DeliveryData) => {
+    handleViewDelivery(delivery);
+  };
+
+  const handleDownloadDelivery = (delivery: DeliveryData) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('DELIVERY NOTE', 14, 20);
+    doc.setFontSize(12);
+    doc.text(delivery.deliveryNoteNumber, 14, 28);
+    doc.setFontSize(10);
+    doc.text(`Date: ${delivery.date}`, 14, 36);
+    doc.text(`Status: ${delivery.status.toUpperCase()}`, 14, 42);
+    doc.text(`Customer: ${delivery.customer}`, 14, 50);
+    if (delivery.driver) doc.text(`Driver: ${delivery.driver}`, 14, 56);
+    if (delivery.vehicle) doc.text(`Vehicle: ${delivery.vehicle}`, 14, 62);
+    
+    const itemsList = delivery.itemsList || [];
+    const tableData = itemsList.map((item: any) => [
+      item.description || item.name || 'N/A',
+      (item.quantity || item.delivered || 0).toString(),
+      formatCurrency(item.rate || item.price || 0),
+      formatCurrency((item.quantity || item.delivered || 0) * (item.rate || item.price || 0))
+    ]);
+    
+    autoTable(doc, {
+      startY: 70,
+      head: [['Description', 'Quantity', 'Rate', 'Amount']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+    
+    const finalY = (doc as any).lastAutoTable?.finalY || 80;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Total: ${formatCurrency(delivery.total)}`, 14, finalY + 10);
+    
+    if (delivery.deliveryNotes) {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text('Notes:', 14, finalY + 20);
+      doc.text(delivery.deliveryNotes, 14, finalY + 26);
+    }
+    
+    const filename = `delivery-${delivery.deliveryNoteNumber}-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    toast({ title: "Downloaded", description: `PDF: ${filename}` });
+  };
+
+  const handleExportDeliveryXLS = (delivery: DeliveryData) => {
+    const itemsList = delivery.itemsList || [];
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head><meta charset="UTF-8"><style>td, th { padding: 5px; border: 1px solid #ccc; } th { background: #f59e0b; color: white; }</style></head>
+      <body>
+        <table>
+          <tr><td colspan="4" style="font-weight: bold;">DELIVERY NOTE</td></tr>
+          <tr><td colspan="4">${delivery.deliveryNoteNumber}</td></tr>
+          <tr><td>Date:</td><td>${delivery.date}</td><td>Status:</td><td>${delivery.status}</td></tr>
+          <tr><td>Customer:</td><td>${delivery.customer}</td><td>Driver:</td><td>${delivery.driver || 'N/A'}</td></tr>
+          <tr><td>Vehicle:</td><td>${delivery.vehicle || 'N/A'}</td><td></td><td></td></tr>
+          <tr><th>Description</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr>
+    `;
+    
+    itemsList.forEach((item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const rate = item.rate || item.price || 0;
+      const amount = qty * rate;
+      html += `<tr><td>${item.description || item.name || 'N/A'}</td><td>${qty}</td><td>${rate}</td><td>${amount}</td></tr>`;
+    });
+    
+    html += `
+          <tr style="font-weight: bold;"><td colspan="3" style="text-align: right;">Total:</td><td>${delivery.total}</td></tr>
+        </table>
+        ${delivery.deliveryNotes ? `<p><strong>Notes:</strong> ${delivery.deliveryNotes}</p>` : ''}
+      </body></html>
+    `;
+    
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = `delivery-${delivery.deliveryNoteNumber}-${new Date().toISOString().split('T')[0]}.xls`;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: `Excel: ${filename}` });
+  };
+
+  const handleShareDeliveryPDF = async (delivery: DeliveryData) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('DELIVERY NOTE', 14, 20);
+    doc.setFontSize(12);
+    doc.text(delivery.deliveryNoteNumber, 14, 28);
+    doc.setFontSize(10);
+    doc.text(`Date: ${delivery.date}`, 14, 36);
+    doc.text(`Status: ${delivery.status.toUpperCase()}`, 14, 42);
+    doc.text(`Customer: ${delivery.customer}`, 14, 50);
+    if (delivery.driver) doc.text(`Driver: ${delivery.driver}`, 14, 56);
+    if (delivery.vehicle) doc.text(`Vehicle: ${delivery.vehicle}`, 14, 62);
+    
+    const itemsList = delivery.itemsList || [];
+    const tableData = itemsList.map((item: any) => [
+      item.description || item.name || 'N/A',
+      (item.quantity || item.delivered || 0).toString(),
+      formatCurrency(item.rate || item.price || 0),
+      formatCurrency((item.quantity || item.delivered || 0) * (item.rate || item.price || 0))
+    ]);
+    
+    autoTable(doc, {
+      startY: 70,
+      head: [['Description', 'Quantity', 'Rate', 'Amount']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+    
+    const finalY = (doc as any).lastAutoTable?.finalY || 80;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Total: ${formatCurrency(delivery.total)}`, 14, finalY + 10);
+    
+    if (delivery.deliveryNotes) {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text('Notes:', 14, finalY + 20);
+      doc.text(delivery.deliveryNotes, 14, finalY + 26);
+    }
+    
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], `delivery-${delivery.deliveryNoteNumber}.pdf`, { type: 'application/pdf' });
+    
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({ files: [pdfFile], title: `Delivery ${delivery.deliveryNoteNumber}` });
+        toast({ title: "Shared", description: "PDF shared successfully" });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          doc.save(`delivery-${delivery.deliveryNoteNumber}.pdf`);
+          toast({ title: "Downloaded", description: "Sharing failed, PDF downloaded" });
+        }
+      }
+    } else {
+      doc.save(`delivery-${delivery.deliveryNoteNumber}.pdf`);
+      toast({ title: "Downloaded", description: "Sharing not supported, PDF downloaded" });
+    }
+  };
+
   // Export actions
   const handlePrintReport = () => {
     if (filteredDeliveries.length === 0) {
@@ -615,15 +766,35 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                   <div className="text-right">
                     <p className="text-lg font-bold">{formatCurrency(delivery.total)}</p>
                     <p className="text-sm text-muted-foreground">{delivery.items} items</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => handleViewDelivery(delivery)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
+                    <div className="flex gap-2 mt-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <FileText className="h-4 w-4 mr-1" />
+                            Actions
+                            <ChevronDown className="h-4 w-4 ml-1" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handlePrintDelivery(delivery)}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            <span>Print</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownloadDelivery(delivery)}>
+                            <Download className="h-4 w-4 mr-2" />
+                            <span>Download .pdf</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExportDeliveryXLS(delivery)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span>Export .xls</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleShareDeliveryPDF(delivery)}>
+                            <Share2 className="h-4 w-4 mr-2" />
+                            <span>Share .pdf</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               </CardContent>
