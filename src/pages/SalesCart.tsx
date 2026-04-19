@@ -699,9 +699,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           }
         }
         
-        // Create new debt record for current transaction if not fully paid
+        // Create new debt record for current transaction
+        // Always create a debt record for debt transactions, even if fully paid
         const remainingNewDebt = totalWithTax - actualAmountPaid;
-        if (paymentMethod === "debt" && remainingNewDebt > 0) {
+        if (paymentMethod === "debt") {
+          // Determine payment status based on amount paid
+          const paymentStatus = remainingNewDebt <= 0 ? 'paid' : (actualAmountPaid > 0 ? 'partial' : 'unpaid');
+          
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
@@ -713,8 +717,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             tax_amount: tax,
             total_amount: totalWithTax,
             amount_paid: actualAmountPaid,
-            remaining_amount: remainingNewDebt,
-            payment_status: 'unpaid' as const,
+            remaining_amount: Math.max(0, remainingNewDebt),
+            payment_status: paymentStatus,
             notes: `Debt for sale ${createdSale.id || 'unknown'}`
           };
 
