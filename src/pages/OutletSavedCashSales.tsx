@@ -39,6 +39,7 @@ import {
   deleteOutletCashSale,
   getOutletCashSaleItemsBySaleId,
   getOutletCustomerById,
+  getOutletDebtsByCustomerId,
   OutletCashSale,
   OutletCashSaleItem
 } from "@/services/databaseService";
@@ -55,12 +56,16 @@ interface SavedSale {
   invoiceNumber: string;
   date: string;
   customer: string;
+  customerId?: string;
   items: { name: string; quantity: number; price: number }[];
   subtotal: number;
   tax: number;
   total: number;
+  amountPaid?: number;
+  changeAmount?: number;
   paymentMethod: string;
   status: string;
+  creditBroughtForward?: number;
 }
 
 export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesProps) => {
@@ -333,6 +338,15 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
             price: item.unit_price
           }));
           
+          // Calculate customer's previous balance (from debts only)
+          let creditBroughtForward = 0;
+          if (sale.customer_id) {
+            const customerDebts = await getOutletDebtsByCustomerId(outletId, sale.customer_id);
+            // Sum all remaining amounts from customer's debts
+            creditBroughtForward = customerDebts
+              .reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
+          }
+          
           return {
             id: sale.id || '',
             invoiceNumber: sale.invoice_number || '',
@@ -346,7 +360,8 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
             amountPaid: sale.amount_paid,
             changeAmount: sale.change_amount,
             paymentMethod: 'cash',
-            status: 'completed'
+            status: 'completed',
+            creditBroughtForward: creditBroughtForward
           };
         })
       );
@@ -441,6 +456,13 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
             <p><span>Subtotal:</span><span>${formatCurrency(sale.subtotal)}</span></p>
             <p><span>Tax (18%):</span><span>${formatCurrency(sale.tax)}</span></p>
             <p class="total-row"><span>Total:</span><span>${formatCurrency(sale.total)}</span></p>
+            ${sale.creditBroughtForward > 0 ? `
+            <p style="color: #f59e0b; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;"><span>Customer's Previous Balance (Debt):</span><span>${formatCurrency(sale.creditBroughtForward)}</span></p>
+            ` : ''}
+            ${sale.creditBroughtForward < 0 ? `
+            <p style="color: #10b981; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;"><span>Customer's Credit Balance:</span><span>-${formatCurrency(Math.abs(sale.creditBroughtForward))}</span></p>
+            ` : ''}
+            <p style="color: #27ae60; font-weight: bold; font-size: 16px; margin-top: 5px;"><span>Amount Paid (Cash):</span><span>${formatCurrency(sale.amountPaid || sale.total)}</span></p>
           </div>
 
           <div class="footer">
