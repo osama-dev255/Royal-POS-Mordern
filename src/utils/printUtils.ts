@@ -344,6 +344,13 @@ export class PrintUtils {
           <div>${change < 0 ? `Credited: ${Math.abs(change).toFixed(2)}` : change.toFixed(2)}</div>
         </div>
       `}
+      ${transaction.salesman || transaction.driver || transaction.truck ? `
+        <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
+          ${transaction.salesman ? `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><div>Salesman:</div><div>${transaction.salesman}</div></div>` : ''}
+          ${transaction.driver ? `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><div>Driver:</div><div>${transaction.driver}</div></div>` : ''}
+          ${transaction.truck ? `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><div>Truck:</div><div>${transaction.truck}</div></div>` : ''}
+        </div>
+      ` : ''}
     </div>
     
     <div class="footer">
@@ -1566,6 +1573,13 @@ export class PrintUtils {
                   <div>${change < 0 ? `Credited: ${Math.abs(change).toFixed(2)}` : change.toFixed(2)}</div>
                 </div>
               `}
+              ${transaction.salesman || transaction.driver || transaction.truck ? `
+                <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
+                  ${transaction.salesman ? `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><div>Salesman:</div><div>${transaction.salesman}</div></div>` : ''}
+                  ${transaction.driver ? `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><div>Driver:</div><div>${transaction.driver}</div></div>` : ''}
+                  ${transaction.truck ? `<div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><div>Truck:</div><div>${transaction.truck}</div></div>` : ''}
+                </div>
+              ` : ''}
             </div>
             
             <div style="text-align: center; margin: 15px 0;">
@@ -3726,9 +3740,10 @@ export class PrintUtils {
     const customerAddress = transaction.customer?.address || '';
     const customerEmail = transaction.customer?.email || '';
     
-    // Salesman and Driver info
+    // Salesman, Driver and Truck info
     const salesman = transaction.salesman || 'Not Assigned';
     const driver = transaction.driver || 'Not Assigned';
+    const truck = transaction.truck || 'Not Assigned';
     
     const items = transaction.items || [];
     const subtotal = transaction.subtotal || 0;
@@ -3934,7 +3949,7 @@ export class PrintUtils {
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
             <div class="amount-due-label">AMOUNT DUE</div>
-            <div class="amount-due">${formatCurrency(total - (transaction.amountPaid || 0))}</div>
+            <div class="amount-due">${formatCurrency(total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0))}</div>
           </div>
           
           <div class="info-section">
@@ -3977,6 +3992,10 @@ export class PrintUtils {
             <div class="date-item">
               <span class="date-label">DRIVER:</span>
               <span class="date-value">${driver}</span>
+            </div>
+            <div class="date-item">
+              <span class="date-label">TRUCK:</span>
+              <span class="date-value">${truck}</span>
             </div>
           </div>
           
@@ -4071,7 +4090,7 @@ export class PrintUtils {
             ` : ''}
             <div class="summary-row amount-due-final">
               <span class="summary-label">AMOUNT DUE:</span>
-              <span>${formatCurrency(total + (transaction.previousDebtBalance > 0 ? transaction.previousDebtBalance : 0) - (transaction.amountPaid || 0))}</span>
+              <span>${formatCurrency(total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0))}</span>
             </div>
             ${transaction.amountPaid > 0 ? `
             <div class="summary-row" style="color: #666; font-size: 12px;">

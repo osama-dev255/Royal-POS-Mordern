@@ -93,6 +93,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [debtPaymentAmount, setDebtPaymentAmount] = useState<string>(""); // Amount paid toward previous debt
   const [salesman, setSalesman] = useState<string>(""); // Salesman name
   const [driver, setDriver] = useState<string>(""); // Driver name
+  const [truck, setTruck] = useState<string>(""); // Truck identifier
   const [dueDate, setDueDate] = useState<string>(""); // Due date for debt transactions
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false); // State for adding new customer
   const [newCustomer, setNewCustomer] = useState({
@@ -864,6 +865,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         customer: selectedCustomer, // Include customer information
         salesman: salesman || 'Not Assigned',
         driver: driver || 'Not Assigned',
+        truck: truck || 'Not Assigned',
         dueDate: paymentMethod === "debt" 
           ? (dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()) 
           : undefined,
@@ -996,6 +998,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       setDebtPaymentAmount("");
       setAdjustments("");
       setAdjustmentReason("");
+      setSalesman("");
+      setDriver("");
+      setTruck("");
       
       toast({
         title: "Success",
@@ -1810,6 +1815,18 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                   onChange={(e) => setDriver(e.target.value)}
                 />
               </div>
+            </div>
+            
+            {/* Truck field */}
+            <div>
+              <Label htmlFor="truck">Truck</Label>
+              <Input
+                id="truck"
+                type="text"
+                placeholder="Enter truck identifier"
+                value={truck}
+                onChange={(e) => setTruck(e.target.value)}
+              />
             </div>
             
             {/* Due Date field for debt transactions */}
