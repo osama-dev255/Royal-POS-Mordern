@@ -149,7 +149,7 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   ],
   deliveryNotes: "Please handle with care. Fragile items included.\nSignature required upon delivery.",
   totalItems: 3,
-  totalQuantity: 17,
+  totalQuantity: 0, // Will be calculated dynamically
   totalPackages: 3,
   preparedByName: "",
   preparedByDate: "",
@@ -1099,7 +1099,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     ],
     deliveryNotes: ".\nSignature required upon delivery.",
     totalItems: 3,
-    totalQuantity: 17,
+    totalQuantity: 0, // Will be calculated dynamically
     totalPackages: 3,
     preparedByName: "",
     preparedByDate: "",
@@ -2336,11 +2336,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       const deliveryNoteNumber = getNextDeliveryNoteNumber();
       setDeliveryNoteName(deliveryNoteNumber);
       
-      // Also update the delivery note number and date in the data
+      // Calculate total quantity from items (use quantity first, then delivered as fallback)
+      const calculatedTotalQuantity = deliveryNoteData.items.reduce((sum, item) => sum + Number(item.quantity || item.delivered || 0), 0);
+      
+      // Also update the delivery note number, date, and calculated totals
       setDeliveryNoteData(prev => ({
         ...prev,
         deliveryNoteNumber: deliveryNoteNumber,
-        date: new Date().toISOString().split('T')[0] // Set to current date in YYYY-MM-DD format
+        date: new Date().toISOString().split('T')[0], // Set to current date in YYYY-MM-DD format
+        totalQuantity: calculatedTotalQuantity // Update with real calculated total
       }));
     }
   }, [activeTab]);
@@ -4677,9 +4681,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   // Calculate totals
   const calculateTotals = () => {
     const totalItems = deliveryNoteData.items.length;
-    const totalQuantity = deliveryNoteData.items.reduce((sum, item) => sum + Number(item.delivered || 0), 0);
+    const totalQuantity = deliveryNoteData.items.reduce((sum, item) => sum + Number(item.quantity || item.delivered || 0), 0);
     const totalPackages = deliveryNoteData.items.reduce((count, item) => 
-      item.unit && item.delivered ? count + 1 : count, 0
+      item.unit && (item.quantity || item.delivered) ? count + 1 : count, 0
     );
     
     return { totalItems, totalQuantity, totalPackages };
@@ -4801,10 +4805,18 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         }));
       }
       
+      // Calculate totals before saving
+      const totals = calculateTotals();
+      
       const newSavedNote: SavedDeliveryNote = {
         id: Date.now().toString(),
         name: deliveryNoteName || getNextDeliveryNoteNumber(),
-        data: deliveryNoteData,
+        data: {
+          ...deliveryNoteData,
+          totalQuantity: totals.totalQuantity, // Save calculated total
+          totalItems: totals.totalItems,
+          totalPackages: totals.totalPackages
+        },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -4849,9 +4861,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         // Calculate totals for the viewed note
         const viewedData = note.data;
         const totalItems = viewedData.items.length;
-        const totalQuantity = viewedData.items.reduce((sum, item) => sum + Number(item.delivered || 0), 0);
+        const totalQuantity = viewedData.items.reduce((sum, item) => sum + Number(item.quantity || item.delivered || 0), 0);
         const totalPackages = viewedData.items.reduce((count, item) => 
-          item.unit && item.delivered ? count + 1 : count, 0
+          item.unit && (item.quantity || item.delivered) ? count + 1 : count, 0
         );
         
         const printContent = `
