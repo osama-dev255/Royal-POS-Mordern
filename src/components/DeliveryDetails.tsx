@@ -158,6 +158,9 @@ export const DeliveryDetails = ({
                   <Calendar className="h-4 w-4" />
                   {formatDate(delivery.date)}
                 </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Time: {new Date(delivery.date).toLocaleTimeString()}
+                </p>
               </div>
               {isEditingMode ? (
                 <div className="flex items-center gap-2">
