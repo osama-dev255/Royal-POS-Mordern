@@ -52,6 +52,11 @@ interface OutletGRNProps {
 
 export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
+    start: '',
+    end: ''
+  });
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -97,11 +102,34 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     }
   };
   
-  const filteredDeliveries = deliveries.filter(delivery =>
-    delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (delivery.driver && delivery.driver.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredDeliveries = deliveries.filter(delivery => {
+    // Search filter
+    const matchesSearch = 
+      delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (delivery.driver && delivery.driver.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Status filter
+    const matchesStatus = !statusFilter || delivery.status === statusFilter;
+    
+    // Date range filter
+    let matchesDateRange = true;
+    if (dateRange.start || dateRange.end) {
+      const deliveryDate = new Date(delivery.date);
+      if (dateRange.start) {
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        matchesDateRange = matchesDateRange && deliveryDate >= startDate;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && deliveryDate <= endDate;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesDateRange;
+  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TZ', {
@@ -445,17 +473,209 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     setEditingDelivery(null);
   };
 
+  // Bulk Export Actions
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const rowsHtml = filteredDeliveries.map(delivery => `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">${delivery.deliveryNoteNumber}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${new Date(delivery.date).toLocaleDateString()}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${delivery.customer}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${delivery.driver || 'N/A'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${delivery.status}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(delivery.total || 0)}</td>
+        </tr>
+      `).join('');
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Outlet GRN Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #f59e0b; color: white; padding: 10px; text-align: left; }
+            .total-row { font-weight: bold; background: #f9f9f9; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Outlet GRN Report</h1>
+          <p>Total Deliveries: ${filteredDeliveries.length}</p>
+          <p>Total Value: ${formatCurrency(filteredDeliveries.reduce((sum, d) => sum + (d.total || 0), 0))}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Delivery Note</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Driver</th>
+                <th>Status</th>
+                <th style="text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="total-row">
+                <td colspan="5" style="text-align: right;">Total:</td>
+                <td style="text-align: right;">${formatCurrency(filteredDeliveries.reduce((sum, d) => sum + (d.total || 0), 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Print</button>
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  const handleDownload = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Outlet GRN Report', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Total Deliveries: ${filteredDeliveries.length}`, 14, 30);
+    doc.text(`Total Value: ${formatCurrency(filteredDeliveries.reduce((sum, d) => sum + (d.total || 0), 0))}`, 14, 36);
+    
+    const tableData = filteredDeliveries.map(delivery => [
+      delivery.deliveryNoteNumber,
+      new Date(delivery.date).toLocaleDateString(),
+      delivery.customer,
+      delivery.driver || 'N/A',
+      delivery.status,
+      formatCurrency(delivery.total || 0)
+    ]);
+    
+    autoTable(doc, {
+      startY: 45,
+      head: [['Delivery Note', 'Date', 'Customer', 'Driver', 'Status', 'Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+
+    doc.save('Outlet_GRN_Report.pdf');
+    toast({
+      title: "Download Started",
+      description: "Downloading GRN report as PDF",
+    });
+  };
+
+  const handleExportXLS = () => {
+    let csvContent = "Delivery Note,Date,Customer,Driver,Status,Total\n";
+    filteredDeliveries.forEach(delivery => {
+      csvContent += `${delivery.deliveryNoteNumber},${delivery.date},${delivery.customer},${delivery.driver || 'N/A'},${delivery.status},${delivery.total || 0}\n`;
+    });
+    csvContent += `\nTotal,,,,,${filteredDeliveries.reduce((sum, d) => sum + (d.total || 0), 0)}\n`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Outlet_GRN_Report.csv';
+    link.click();
+    toast({
+      title: "Export Started",
+      description: "Exporting GRN report as CSV",
+    });
+  };
+
+  const handleSharePDF = async () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Outlet GRN Report', 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Total Deliveries: ${filteredDeliveries.length}`, 14, 30);
+      
+      const tableData = filteredDeliveries.map(delivery => [
+        delivery.deliveryNoteNumber,
+        new Date(delivery.date).toLocaleDateString(),
+        delivery.customer,
+        delivery.driver || 'N/A',
+        delivery.status,
+        formatCurrency(delivery.total || 0)
+      ]);
+      
+      autoTable(doc, {
+        startY: 40,
+        head: [['Delivery Note', 'Date', 'Customer', 'Driver', 'Status', 'Total']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], 'Outlet_GRN_Report.pdf', { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Outlet GRN Report',
+          text: `GRN report with ${filteredDeliveries.length} deliveries`
+        });
+        toast({
+          title: "Shared Successfully",
+          description: "GRN report has been shared",
+        });
+      } else {
+        handleDownload();
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+        handleDownload();
+      }
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 px-4">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Outlet GRN</h1>
-          <p className="text-muted-foreground">Manage Goods Received Notes for this outlet</p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Outlet GRN</h1>
+            <p className="text-muted-foreground">Manage Goods Received Notes for this outlet</p>
+          </div>
         </div>
+        
+        {/* Export Actions Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <FileText className="h-4 w-4 mr-2" />
+              Export
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handlePrintReport}>
+              <Printer className="h-4 w-4 mr-2" />
+              <span>Print</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-2" />
+              <span>Download .pdf</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportXLS}>
+              <FileText className="h-4 w-4 mr-2" />
+              <span>Export .xls</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSharePDF}>
+              <Share2 className="h-4 w-4 mr-2" />
+              <span>Share .pdf</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Stats Cards */}
@@ -465,7 +685,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Deliveries</p>
-                <p className="text-2xl font-bold">{deliveries.length}</p>
+                <p className="text-2xl font-bold">{filteredDeliveries.length}</p>
               </div>
               <Truck className="h-8 w-8 text-primary" />
             </div>
@@ -476,7 +696,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Delivered</p>
-                <p className="text-2xl font-bold">{deliveries.filter(d => d.status === 'delivered').length}</p>
+                <p className="text-2xl font-bold">{filteredDeliveries.filter(d => d.status === 'delivered').length}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
                 <div className="h-3 w-3 rounded-full bg-green-500" />
@@ -489,7 +709,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">In Transit</p>
-                <p className="text-2xl font-bold">{deliveries.filter(d => d.status === 'in-transit').length}</p>
+                <p className="text-2xl font-bold">{filteredDeliveries.filter(d => d.status === 'in-transit').length}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                 <div className="h-3 w-3 rounded-full bg-blue-500" />
@@ -503,7 +723,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
               <div>
                 <p className="text-sm text-muted-foreground">Total Value</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(deliveries.reduce((sum, d) => sum + (d.total || 0), 0))}
+                  {formatCurrency(filteredDeliveries.reduce((sum, d) => sum + (d.total || 0), 0))}
                 </p>
               </div>
               <Package className="h-8 w-8 text-blue-500" />
@@ -512,17 +732,63 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Filter Bar */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search deliveries by number, customer, or driver..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search Bar */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search deliveries by number, customer, or driver..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm w-full md:w-auto"
+            >
+              <option value="">All Status</option>
+              <option value="delivered">Delivered</option>
+              <option value="in-transit">In Transit</option>
+              <option value="pending">Pending</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            
+            {/* Date Range Picker */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                className="px-2 py-1.5 border rounded-md text-sm"
+                placeholder="Start Date"
+              />
+              <span className="text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                className="px-2 py-1.5 border rounded-md text-sm"
+                placeholder="End Date"
+              />
+              {(dateRange.start || dateRange.end) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange({ start: '', end: '' })}
+                  className="h-7 px-2"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -647,7 +913,11 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         <div className="text-center py-12">
           <Truck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium">No deliveries found</h3>
-          <p className="text-muted-foreground">Try adjusting your search terms</p>
+          <p className="text-muted-foreground">
+            {searchTerm || statusFilter || dateRange.start || dateRange.end
+              ? 'Try adjusting your filters'
+              : 'No deliveries for this outlet yet'}
+          </p>
         </div>
       )}
 
