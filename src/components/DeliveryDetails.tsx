@@ -159,7 +159,7 @@ export const DeliveryDetails = ({
                   {formatDate(delivery.date)}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Time: {new Date(delivery.date).toLocaleTimeString()}
+                  Time: {new Date().toLocaleTimeString()}
                 </p>
               </div>
               {isEditingMode ? (
