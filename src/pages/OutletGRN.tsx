@@ -1044,8 +1044,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                     <TableRow>
                       <TableHead>Description</TableHead>
                       <TableHead className="w-[100px]">Quantity</TableHead>
-                      <TableHead className="w-[120px]">Rate</TableHead>
-                      <TableHead className="w-[120px]">Amount</TableHead>
+                      <TableHead className="w-[120px]">Unit Cost</TableHead>
+                      <TableHead className="w-[120px]">Total Cost</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1098,7 +1098,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
               </div>
               
               <div className="flex justify-end items-center gap-2 pt-2">
-                <span className="text-sm font-medium">Total:</span>
+                <span className="text-sm font-medium">Total Cost:</span>
                 <span className="text-lg font-bold">{formatCurrency(editForm.total)}</span>
               </div>
             </div>
