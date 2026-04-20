@@ -52,6 +52,10 @@ interface ReceiptSale {
   type: 'sales' | 'commission' | 'other';
   previousBalance?: number;
   newBalance?: number;
+  notes?: string;
+  cashier?: string;
+  preparedBy?: string;
+  approvedBy?: string;
 }
 
 export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
@@ -91,6 +95,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [settlementPaymentMethod, setSettlementPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash');
   const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0]);
   const [settlementNotes, setSettlementNotes] = useState('');
+  const [settlementCashier, setSettlementCashier] = useState('');
+  const [settlementPreparedBy, setSettlementPreparedBy] = useState('');
+  const [settlementApprovedBy, setSettlementApprovedBy] = useState('');
   
   // Customer search state
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
@@ -114,6 +121,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [editPaymentMethod, setEditPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash');
   const [editDate, setEditDate] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editCashier, setEditCashier] = useState('');
+  const [editPreparedBy, setEditPreparedBy] = useState('');
+  const [editApprovedBy, setEditApprovedBy] = useState('');
 
   useEffect(() => {
     fetchReceipts();
@@ -367,7 +377,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     setEditPaymentAmount(receipt.amountPaid);
     setEditPaymentMethod(receipt.paymentMethod as 'cash' | 'card' | 'mobile');
     setEditDate(receipt.date.split('T')[0]);
-    setEditNotes(''); // Notes might not be in the receipt object, will fetch if needed
+    setEditNotes(receipt.notes || '');
+    setEditCashier(receipt.cashier || '');
+    setEditPreparedBy(receipt.preparedBy || '');
+    setEditApprovedBy(receipt.approvedBy || '');
     setIsEditDialogOpen(true);
   };
   
@@ -384,6 +397,24 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       return;
     }
     
+    if (!editCashier.trim()) {
+      toast({
+        title: "Error",
+        description: "Cashier is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!editPreparedBy.trim()) {
+      toast({
+        title: "Error",
+        description: "Prepared By is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setSaving(true);
     
     try {
@@ -395,7 +426,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         payment_method: editPaymentMethod,
         settlement_date: editDate,
         new_balance: newBalance,
-        notes: editNotes || undefined
+        notes: editNotes || undefined,
+        cashier: editCashier || undefined,
+        prepared_by: editPreparedBy || undefined,
+        approved_by: editApprovedBy || undefined
       });
       
       if (!result) {
@@ -675,6 +709,24 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       return;
     }
     
+    if (!settlementCashier.trim()) {
+      toast({
+        title: "Error",
+        description: "Cashier is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!settlementPreparedBy.trim()) {
+      toast({
+        title: "Error",
+        description: "Prepared By is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setSaving(true);
     
     try {
@@ -694,7 +746,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         payment_method: settlementPaymentMethod,
         previous_balance: settlementPreviousBalance,
         new_balance: newBalance,
-        notes: settlementNotes
+        notes: settlementNotes,
+        cashier: settlementCashier,
+        prepared_by: settlementPreparedBy,
+        approved_by: settlementApprovedBy
       });
       
       // Save settlement to database
@@ -708,7 +763,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         payment_method: settlementPaymentMethod,
         previous_balance: settlementPreviousBalance,
         new_balance: newBalance,
-        notes: settlementNotes
+        notes: settlementNotes,
+        cashier: settlementCashier || undefined,
+        prepared_by: settlementPreparedBy || undefined,
+        approved_by: settlementApprovedBy || undefined
       });
       
       if (!result) {
@@ -1049,9 +1107,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                         id="settlementPreviousBalance"
                         type="number"
                         value={settlementPreviousBalance || ''}
-                        onChange={(e) => setSettlementPreviousBalance(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        className="mt-1"
+                        disabled
+                        className="mt-1 bg-muted cursor-not-allowed"
                       />
                       <p className="text-xs text-muted-foreground mt-1">Total amount customer owed</p>
                     </div>
@@ -1138,6 +1195,42 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   placeholder="Additional notes about this settlement"
                   className="mt-1"
                 />
+              </div>
+              
+              {/* Cashier, Prepared By, Approved By Fields */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="settlementCashier">Cashier *</Label>
+                  <Input
+                    id="settlementCashier"
+                    value={settlementCashier}
+                    onChange={(e) => setSettlementCashier(e.target.value)}
+                    placeholder="Cashier name"
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settlementPreparedBy">Prepared By *</Label>
+                  <Input
+                    id="settlementPreparedBy"
+                    value={settlementPreparedBy}
+                    onChange={(e) => setSettlementPreparedBy(e.target.value)}
+                    placeholder="Prepared by"
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settlementApprovedBy">Approved By</Label>
+                  <Input
+                    id="settlementApprovedBy"
+                    value={settlementApprovedBy}
+                    onChange={(e) => setSettlementApprovedBy(e.target.value)}
+                    placeholder="Approved by (Optional)"
+                    className="mt-1"
+                  />
+                </div>
               </div>
               
               {/* Actions */}
@@ -1731,6 +1824,41 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                       placeholder="Additional notes about this settlement"
                       className="mt-1"
                     />
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="editCashier">Cashier *</Label>
+                      <Input
+                        id="editCashier"
+                        value={editCashier}
+                        onChange={(e) => setEditCashier(e.target.value)}
+                        placeholder="Cashier name"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editPreparedBy">Prepared By *</Label>
+                      <Input
+                        id="editPreparedBy"
+                        value={editPreparedBy}
+                        onChange={(e) => setEditPreparedBy(e.target.value)}
+                        placeholder="Prepared by"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editApprovedBy">Approved By</Label>
+                      <Input
+                        id="editApprovedBy"
+                        value={editApprovedBy}
+                        onChange={(e) => setEditApprovedBy(e.target.value)}
+                        placeholder="Approved by (Optional)"
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
                 </div>
 

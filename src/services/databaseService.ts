@@ -4578,6 +4578,9 @@ export interface OutletCustomerSettlement {
   previous_balance: number;
   new_balance: number;
   notes?: string;
+  cashier?: string;
+  prepared_by?: string;
+  approved_by?: string;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
