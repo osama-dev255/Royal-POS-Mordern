@@ -5143,6 +5143,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
             <div>
               <p class="font-bold">Date:</p>
               <p>${deliveryNoteData.date}</p>
+              <p class="text-sm" style="font-size: 12px; color: #666; margin-top: 4px;">Time: ${new Date().toLocaleTimeString()}</p>
             </div>
             <div>
               <p class="font-bold">Delivery Date:</p>
@@ -5346,6 +5347,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           <div>
             <p class="font-bold">Date:</p>
             <p>${deliveryNoteData.date}</p>
+            <p class="text-sm" style="font-size: 12px; color: #666; margin-top: 4px;">Time: ${new Date().toLocaleTimeString()}</p>
           </div>
           <div>
             <p class="font-bold">Delivery Date:</p>
