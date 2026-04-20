@@ -938,7 +938,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                 <Input
                   id="deliveryNoteNumber"
                   value={editForm.deliveryNoteNumber}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, deliveryNoteNumber: e.target.value }))}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
                 />
               </div>
               <div className="space-y-2">
@@ -947,7 +948,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                   id="date"
                   type="date"
                   value={editForm.date}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
                 />
               </div>
             </div>
@@ -957,7 +959,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
               <Input
                 id="customer"
                 value={editForm.customer}
-                onChange={(e) => setEditForm(prev => ({ ...prev, customer: e.target.value }))}
+                disabled
+                className="bg-muted cursor-not-allowed"
               />
             </div>
 
@@ -998,12 +1001,13 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="total">Total Amount</Label>
+                <Label htmlFor="total">Total Amount (Auto-calculated)</Label>
                 <Input
                   id="total"
                   type="number"
                   value={editForm.total}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, total: parseFloat(e.target.value) || 0 }))}
+                  disabled
+                  className="bg-muted cursor-not-allowed font-semibold"
                 />
               </div>
             </div>
