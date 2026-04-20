@@ -393,8 +393,11 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       ...prev,
       itemsList: [...prev.itemsList, {
         description: '',
+        name: '',
         quantity: 0,
+        delivered: 0,
         rate: 0,
+        price: 0,
         amount: 0
       }]
     }));
@@ -417,13 +420,17 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       const newItemsList = [...prev.itemsList];
       newItemsList[index] = { ...newItemsList[index], [field]: value };
       
-      // Calculate amount for this row
-      const quantity = field === 'quantity' ? value : (newItemsList[index].quantity || 0);
-      const rate = field === 'rate' ? value : (newItemsList[index].rate || 0);
+      // Calculate amount for this row using the correct field names
+      const quantity = field === 'quantity' ? value : (newItemsList[index].quantity || newItemsList[index].delivered || 0);
+      const rate = field === 'rate' ? value : (newItemsList[index].rate || newItemsList[index].price || 0);
       newItemsList[index].amount = quantity * rate;
       
       // Recalculate total
-      const newTotal = newItemsList.reduce((sum, item) => sum + ((item.quantity || 0) * (item.rate || 0)), 0);
+      const newTotal = newItemsList.reduce((sum, item) => {
+        const qty = item.quantity || item.delivered || 0;
+        const rt = item.rate || item.price || 0;
+        return sum + (qty * rt);
+      }, 0);
       
       return {
         ...prev,
@@ -773,7 +780,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                       <TableRow key={index}>
                         <TableCell>
                           <Input
-                            value={item.description || ''}
+                            value={item.description || item.name || ''}
                             onChange={(e) => updateItemRow(index, 'description', e.target.value)}
                             placeholder="Item description"
                           />
@@ -781,7 +788,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                         <TableCell>
                           <Input
                             type="number"
-                            value={item.quantity || 0}
+                            value={item.quantity || item.delivered || 0}
                             onChange={(e) => updateItemRow(index, 'quantity', parseFloat(e.target.value) || 0)}
                             min="0"
                             className="text-right"
@@ -790,7 +797,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                         <TableCell>
                           <Input
                             type="number"
-                            value={item.rate || 0}
+                            value={item.rate || item.price || 0}
                             onChange={(e) => updateItemRow(index, 'rate', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.01"
@@ -798,7 +805,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                           />
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {formatCurrency((item.quantity || 0) * (item.rate || 0))}
+                          {formatCurrency(((item.quantity || item.delivered || 0)) * ((item.rate || item.price || 0)))}
                         </TableCell>
                         <TableCell>
                           <Button
