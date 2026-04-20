@@ -6249,6 +6249,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
             <h2>DELIVERY NOTE</h2>
             <div class="number">${deliveryNoteData.deliveryNoteNumber}</div>
             <div>Date: ${deliveryNoteData.date}</div>
+            <div>Time: ${new Date().toLocaleTimeString()}</div>
           </div>
           
           <div class="info-section">
