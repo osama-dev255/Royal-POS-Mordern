@@ -255,7 +255,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         price: product.selling_price,
         quantity: 1, // Changed to 1 instead of 0
       };
-      setCart([...cart, newItem]);
+      // Add new items at the beginning of the cart for better UX
+      setCart([newItem, ...cart]);
     }
     
     setSearchTerm("");
