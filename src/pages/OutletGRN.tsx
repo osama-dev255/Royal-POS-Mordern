@@ -426,7 +426,10 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         delivered: 0,
         rate: 0,
         price: 0,
-        amount: 0
+        amount: 0,
+        sellingPrice: 0,
+        unitPrice: 0,
+        totalPrice: 0
       }]
     }));
   };
@@ -448,12 +451,16 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       const newItemsList = [...prev.itemsList];
       newItemsList[index] = { ...newItemsList[index], [field]: value };
       
-      // Calculate amount for this row using the correct field names
+      // Calculate amount (Total Cost) for this row
       const quantity = field === 'quantity' ? value : (newItemsList[index].quantity || newItemsList[index].delivered || 0);
       const rate = field === 'rate' ? value : (newItemsList[index].rate || newItemsList[index].price || 0);
       newItemsList[index].amount = quantity * rate;
       
-      // Recalculate total
+      // Calculate totalPrice for this row
+      const sellingPrice = field === 'sellingPrice' ? value : (newItemsList[index].sellingPrice || newItemsList[index].unitPrice || 0);
+      newItemsList[index].totalPrice = quantity * sellingPrice;
+      
+      // Recalculate total (Total Cost)
       const newTotal = newItemsList.reduce((sum, item) => {
         const qty = item.quantity || item.delivered || 0;
         const rt = item.rate || item.price || 0;
@@ -923,7 +930,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
 
       {/* Edit Delivery Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Delivery</DialogTitle>
             <DialogDescription>
@@ -1046,6 +1053,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                       <TableHead className="w-[100px]">Quantity</TableHead>
                       <TableHead className="w-[120px]">Unit Cost</TableHead>
                       <TableHead className="w-[120px]">Total Cost</TableHead>
+                      <TableHead className="w-[120px]">Unit Price</TableHead>
+                      <TableHead className="w-[120px]">Total Price</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1080,6 +1089,20 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(((item.quantity || item.delivered || 0)) * ((item.rate || item.price || 0)))}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.sellingPrice || item.unitPrice || 0}
+                            onChange={(e) => updateItemRow(index, 'sellingPrice', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.01"
+                            className="text-right"
+                            placeholder="0.00"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(((item.quantity || item.delivered || 0)) * ((item.sellingPrice || item.unitPrice || 0)))}
                         </TableCell>
                         <TableCell>
                           <Button
