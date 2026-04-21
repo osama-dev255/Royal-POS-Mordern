@@ -70,6 +70,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     status: 'pending' as string,
     deliveryNotes: '',
     total: 0,
+    totalPrice: 0,
     itemsList: [] as any[]
   });
   const [saving, setSaving] = useState(false);
@@ -359,15 +360,27 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
 
   const handleEditDelivery = (delivery: DeliveryData) => {
     setEditingDelivery(delivery);
+    
+    // Calculate totalPrice from items
+    const calculatedTotalPrice = (delivery.itemsList || []).reduce((sum, item) => {
+      const qty = item.quantity || item.delivered || 0;
+      const sp = item.sellingPrice || item.unitPrice || 0;
+      return sum + (qty * sp);
+    }, 0);
+    
+    // Extract date portion only (YYYY-MM-DD) from datetime string for date input
+    const deliveryDate = delivery.date ? new Date(delivery.date).toISOString().split('T')[0] : '';
+    
     setEditForm({
       deliveryNoteNumber: delivery.deliveryNoteNumber,
-      date: delivery.date,
+      date: deliveryDate,
       customer: delivery.customer,
       driver: delivery.driver || '',
       vehicle: delivery.vehicle || '',
       status: delivery.status,
       deliveryNotes: delivery.deliveryNotes || '',
       total: delivery.total || 0,
+      totalPrice: calculatedTotalPrice,
       itemsList: delivery.itemsList || []
     });
     setIsEditDialogOpen(true);
@@ -467,10 +480,18 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         return sum + (qty * rt);
       }, 0);
       
+      // Recalculate totalPrice
+      const newTotalPrice = newItemsList.reduce((sum, item) => {
+        const qty = item.quantity || item.delivered || 0;
+        const sp = item.sellingPrice || item.unitPrice || 0;
+        return sum + (qty * sp);
+      }, 0);
+      
       return {
         ...prev,
         itemsList: newItemsList,
-        total: newTotal
+        total: newTotal,
+        totalPrice: newTotalPrice
       };
     });
   };
@@ -1055,6 +1076,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                       <TableHead className="w-[120px]">Total Cost</TableHead>
                       <TableHead className="w-[120px]">Unit Price</TableHead>
                       <TableHead className="w-[120px]">Total Price</TableHead>
+                      <TableHead className="w-[120px]">Unit Gain</TableHead>
+                      <TableHead className="w-[120px]">Total Gain</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1104,6 +1127,12 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                         <TableCell className="text-right font-medium">
                           {formatCurrency(((item.quantity || item.delivered || 0)) * ((item.sellingPrice || item.unitPrice || 0)))}
                         </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(((item.sellingPrice || item.unitPrice || 0)) - ((item.rate || item.price || 0)))}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(((item.quantity || item.delivered || 0)) * (((item.sellingPrice || item.unitPrice || 0)) - ((item.rate || item.price || 0))))}
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -1123,6 +1152,16 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
               <div className="flex justify-end items-center gap-2 pt-2">
                 <span className="text-sm font-medium">Total Cost:</span>
                 <span className="text-lg font-bold">{formatCurrency(editForm.total)}</span>
+              </div>
+              
+              <div className="flex justify-end items-center gap-2 pt-2">
+                <span className="text-sm font-medium">Total Price:</span>
+                <span className="text-lg font-bold">{formatCurrency(editForm.totalPrice)}</span>
+              </div>
+              
+              <div className="flex justify-end items-center gap-2 pt-2">
+                <span className="text-sm font-medium">Total Gain:</span>
+                <span className="text-lg font-bold">{formatCurrency(editForm.totalPrice - editForm.total)}</span>
               </div>
             </div>
           </div>
