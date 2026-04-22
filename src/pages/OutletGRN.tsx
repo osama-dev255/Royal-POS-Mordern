@@ -491,6 +491,38 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         } else {
           console.log(`✅ Saved ${itemsToInsert.length} items to grn_delivery_items`);
         }
+        
+        // Update inventory_products with new unit prices
+        console.log('🔄 Updating inventory product prices...');
+        
+        for (const item of editForm.itemsList) {
+          const unitPrice = item.sellingPrice || item.unitPrice;
+          const productName = item.description || item.name;
+          
+          if (unitPrice && unitPrice > 0 && productName) {
+            try {
+              // Update selling_price in inventory_products
+              const { error: updateError } = await supabase
+                .from('inventory_products')
+                .update({ 
+                  selling_price: unitPrice,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('outlet_id', outletId)
+                .eq('name', productName);
+              
+              if (updateError) {
+                console.error(`Error updating ${productName}:`, updateError);
+              } else {
+                console.log(`✅ Updated ${productName} selling price to ${unitPrice}`);
+              }
+            } catch (error) {
+              console.error(`Failed to update ${productName}:`, error);
+            }
+          }
+        }
+        
+        console.log('✅ Inventory product prices updated successfully');
       }
       
       // Refresh the deliveries list
