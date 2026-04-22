@@ -867,10 +867,68 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
   const handleExportEditDeliveryXLS = () => {
     if (!editingDelivery) return;
     
-    let csvContent = "EDIT DELIVERY DETAILS\n\n";
-    csvContent += "Delivery Note,Date,Status,Customer,Driver,Vehicle\n";
-    csvContent += `${editForm.deliveryNoteNumber},${new Date(editForm.date).toLocaleDateString()},${editForm.status},${editForm.customer},${editForm.driver || ''},${editForm.vehicle || ''}\n\n`;
-    csvContent += "Description,Quantity,Unit Cost,Total Cost,Unit Price,Total Price,Unit Gain,Total Gain\n";
+    // Create HTML table for Excel format
+    let htmlTable = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Delivery Details</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          td, th { mso-number-format: "\\@"; }
+          .number { mso-number-format: "#,##0.00"; }
+          .header { font-weight: bold; background-color: #F59E0B; color: white; }
+          .title { font-size: 16pt; font-weight: bold; }
+          .total { font-weight: bold; background-color: #F3F4F6; }
+          .gain { color: #10B981; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+    `;
+    
+    // Title
+    htmlTable += `<table><tr><td class="title" colspan="8">EDIT DELIVERY DETAILS</td></tr></table><br>`;
+    
+    // Delivery Info
+    htmlTable += `<table>
+      <tr><td><strong>Delivery Note:</strong></td><td>${editForm.deliveryNoteNumber}</td>
+          <td><strong>Date:</strong></td><td>${new Date(editForm.date).toLocaleDateString()}</td></tr>
+      <tr><td><strong>Customer:</strong></td><td>${editForm.customer}</td>
+          <td><strong>Status:</strong></td><td>${editForm.status.toUpperCase()}</td></tr>`;
+    
+    if (editForm.driver) {
+      htmlTable += `<tr><td><strong>Driver:</strong></td><td>${editForm.driver}</td></tr>`;
+    }
+    if (editForm.vehicle) {
+      htmlTable += `<tr><td><strong>Vehicle:</strong></td><td>${editForm.vehicle}</td></tr>`;
+    }
+    
+    htmlTable += `</table><br>`;
+    
+    // Items Table
+    htmlTable += `<table border="1">
+      <tr class="header">
+        <th>Description</th>
+        <th>Quantity</th>
+        <th>Unit Cost</th>
+        <th>Total Cost</th>
+        <th>Unit Price</th>
+        <th>Total Price</th>
+        <th>Unit Gain</th>
+        <th>Total Gain</th>
+      </tr>`;
     
     editForm.itemsList.forEach((item: any) => {
       const qty = item.quantity || item.delivered || 0;
@@ -881,9 +939,19 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       const unitGain = unitPrice - unitCost;
       const totalGain = qty * unitGain;
       
-      csvContent += `"${item.description || item.name || 'N/A'}",${qty},${unitCost},${totalCost},${unitPrice},${totalPrice},${unitGain},${totalGain}\n`;
+      htmlTable += `<tr>
+        <td>${item.description || item.name || 'N/A'}</td>
+        <td class="number">${qty}</td>
+        <td class="number">${unitCost.toFixed(2)}</td>
+        <td class="number">${totalCost.toFixed(2)}</td>
+        <td class="number">${unitPrice.toFixed(2)}</td>
+        <td class="number">${totalPrice.toFixed(2)}</td>
+        <td class="number">${unitGain.toFixed(2)}</td>
+        <td class="number">${totalGain.toFixed(2)}</td>
+      </tr>`;
     });
     
+    // Calculate totals
     const totalCostSum = editForm.itemsList.reduce((sum: number, item: any) => {
       const qty = item.quantity || item.delivered || 0;
       const unitCost = item.rate || item.price || 0;
@@ -898,19 +966,37 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     
     const totalGainSum = totalPriceSum - totalCostSum;
     
-    csvContent += `\nTotal Cost,,,,,${totalCostSum}\n`;
-    csvContent += `Total Price,,,,,,${totalPriceSum}\n`;
-    csvContent += `Total Gain,,,,,,,${totalGainSum}\n`;
+    // Total rows
+    htmlTable += `<tr class="total">
+      <td colspan="2" align="right"><strong>Total Cost:</strong></td>
+      <td colspan="2" class="number">${totalCostSum.toFixed(2)}</td>
+      <td colspan="2" align="right"><strong>Total Price:</strong></td>
+      <td colspan="2" class="number">${totalPriceSum.toFixed(2)}</td>
+    </tr>`;
     
+    htmlTable += `<tr class="total">
+      <td colspan="6" align="right"><strong>Total Gain:</strong></td>
+      <td colspan="2" class="number gain">${totalGainSum.toFixed(2)}</td>
+    </tr>`;
+    
+    htmlTable += `</table>`;
+    
+    // Notes
     if (editForm.deliveryNotes) {
-      csvContent += `\nNotes:,${editForm.deliveryNotes}\n`;
+      htmlTable += `<br><table><tr><td><strong>Notes:</strong></td><td>${editForm.deliveryNotes}</td></tr></table>`;
     }
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    htmlTable += `</body></html>`;
+    
+    // Create blob and download
+    const blob = new Blob([htmlTable], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `Edit_Delivery_${editForm.deliveryNoteNumber}.xls`;
     link.click();
+    
+    // Cleanup
+    setTimeout(() => URL.revokeObjectURL(link.href), 100);
     
     toast({
       title: "Export Successful",
