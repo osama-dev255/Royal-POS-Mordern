@@ -1240,7 +1240,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Description</TableHead>
+                      <TableHead className="min-w-[250px]">Description</TableHead>
                       <TableHead className="w-[100px]">Quantity</TableHead>
                       <TableHead className="w-[120px]">Unit Cost</TableHead>
                       <TableHead className="w-[120px]">Total Cost</TableHead>
