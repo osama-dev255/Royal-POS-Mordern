@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData, updateDelivery } from "@/utils/deliveryUtils";
 import { getInventoryProducts } from "@/services/databaseService";
+import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -440,6 +441,57 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       };
 
       await updateDelivery(updatedDelivery);
+      
+      // Save items to grn_delivery_items table
+      if (outletId && editForm.itemsList && editForm.itemsList.length > 0) {
+        console.log('💾 Saving delivery items to database...');
+        
+        // First, delete existing items for this delivery
+        const { error: deleteError } = await supabase
+          .from('grn_delivery_items')
+          .delete()
+          .eq('delivery_id', editingDelivery.id);
+        
+        if (deleteError) {
+          console.error('Error deleting old items:', deleteError);
+        } else {
+          console.log('✅ Deleted old items successfully');
+        }
+        
+        // Prepare items for insertion
+        const itemsToInsert = editForm.itemsList.map(item => {
+          const quantity = item.quantity || item.delivered || 0;
+          const unitCost = item.rate || item.price || 0;
+          const unitPrice = item.sellingPrice || item.unitPrice || 0;
+          
+          return {
+            delivery_id: editingDelivery.id,
+            outlet_id: outletId,
+            description: item.description || item.name || '',
+            product_name: item.description || item.name || '',
+            quantity: quantity,
+            delivered: item.delivered || 0,
+            unit_cost: unitCost,
+            total_cost: quantity * unitCost,
+            unit_price: unitPrice,
+            total_price: quantity * unitPrice,
+            unit_gain: unitPrice - unitCost,
+            total_gain: quantity * (unitPrice - unitCost)
+          };
+        });
+        
+        // Insert new items
+        const { error: insertError } = await supabase
+          .from('grn_delivery_items')
+          .insert(itemsToInsert);
+        
+        if (insertError) {
+          console.error('Error inserting items:', insertError);
+          throw new Error(`Failed to save delivery items: ${insertError.message}`);
+        } else {
+          console.log(`✅ Saved ${itemsToInsert.length} items to grn_delivery_items`);
+        }
+      }
       
       // Refresh the deliveries list
       await loadDeliveries();
