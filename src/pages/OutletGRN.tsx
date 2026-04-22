@@ -671,6 +671,294 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     setEditingDelivery(null);
   };
 
+  // Helper functions for Edit Delivery actions
+  const handlePrintEditDelivery = () => {
+    if (!editingDelivery) return;
+    
+    const itemsHtml = editForm.itemsList.map((item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      const totalCost = qty * unitCost;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      const totalPrice = qty * unitPrice;
+      const unitGain = unitPrice - unitCost;
+      const totalGain = qty * unitGain;
+      
+      return `
+        <tr>
+          <td>${item.description || item.name || 'N/A'}</td>
+          <td style="text-align: center;">${qty}</td>
+          <td style="text-align: right;">${formatCurrency(unitCost)}</td>
+          <td style="text-align: right;">${formatCurrency(totalCost)}</td>
+          <td style="text-align: right;">${formatCurrency(unitPrice)}</td>
+          <td style="text-align: right;">${formatCurrency(totalPrice)}</td>
+          <td style="text-align: right;">${formatCurrency(unitGain)}</td>
+          <td style="text-align: right;">${formatCurrency(totalGain)}</td>
+        </tr>
+      `;
+    }).join('');
+    
+    const totalCostSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      return sum + (qty * unitCost);
+    }, 0);
+    
+    const totalPriceSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      return sum + (qty * unitPrice);
+    }, 0);
+    
+    const totalGainSum = totalPriceSum - totalCostSum;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Edit Delivery - ${editForm.deliveryNoteNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+            th { background-color: #f59e0b; color: white; text-align: left; }
+            .total-row { font-weight: bold; background-color: #f3f4f6; }
+            .info-box { margin: 10px 0; padding: 10px; background: #f9fafb; border-radius: 5px; }
+            @media print { .no-print { display: none; } }
+          </style>
+        </head>
+        <body>
+          <h1>EDIT DELIVERY DETAILS</h1>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div class="info-box">
+              <h3>Delivery Information</h3>
+              <p><strong>Delivery Note:</strong> ${editForm.deliveryNoteNumber}</p>
+              <p><strong>Date:</strong> ${new Date(editForm.date).toLocaleDateString()}</p>
+              <p><strong>Customer:</strong> ${editForm.customer}</p>
+              ${editForm.driver ? `<p><strong>Driver:</strong> ${editForm.driver}</p>` : ''}
+            </div>
+            <div class="info-box">
+              <h3>Delivery Details</h3>
+              <p><strong>Status:</strong> <span style="background: ${getStatusColor(editForm.status)}; color: white; padding: 4px 8px; border-radius: 4px;">${editForm.status.toUpperCase()}</span></p>
+              ${editForm.vehicle ? `<p><strong>Vehicle:</strong> ${editForm.vehicle}</p>` : ''}
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th style="text-align: center;">Quantity</th>
+                <th style="text-align: right;">Unit Cost</th>
+                <th style="text-align: right;">Total Cost</th>
+                <th style="text-align: right;">Unit Price</th>
+                <th style="text-align: right;">Total Price</th>
+                <th style="text-align: right;">Unit Gain</th>
+                <th style="text-align: right;">Total Gain</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+              <tr class="total-row">
+                <td colspan="3" style="text-align: right;">Total Cost:</td>
+                <td style="text-align: right;">${formatCurrency(totalCostSum)}</td>
+                <td colspan="2" style="text-align: right;">Total Price:</td>
+                <td colspan="2" style="text-align: right;">${formatCurrency(totalPriceSum)}</td>
+              </tr>
+              <tr class="total-row">
+                <td colspan="6" style="text-align: right;">Total Gain:</td>
+                <td colspan="2" style="text-align: right; color: #10b981; font-size: 14px;">${formatCurrency(totalGainSum)}</td>
+              </tr>
+            </tbody>
+          </table>
+          ${editForm.deliveryNotes ? `<div style="margin-top: 30px;"><h3>Notes:</h3><p>${editForm.deliveryNotes}</p></div>` : ''}
+          <div class="no-print" style="margin-top: 30px; text-align: center;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Print</button>
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  const handleExportEditDeliveryPDF = () => {
+    if (!editingDelivery) return;
+    
+    const doc = new jsPDF('l');
+    doc.setFontSize(18);
+    doc.text('EDIT DELIVERY DETAILS', 14, 20);
+    doc.setFontSize(12);
+    doc.text(editForm.deliveryNoteNumber, 14, 28);
+    doc.setFontSize(10);
+    doc.text(`Date: ${new Date(editForm.date).toLocaleDateString()}`, 14, 36);
+    doc.text(`Customer: ${editForm.customer}`, 14, 42);
+    if (editForm.driver) doc.text(`Driver: ${editForm.driver}`, 14, 48);
+    if (editForm.vehicle) doc.text(`Vehicle: ${editForm.vehicle}`, 14, 54);
+    doc.text(`Status: ${editForm.status.toUpperCase()}`, 14, 60);
+    
+    const itemsList = editForm.itemsList.map((item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      const totalCost = qty * unitCost;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      const totalPrice = qty * unitPrice;
+      const unitGain = unitPrice - unitCost;
+      const totalGain = qty * unitGain;
+      
+      return [
+        item.description || item.name || 'N/A',
+        qty.toString(),
+        formatCurrency(unitCost),
+        formatCurrency(totalCost),
+        formatCurrency(unitPrice),
+        formatCurrency(totalPrice),
+        formatCurrency(unitGain),
+        formatCurrency(totalGain)
+      ];
+    });
+    
+    autoTable(doc, {
+      startY: 65,
+      head: [['Description', 'Quantity', 'Unit Cost', 'Total Cost', 'Unit Price', 'Total Price', 'Unit Gain', 'Total Gain']],
+      body: itemsList,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 150;
+    
+    const totalCostSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      return sum + (qty * unitCost);
+    }, 0);
+    
+    const totalPriceSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      return sum + (qty * unitPrice);
+    }, 0);
+    
+    const totalGainSum = totalPriceSum - totalCostSum;
+    
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Total Cost: ${formatCurrency(totalCostSum)}`, 14, finalY + 10);
+    doc.text(`Total Price: ${formatCurrency(totalPriceSum)}`, 80, finalY + 10);
+    doc.setTextColor(16, 185, 129);
+    doc.text(`Total Gain: ${formatCurrency(totalGainSum)}`, 150, finalY + 10);
+
+    if (editForm.deliveryNotes) {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Notes: ${editForm.deliveryNotes}`, 14, finalY + 20);
+    }
+
+    doc.save(`Edit_Delivery_${editForm.deliveryNoteNumber}.pdf`);
+    toast({
+      title: "Download Started",
+      description: `Downloading ${editForm.deliveryNoteNumber} as PDF`,
+    });
+  };
+
+  const handleExportEditDeliveryXLS = () => {
+    if (!editingDelivery) return;
+    
+    let csvContent = "EDIT DELIVERY DETAILS\n\n";
+    csvContent += "Delivery Note,Date,Status,Customer,Driver,Vehicle\n";
+    csvContent += `${editForm.deliveryNoteNumber},${new Date(editForm.date).toLocaleDateString()},${editForm.status},${editForm.customer},${editForm.driver || ''},${editForm.vehicle || ''}\n\n`;
+    csvContent += "Description,Quantity,Unit Cost,Total Cost,Unit Price,Total Price,Unit Gain,Total Gain\n";
+    
+    editForm.itemsList.forEach((item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      const totalCost = qty * unitCost;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      const totalPrice = qty * unitPrice;
+      const unitGain = unitPrice - unitCost;
+      const totalGain = qty * unitGain;
+      
+      csvContent += `"${item.description || item.name || 'N/A'}",${qty},${unitCost},${totalCost},${unitPrice},${totalPrice},${unitGain},${totalGain}\n`;
+    });
+    
+    const totalCostSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      return sum + (qty * unitCost);
+    }, 0);
+    
+    const totalPriceSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      return sum + (qty * unitPrice);
+    }, 0);
+    
+    const totalGainSum = totalPriceSum - totalCostSum;
+    
+    csvContent += `\nTotal Cost,,,,,${totalCostSum}\n`;
+    csvContent += `Total Price,,,,,,${totalPriceSum}\n`;
+    csvContent += `Total Gain,,,,,,,${totalGainSum}\n`;
+    
+    if (editForm.deliveryNotes) {
+      csvContent += `\nNotes:,${editForm.deliveryNotes}\n`;
+    }
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Edit_Delivery_${editForm.deliveryNoteNumber}.xls`;
+    link.click();
+    
+    toast({
+      title: "Export Successful",
+      description: `Exported ${editForm.deliveryNoteNumber} to Excel`,
+    });
+  };
+
+  const handleShareEditDelivery = () => {
+    if (!editingDelivery) return;
+    
+    const totalCostSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitCost = item.rate || item.price || 0;
+      return sum + (qty * unitCost);
+    }, 0);
+    
+    const totalPriceSum = editForm.itemsList.reduce((sum: number, item: any) => {
+      const qty = item.quantity || item.delivered || 0;
+      const unitPrice = item.sellingPrice || item.unitPrice || 0;
+      return sum + (qty * unitPrice);
+    }, 0);
+    
+    const totalGainSum = totalPriceSum - totalCostSum;
+    
+    const deliveryText = `EDIT DELIVERY DETAILS\n\nDelivery Note: ${editForm.deliveryNoteNumber}\nDate: ${new Date(editForm.date).toLocaleDateString()}\nCustomer: ${editForm.customer}\nStatus: ${editForm.status}\n\nTotal Cost: ${formatCurrency(totalCostSum)}\nTotal Price: ${formatCurrency(totalPriceSum)}\nTotal Gain: ${formatCurrency(totalGainSum)}\n\nItems: ${editForm.itemsList.length}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: `Edit Delivery ${editForm.deliveryNoteNumber}`,
+        text: deliveryText,
+      }).catch(err => console.log('Error sharing:', err));
+    } else {
+      navigator.clipboard.writeText(deliveryText).then(() => {
+        toast({
+          title: "Copied to Clipboard",
+          description: "Delivery details copied to clipboard",
+        });
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+        toast({
+          title: "Error",
+          description: "Failed to copy delivery details",
+          variant: "destructive",
+        });
+      });
+    }
+  };
+
   // Bulk Export Actions
   const handlePrintReport = () => {
     const printWindow = window.open('', '_blank');
@@ -1351,15 +1639,19 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => console.log('Print clicked')}>
+                  <DropdownMenuItem onClick={handlePrintEditDelivery}>
                     <Printer className="h-4 w-4 mr-2" />
                     Print Delivery Note
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => console.log('Export clicked')}>
+                  <DropdownMenuItem onClick={handleExportEditDeliveryPDF}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportEditDeliveryXLS}>
                     <Download className="h-4 w-4 mr-2" />
                     Export to Excel
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => console.log('Share clicked')}>
+                  <DropdownMenuItem onClick={handleShareEditDelivery}>
                     <Share2 className="h-4 w-4 mr-2" />
                     Share Delivery
                   </DropdownMenuItem>
