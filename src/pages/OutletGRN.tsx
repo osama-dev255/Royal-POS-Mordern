@@ -1337,15 +1337,39 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-between items-center">
             <Button variant="outline" onClick={handleCancelEdit} disabled={saving}>
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={saving}>
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={saving}>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    More Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => console.log('Print clicked')}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Delivery Note
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => console.log('Export clicked')}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export to Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => console.log('Share clicked')}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share Delivery
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={handleSaveEdit} disabled={saving}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
