@@ -41,6 +41,7 @@ import {
   Trash2
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData, updateDelivery } from "@/utils/deliveryUtils";
+import { getInventoryProducts } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -358,18 +359,51 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     }
   };
 
-  const handleEditDelivery = (delivery: DeliveryData) => {
+  const handleEditDelivery = async (delivery: DeliveryData) => {
     setEditingDelivery(delivery);
     
-    // Calculate totalPrice from items
-    const calculatedTotalPrice = (delivery.itemsList || []).reduce((sum, item) => {
+    // Extract date portion only (YYYY-MM-DD) from datetime string for date input
+    const deliveryDate = delivery.date ? new Date(delivery.date).toISOString().split('T')[0] : '';
+    
+    // Get inventory products to populate unit prices
+    let inventoryProducts: any[] = [];
+    if (outletId) {
+      try {
+        inventoryProducts = await getInventoryProducts();
+        console.log(`📦 Loaded ${inventoryProducts.length} inventory products for price lookup`);
+      } catch (error) {
+        console.error('Failed to load inventory products:', error);
+      }
+    }
+    
+    // Enrich itemsList with unit prices from inventory
+    const enrichedItemsList = (delivery.itemsList || []).map(item => {
+      // Try to find matching product in inventory
+      const matchingProduct = inventoryProducts.find(
+        p => p.product_name === item.description || 
+             p.product_name === item.name ||
+             p.name === item.description ||
+             p.name === item.name
+      );
+      
+      // If found and has selling_price, use it; otherwise use existing value or 0
+      const unitPrice = matchingProduct?.selling_price || item.sellingPrice || item.unitPrice || 0;
+      const totalPrice = (item.quantity || item.delivered || 0) * unitPrice;
+      
+      return {
+        ...item,
+        sellingPrice: unitPrice,
+        unitPrice: unitPrice,
+        totalPrice: totalPrice
+      };
+    });
+    
+    // Calculate totalPrice from enriched items
+    const calculatedTotalPrice = enrichedItemsList.reduce((sum, item) => {
       const qty = item.quantity || item.delivered || 0;
       const sp = item.sellingPrice || item.unitPrice || 0;
       return sum + (qty * sp);
     }, 0);
-    
-    // Extract date portion only (YYYY-MM-DD) from datetime string for date input
-    const deliveryDate = delivery.date ? new Date(delivery.date).toISOString().split('T')[0] : '';
     
     setEditForm({
       deliveryNoteNumber: delivery.deliveryNoteNumber,
@@ -381,7 +415,7 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       deliveryNotes: delivery.deliveryNotes || '',
       total: delivery.total || 0,
       totalPrice: calculatedTotalPrice,
-      itemsList: delivery.itemsList || []
+      itemsList: enrichedItemsList
     });
     setIsEditDialogOpen(true);
   };
