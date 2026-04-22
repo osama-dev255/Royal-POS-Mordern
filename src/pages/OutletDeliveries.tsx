@@ -37,6 +37,7 @@ interface OutletDeliveriesProps {
 export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState<"all" | "in" | "out">("all");
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: '',
     end: ''
@@ -82,6 +83,16 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     // Status filter
     const matchesStatus = !statusFilter || delivery.status === statusFilter;
     
+    // Section filter (All, Deliveries In, Deliveries Out)
+    let matchesSection = true;
+    if (sectionFilter === "in") {
+      // Deliveries In: deliveries TO the outlet (incoming stock)
+      matchesSection = delivery.status === "delivered" || delivery.status === "in-transit";
+    } else if (sectionFilter === "out") {
+      // Deliveries Out: deliveries FROM the outlet (outgoing sales)
+      matchesSection = delivery.customer && delivery.customer.toLowerCase().includes('outlet');
+    }
+    
     // Date range filter
     let matchesDateRange = true;
     if (dateRange.start || dateRange.end) {
@@ -98,7 +109,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       }
     }
     
-    return matchesSearch && matchesStatus && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesSection && matchesDateRange;
   });
 
   const formatCurrency = (amount: number) => {
@@ -663,6 +674,43 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Section Filter Tabs */}
+      <div className="flex gap-2 mb-6">
+        <Button
+          variant={sectionFilter === "all" ? "default" : "outline"}
+          onClick={() => setSectionFilter("all")}
+          className="flex-1 md:flex-none"
+        >
+          <Package className="h-4 w-4 mr-2" />
+          All
+          <Badge variant="secondary" className="ml-2">
+            {deliveries.length}
+          </Badge>
+        </Button>
+        <Button
+          variant={sectionFilter === "in" ? "default" : "outline"}
+          onClick={() => setSectionFilter("in")}
+          className="flex-1 md:flex-none"
+        >
+          <Truck className="h-4 w-4 mr-2" />
+          Deliveries In
+          <Badge variant="secondary" className="ml-2">
+            {deliveries.filter(d => d.status === "delivered" || d.status === "in-transit").length}
+          </Badge>
+        </Button>
+        <Button
+          variant={sectionFilter === "out" ? "default" : "outline"}
+          onClick={() => setSectionFilter("out")}
+          className="flex-1 md:flex-none"
+        >
+          <Share2 className="h-4 w-4 mr-2" />
+          Deliveries Out
+          <Badge variant="secondary" className="ml-2">
+            {deliveries.filter(d => d.customer && d.customer.toLowerCase().includes('outlet')).length}
+          </Badge>
+        </Button>
       </div>
 
       {/* Search and Date Range */}
