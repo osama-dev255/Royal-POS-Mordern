@@ -366,12 +366,20 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     // Extract date portion only (YYYY-MM-DD) from datetime string for date input
     const deliveryDate = delivery.date ? new Date(delivery.date).toISOString().split('T')[0] : '';
     
+    console.log('🔍 Loading edit dialog for delivery:', delivery.deliveryNoteNumber);
+    console.log('📋 Original itemsList:', delivery.itemsList?.map((item: any) => ({
+      name: item.description || item.name,
+      sellingPrice: item.sellingPrice,
+      unitPrice: item.unitPrice
+    })));
+    
     // Get inventory products to populate unit prices
     let inventoryProducts: any[] = [];
     if (outletId) {
       try {
         inventoryProducts = await getInventoryProducts();
-        console.log(`📦 Loaded ${inventoryProducts.length} inventory products for price lookup`);
+        console.log(`📦 Loaded ${inventoryProducts.length} inventory products`);
+        console.log('📦 Products:', inventoryProducts.map(p => ({ name: p.name || p.product_name, price: p.selling_price })));
       } catch (error) {
         console.error('Failed to load inventory products:', error);
       }
@@ -379,17 +387,24 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
     
     // Enrich itemsList with unit prices from inventory
     const enrichedItemsList = (delivery.itemsList || []).map(item => {
+      const itemName = item.description || item.name || '';
+      
       // Try to find matching product in inventory
       const matchingProduct = inventoryProducts.find(
-        p => p.product_name === item.description || 
-             p.product_name === item.name ||
-             p.name === item.description ||
-             p.name === item.name
+        p => (p.product_name || p.name) === itemName
       );
       
-      // If found and has selling_price, use it; otherwise use existing value or 0
+      console.log(`  🔎 Looking up: ${itemName}`);
+      console.log(`    Match found: ${!!matchingProduct}`);
+      if (matchingProduct) {
+        console.log(`    Inventory price: ${matchingProduct.selling_price}`);
+      }
+      
+      // Priority: inventory selling_price > existing item price > 0
       const unitPrice = matchingProduct?.selling_price || item.sellingPrice || item.unitPrice || 0;
       const totalPrice = (item.quantity || item.delivered || 0) * unitPrice;
+      
+      console.log(`    Final unitPrice: ${unitPrice}`);
       
       return {
         ...item,
@@ -405,6 +420,13 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
       const sp = item.sellingPrice || item.unitPrice || 0;
       return sum + (qty * sp);
     }, 0);
+    
+    console.log('✅ Enriched itemsList:', enrichedItemsList.map(item => ({
+      name: item.description || item.name,
+      sellingPrice: item.sellingPrice,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice
+    })));
     
     setEditForm({
       deliveryNoteNumber: delivery.deliveryNoteNumber,
@@ -426,6 +448,14 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
 
     try {
       setSaving(true);
+      
+      console.log('💾 Saving delivery with itemsList:', editForm.itemsList.map((item: any) => ({
+        name: item.description || item.name,
+        sellingPrice: item.sellingPrice,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity || item.delivered
+      })));
+      
       const updatedDelivery: DeliveryData = {
         ...editingDelivery,
         deliveryNoteNumber: editForm.deliveryNoteNumber,
@@ -496,33 +526,55 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         console.log('🔄 Updating inventory product prices...');
         
         for (const item of editForm.itemsList) {
-          const unitPrice = item.sellingPrice || item.unitPrice;
-          const productName = item.description || item.name;
+          const unitPrice = item.sellingPrice || item.unitPrice || 0;
+          const productName = item.description || item.name || '';
+          
+          console.log(`  📦 Product: ${productName}`);
+          console.log(`    ├─ sellingPrice: ${item.sellingPrice}`);
+          console.log(`    ├─ unitPrice: ${item.unitPrice}`);
+          console.log(`    └─ Final unitPrice: ${unitPrice}`);
           
           if (unitPrice && unitPrice > 0 && productName) {
             try {
-              // Update selling_price in inventory_products
-              const { error: updateError } = await supabase
+              // Check if product exists first
+              const { data: existingProduct } = await supabase
                 .from('inventory_products')
-                .update({ 
-                  selling_price: unitPrice,
-                  updated_at: new Date().toISOString()
-                })
+                .select('id, name, selling_price')
                 .eq('outlet_id', outletId)
-                .eq('name', productName);
+                .eq('name', productName)
+                .single();
               
-              if (updateError) {
-                console.error(`Error updating ${productName}:`, updateError);
+              if (existingProduct) {
+                console.log(`    ✓ Found in inventory: ${existingProduct.name} (current price: ${existingProduct.selling_price})`);
+                
+                // Update selling_price in inventory_products
+                const { data: updatedData, error: updateError } = await supabase
+                  .from('inventory_products')
+                  .update({ 
+                    selling_price: unitPrice,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('outlet_id', outletId)
+                  .eq('name', productName)
+                  .select();
+                
+                if (updateError) {
+                  console.error(`    ❌ Error: ${updateError.message}`);
+                } else {
+                  console.log(`    ✅ Updated: ${productName} ${existingProduct.selling_price} → ${unitPrice}`);
+                }
               } else {
-                console.log(`✅ Updated ${productName} selling price to ${unitPrice}`);
+                console.log(`    ⚠️ Not found in inventory_products`);
               }
             } catch (error) {
-              console.error(`Failed to update ${productName}:`, error);
+              console.error(`    ❌ Failed:`, error);
             }
+          } else {
+            console.log(`    ⏭️ Skipped (unitPrice: ${unitPrice})`);
           }
         }
         
-        console.log('✅ Inventory product prices updated successfully');
+        console.log('✅ Inventory price sync complete');
       }
       
       // Refresh the deliveries list
