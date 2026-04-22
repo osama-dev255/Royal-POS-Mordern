@@ -1257,7 +1257,8 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                         <TableCell>
                           <Input
                             value={item.description || item.name || ''}
-                            onChange={(e) => updateItemRow(index, 'description', e.target.value)}
+                            disabled
+                            className="bg-muted cursor-not-allowed"
                             placeholder="Item description"
                           />
                         </TableCell>
@@ -1265,19 +1266,19 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
                           <Input
                             type="number"
                             value={item.quantity || item.delivered || 0}
-                            onChange={(e) => updateItemRow(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            disabled
+                            className="bg-muted cursor-not-allowed text-right"
                             min="0"
-                            className="text-right"
                           />
                         </TableCell>
                         <TableCell>
                           <Input
                             type="number"
                             value={item.rate || item.price || 0}
-                            onChange={(e) => updateItemRow(index, 'rate', parseFloat(e.target.value) || 0)}
+                            disabled
+                            className="bg-muted cursor-not-allowed text-right"
                             min="0"
                             step="0.01"
-                            className="text-right"
                           />
                         </TableCell>
                         <TableCell className="text-right font-medium">
