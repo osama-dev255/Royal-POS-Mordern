@@ -73,6 +73,7 @@ import { OutletSavedCardSales } from "@/pages/OutletSavedCardSales";
 import { OutletSavedMobileSales } from "@/pages/OutletSavedMobileSales";
 import { OutletSavedDebts } from "@/pages/OutletSavedDebts";
 import { OutletSavedStockTakes } from "@/pages/OutletSavedStockTakes";
+import { getUserOutlet } from "@/services/outletAccessService";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -283,26 +284,40 @@ export const Index = () => {
         console.warn("Auth failed:", result.error);
         return;
       } else {
-        // Auth successful
-        
-        // Get user role and redirect based on role
+        // Auth successful - check if user has an assigned outlet
         if (result.user) {
-          // For staff members, we need to check what modules they have access to
-          if (result.user.email?.includes('staff')) {
-            // Staff members should not have access to sales management
-            // Redirect to comprehensive dashboard which will filter modules
-            setCurrentView("comprehensive");
+          console.log("Login successful, checking for outlet assignment...", result.user.id);
+          
+          // Check if user has an assigned outlet
+          const userOutlet = await getUserOutlet(result.user.id);
+          
+          if (userOutlet && userOutlet.outlet) {
+            // User has an outlet assignment - redirect directly to outlet dashboard
+            console.log("User has outlet assignment:", userOutlet.outlet.name, userOutlet.outlet.id);
+            const outletId = userOutlet.outlet.id;
+            setCurrentView(`outlet-details-${outletId}`);
+            window.location.hash = `#/outlet/${outletId}`;
           } else {
-            // For other roles, use the existing logic
-            if (result.user.email?.includes('admin')) {
+            // No outlet assignment - use the existing role-based logic
+            console.log("No outlet assignment, using role-based redirect");
+            
+            // For staff members, we need to check what modules they have access to
+            if (result.user.email?.includes('staff')) {
+              // Staff members should not have access to sales management
+              // Redirect to comprehensive dashboard which will filter modules
               setCurrentView("comprehensive");
-            } else if (result.user.email?.includes('manager')) {
-              setCurrentView("comprehensive");
-            } else if (result.user.email?.includes('cashier')) {
-              setCurrentView("sales");
             } else {
-              // Default to comprehensive dashboard for unknown roles
-              setCurrentView("comprehensive");
+              // For other roles, use the existing logic
+              if (result.user.email?.includes('admin')) {
+                setCurrentView("comprehensive");
+              } else if (result.user.email?.includes('manager')) {
+                setCurrentView("comprehensive");
+              } else if (result.user.email?.includes('cashier')) {
+                setCurrentView("sales");
+              } else {
+                // Default to comprehensive dashboard for unknown roles
+                setCurrentView("comprehensive");
+              }
             }
           }
         }
