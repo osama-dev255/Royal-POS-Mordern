@@ -1411,7 +1411,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               Cancel
             </Button>
             <Button onClick={handleCreateDelivery}>
-              Create Delivery
+              Save Delivery
             </Button>
           </DialogFooter>
         </DialogContent>
