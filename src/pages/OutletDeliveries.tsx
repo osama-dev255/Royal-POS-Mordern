@@ -4,6 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -22,12 +33,15 @@ import {
   Download,
   Share2,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  Pencil
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { supabase } from "@/lib/supabaseClient";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
@@ -44,6 +58,41 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   });
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showNewDeliveryDialog, setShowNewDeliveryDialog] = useState(false);
+  const [editingDelivery, setEditingDelivery] = useState<DeliveryData | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingItems, setEditingItems] = useState<any[]>([]);
+  const [showEditItemDialog, setShowEditItemDialog] = useState(false);
+  const [editItemForm, setEditItemForm] = useState({
+    description: '',
+    quantity: 0,
+    rate: 0
+  });
+  const [editItemIndex, setEditItemIndex] = useState<number | null>(null);
+  const [newDeliveryForm, setNewDeliveryForm] = useState({
+    deliveryNoteNumber: '',
+    deliveryDate: new Date().toISOString().split('T')[0],
+    destinationOutlet: '',
+    destinationAddress: '',
+    driverName: '',
+    vehicleNumber: '',
+    paymentMethod: 'credit',
+    status: 'pending',
+    notes: ''
+  });
+  const [deliveryItems, setDeliveryItems] = useState<Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    rate: number;
+  }>>([]);
+  const [showItemDialog, setShowItemDialog] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemForm, setItemForm] = useState({
+    description: '',
+    quantity: 0,
+    rate: 0
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,8 +108,64 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
     try {
       setLoading(true);
-      const data = await getDeliveriesByOutletId(outletId);
-      setDeliveries(data);
+      
+      // Fetch incoming deliveries (Deliveries In)
+      const incomingData = await getDeliveriesByOutletId(outletId);
+      
+      // Fetch outgoing deliveries (Deliveries Out)
+      const { data: outgoingData, error: outgoingError } = await supabase
+        .from('outlet_deliveries_out')
+        .select(`
+          *,
+          outlet_deliveries_out_items (*)
+        `)
+        .eq('outlet_id', outletId)
+        .order('delivery_date', { ascending: false });
+
+      if (outgoingError) {
+        console.error("Error loading outgoing deliveries:", outgoingError);
+      }
+
+      // Transform outgoing deliveries to match DeliveryData format
+      const outgoingDeliveries: DeliveryData[] = (outgoingData || []).map((outgoing: any) => {
+        const items = outgoing.outlet_deliveries_out_items || [];
+        const totalAmount = items.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0);
+        
+        return {
+          id: outgoing.id,
+          deliveryNoteNumber: outgoing.delivery_note_number,
+          date: outgoing.delivery_date,
+          customer: outgoing.destination_outlet,
+          items: outgoing.items_count,
+          total: totalAmount || outgoing.total_amount,
+          paymentMethod: outgoing.payment_method,
+          status: outgoing.status,
+          driver: outgoing.driver_name,
+          vehicle: outgoing.vehicle_number,
+          deliveryNotes: outgoing.delivery_notes,
+          outletId: outgoing.outlet_id,
+          deliveryType: 'out', // Mark as outgoing delivery
+          itemsList: items.map((item: any) => ({
+            description: item.product_name || item.description,
+            quantity: item.quantity,
+            delivered: item.delivered_quantity,
+            rate: item.selling_price,
+            price: item.selling_price,
+            sellingPrice: item.selling_price,
+            unitPrice: item.selling_price
+          }))
+        };
+      });
+
+      // Mark incoming deliveries
+      const incomingDeliveriesWithType: DeliveryData[] = incomingData.map(delivery => ({
+        ...delivery,
+        deliveryType: 'in' as const // Mark as incoming delivery
+      }));
+
+      // Combine incoming and outgoing deliveries
+      const allDeliveries = [...incomingDeliveriesWithType, ...outgoingDeliveries];
+      setDeliveries(allDeliveries);
     } catch (error) {
       console.error("Error loading deliveries:", error);
       toast({
@@ -87,10 +192,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     let matchesSection = true;
     if (sectionFilter === "in") {
       // Deliveries In: deliveries TO the outlet (incoming stock)
-      matchesSection = delivery.status === "delivered" || delivery.status === "in-transit";
+      matchesSection = delivery.deliveryType === 'in';
     } else if (sectionFilter === "out") {
       // Deliveries Out: deliveries FROM the outlet (outgoing sales)
-      matchesSection = delivery.customer && delivery.customer.toLowerCase().includes('outlet');
+      matchesSection = delivery.deliveryType === 'out';
     }
     
     // Date range filter
@@ -228,6 +333,79 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       `);
       printWindow.document.close();
     }
+  };
+
+  const handleEditDelivery = (delivery: DeliveryData) => {
+    setEditingDelivery(delivery);
+    setEditingItems(delivery.itemsList || []);
+    setShowEditDialog(true);
+  };
+
+  const handleAddEditItem = (index: number | null = null) => {
+    setEditItemIndex(index);
+    if (index !== null && editingItems[index]) {
+      setEditItemForm({
+        description: editingItems[index].description || editingItems[index].name || '',
+        quantity: editingItems[index].quantity || editingItems[index].delivered || 0,
+        rate: editingItems[index].rate || editingItems[index].price || 0
+      });
+    } else {
+      setEditItemForm({ description: '', quantity: 0, rate: 0 });
+    }
+    setShowEditItemDialog(true);
+  };
+
+  const handleSaveEditItem = () => {
+    if (!editItemForm.description || editItemForm.quantity <= 0 || editItemForm.rate <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all item fields correctly",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updatedItem = {
+      description: editItemForm.description,
+      name: editItemForm.description,
+      quantity: editItemForm.quantity,
+      delivered: editItemForm.quantity,
+      rate: editItemForm.rate,
+      price: editItemForm.rate,
+      sellingPrice: editItemForm.rate,
+      unitPrice: editItemForm.rate
+    };
+
+    if (editItemIndex !== null) {
+      // Update existing item
+      setEditingItems(prev => {
+        const updated = [...prev];
+        updated[editItemIndex] = updatedItem;
+        return updated;
+      });
+    } else {
+      // Add new item
+      setEditingItems(prev => [...prev, updatedItem]);
+    }
+
+    setShowEditItemDialog(false);
+    setEditItemForm({ description: '', quantity: 0, rate: 0 });
+  };
+
+  const handleDeleteEditItem = (index: number) => {
+    setEditingItems(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: "Item Removed",
+      description: "Item has been removed from the delivery"
+    });
+  };
+
+  const calculateEditTotal = () => {
+    return editingItems.reduce((sum, item) => {
+      const qty = item.quantity || item.delivered || 0;
+      const rate = item.rate || item.price || 0;
+      return sum + (qty * rate);
+    }, 0);
   };
 
   // Individual delivery export actions
@@ -531,6 +709,165 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     toast({ title: "Exported", description: `Excel: ${filename}` });
   };
 
+  const handleCreateDelivery = async () => {
+    if (!outletId) {
+      toast({
+        title: "Error",
+        description: "No outlet selected",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!newDeliveryForm.deliveryNoteNumber || !newDeliveryForm.destinationOutlet) {
+      toast({
+        title: "Error",
+        description: "Please fill in required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (deliveryItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Calculate totals
+      const totalAmount = deliveryItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+
+      // Insert into outlet_deliveries_out table
+      const { data: deliveryData, error: deliveryError } = await supabase
+        .from('outlet_deliveries_out')
+        .insert({
+          outlet_id: outletId,
+          delivery_note_number: newDeliveryForm.deliveryNoteNumber,
+          delivery_date: new Date(newDeliveryForm.deliveryDate).toISOString(),
+          destination_outlet: newDeliveryForm.destinationOutlet,
+          destination_address: newDeliveryForm.destinationAddress || null,
+          items_count: deliveryItems.length,
+          total_amount: totalAmount,
+          payment_method: newDeliveryForm.paymentMethod,
+          status: newDeliveryForm.status,
+          driver_name: newDeliveryForm.driverName || null,
+          vehicle_number: newDeliveryForm.vehicleNumber || null,
+          delivery_notes: newDeliveryForm.notes || null
+        })
+        .select()
+        .single();
+
+      if (deliveryError) throw deliveryError;
+
+      // Insert items
+      const itemsToInsert = deliveryItems.map(item => ({
+        delivery_id: deliveryData.id,
+        product_name: item.description,
+        description: item.description,
+        quantity: item.quantity,
+        delivered_quantity: item.quantity,
+        unit_cost: 0, // Can be added later
+        selling_price: item.rate,
+        total_cost: 0,
+        total_price: item.quantity * item.rate
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('outlet_deliveries_out_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: "Success",
+        description: "Delivery created successfully"
+      });
+
+      // Close dialog and reset form
+      setShowNewDeliveryDialog(false);
+      setNewDeliveryForm({
+        deliveryNoteNumber: '',
+        deliveryDate: new Date().toISOString().split('T')[0],
+        destinationOutlet: '',
+        destinationAddress: '',
+        driverName: '',
+        vehicleNumber: '',
+        paymentMethod: 'credit',
+        status: 'pending',
+        notes: ''
+      });
+      setDeliveryItems([]);
+
+      // Reload deliveries to show the new one
+      await loadDeliveries();
+    } catch (error: any) {
+      console.error("Error creating delivery:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create delivery",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddItem = () => {
+    setEditingItemIndex(null);
+    setItemForm({ description: '', quantity: 0, rate: 0 });
+    setShowItemDialog(true);
+  };
+
+  const handleEditItem = (index: number) => {
+    setEditingItemIndex(index);
+    setItemForm({ ...deliveryItems[index] });
+    setShowItemDialog(true);
+  };
+
+  const handleDeleteItem = (index: number) => {
+    setDeliveryItems(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: "Item Removed",
+      description: "Item has been removed from the delivery"
+    });
+  };
+
+  const handleSaveItem = () => {
+    if (!itemForm.description || itemForm.quantity <= 0 || itemForm.rate <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all item fields correctly",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (editingItemIndex !== null) {
+      // Update existing item
+      setDeliveryItems(prev => {
+        const updated = [...prev];
+        updated[editingItemIndex] = { ...itemForm, id: updated[editingItemIndex].id };
+        return updated;
+      });
+    } else {
+      // Add new item
+      setDeliveryItems(prev => [...prev, { ...itemForm, id: Date.now().toString() }]);
+    }
+
+    setShowItemDialog(false);
+    setItemForm({ description: '', quantity: 0, rate: 0 });
+  };
+
+  const calculateItemAmount = (quantity: number, rate: number) => {
+    return quantity * rate;
+  };
+
+  const calculateTotalAmount = () => {
+    return deliveryItems.reduce((sum, item) => sum + calculateItemAmount(item.quantity, item.rate), 0);
+  };
+
   const handleSharePDF = async () => {
     if (filteredDeliveries.length === 0) {
       toast({ title: "No Data", description: "No deliveries to share", variant: "destructive" });
@@ -592,34 +929,44 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           </div>
         </div>
         
-        {/* Export Actions Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              Export
-              <ChevronDown className="h-4 w-4 ml-2" />
+        <div className="flex gap-2">
+          {/* New Delivery Button - Only for Deliveries Out section */}
+          {sectionFilter === "out" && (
+            <Button onClick={() => setShowNewDeliveryDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Delivery
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handlePrintReport}>
-              <Printer className="h-4 w-4 mr-2" />
-              <span>Print</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              <span>Download .pdf</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportXLS}>
-              <FileText className="h-4 w-4 mr-2" />
-              <span>Export .xls</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleSharePDF}>
-              <Share2 className="h-4 w-4 mr-2" />
-              <span>Share .pdf</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+          
+          {/* Export Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <FileText className="h-4 w-4 mr-2" />
+                Export
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handlePrintReport}>
+                <Printer className="h-4 w-4 mr-2" />
+                <span>Print</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownload}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>Download .pdf</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportXLS}>
+                <FileText className="h-4 w-4 mr-2" />
+                <span>Export .xls</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSharePDF}>
+                <Share2 className="h-4 w-4 mr-2" />
+                <span>Share .pdf</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -697,7 +1044,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           <Truck className="h-4 w-4 mr-2" />
           Deliveries In
           <Badge variant="secondary" className="ml-2">
-            {deliveries.filter(d => d.status === "delivered" || d.status === "in-transit").length}
+            {deliveries.filter(d => d.deliveryType === 'in').length}
           </Badge>
         </Button>
         <Button
@@ -708,7 +1055,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           <Share2 className="h-4 w-4 mr-2" />
           Deliveries Out
           <Badge variant="secondary" className="ml-2">
-            {deliveries.filter(d => d.customer && d.customer.toLowerCase().includes('outlet')).length}
+            {deliveries.filter(d => d.deliveryType === 'out').length}
           </Badge>
         </Button>
       </div>
@@ -845,6 +1192,14 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                       <Button 
                         variant="ghost" 
                         size="sm"
+                        onClick={() => handleEditDelivery(delivery)}
+                        title="Edit Delivery"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
                         onClick={() => handleViewDelivery(delivery)}
                         title="View Details"
                       >
@@ -868,6 +1223,571 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           </p>
         </div>
       )}
+
+      {/* New Delivery Dialog */}
+      <Dialog open={showNewDeliveryDialog} onOpenChange={setShowNewDeliveryDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Outgoing Delivery</DialogTitle>
+            <DialogDescription>
+              Fill in the details for the new delivery to another outlet
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="deliveryNoteNumber">Delivery Note Number *</Label>
+                <Input
+                  id="deliveryNoteNumber"
+                  value={newDeliveryForm.deliveryNoteNumber}
+                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, deliveryNoteNumber: e.target.value }))}
+                  placeholder="DO-2026-001"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deliveryDate">Delivery Date *</Label>
+                <Input
+                  id="deliveryDate"
+                  type="date"
+                  value={newDeliveryForm.deliveryDate}
+                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="destinationOutlet">Destination Outlet *</Label>
+              <Input
+                id="destinationOutlet"
+                value={newDeliveryForm.destinationOutlet}
+                onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, destinationOutlet: e.target.value }))}
+                placeholder="e.g., Outlet - Downtown Branch"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="destinationAddress">Destination Address</Label>
+              <Textarea
+                id="destinationAddress"
+                value={newDeliveryForm.destinationAddress}
+                onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, destinationAddress: e.target.value }))}
+                placeholder="Full address of destination outlet"
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="driverName">Driver Name</Label>
+                <Input
+                  id="driverName"
+                  value={newDeliveryForm.driverName}
+                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, driverName: e.target.value }))}
+                  placeholder="e.g., John Doe"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicleNumber">Vehicle Number</Label>
+                <Input
+                  id="vehicleNumber"
+                  value={newDeliveryForm.vehicleNumber}
+                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, vehicleNumber: e.target.value }))}
+                  placeholder="e.g., TRK-001"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Payment Method</Label>
+                <select
+                  id="paymentMethod"
+                  value={newDeliveryForm.paymentMethod}
+                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="credit">Credit</option>
+                  <option value="transfer">Bank Transfer</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <select
+                  id="status"
+                  value={newDeliveryForm.status}
+                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in-transit">In Transit</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Delivery Notes</Label>
+              <Textarea
+                id="notes"
+                value={newDeliveryForm.notes}
+                onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes for this delivery"
+                rows={3}
+              />
+            </div>
+
+            {/* Items Section */}
+            <div className="space-y-4 mt-6 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-lg font-semibold">Items Delivered</Label>
+                <Button size="sm" onClick={handleAddItem}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Item
+                </Button>
+              </div>
+
+              {deliveryItems.length > 0 ? (
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {deliveryItems.map((item, index) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.description}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell className="text-right">TSh {item.rate.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-semibold">TSh {calculateItemAmount(item.quantity, item.rate).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditItem(index)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteItem(index)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-right font-bold">Total:</TableCell>
+                        <TableCell className="text-right font-bold text-lg">TSh {calculateTotalAmount().toLocaleString()}</TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 border-2 border-dashed rounded-md">
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">No items added yet</p>
+                  <p className="text-sm text-muted-foreground">Click "Add Item" to add products</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewDeliveryDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateDelivery}>
+              Create Delivery
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Item Dialog */}
+      <Dialog open={showItemDialog} onOpenChange={setShowItemDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingItemIndex !== null ? 'Edit Item' : 'Add Item'}</DialogTitle>
+            <DialogDescription>
+              {editingItemIndex !== null ? 'Update the item details' : 'Enter the item details for this delivery'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="itemDescription">Description *</Label>
+              <Input
+                id="itemDescription"
+                value={itemForm.description}
+                onChange={(e) => setItemForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="e.g., Afiya Embe Juice 300mls"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="itemQuantity">Quantity *</Label>
+                <Input
+                  id="itemQuantity"
+                  type="number"
+                  min="0"
+                  value={itemForm.quantity}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                  placeholder="200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="itemRate">Rate (TSh) *</Label>
+                <Input
+                  id="itemRate"
+                  type="number"
+                  min="0"
+                  value={itemForm.rate}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, rate: parseInt(e.target.value) || 0 }))}
+                  placeholder="5500"
+                />
+              </div>
+            </div>
+
+            {itemForm.quantity > 0 && itemForm.rate > 0 && (
+              <div className="p-4 bg-muted rounded-md">
+                <p className="text-sm text-muted-foreground">Amount:</p>
+                <p className="text-2xl font-bold">TSh {calculateItemAmount(itemForm.quantity, itemForm.rate).toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowItemDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveItem}>
+              {editingItemIndex !== null ? 'Update Item' : 'Add Item'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Delivery Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Delivery - {editingDelivery?.deliveryNoteNumber}</DialogTitle>
+            <DialogDescription>
+              Update the delivery details
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingDelivery && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Delivery Note Number</Label>
+                  <Input value={editingDelivery.deliveryNoteNumber} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input value={new Date(editingDelivery.date).toLocaleDateString()} disabled />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{editingDelivery.deliveryType === 'out' ? 'Destination Outlet' : 'Customer'}</Label>
+                <Input value={editingDelivery.customer} disabled />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editDriver">Driver Name</Label>
+                  <Input
+                    id="editDriver"
+                    value={editingDelivery.driver || ''}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, driver: e.target.value} : null)}
+                    placeholder="e.g., John Doe"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editVehicle">Vehicle Number</Label>
+                  <Input
+                    id="editVehicle"
+                    value={editingDelivery.vehicle || ''}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, vehicle: e.target.value} : null)}
+                    placeholder="e.g., TRK-001"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editStatus">Status</Label>
+                  <select
+                    id="editStatus"
+                    value={editingDelivery.status}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, status: e.target.value as any} : null)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Total Amount</Label>
+                  <Input value={formatCurrency(editingDelivery.total)} disabled />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editNotes">Delivery Notes</Label>
+                <Textarea
+                  id="editNotes"
+                  value={editingDelivery.deliveryNotes || ''}
+                  onChange={(e) => setEditingDelivery(prev => prev ? {...prev, deliveryNotes: e.target.value} : null)}
+                  placeholder="Additional notes for this delivery"
+                  rows={3}
+                />
+              </div>
+
+              {/* Items Display */}
+              <div className="space-y-4 mt-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Items ({editingItems.length})</Label>
+                  <Button size="sm" onClick={() => handleAddEditItem(null)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+                
+                {editingItems.length > 0 ? (
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {editingItems.map((item: any, index: number) => {
+                          const qty = item.quantity || item.delivered || 0;
+                          const rate = item.rate || item.price || 0;
+                          const amount = qty * rate;
+                          return (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{item.description || item.name || 'N/A'}</TableCell>
+                              <TableCell className="text-right">{qty}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(rate)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(amount)}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAddEditItem(index)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteEditItem(index)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-right font-bold">Total:</TableCell>
+                          <TableCell className="text-right font-bold text-lg">{formatCurrency(calculateEditTotal())}</TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border-2 border-dashed rounded-md">
+                    <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">No items added yet</p>
+                    <p className="text-sm text-muted-foreground">Click "Add Item" to add products</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={async () => {
+              if (!editingDelivery) return;
+              
+              try {
+                const totalAmount = calculateEditTotal();
+
+                // Update based on delivery type
+                if (editingDelivery.deliveryType === 'out') {
+                  // Update delivery header
+                  const { error: deliveryError } = await supabase
+                    .from('outlet_deliveries_out')
+                    .update({
+                      driver_name: editingDelivery.driver,
+                      vehicle_number: editingDelivery.vehicle,
+                      status: editingDelivery.status,
+                      delivery_notes: editingDelivery.deliveryNotes,
+                      items_count: editingItems.length,
+                      total_amount: totalAmount
+                    })
+                    .eq('id', editingDelivery.id);
+
+                  if (deliveryError) throw deliveryError;
+
+                  // Delete old items
+                  const { error: deleteError } = await supabase
+                    .from('outlet_deliveries_out_items')
+                    .delete()
+                    .eq('delivery_id', editingDelivery.id);
+
+                  if (deleteError) throw deleteError;
+
+                  // Insert new items
+                  if (editingItems.length > 0) {
+                    const itemsToInsert = editingItems.map(item => ({
+                      delivery_id: editingDelivery.id,
+                      product_name: item.description || item.name,
+                      description: item.description || item.name,
+                      quantity: item.quantity || item.delivered || 0,
+                      delivered_quantity: item.quantity || item.delivered || 0,
+                      unit_cost: 0,
+                      selling_price: item.rate || item.price || 0,
+                      total_cost: 0,
+                      total_price: (item.quantity || item.delivered || 0) * (item.rate || item.price || 0)
+                    }));
+
+                    const { error: insertError } = await supabase
+                      .from('outlet_deliveries_out_items')
+                      .insert(itemsToInsert);
+
+                    if (insertError) throw insertError;
+                  }
+                } else {
+                  toast({
+                    title: "Info",
+                    description: "Editing incoming deliveries not yet implemented"
+                  });
+                  return;
+                }
+
+                toast({
+                  title: "Success",
+                  description: "Delivery updated successfully"
+                });
+
+                setShowEditDialog(false);
+                setEditingDelivery(null);
+                setEditingItems([]);
+                await loadDeliveries();
+              } catch (error: any) {
+                console.error("Error updating delivery:", error);
+                toast({
+                  title: "Error",
+                  description: error.message || "Failed to update delivery",
+                  variant: "destructive"
+                });
+              }
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Item Dialog */}
+      <Dialog open={showEditItemDialog} onOpenChange={setShowEditItemDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editItemIndex !== null ? 'Edit Item' : 'Add Item'}</DialogTitle>
+            <DialogDescription>
+              {editItemIndex !== null ? 'Update the item details' : 'Enter the item details for this delivery'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editItemDescription">Description *</Label>
+              <Input
+                id="editItemDescription"
+                value={editItemForm.description}
+                onChange={(e) => setEditItemForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="e.g., Afiya Embe Juice 300mls"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editItemQuantity">Quantity *</Label>
+                <Input
+                  id="editItemQuantity"
+                  type="number"
+                  min="0"
+                  value={editItemForm.quantity}
+                  onChange={(e) => setEditItemForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                  placeholder="200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editItemRate">Rate (TSh) *</Label>
+                <Input
+                  id="editItemRate"
+                  type="number"
+                  min="0"
+                  value={editItemForm.rate}
+                  onChange={(e) => setEditItemForm(prev => ({ ...prev, rate: parseInt(e.target.value) || 0 }))}
+                  placeholder="5500"
+                />
+              </div>
+            </div>
+
+            {editItemForm.quantity > 0 && editItemForm.rate > 0 && (
+              <div className="p-4 bg-muted rounded-md">
+                <p className="text-sm text-muted-foreground">Amount:</p>
+                <p className="text-2xl font-bold">{formatCurrency(editItemForm.quantity * editItemForm.rate)}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditItemDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEditItem}>
+              {editItemIndex !== null ? 'Update Item' : 'Add Item'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

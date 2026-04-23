@@ -21,6 +21,7 @@ export interface DeliveryData {
   driver?: string;
   deliveryNotes?: string;
   outletId?: string;
+  deliveryType?: 'in' | 'out'; // 'in' for incoming, 'out' for outgoing
 }
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
