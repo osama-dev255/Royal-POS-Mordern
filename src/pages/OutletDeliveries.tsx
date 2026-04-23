@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabaseClient";
+import { getOutlets, Outlet, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
@@ -69,8 +70,16 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     rate: 0
   });
   const [editItemIndex, setEditItemIndex] = useState<number | null>(null);
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
+  const [loadingOutlets, setLoadingOutlets] = useState(false);
+  const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [editProductSearchTerm, setEditProductSearchTerm] = useState('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [showEditProductDropdown, setShowEditProductDropdown] = useState(false);
   const [newDeliveryForm, setNewDeliveryForm] = useState({
-    deliveryNoteNumber: '',
+    deliveryNoteNumber: `DO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
     deliveryDate: new Date().toISOString().split('T')[0],
     destinationOutlet: '',
     destinationAddress: '',
@@ -97,7 +106,26 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
   useEffect(() => {
     loadDeliveries();
+    loadOutlets();
   }, [outletId]);
+
+  const loadOutlets = async () => {
+    try {
+      setLoadingOutlets(true);
+      const data = await getOutlets();
+      setOutlets(data);
+      
+      // Load inventory products for the current outlet
+      if (outletId) {
+        const products = await getInventoryProductsByOutlet(outletId);
+        setInventoryProducts(products);
+      }
+    } catch (error) {
+      console.error("Error loading outlets:", error);
+    } finally {
+      setLoadingOutlets(false);
+    }
+  };
 
   const loadDeliveries = async () => {
     if (!outletId) {
@@ -782,6 +810,94 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
       if (itemsError) throw itemsError;
 
+      // Update inventory for both source and destination outlets
+      if (newDeliveryForm.status === 'delivered') {
+        // Find destination outlet ID
+        const destinationOutletData = outlets.find(o => o.name === newDeliveryForm.destinationOutlet);
+        
+        if (destinationOutletData) {
+          // Update inventory for each item
+          for (const item of deliveryItems) {
+            // Deduct from source outlet inventory
+            const sourceProduct = inventoryProducts.find(p => p.name === item.description);
+            
+            if (sourceProduct) {
+              const newSourceQuantity = Math.max(0, (sourceProduct.available_quantity || 0) - item.quantity);
+              
+              await supabase
+                .from('inventory_products')
+                .update({
+                  quantity: newSourceQuantity,
+                  available_quantity: newSourceQuantity
+                })
+                .eq('id', sourceProduct.id);
+            }
+
+            // Add to destination outlet inventory
+            const { data: destProducts } = await supabase
+              .from('inventory_products')
+              .select('*')
+              .eq('outlet_id', destinationOutletData.id)
+              .eq('name', item.description);
+
+            if (destProducts && destProducts.length > 0) {
+              // Product exists in destination, update quantity
+              const destProduct = destProducts[0];
+              const newDestQuantity = (destProduct.available_quantity || 0) + item.quantity;
+              
+              await supabase
+                .from('inventory_products')
+                .update({
+                  quantity: newDestQuantity,
+                  available_quantity: newDestQuantity
+                })
+                .eq('id', destProduct.id);
+            } else {
+              // Product doesn't exist in destination, create it
+              await supabase
+                .from('inventory_products')
+                .insert({
+                  outlet_id: destinationOutletData.id,
+                  name: item.description,
+                  quantity: item.quantity,
+                  available_quantity: item.quantity,
+                  unit_cost: 0,
+                  selling_price: item.rate
+                });
+            }
+          }
+
+          // Also save to saved_delivery_notes for destination outlet (Deliveries In)
+          const deliveryItemsList = deliveryItems.map(item => ({
+            description: item.description,
+            name: item.description,
+            quantity: item.quantity,
+            delivered: item.quantity,
+            rate: item.rate,
+            price: item.rate,
+            sellingPrice: item.rate,
+            unitPrice: item.rate
+          }));
+
+          await supabase
+            .from('saved_delivery_notes')
+            .insert({
+              outlet_id: destinationOutletData.id,
+              delivery_note_number: newDeliveryForm.deliveryNoteNumber,
+              date: new Date(newDeliveryForm.deliveryDate).toISOString(),
+              customer: outlets.find(o => o.id === outletId)?.name || 'Unknown Outlet',
+              items: deliveryItems.length,
+              total: totalAmount,
+              payment_method: newDeliveryForm.paymentMethod,
+              status: newDeliveryForm.status,
+              driver: newDeliveryForm.driverName || null,
+              vehicle: newDeliveryForm.vehicleNumber || null,
+              delivery_notes: newDeliveryForm.notes || null,
+              items_list: deliveryItemsList
+            });
+        }
+      }
+
       toast({
         title: "Success",
         description: "Delivery created successfully"
@@ -790,7 +906,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       // Close dialog and reset form
       setShowNewDeliveryDialog(false);
       setNewDeliveryForm({
-        deliveryNoteNumber: '',
+        deliveryNoteNumber: `DO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
         deliveryDate: new Date().toISOString().split('T')[0],
         destinationOutlet: '',
         destinationAddress: '',
@@ -1241,9 +1357,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                 <Input
                   id="deliveryNoteNumber"
                   value={newDeliveryForm.deliveryNoteNumber}
-                  onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, deliveryNoteNumber: e.target.value }))}
-                  placeholder="DO-2026-001"
+                  disabled
+                  className="bg-muted"
                 />
+                <p className="text-xs text-muted-foreground">Auto-generated</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deliveryDate">Delivery Date *</Label>
@@ -1258,12 +1375,23 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
             <div className="space-y-2">
               <Label htmlFor="destinationOutlet">Destination Outlet *</Label>
-              <Input
+              <select
                 id="destinationOutlet"
                 value={newDeliveryForm.destinationOutlet}
                 onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, destinationOutlet: e.target.value }))}
-                placeholder="e.g., Outlet - Downtown Branch"
-              />
+                className="w-full px-3 py-2 border rounded-md"
+                disabled={loadingOutlets}
+              >
+                <option value="">Select an outlet</option>
+                {outlets.map((outlet) => (
+                  <option key={outlet.id} value={outlet.name}>
+                    {outlet.name}
+                  </option>
+                ))}
+              </select>
+              {loadingOutlets && (
+                <p className="text-xs text-muted-foreground">Loading outlets...</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1430,12 +1558,72 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="itemDescription">Description *</Label>
-              <Input
-                id="itemDescription"
-                value={itemForm.description}
-                onChange={(e) => setItemForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="e.g., Afiya Embe Juice 300mls"
-              />
+              <div className="relative">
+                <Input
+                  id="itemDescription"
+                  value={productSearchTerm || itemForm.description}
+                  onChange={(e) => {
+                    setProductSearchTerm(e.target.value);
+                    setShowProductDropdown(true);
+                    if (!e.target.value) {
+                      setItemForm(prev => ({ ...prev, description: '' }));
+                    }
+                  }}
+                  onFocus={() => setShowProductDropdown(true)}
+                  onBlur={() => {
+                    setTimeout(() => setShowProductDropdown(false), 200);
+                  }}
+                  placeholder="Search or select a product..."
+                  disabled={loadingProducts || inventoryProducts.length === 0}
+                />
+                {showProductDropdown && (loadingProducts || inventoryProducts.length > 0) && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {loadingProducts ? (
+                      <div className="p-3 text-sm text-muted-foreground">Loading products...</div>
+                    ) : (
+                      <>
+                        {inventoryProducts
+                          .filter(p => {
+                            const hasStock = (p.available_quantity || 0) > 0;
+                            const matchesSearch = p.name.toLowerCase().includes(productSearchTerm.toLowerCase());
+                            return hasStock && matchesSearch;
+                          })
+                          .slice(0, 50)
+                          .map((product) => (
+                            <div
+                              key={product.id}
+                              className="px-3 py-2 hover:bg-muted cursor-pointer text-sm"
+                              onMouseDown={() => {
+                                setItemForm(prev => ({ 
+                                  ...prev, 
+                                  description: product.name,
+                                  rate: product.selling_price || 0
+                                }));
+                                setProductSearchTerm(product.name);
+                                setShowProductDropdown(false);
+                              }}
+                            >
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Available: {product.available_quantity || 0} | Price: {formatCurrency(product.selling_price || 0)}
+                              </div>
+                            </div>
+                          ))}
+                        {inventoryProducts.filter(p => {
+                          const hasStock = (p.available_quantity || 0) > 0;
+                          const matchesSearch = p.name.toLowerCase().includes(productSearchTerm.toLowerCase());
+                          return hasStock && matchesSearch;
+                        }).length === 0 && (
+                          <div className="p-3 text-sm text-muted-foreground">No products found</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!loadingProducts && inventoryProducts.length === 0 && (
+                <p className="text-xs text-muted-foreground">No products in inventory</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1737,12 +1925,72 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="editItemDescription">Description *</Label>
-              <Input
-                id="editItemDescription"
-                value={editItemForm.description}
-                onChange={(e) => setEditItemForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="e.g., Afiya Embe Juice 300mls"
-              />
+              <div className="relative">
+                <Input
+                  id="editItemDescription"
+                  value={editProductSearchTerm || editItemForm.description}
+                  onChange={(e) => {
+                    setEditProductSearchTerm(e.target.value);
+                    setShowEditProductDropdown(true);
+                    if (!e.target.value) {
+                      setEditItemForm(prev => ({ ...prev, description: '' }));
+                    }
+                  }}
+                  onFocus={() => setShowEditProductDropdown(true)}
+                  onBlur={() => {
+                    setTimeout(() => setShowEditProductDropdown(false), 200);
+                  }}
+                  placeholder="Search or select a product..."
+                  disabled={loadingProducts || inventoryProducts.length === 0}
+                />
+                {showEditProductDropdown && (loadingProducts || inventoryProducts.length > 0) && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {loadingProducts ? (
+                      <div className="p-3 text-sm text-muted-foreground">Loading products...</div>
+                    ) : (
+                      <>
+                        {inventoryProducts
+                          .filter(p => {
+                            const hasStock = (p.available_quantity || 0) > 0;
+                            const matchesSearch = p.name.toLowerCase().includes(editProductSearchTerm.toLowerCase());
+                            return hasStock && matchesSearch;
+                          })
+                          .slice(0, 50)
+                          .map((product) => (
+                            <div
+                              key={product.id}
+                              className="px-3 py-2 hover:bg-muted cursor-pointer text-sm"
+                              onMouseDown={() => {
+                                setEditItemForm(prev => ({ 
+                                  ...prev, 
+                                  description: product.name,
+                                  rate: product.selling_price || 0
+                                }));
+                                setEditProductSearchTerm(product.name);
+                                setShowEditProductDropdown(false);
+                              }}
+                            >
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Available: {product.available_quantity || 0} | Price: {formatCurrency(product.selling_price || 0)}
+                              </div>
+                            </div>
+                          ))}
+                        {inventoryProducts.filter(p => {
+                          const hasStock = (p.available_quantity || 0) > 0;
+                          const matchesSearch = p.name.toLowerCase().includes(editProductSearchTerm.toLowerCase());
+                          return hasStock && matchesSearch;
+                        }).length === 0 && (
+                          <div className="p-3 text-sm text-muted-foreground">No products found</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!loadingProducts && inventoryProducts.length === 0 && (
+                <p className="text-xs text-muted-foreground">No products in inventory</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
