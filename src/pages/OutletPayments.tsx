@@ -3,6 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +51,7 @@ interface Payment {
   method: 'cash' | 'card' | 'mobile' | 'debt';
   status: 'completed' | 'pending' | 'failed';
   description: string;
+  type: 'outlet' | 'kilango' | 'other';
 }
 
 // Mock data for outlet payments
@@ -54,7 +64,8 @@ const generateMockPayments = (outletId: string): Payment[] => [
     amount: 125000,
     method: 'cash',
     status: 'completed',
-    description: "Payment for invoice #INV-001"
+    description: "Payment for invoice #INV-001",
+    type: 'outlet'
   },
   {
     id: `pay-${outletId}-2`,
@@ -64,7 +75,8 @@ const generateMockPayments = (outletId: string): Payment[] => [
     amount: 89000,
     method: 'card',
     status: 'completed',
-    description: "Payment for invoice #INV-002"
+    description: "Payment for invoice #INV-002",
+    type: 'kilango'
   },
   {
     id: `pay-${outletId}-3`,
@@ -73,8 +85,9 @@ const generateMockPayments = (outletId: string): Payment[] => [
     customer: "Michael Brown",
     amount: 234000,
     method: 'mobile',
-    status: 'completed',
-    description: "Payment for invoice #INV-003"
+    status: 'pending',
+    description: "Payment for invoice #INV-003",
+    type: 'outlet'
   },
   {
     id: `pay-${outletId}-4`,
@@ -84,7 +97,8 @@ const generateMockPayments = (outletId: string): Payment[] => [
     amount: 56700,
     method: 'debt',
     status: 'pending',
-    description: "Debt payment - partial"
+    description: "Debt payment - partial",
+    type: 'other'
   },
   {
     id: `pay-${outletId}-5`,
@@ -94,7 +108,30 @@ const generateMockPayments = (outletId: string): Payment[] => [
     amount: 178000,
     method: 'cash',
     status: 'completed',
-    description: "Payment for invoice #INV-005"
+    description: "Payment for invoice #INV-005",
+    type: 'kilango'
+  },
+  {
+    id: `pay-${outletId}-6`,
+    transactionId: "TXN-2026-006",
+    date: "2026-03-08",
+    customer: "Kilango Investment Ltd",
+    amount: 450000,
+    method: 'card',
+    status: 'pending',
+    description: "Monthly franchise fee",
+    type: 'kilango'
+  },
+  {
+    id: `pay-${outletId}-7`,
+    transactionId: "TXN-2026-007",
+    date: "2026-03-07",
+    customer: "Supplier ABC",
+    amount: 320000,
+    method: 'mobile',
+    status: 'completed',
+    description: "Supplier payment",
+    type: 'other'
   }
 ];
 
@@ -108,6 +145,19 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
   });
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState<'all' | 'outlet' | 'kilango' | 'other'>('all');
+  const [activeStatus, setActiveStatus] = useState<'all' | 'due' | 'paid'>('all');
+  const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
+  const [newPaymentForm, setNewPaymentForm] = useState({
+    transactionId: `PAY-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
+    date: new Date().toISOString().split('T')[0],
+    customer: '',
+    amount: 0,
+    method: 'cash' as 'cash' | 'card' | 'mobile' | 'debt',
+    status: 'completed' as 'completed' | 'pending' | 'failed',
+    description: '',
+    type: 'outlet' as 'outlet' | 'kilango' | 'other'
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -135,6 +185,51 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreatePayment = async () => {
+    if (!newPaymentForm.customer || newPaymentForm.amount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in customer and amount",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const newPayment: Payment = {
+        id: `pay-${Date.now()}`,
+        ...newPaymentForm
+      };
+
+      setPayments(prev => [newPayment, ...prev]);
+
+      toast({
+        title: "Success",
+        description: "Payment created successfully"
+      });
+
+      // Reset form
+      setShowNewPaymentDialog(false);
+      setNewPaymentForm({
+        transactionId: `PAY-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
+        date: new Date().toISOString().split('T')[0],
+        customer: '',
+        amount: 0,
+        method: 'cash',
+        status: 'completed',
+        description: '',
+        type: activeSection === 'all' ? 'outlet' : activeSection
+      });
+    } catch (error: any) {
+      console.error("Error creating payment:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create payment",
+        variant: "destructive"
+      });
     }
   };
   
@@ -166,8 +261,16 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
         matchesDateRange = matchesDateRange && paymentDate <= endDate;
       }
     }
+
+    // Section filter
+    const matchesSection = activeSection === 'all' || payment.type === activeSection;
+
+    // Status tab filter (due = pending, paid = completed)
+    const matchesStatusTab = activeStatus === 'all' || 
+      (activeStatus === 'due' && payment.status === 'pending') ||
+      (activeStatus === 'paid' && payment.status === 'completed');
     
-    return matchesSearch && matchesStatus && matchesMethod && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesMethod && matchesDateRange && matchesSection && matchesStatusTab;
   });
 
   const formatCurrency = (amount: number) => {
@@ -403,6 +506,93 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
         </DropdownMenu>
       </div>
 
+      {/* Section Tabs */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-2 mb-3">
+            <Button
+              variant={activeSection === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveSection('all')}
+              className="flex-1 min-w-[120px]"
+            >
+              All Payments
+            </Button>
+            <Button
+              variant={activeSection === 'outlet' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveSection('outlet')}
+              className="flex-1 min-w-[120px]"
+            >
+              Outlet Payments
+            </Button>
+            <Button
+              variant={activeSection === 'kilango' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveSection('kilango')}
+              className="flex-1 min-w-[150px]"
+            >
+              Kilango Investment
+            </Button>
+            <Button
+              variant={activeSection === 'other' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveSection('other')}
+              className="flex-1 min-w-[120px]"
+            >
+              Other Payments
+            </Button>
+          </div>
+
+          {/* Status Sub-Tabs and New Payment Button */}
+          <div className="flex flex-col md:flex-row gap-3 mt-3 pt-3 border-t">
+            <div className="flex gap-2 flex-1">
+              <Button
+                variant={activeStatus === 'all' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveStatus('all')}
+              >
+                All
+              </Button>
+              <Button
+                variant={activeStatus === 'due' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveStatus('due')}
+                className="text-yellow-600"
+              >
+                <Clock className="h-4 w-4 mr-1" />
+                Due Payments
+              </Button>
+              <Button
+                variant={activeStatus === 'paid' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveStatus('paid')}
+                className="text-green-600"
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Paid Payments
+              </Button>
+            </div>
+
+            {/* New Payment Button - Only show for specific sections */}
+            {activeSection !== 'all' && (
+              <Button
+                onClick={() => {
+                  setNewPaymentForm(prev => ({
+                    ...prev,
+                    type: activeSection
+                  }));
+                  setShowNewPaymentDialog(true);
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                + New Payment
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
@@ -584,6 +774,102 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
           </p>
         </div>
       )}
+
+      {/* New Payment Dialog */}
+      <Dialog open={showNewPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Payment</DialogTitle>
+            <DialogDescription>
+              Enter the payment details for {activeSection === 'outlet' ? 'Outlet' : activeSection === 'kilango' ? 'Kilango Investment' : 'Other'} payment
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="paymentCustomer">Customer *</Label>
+              <Input
+                id="paymentCustomer"
+                value={newPaymentForm.customer}
+                onChange={(e) => setNewPaymentForm(prev => ({ ...prev, customer: e.target.value }))}
+                placeholder="Enter customer name"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="paymentAmount">Amount (TSh) *</Label>
+                <Input
+                  id="paymentAmount"
+                  type="number"
+                  min="0"
+                  value={newPaymentForm.amount}
+                  onChange={(e) => setNewPaymentForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentDate">Date</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={newPaymentForm.date}
+                  onChange={(e) => setNewPaymentForm(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Method</Label>
+                <select
+                  id="paymentMethod"
+                  value={newPaymentForm.method}
+                  onChange={(e) => setNewPaymentForm(prev => ({ ...prev, method: e.target.value as any }))}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="debt">Debt</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentStatus">Status</Label>
+                <select
+                  id="paymentStatus"
+                  value={newPaymentForm.status}
+                  onChange={(e) => setNewPaymentForm(prev => ({ ...prev, status: e.target.value as any }))}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paymentDescription">Description</Label>
+              <Input
+                id="paymentDescription"
+                value={newPaymentForm.description}
+                onChange={(e) => setNewPaymentForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Payment description"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewPaymentDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreatePayment} className="bg-green-600 hover:bg-green-700">
+              Create Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
