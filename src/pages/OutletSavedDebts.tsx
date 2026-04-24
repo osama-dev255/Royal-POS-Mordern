@@ -998,21 +998,69 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         
         console.log('✅ All items created and inventory updated successfully');
         
-        // Mark the debt as edited
-        const editedSale = {
-          ...selectedSale,
-          ...editFormData,
-          isEdited: true
-        };
-        setSelectedSale(editedSale);
-        
         toast({
           title: "Success",
           description: "Debt record updated successfully and inventory recalculated"
         });
+        
+        // Close the edit dialog
         setIsEditDialogOpen(false);
-        fetchSavedDebts(); // Refresh the list
-        fetchInventoryProducts(); // Refresh inventory products
+        
+        // Refresh the entire list from database to get updated data
+        await fetchSavedDebts();
+        
+        // Refresh inventory products
+        fetchInventoryProducts();
+        
+        // If view dialog is open, refresh selectedSale from the updated list
+        if (isViewDialogOpen && selectedSale) {
+          // Fetch the updated debt from database
+          const allDebts = await getOutletDebtsByOutletId(outletId);
+          const updatedDebt = allDebts.find(d => d.id === selectedSale.id);
+          
+          if (updatedDebt) {
+            // Fetch customer name
+            let customerName = 'Walk-in Customer';
+            if (updatedDebt.customer_id) {
+              const customer = await getOutletCustomerById(updatedDebt.customer_id);
+              if (customer) {
+                customerName = `${customer.first_name} ${customer.last_name}`.trim();
+              }
+            }
+            
+            // Fetch updated items
+            const debtItems = await getOutletDebtItemsByDebtId(updatedDebt.id || '');
+            const itemsWithNames = debtItems.map((item) => ({
+              name: item.product_name || 'Unknown Product',
+              quantity: item.quantity,
+              price: item.unit_price
+            }));
+            
+            // Update selectedSale with fresh data
+            setSelectedSale({
+              id: updatedDebt.id || '',
+              invoiceNumber: updatedDebt.invoice_number || '',
+              date: updatedDebt.debt_date || updatedDebt.created_at || '',
+              dueDate: updatedDebt.due_date,
+              customer: customerName,
+              customerId: updatedDebt.customer_id,
+              items: itemsWithNames,
+              subtotal: updatedDebt.subtotal,
+              tax: updatedDebt.tax_amount,
+              total: updatedDebt.total_amount,
+              amountPaid: updatedDebt.amount_paid || 0,
+              remainingAmount: updatedDebt.remaining_amount,
+              paymentMethod: 'debt',
+              status: updatedDebt.payment_status,
+              creditBroughtForward: selectedSale.creditBroughtForward, // Keep existing value
+              adjustments: 0,
+              salesman: updatedDebt.salesman,
+              driver: updatedDebt.driver,
+              truck: updatedDebt.truck,
+              isEdited: true
+            });
+          }
+        }
       } else {
         console.error('❌ updateOutletDebt returned null');
         toast({
@@ -1057,8 +1105,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         address: '',
         email: ''
       },
-      salesman: 'Not Assigned',
-      driver: 'Not Assigned',
+      salesman: sale.salesman || 'Not Assigned',
+      driver: sale.driver || 'Not Assigned',
+      truck: sale.truck || 'Not Assigned',
       dueDate: sale.date, // Use sale date as due date if not specified
       isEdited: sale.isEdited || false // Pass the edited flag
     };
