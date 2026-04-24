@@ -1043,10 +1043,28 @@ export class PrintUtils {
               <div style="font-weight: bold;">Status:</div>
               <div>${settlement.status || 'completed'}</div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-              <div style="font-weight: bold;">Processed By:</div>
-              <div>${settlement.cashierName || 'System'}</div>
+            ${settlement.cashier || settlement.preparedBy || settlement.approvedBy ? `
+            <div style="border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between; gap: 10px;">
+                ${settlement.cashier ? `
+                <div style="flex: 1;">
+                  <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Cashier:</div>
+                  <div>${settlement.cashier}</div>
+                </div>
+                ` : ''}
+                ${settlement.preparedBy ? `
+                <div style="flex: 1;">
+                  <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Prepared By:</div>
+                  <div>${settlement.preparedBy}</div>
+                </div>
+                ` : ''}
+                <div style="flex: 1;">
+                  <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Approved By:</div>
+                  <div style="min-height: 20px;">${settlement.approvedBy || '_______________________'}</div>
+                </div>
+              </div>
             </div>
+            ` : ''}
           </div>
         </div>
         
@@ -3351,6 +3369,11 @@ export class PrintUtils {
     const amountPaid = transaction.debtPaymentAmount || transaction.amountPaid || 0;
     const newBalance = transaction.newBalance || (previousBalance - amountPaid);
     
+    // Get cashier, prepared by, and approved by fields
+    const cashier = transaction.cashier || 'Not Assigned';
+    const preparedBy = transaction.preparedBy || 'Not Assigned';
+    const approvedBy = transaction.approvedBy || ''; // Leave blank for manual signature
+    
     const formatCurrency = (amount: number) => {
       return `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
@@ -3393,7 +3416,7 @@ export class PrintUtils {
       }
       body {
         font-family: 'Courier New', Courier, monospace;
-        font-size: 12px;
+        font-size: 18px;
         line-height: 1.5;
         max-width: 180mm;
         margin: 0 auto;
@@ -3411,14 +3434,14 @@ export class PrintUtils {
         margin-bottom: 10px;
       }
       .logo-area {
-        font-size: 20px;
+        font-size: 24px;
         font-weight: 900;
         letter-spacing: 2px;
         margin-bottom: 3px;
         text-transform: uppercase;
       }
       .business-details {
-        font-size: 8px;
+        font-size: 12px;
         line-height: 1.4;
         margin-bottom: 5px;
       }
@@ -3426,7 +3449,7 @@ export class PrintUtils {
         background: #000;
         color: #fff;
         padding: 4px 8px;
-        font-size: 12px;
+        font-size: 16px;
         font-weight: 900;
         letter-spacing: 3px;
         text-align: center;
@@ -3436,7 +3459,7 @@ export class PrintUtils {
       .meta-info {
         display: flex;
         justify-content: space-between;
-        font-size: 9px;
+        font-size: 13px;
         margin-bottom: 10px;
         padding: 6px;
         background: #f5f5f5;
@@ -3444,7 +3467,7 @@ export class PrintUtils {
       .meta-label {
         font-weight: 700;
         display: block;
-        font-size: 7px;
+        font-size: 11px;
         text-transform: uppercase;
         margin-bottom: 2px;
         color: #666;
@@ -3458,7 +3481,7 @@ export class PrintUtils {
         background: #fafafa;
       }
       .section-label {
-        font-size: 8px;
+        font-size: 12px;
         font-weight: 900;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -3466,7 +3489,7 @@ export class PrintUtils {
         color: #000;
       }
       .customer-name {
-        font-size: 13px;
+        font-size: 16px;
         font-weight: 900;
         margin-bottom: 2px;
       }
@@ -3569,14 +3592,14 @@ export class PrintUtils {
         text-align: center;
       }
       .footer-message {
-        font-size: 9px;
+        font-size: 13px;
         font-weight: 700;
         margin-bottom: 3px;
         text-transform: uppercase;
         letter-spacing: 1px;
       }
       .footer-sub {
-        font-size: 8px;
+        font-size: 12px;
         color: #666;
         line-height: 1.3;
       }
@@ -3664,6 +3687,32 @@ export class PrintUtils {
       </div>
       
       <div class="status-badge">${getStatusBadge()}</div>
+      
+      ${cashier || preparedBy || approvedBy ? `
+      <div class="transaction-box" style="margin-top: 10px;">
+        <div class="transaction-header">Authorization</div>
+        <div class="transaction-body">
+          <div style="display: flex; justify-content: space-between; gap: 10px;">
+            ${cashier ? `
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Cashier</div>
+              <div style="font-weight: 600; padding: 4px; background: #f5f5f5;">${cashier}</div>
+            </div>
+            ` : ''}
+            ${preparedBy ? `
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Prepared By</div>
+              <div style="font-weight: 600; padding: 4px; background: #f5f5f5;">${preparedBy}</div>
+            </div>
+            ` : ''}
+            <div style="flex: 1;">
+              <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Approved By</div>
+              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; min-height: 20px;">${approvedBy || '_______________________'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
       
       <div class="footer-section">
         <div class="footer-message">Thank You For Your Payment</div>

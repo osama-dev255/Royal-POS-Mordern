@@ -269,7 +269,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         status: 'paid',
         type: 'sales' as const,
         previousBalance: s.previous_balance,
-        newBalance: s.new_balance
+        newBalance: s.new_balance,
+        notes: s.notes,
+        cashier: s.cashier,
+        preparedBy: s.prepared_by,
+        approvedBy: s.approved_by
       }));
       
       // Calculate total paid amount from settlements
@@ -334,7 +338,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         amountPaid: receipt.amountPaid,
         debtPaymentAmount: receipt.amountPaid,
         previousDebtBalance: receipt.previousBalance || 0,
-        newBalance: receipt.newBalance || 0
+        newBalance: receipt.newBalance || 0,
+        cashier: receipt.cashier,
+        preparedBy: receipt.preparedBy,
+        approvedBy: receipt.approvedBy
       };
       
       PrintUtils.printSettlementReceipt(transaction);
