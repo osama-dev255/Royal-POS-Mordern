@@ -200,170 +200,192 @@ export const DeliveryDetails = ({
             </div>
           </CardHeader>
           
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer Information */}
+          <CardContent className="space-y-4">
+
+            {/* FROM and TO Sections Side by Side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* FROM Section */}
               <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Customer Information
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Name:</span>
-                    <span>{delivery.customer}</span>
-                  </div>
-                  {delivery.outletId && (
-                    <div className="flex justify-between bg-blue-50 p-2 rounded">
-                      <span className="text-blue-700 font-medium">Outlet:</span>
-                      <span className="text-blue-700">{delivery.customer}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Items:</span>
-                    <span>{delivery.items}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total:</span>
-                    <span className="font-semibold">{formatCurrency(delivery.total)}</span>
-                  </div>
-                  {delivery.subtotal !== undefined && delivery.subtotal !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal:</span>
-                      <span>{formatCurrency(delivery.subtotal)}</span>
-                    </div>
-                  )}
-                  {delivery.tax !== undefined && delivery.tax !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tax:</span>
-                      <span>{formatCurrency(delivery.tax)}</span>
-                    </div>
-                  )}
-                  {delivery.discount !== undefined && delivery.discount !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Discount:</span>
-                      <span>-{formatCurrency(delivery.discount)}</span>
-                    </div>
-                  )}
-                  {delivery.amountReceived !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Amount Received:</span>
-                      <span>{formatCurrency(delivery.amountReceived)}</span>
-                    </div>
-                  )}
-                  {delivery.change !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Change:</span>
-                      <span>{formatCurrency(delivery.change)}</span>
-                    </div>
-                  )}
+                <h3 className="text-xs font-bold text-muted-foreground uppercase mb-1">From:</h3>
+                <div>
+                  <p className="font-bold text-lg">{(delivery as any).businessName || 'Business Name'}</p>
+                  <p className="text-sm text-muted-foreground">{(delivery as any).businessAddress || 'Business Address'}</p>
+                  {(delivery as any).businessPhone && <p className="text-sm">📞 {(delivery as any).businessPhone}</p>}
+                  {(delivery as any).businessEmail && <p className="text-sm">✉️ {(delivery as any).businessEmail}</p>}
                 </div>
               </div>
 
-              {/* Delivery Information */}
+              {/* TO Section */}
               <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <Truck className="h-5 w-5" />
-                  Delivery Information
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Vehicle:</span>
-                    <span>{delivery.vehicle || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Driver:</span>
-                    <span>{delivery.driver || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Payment Method:</span>
-                    <span>{delivery.paymentMethod || 'N/A'}</span>
-                  </div>
+                <h3 className="text-xs font-bold text-muted-foreground uppercase mb-1">To:</h3>
+                <div>
+                  <p className="font-bold text-lg">{delivery.customer}</p>
+                  {(delivery as any).customerAddress1 && <p className="text-sm text-muted-foreground">{(delivery as any).customerAddress1}</p>}
+                  {(delivery as any).customerAddress2 && <p className="text-sm text-muted-foreground">{(delivery as any).customerAddress2}</p>}
+                  {(delivery as any).customerPhone && <p className="text-sm">📞 {(delivery as any).customerPhone}</p>}
+                  {(delivery as any).customerEmail && <p className="text-sm">✉️ {(delivery as any).customerEmail}</p>}
                 </div>
               </div>
             </div>
 
-            {/* Additional Delivery Details */}
-            {delivery.deliveryNotes && (
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Delivery Notes
-                </h3>
-                <p className="text-muted-foreground bg-muted p-3 rounded-md">
-                  {delivery.deliveryNotes}
+            {/* Delivery Details Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 py-3 border-y">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Vehicle</p>
+                <p className="text-sm font-semibold mt-0.5">{delivery.vehicle || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Driver</p>
+                <p className="text-sm font-semibold mt-0.5">{delivery.driver || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Total Items</p>
+                <p className="text-sm font-semibold mt-0.5">{delivery.itemsList?.length || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Total Quantity</p>
+                <p className="text-sm font-semibold mt-0.5">
+                  {delivery.itemsList?.reduce((sum, item: any) => sum + (item.quantity || 0), 0) || 0} units
                 </p>
               </div>
-            )}
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase">Total Packages</p>
+                <p className="text-sm font-semibold mt-0.5">
+                  {delivery.itemsList?.filter((item: any) => item.unit && item.quantity).length || 0}
+                </p>
+              </div>
+            </div>
 
-            {/* Items List */}
+            {/* Items Table */}
             {delivery.itemsList && delivery.itemsList.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-3">Items</h3>
-                <div className="border rounded-lg overflow-hidden">
+              <div>
+                <h3 className="text-base font-bold mb-2">ITEMS DELIVERED</h3>
+                <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="text-left p-3">Product</th>
-                        <th className="text-right p-3">Quantity</th>
-                        <th className="text-right p-3">Price</th>
-                        <th className="text-right p-3">Total</th>
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="text-left p-3 text-xs font-bold uppercase">Item</th>
+                        <th className="text-left p-3 text-xs font-bold uppercase">Description</th>
+                        <th className="text-right p-3 text-xs font-bold uppercase">Quantity</th>
+                        <th className="text-left p-3 text-xs font-bold uppercase">Unit</th>
+                        <th className="text-right p-3 text-xs font-bold uppercase">Rate</th>
+                        <th className="text-right p-3 text-xs font-bold uppercase">Amount</th>
+                        <th className="text-right p-3 text-xs font-bold uppercase">Delivered</th>
+                        <th className="text-left p-3 text-xs font-bold uppercase">Remarks</th>
                       </tr>
                     </thead>
                     <tbody>
                       {delivery.itemsList.map((item: any, index: number) => (
-                        <tr key={index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
-                          <td className="p-3">{item.name || item.productName}</td>
-                          <td className="p-3 text-right">{item.quantity}</td>
-                          <td className="p-3 text-right">{formatCurrency(item.price)}</td>
-                          <td className="p-3 text-right">{formatCurrency(item.total || item.price * item.quantity)}</td>
+                        <tr key={index} className={`hover:bg-muted/50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-muted/30"}`}>
+                          <td className="p-3 font-semibold">{index + 1}</td>
+                          <td className="p-3 font-medium">{item.name || item.productName || item.description}</td>
+                          <td className="p-3 text-right font-semibold">{item.quantity || 0}</td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="text-xs">{item.unit || 'N/A'}</Badge>
+                          </td>
+                          <td className="p-3 text-right">{formatCurrency(item.price || item.rate || 0)}</td>
+                          <td className="p-3 text-right font-bold">{formatCurrency(item.total || (item.price || item.rate || 0) * (item.quantity || 0))}</td>
+                          <td className="p-3 text-right">
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                              {item.delivered || item.quantity || 0}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-sm text-muted-foreground">{item.remarks || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
 
-                {/* Totals */}
-                <div className="mt-4 flex justify-end">
-                  <div className="w-64 space-y-1">
-                    {delivery.subtotal !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subtotal:</span>
-                        <span>{formatCurrency(delivery.subtotal)}</span>
-                      </div>
-                    )}
-                    {delivery.tax !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax:</span>
-                        <span>{formatCurrency(delivery.tax)}</span>
-                      </div>
-                    )}
-                    {delivery.discount !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Discount:</span>
-                        <span>-{formatCurrency(delivery.discount)}</span>
-                      </div>
-                    )}
-                    {delivery.amountReceived !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Amount Received:</span>
-                        <span>{formatCurrency(delivery.amountReceived)}</span>
-                      </div>
-                    )}
-                    {delivery.change !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Change:</span>
-                        <span>{formatCurrency(delivery.change)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between font-bold pt-2 border-t">
-                      <span>Total:</span>
-                      <span>{formatCurrency(delivery.total)}</span>
+            {/* Payment Summary */}
+            <div className="flex justify-end">
+              <div className="w-80">
+                <h3 className="text-xs font-bold text-muted-foreground uppercase mb-1">Payment Summary</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="font-semibold">Total:</span>
+                    <span className="font-bold text-xl">{formatCurrency(delivery.total)}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="font-semibold">Amount Paid:</span>
+                    <span className="font-semibold text-green-600">{formatCurrency(delivery.amountReceived || delivery.total)}</span>
+                  </div>
+                  {(delivery as any).creditBroughtForward !== undefined && (delivery as any).creditBroughtForward !== 0 && (
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="font-semibold">Credit Brought Forward:</span>
+                      <span className="font-semibold text-orange-600">{formatCurrency((delivery as any).creditBroughtForward)}</span>
                     </div>
+                  )}
+                  <div className="flex justify-between pt-3">
+                    <span className="font-bold text-lg">AMOUNT DUE:</span>
+                    <span className="font-bold text-2xl text-red-600">
+                      {formatCurrency((delivery.total || 0) - (delivery.amountReceived || delivery.total || 0) + ((delivery as any).creditBroughtForward || 0))}
+                    </span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Delivery Notes */}
+            {delivery.deliveryNotes && (
+              <div>
+                <h3 className="text-xs font-bold text-muted-foreground uppercase mb-1">Delivery Notes</h3>
+                <p className="text-sm whitespace-pre-line leading-relaxed bg-muted/50 p-3 rounded-lg">
+                  {delivery.deliveryNotes}
+                </p>
+              </div>
             )}
+
+            {/* Signature Section */}
+            <div className="border-t pt-4">
+              <h3 className="text-base font-bold mb-3 text-center">Authorization & Signatures</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-bold mb-3">Prepared By</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Name</p>
+                      <p className="font-semibold">{(delivery as any).preparedByName || '_________________'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Date</p>
+                      <p className="font-semibold">{(delivery as any).preparedByDate || '_________'}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-bold mb-3">Driver Signature</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Name</p>
+                      <p className="font-semibold">{(delivery as any).driverName || delivery.driver || '_________________'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Date</p>
+                      <p className="font-semibold">{(delivery as any).driverDate || '_________'}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-bold mb-3">Received By</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Name</p>
+                      <p className="font-semibold">{(delivery as any).receivedByName || '_________________'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Date</p>
+                      <p className="font-semibold">{(delivery as any).receivedByDate || '_________'}</p>
+                    </div>
+                    <p className="text-xs mt-3 text-red-600 font-semibold">⚠️ Signature Required</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
