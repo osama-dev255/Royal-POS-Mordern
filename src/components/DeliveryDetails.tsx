@@ -310,7 +310,7 @@ export const DeliveryDetails = ({
             </div>
             <div class="payment-row">
               <span>Amount Paid:</span>
-              <span style="color: #16a34a;">${formatCurrency(delivery.amountReceived || delivery.total)}</span>
+              <span style="color: #16a34a;">${formatCurrency(delivery.amountReceived ?? 0)}</span>
             </div>
             ${(delivery as any).creditBroughtForward && (delivery as any).creditBroughtForward !== 0 ? `
               <div class="payment-row">
@@ -320,7 +320,7 @@ export const DeliveryDetails = ({
             ` : ''}
             <div class="payment-row amount-due">
               <span>AMOUNT DUE:</span>
-              <span>${formatCurrency((delivery.total || 0) - (delivery.amountReceived || delivery.total || 0) + ((delivery as any).creditBroughtForward || 0))}</span>
+              <span>${formatCurrency((delivery.total || 0) - (delivery.amountReceived ?? 0) + ((delivery as any).creditBroughtForward || 0))}</span>
             </div>
           </div>
 
@@ -629,7 +629,7 @@ export const DeliveryDetails = ({
                   </div>
                   <div className="flex justify-between py-2 border-b">
                     <span className="font-semibold">Amount Paid:</span>
-                    <span className="font-semibold text-green-600">{formatCurrency(delivery.amountReceived || delivery.total)}</span>
+                    <span className="font-semibold text-green-600">{formatCurrency(delivery.amountReceived ?? 0)}</span>
                   </div>
                   {(delivery as any).creditBroughtForward !== undefined && (delivery as any).creditBroughtForward !== 0 && (
                     <div className="flex justify-between py-2 border-b">
@@ -640,7 +640,7 @@ export const DeliveryDetails = ({
                   <div className="flex justify-between pt-3">
                     <span className="font-bold text-lg">AMOUNT DUE:</span>
                     <span className="font-bold text-2xl text-red-600">
-                      {formatCurrency((delivery.total || 0) - (delivery.amountReceived || delivery.total || 0) + ((delivery as any).creditBroughtForward || 0))}
+                      {formatCurrency((delivery.total || 0) - (delivery.amountReceived ?? 0) + ((delivery as any).creditBroughtForward || 0))}
                     </span>
                   </div>
                 </div>
