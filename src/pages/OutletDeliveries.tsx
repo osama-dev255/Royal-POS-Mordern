@@ -1971,6 +1971,90 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                       }
                     }
                   }
+
+                  // Update the delivery in destination outlet's saved_delivery_notes (Deliveries In)
+                  const destinationOutletData = outlets.find(o => o.name === editingDelivery.customer);
+                  
+                  if (destinationOutletData) {
+                    try {
+                      // Prepare items list for saved_delivery_notes
+                      const deliveryItemsList = editingItems.map(item => ({
+                        description: item.description || item.name,
+                        name: item.description || item.name,
+                        quantity: item.quantity || item.delivered || 0,
+                        delivered: item.quantity || item.delivered || 0,
+                        rate: item.rate || item.price || 0,
+                        price: item.rate || item.price || 0,
+                        sellingPrice: item.rate || item.price || 0,
+                        unitPrice: item.rate || item.price || 0
+                      }));
+
+                      // Find the existing saved_delivery_notes record for this delivery
+                      const { data: existingDeliveryIn, error: fetchError } = await supabase
+                        .from('saved_delivery_notes')
+                        .select('*')
+                        .eq('outlet_id', destinationOutletData.id)
+                        .eq('delivery_note_number', editingDelivery.deliveryNoteNumber)
+                        .maybeSingle();
+
+                      if (fetchError) {
+                        console.error('Error fetching destination delivery:', fetchError);
+                      }
+
+                      if (existingDeliveryIn) {
+                        // Update existing record
+                        const { error: updateError } = await supabase
+                          .from('saved_delivery_notes')
+                          .update({
+                            date: editingDelivery.date ? new Date(editingDelivery.date).toISOString() : undefined,
+                            customer: outlets.find(o => o.id === outletId)?.name || 'Unknown Outlet',
+                            items: editingItems.length,
+                            total: totalAmount,
+                            payment_method: editingDelivery.paymentMethod || undefined,
+                            status: editingDelivery.status,
+                            driver: editingDelivery.driver || null,
+                            vehicle: editingDelivery.vehicle || null,
+                            delivery_notes: editingDelivery.deliveryNotes || null,
+                            items_list: deliveryItemsList
+                          })
+                          .eq('id', existingDeliveryIn.id);
+
+                        if (updateError) {
+                          console.error('Error updating destination delivery:', updateError);
+                        } else {
+                          console.log('✅ Destination outlet delivery updated successfully');
+                        }
+                      } else {
+                        console.warn('⚠️ Destination delivery record not found, creating new one...');
+                        // Create new record if it doesn't exist
+                        const { error: insertError } = await supabase
+                          .from('saved_delivery_notes')
+                          .insert({
+                            outlet_id: destinationOutletData.id,
+                            delivery_note_number: editingDelivery.deliveryNoteNumber,
+                            date: editingDelivery.date ? new Date(editingDelivery.date).toISOString() : new Date().toISOString(),
+                            customer: outlets.find(o => o.id === outletId)?.name || 'Unknown Outlet',
+                            items: editingItems.length,
+                            total: totalAmount,
+                            payment_method: editingDelivery.paymentMethod || 'credit',
+                            status: editingDelivery.status,
+                            driver: editingDelivery.driver || null,
+                            vehicle: editingDelivery.vehicle || null,
+                            delivery_notes: editingDelivery.deliveryNotes || null,
+                            items_list: deliveryItemsList
+                          });
+
+                        if (insertError) {
+                          console.error('Error creating destination delivery:', insertError);
+                        } else {
+                          console.log('✅ Destination outlet delivery created successfully');
+                        }
+                      }
+                    } catch (destError) {
+                      console.error('Error updating destination outlet delivery:', destError);
+                      // Don't throw - allow the delivery edit to succeed even if destination update fails
+                    }
+                  }
                 } else {
                   toast({
                     title: "Info",
