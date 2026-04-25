@@ -22,6 +22,9 @@ export interface DeliveryData {
   deliveryNotes?: string;
   outletId?: string;
   deliveryType?: 'in' | 'out'; // 'in' for incoming, 'out' for outgoing
+  sourceType?: 'investment' | 'outlet'; // 'investment' from main warehouse, 'outlet' from another outlet
+  sourceOutletId?: string; // ID of the source outlet (if sourceType is 'outlet')
+  sourceOutletName?: string; // Name of the source outlet (for display purposes)
 }
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
@@ -51,7 +54,9 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
           vehicle: delivery.vehicle,
           driver: delivery.driver,
           delivery_notes: delivery.deliveryNotes,
-          outlet_id: delivery.outletId
+          outlet_id: delivery.outletId,
+          source_type: delivery.sourceType || 'investment',
+          source_outlet_id: delivery.sourceOutletId || null
         });
         
       if (error) {
@@ -170,7 +175,9 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
         vehicle: dbDelivery.vehicle,
         driver: dbDelivery.driver,
         deliveryNotes: dbDelivery.delivery_notes,
-        outletId: dbDelivery.outlet_id
+        outletId: dbDelivery.outlet_id,
+        sourceType: dbDelivery.source_type || 'investment',
+        sourceOutletId: dbDelivery.source_outlet_id
       }));
       
       return deliveries;
@@ -302,7 +309,9 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         vehicle: updatedDelivery.vehicle,
         driver: updatedDelivery.driver,
         delivery_notes: updatedDelivery.deliveryNotes,
-        outlet_id: updatedDelivery.outletId
+        outlet_id: updatedDelivery.outletId,
+        source_type: updatedDelivery.sourceType || 'investment',
+        source_outlet_id: updatedDelivery.sourceOutletId || null
       };
       
       console.log('📦 Update data:', JSON.stringify(updateData, null, 2));
@@ -437,7 +446,9 @@ export const getDeliveriesByOutletId = async (outletId: string): Promise<Deliver
         vehicle: dbDelivery.vehicle,
         driver: dbDelivery.driver,
         deliveryNotes: dbDelivery.delivery_notes,
-        outletId: dbDelivery.outlet_id
+        outletId: dbDelivery.outlet_id,
+        sourceType: dbDelivery.source_type || 'investment',
+        sourceOutletId: dbDelivery.source_outlet_id
       }));
       
       return deliveries;

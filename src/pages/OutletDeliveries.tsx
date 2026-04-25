@@ -35,7 +35,8 @@ import {
   FileText,
   ChevronDown,
   Plus,
-  Pencil
+  Pencil,
+  Building
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +54,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState<"all" | "in" | "out">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "investment" | "outlet">("all"); // Filter for delivery source
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: '',
     end: ''
@@ -185,11 +187,15 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         };
       });
 
-      // Mark incoming deliveries
-      const incomingDeliveriesWithType: DeliveryData[] = incomingData.map(delivery => ({
-        ...delivery,
-        deliveryType: 'in' as const // Mark as incoming delivery
-      }));
+      // Mark incoming deliveries and enrich with source outlet names
+      const incomingDeliveriesWithType: DeliveryData[] = incomingData.map(delivery => {
+        const sourceOutlet = outlets.find(o => o.id === delivery.sourceOutletId);
+        return {
+          ...delivery,
+          deliveryType: 'in' as const, // Mark as incoming delivery
+          sourceOutletName: sourceOutlet?.name || 'Unknown Outlet'
+        };
+      });
 
       // Combine incoming and outgoing deliveries
       const allDeliveries = [...incomingDeliveriesWithType, ...outgoingDeliveries];
@@ -226,6 +232,12 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       matchesSection = delivery.deliveryType === 'out';
     }
     
+    // Source filter (only applies when sectionFilter is "in")
+    let matchesSource = true;
+    if (sectionFilter === "in" && sourceFilter !== "all") {
+      matchesSource = delivery.sourceType === sourceFilter;
+    }
+    
     // Date range filter
     let matchesDateRange = true;
     if (dateRange.start || dateRange.end) {
@@ -242,7 +254,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       }
     }
     
-    return matchesSearch && matchesStatus && matchesSection && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesSection && matchesSource && matchesDateRange;
   });
 
   const formatCurrency = (amount: number) => {
@@ -1175,6 +1187,48 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           </Badge>
         </Button>
       </div>
+
+      {/* Source Filter Tabs (only shown when Deliveries In is selected) */}
+      {sectionFilter === "in" && (
+        <div className="flex gap-2 mb-6 p-4 bg-muted/30 rounded-lg">
+          <Button
+            variant={sourceFilter === "all" ? "default" : "outline"}
+            onClick={() => setSourceFilter("all")}
+            className="flex-1 md:flex-none"
+            size="sm"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            All Sources
+            <Badge variant="secondary" className="ml-2">
+              {deliveries.filter(d => d.deliveryType === 'in').length}
+            </Badge>
+          </Button>
+          <Button
+            variant={sourceFilter === "investment" ? "default" : "outline"}
+            onClick={() => setSourceFilter("investment")}
+            className="flex-1 md:flex-none"
+            size="sm"
+          >
+            <Building className="h-4 w-4 mr-2" />
+            From Investment
+            <Badge variant="secondary" className="ml-2">
+              {deliveries.filter(d => d.deliveryType === 'in' && (d.sourceType === 'investment' || !d.sourceType)).length}
+            </Badge>
+          </Button>
+          <Button
+            variant={sourceFilter === "outlet" ? "default" : "outline"}
+            onClick={() => setSourceFilter("outlet")}
+            className="flex-1 md:flex-none"
+            size="sm"
+          >
+            <MapPin className="h-4 w-4 mr-2" />
+            From Other Outlets
+            <Badge variant="secondary" className="ml-2">
+              {deliveries.filter(d => d.deliveryType === 'in' && d.sourceType === 'outlet').length}
+            </Badge>
+          </Button>
+        </div>
+      )}
 
       {/* Search and Date Range */}
       <Card className="mb-6">
