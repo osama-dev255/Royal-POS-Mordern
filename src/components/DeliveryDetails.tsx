@@ -35,32 +35,351 @@ export const DeliveryDetails = ({
   };
 
   const handlePrint = () => {
-    if (onPrint) {
-      onPrint();
-    } else {
-      // Create a transaction object for printing
-      const transaction = {
-        id: delivery.id,
-        receiptNumber: delivery.deliveryNoteNumber,
-        date: delivery.date,
-        items: delivery.itemsList || [],
-        subtotal: delivery.subtotal || 0,
-        tax: delivery.tax || 0,
-        discount: delivery.discount || 0,
-        total: delivery.total,
-        paymentMethod: delivery.paymentMethod,
-        amountReceived: delivery.amountReceived || delivery.total,
-        change: delivery.change || 0,
-        customer: { name: delivery.customer },
-        vehicle: delivery.vehicle,
-        driver: delivery.driver,
-        deliveryNotes: delivery.deliveryNotes
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const totals = {
+        totalItems: delivery.itemsList?.length || 0,
+        totalQuantity: delivery.itemsList?.reduce((sum, item: any) => sum + (item.quantity || 0), 0) || 0,
+        totalPackages: delivery.itemsList?.filter((item: any) => item.unit && item.quantity).length || 0
       };
-      
-      // Use PrintUtils for printing
-      import("@/utils/printUtils").then(({ PrintUtils }) => {
-        PrintUtils.printDeliveryNote(transaction);
-      });
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Delivery Note - ${delivery.deliveryNoteNumber}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px;
+              font-size: 14px;
+              line-height: 1.5;
+            }
+            @media print {
+              body { margin: 0; padding: 15px; }
+              .no-print { display: none; }
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              border-bottom: 2px solid #000;
+              padding-bottom: 10px;
+            }
+            .header h1 {
+              font-size: 28px;
+              margin: 0 0 5px 0;
+            }
+            .header .note-number {
+              font-size: 20px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .header .date-time {
+              font-size: 12px;
+              color: #666;
+              margin-top: 5px;
+            }
+            .info-section {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              margin-bottom: 20px;
+            }
+            .info-box h3 {
+              font-size: 11px;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .info-box .name {
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .info-box p {
+              margin: 2px 0;
+              font-size: 13px;
+            }
+            .details-grid {
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 10px;
+              padding: 10px 0;
+              border-top: 1px solid #ddd;
+              border-bottom: 1px solid #ddd;
+              margin-bottom: 20px;
+            }
+            .detail-item {
+              text-align: left;
+            }
+            .detail-item label {
+              display: block;
+              font-size: 10px;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #666;
+              margin-bottom: 3px;
+            }
+            .detail-item .value {
+              font-size: 14px;
+              font-weight: 600;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+            }
+            .items-table th {
+              background-color: #f3f4f6;
+              padding: 8px;
+              text-align: left;
+              font-size: 11px;
+              font-weight: bold;
+              text-transform: uppercase;
+              border-bottom: 2px solid #ddd;
+            }
+            .items-table td {
+              padding: 8px;
+              border-bottom: 1px solid #eee;
+              font-size: 13px;
+            }
+            .items-table tr:nth-child(even) {
+              background-color: #f9fafb;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .payment-summary {
+              float: right;
+              width: 300px;
+              margin-bottom: 20px;
+            }
+            .payment-summary h3 {
+              font-size: 11px;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #666;
+              margin-bottom: 8px;
+            }
+            .payment-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 8px 0;
+              border-bottom: 1px solid #ddd;
+            }
+            .payment-row.total {
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .payment-row.amount-due {
+              border-top: 2px solid #000;
+              padding-top: 10px;
+              margin-top: 10px;
+              font-size: 16px;
+              font-weight: bold;
+              color: #dc2626;
+            }
+            .delivery-notes {
+              clear: both;
+              margin-bottom: 20px;
+              padding: 12px;
+              background-color: #f9fafb;
+              border-radius: 5px;
+            }
+            .delivery-notes h3 {
+              font-size: 11px;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .delivery-notes p {
+              font-size: 13px;
+              white-space: pre-line;
+            }
+            .signatures {
+              border-top: 2px solid #000;
+              padding-top: 15px;
+              display: grid;
+              grid-template-columns: 1fr 1fr 1fr;
+              gap: 20px;
+            }
+            .signature-box h4 {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .signature-box .field {
+              margin-bottom: 8px;
+            }
+            .signature-box label {
+              display: block;
+              font-size: 10px;
+              color: #666;
+              margin-bottom: 2px;
+            }
+            .signature-box .value {
+              font-size: 13px;
+              font-weight: 600;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>DELIVERY NOTE</h1>
+            <div class="note-number">${delivery.deliveryNoteNumber}</div>
+            <div class="date-time">Date: ${new Date(delivery.date).toLocaleDateString()} | Time: ${new Date(delivery.date).toLocaleTimeString()}</div>
+          </div>
+
+          <div class="info-section">
+            <div class="info-box">
+              <h3>From:</h3>
+              <div class="name">${(delivery as any).businessName || 'Business Name'}</div>
+              <p>${(delivery as any).businessAddress || 'Business Address'}</p>
+              ${(delivery as any).businessPhone ? '<p>📞 ' + (delivery as any).businessPhone + '</p>' : ''}
+              ${(delivery as any).businessEmail ? '<p>✉️ ' + (delivery as any).businessEmail + '</p>' : ''}
+            </div>
+            <div class="info-box">
+              <h3>To:</h3>
+              <div class="name">${delivery.customer}</div>
+              ${(delivery as any).customerAddress1 ? '<p>' + (delivery as any).customerAddress1 + '</p>' : ''}
+              ${(delivery as any).customerAddress2 ? '<p>' + (delivery as any).customerAddress2 + '</p>' : ''}
+              ${(delivery as any).customerPhone ? '<p>📞 ' + (delivery as any).customerPhone + '</p>' : ''}
+              ${(delivery as any).customerEmail ? '<p>✉️ ' + (delivery as any).customerEmail + '</p>' : ''}
+            </div>
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Vehicle</label>
+              <div class="value">${delivery.vehicle || 'N/A'}</div>
+            </div>
+            <div class="detail-item">
+              <label>Driver</label>
+              <div class="value">${delivery.driver || 'N/A'}</div>
+            </div>
+            <div class="detail-item">
+              <label>Total Items</label>
+              <div class="value">${totals.totalItems}</div>
+            </div>
+            <div class="detail-item">
+              <label>Total Quantity</label>
+              <div class="value">${totals.totalQuantity} units</div>
+            </div>
+            <div class="detail-item">
+              <label>Total Packages</label>
+              <div class="value">${totals.totalPackages}</div>
+            </div>
+          </div>
+
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th class="text-right">Quantity</th>
+                <th>Unit</th>
+                <th class="text-right">Rate</th>
+                <th class="text-right">Amount</th>
+                <th class="text-right">Delivered</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${delivery.itemsList?.map((item: any, index: number) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${item.name || item.productName || item.description}</td>
+                  <td class="text-right">${item.quantity || 0}</td>
+                  <td>${item.unit || 'N/A'}</td>
+                  <td class="text-right">${formatCurrency(item.price || item.rate || 0)}</td>
+                  <td class="text-right">${formatCurrency(item.total || (item.price || item.rate || 0) * (item.quantity || 0))}</td>
+                  <td class="text-right">${item.delivered || item.quantity || 0}</td>
+                  <td>${item.remarks || '-'}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="8" style="text-align:center;">No items</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="payment-summary">
+            <h3>Payment Summary</h3>
+            <div class="payment-row total">
+              <span>Total:</span>
+              <span>${formatCurrency(delivery.total)}</span>
+            </div>
+            <div class="payment-row">
+              <span>Amount Paid:</span>
+              <span style="color: #16a34a;">${formatCurrency(delivery.amountReceived || delivery.total)}</span>
+            </div>
+            ${(delivery as any).creditBroughtForward && (delivery as any).creditBroughtForward !== 0 ? `
+              <div class="payment-row">
+                <span>Credit Brought Forward:</span>
+                <span style="color: #ea580c;">${formatCurrency((delivery as any).creditBroughtForward)}</span>
+              </div>
+            ` : ''}
+            <div class="payment-row amount-due">
+              <span>AMOUNT DUE:</span>
+              <span>${formatCurrency((delivery.total || 0) - (delivery.amountReceived || delivery.total || 0) + ((delivery as any).creditBroughtForward || 0))}</span>
+            </div>
+          </div>
+
+          ${delivery.deliveryNotes ? `
+            <div class="delivery-notes">
+              <h3>Delivery Notes</h3>
+              <p>${delivery.deliveryNotes}</p>
+            </div>
+          ` : ''}
+
+          <div class="signatures">
+            <div class="signature-box">
+              <h4>Prepared By</h4>
+              <div class="field">
+                <label>Name</label>
+                <div class="value">${(delivery as any).preparedByName || '_________________'}</div>
+              </div>
+              <div class="field">
+                <label>Date</label>
+                <div class="value">${(delivery as any).preparedByDate || '_________'}</div>
+              </div>
+            </div>
+            <div class="signature-box">
+              <h4>Driver Signature</h4>
+              <div class="field">
+                <label>Name</label>
+                <div class="value">${(delivery as any).driverName || delivery.driver || '_________________'}</div>
+              </div>
+              <div class="field">
+                <label>Date</label>
+                <div class="value">${(delivery as any).driverDate || '_________'}</div>
+              </div>
+            </div>
+            <div class="signature-box">
+              <h4>Received By</h4>
+              <div class="field">
+                <label>Name</label>
+                <div class="value">${(delivery as any).receivedByName || '_________________'}</div>
+              </div>
+              <div class="field">
+                <label>Date</label>
+                <div class="value">${(delivery as any).receivedByDate || '_________'}</div>
+              </div>
+              <p style="font-size: 11px; color: #dc2626; margin-top: 10px; font-weight: bold;">⚠️ Signature Required</p>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              window.close();
+            }
+          </script>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(printContent);
+      printWindow.document.close();
     }
   };
 
