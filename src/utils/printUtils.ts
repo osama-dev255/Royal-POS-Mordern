@@ -1048,18 +1048,18 @@ export class PrintUtils {
               <div style="display: flex; justify-content: space-between; gap: 10px;">
                 ${settlement.cashier ? `
                 <div style="flex: 1;">
-                  <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Cashier:</div>
+                  <div style="font-size: 13px; font-weight: bold; margin-bottom: 3px;">Cashier:</div>
                   <div>${settlement.cashier}</div>
                 </div>
                 ` : ''}
                 ${settlement.preparedBy ? `
                 <div style="flex: 1;">
-                  <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Prepared By:</div>
+                  <div style="font-size: 13px; font-weight: bold; margin-bottom: 3px;">Prepared By:</div>
                   <div>${settlement.preparedBy}</div>
                 </div>
                 ` : ''}
                 <div style="flex: 1;">
-                  <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">Approved By:</div>
+                  <div style="font-size: 13px; font-weight: bold; margin-bottom: 3px;">Approved By:</div>
                   <div style="min-height: 20px;">${settlement.approvedBy || '_______________________'}</div>
                 </div>
               </div>
@@ -3441,7 +3441,7 @@ export class PrintUtils {
         text-transform: uppercase;
       }
       .business-details {
-        font-size: 12px;
+        font-size: 13px;
         line-height: 1.4;
         margin-bottom: 5px;
       }
@@ -3459,7 +3459,7 @@ export class PrintUtils {
       .meta-info {
         display: flex;
         justify-content: space-between;
-        font-size: 13px;
+        font-size: 14px;
         margin-bottom: 10px;
         padding: 6px;
         background: #f5f5f5;
@@ -3467,7 +3467,7 @@ export class PrintUtils {
       .meta-label {
         font-weight: 700;
         display: block;
-        font-size: 11px;
+        font-size: 13px;
         text-transform: uppercase;
         margin-bottom: 2px;
         color: #666;
@@ -3481,7 +3481,7 @@ export class PrintUtils {
         background: #fafafa;
       }
       .section-label {
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 900;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -3501,7 +3501,7 @@ export class PrintUtils {
         background: #000;
         color: #fff;
         padding: 4px 6px;
-        font-size: 9px;
+        font-size: 13px;
         font-weight: 900;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -3513,7 +3513,7 @@ export class PrintUtils {
         display: flex;
         justify-content: space-between;
         margin-bottom: 6px;
-        font-size: 10px;
+        font-size: 13px;
       }
       .transaction-row:last-child {
         margin-bottom: 0;
@@ -3538,7 +3538,7 @@ export class PrintUtils {
         background: #333;
         color: #fff;
         padding: 4px 6px;
-        font-size: 9px;
+        font-size: 13px;
         font-weight: 900;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -3550,7 +3550,7 @@ export class PrintUtils {
         display: flex;
         justify-content: space-between;
         padding: 4px 0;
-        font-size: 10px;
+        font-size: 13px;
       }
       .calc-row:last-child {
         border-bottom: none;
@@ -3570,7 +3570,7 @@ export class PrintUtils {
         background: #000;
         color: #fff;
         padding: 3px 8px;
-        font-size: 9px;
+        font-size: 13px;
         font-weight: 900;
         letter-spacing: 1px;
         margin-top: 4px;
@@ -3580,7 +3580,7 @@ export class PrintUtils {
         display: block;
         text-align: center;
         padding: 6px;
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 900;
         letter-spacing: 2px;
         margin: 10px 0;
@@ -3599,7 +3599,7 @@ export class PrintUtils {
         letter-spacing: 1px;
       }
       .footer-sub {
-        font-size: 12px;
+        font-size: 13px;
         color: #666;
         line-height: 1.3;
       }
@@ -3607,7 +3607,7 @@ export class PrintUtils {
         margin-top: 8px;
         padding: 4px;
         background: #f5f5f5;
-        font-size: 8px;
+        font-size: 13px;
         font-family: 'Libre Barcode 39', cursive;
         text-align: center;
       }
@@ -3695,18 +3695,18 @@ export class PrintUtils {
           <div style="display: flex; justify-content: space-between; gap: 10px;">
             ${cashier ? `
             <div style="flex: 1;">
-              <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Cashier</div>
+              <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Cashier</div>
               <div style="font-weight: 600; padding: 4px; background: #f5f5f5;">${cashier}</div>
             </div>
             ` : ''}
             ${preparedBy ? `
             <div style="flex: 1;">
-              <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Prepared By</div>
+              <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Prepared By</div>
               <div style="font-weight: 600; padding: 4px; background: #f5f5f5;">${preparedBy}</div>
             </div>
             ` : ''}
             <div style="flex: 1;">
-              <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Approved By</div>
+              <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Approved By</div>
               <div style="font-weight: 600; padding: 4px; background: #f5f5f5; min-height: 20px;">${approvedBy || '_______________________'}</div>
             </div>
           </div>
