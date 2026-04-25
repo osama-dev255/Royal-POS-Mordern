@@ -527,6 +527,18 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
               </div>
               
               <div>
+                <label className="block text-sm font-medium mb-1">Credit Brought Forward from previous:</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={(editingDelivery as any).creditBroughtForward || 0}
+                  onChange={(e) => setEditingDelivery(prev => prev ? {...prev, creditBroughtForward: parseFloat(e.target.value) || 0} as any : null)}
+                  className="border-orange-300 focus:border-orange-500 focus:ring-orange-500"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Enter any outstanding credit from previous deliveries for this customer</p>
+              </div>
+              
+              <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-sm font-medium">Items</label>
                   <Button 

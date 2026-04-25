@@ -2459,7 +2459,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           vehicle: deliveryNoteData.vehicle,
           driver: deliveryNoteData.driver,
           deliveryNotes: deliveryNoteData.deliveryNotes,
-          outletId: outletId
+          outletId: outletId,
+          creditBroughtForward: deliveryNoteData.creditBroughtForward || 0
         };
         
         await saveDelivery(deliveryToSave);
@@ -4765,7 +4766,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           vehicle: deliveryNoteData.vehicle,
           driver: deliveryNoteData.driver,
           deliveryNotes: deliveryNoteData.deliveryNotes,
-          outletId: outletId
+          outletId: outletId,
+          creditBroughtForward: deliveryNoteData.creditBroughtForward || 0
         };
         
         await saveDelivery(deliveryToSave);

@@ -25,6 +25,7 @@ export interface DeliveryData {
   sourceType?: 'investment' | 'outlet'; // 'investment' from main warehouse, 'outlet' from another outlet
   sourceOutletId?: string; // ID of the source outlet (if sourceType is 'outlet')
   sourceOutletName?: string; // Name of the source outlet (for display purposes)
+  creditBroughtForward?: number; // Credit brought forward from previous deliveries
 }
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
@@ -56,7 +57,8 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
           delivery_notes: delivery.deliveryNotes,
           outlet_id: delivery.outletId,
           source_type: delivery.sourceType || 'investment',
-          source_outlet_id: delivery.sourceOutletId || null
+          source_outlet_id: delivery.sourceOutletId || null,
+          credit_brought_forward: delivery.creditBroughtForward || 0
         });
         
       if (error) {
@@ -177,7 +179,8 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
         deliveryNotes: dbDelivery.delivery_notes,
         outletId: dbDelivery.outlet_id,
         sourceType: dbDelivery.source_type || 'investment',
-        sourceOutletId: dbDelivery.source_outlet_id
+        sourceOutletId: dbDelivery.source_outlet_id,
+        creditBroughtForward: dbDelivery.credit_brought_forward || 0
       }));
       
       return deliveries;
@@ -311,7 +314,8 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         delivery_notes: updatedDelivery.deliveryNotes,
         outlet_id: updatedDelivery.outletId,
         source_type: updatedDelivery.sourceType || 'investment',
-        source_outlet_id: updatedDelivery.sourceOutletId || null
+        source_outlet_id: updatedDelivery.sourceOutletId || null,
+        credit_brought_forward: updatedDelivery.creditBroughtForward || 0
       };
       
       console.log('📦 Update data:', JSON.stringify(updateData, null, 2));
@@ -448,7 +452,8 @@ export const getDeliveriesByOutletId = async (outletId: string): Promise<Deliver
         deliveryNotes: dbDelivery.delivery_notes,
         outletId: dbDelivery.outlet_id,
         sourceType: dbDelivery.source_type || 'investment',
-        sourceOutletId: dbDelivery.source_outlet_id
+        sourceOutletId: dbDelivery.source_outlet_id,
+        creditBroughtForward: dbDelivery.credit_brought_forward || 0
       }));
       
       return deliveries;

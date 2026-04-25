@@ -314,7 +314,7 @@ export const DeliveryDetails = ({
             </div>
             ${(delivery as any).creditBroughtForward && (delivery as any).creditBroughtForward !== 0 ? `
               <div class="payment-row">
-                <span>Credit Brought Forward:</span>
+                <span>Credit Brought Forward from previous:</span>
                 <span style="color: #ea580c;">${formatCurrency((delivery as any).creditBroughtForward)}</span>
               </div>
             ` : ''}
@@ -631,12 +631,10 @@ export const DeliveryDetails = ({
                     <span className="font-semibold">Amount Paid:</span>
                     <span className="font-semibold text-green-600">{formatCurrency(delivery.amountReceived ?? 0)}</span>
                   </div>
-                  {(delivery as any).creditBroughtForward !== undefined && (delivery as any).creditBroughtForward !== 0 && (
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="font-semibold">Credit Brought Forward:</span>
-                      <span className="font-semibold text-orange-600">{formatCurrency((delivery as any).creditBroughtForward)}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="font-semibold">Credit Brought Forward from previous:</span>
+                    <span className="font-semibold text-orange-600">{formatCurrency((delivery as any).creditBroughtForward ?? 0)}</span>
+                  </div>
                   <div className="flex justify-between pt-3">
                     <span className="font-bold text-lg">AMOUNT DUE:</span>
                     <span className="font-bold text-2xl text-red-600">
