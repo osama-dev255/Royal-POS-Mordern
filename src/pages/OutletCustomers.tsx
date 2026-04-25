@@ -24,7 +24,8 @@ import {
   UserPlus,
   Loader2,
   LayoutGrid,
-  List
+  List,
+  Pencil
 } from "lucide-react";
 import {
   Table,
@@ -35,7 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { getOutletCustomers, createOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer } from "@/services/databaseService";
+import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletCustomersProps {
@@ -49,12 +50,25 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const [customerBalances, setCustomerBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<OutletCustomer | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const { toast } = useToast();
 
   // Form state for new customer - aligned with SalesCart
   const [newCustomer, setNewCustomer] = useState({
+    first_name: "",
+    last_name: "",
+    phone: "",
+    email: "",
+    address: "",
+    district_ward: "",
+    tax_id: ""
+  });
+
+  // Form state for editing customer
+  const [editForm, setEditForm] = useState({
     first_name: "",
     last_name: "",
     phone: "",
@@ -195,6 +209,79 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleEditCustomer = (customer: OutletCustomer) => {
+    setEditingCustomer(customer);
+    setEditForm({
+      first_name: customer.first_name,
+      last_name: customer.last_name,
+      phone: customer.phone || "",
+      email: customer.email || "",
+      address: customer.address || "",
+      district_ward: customer.district_ward || "",
+      tax_id: customer.tax_id || ""
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCustomer?.id) return;
+    if (!editForm.first_name.trim() || !editForm.last_name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "First name and last name are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const updated = await updateOutletCustomer(editingCustomer.id, {
+        first_name: editForm.first_name.trim(),
+        last_name: editForm.last_name.trim(),
+        phone: editForm.phone.trim() || undefined,
+        email: editForm.email.trim() || undefined,
+        address: editForm.address.trim() || undefined,
+        district_ward: editForm.district_ward.trim() || undefined,
+        tax_id: editForm.tax_id.trim() || undefined
+      });
+
+      if (updated) {
+        setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+        setIsEditDialogOpen(false);
+        setEditingCustomer(null);
+        toast({
+          title: "Success",
+          description: "Customer updated successfully"
+        });
+      } else {
+        throw new Error("Failed to update customer");
+      }
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update customer",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const resetEditForm = () => {
+    setEditForm({
+      first_name: "",
+      last_name: "",
+      phone: "",
+      email: "",
+      address: "",
+      district_ward: "",
+      tax_id: ""
+    });
+    setEditingCustomer(null);
   };
 
   const resetForm = () => {
@@ -369,13 +456,22 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                       {customer.is_active !== false ? 'active' : 'inactive'}
                     </Badge>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteCustomer(customer.id!, `${customer.first_name} ${customer.last_name}`)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditCustomer(customer)}
+                    >
+                      <Pencil className="h-4 w-4 text-blue-500" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteCustomer(customer.id!, `${customer.first_name} ${customer.last_name}`)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
@@ -464,13 +560,22 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                     {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '-'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteCustomer(customer.id!, `${customer.first_name} ${customer.last_name}`)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditCustomer(customer)}
+                      >
+                        <Pencil className="h-4 w-4 text-blue-500" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCustomer(customer.id!, `${customer.first_name} ${customer.last_name}`)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -566,6 +671,100 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                 <>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Customer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Customer Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) resetEditForm();
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Customer</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">First Name *</label>
+                <Input
+                  value={editForm.first_name}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, first_name: e.target.value }))}
+                  placeholder="Enter first name"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Last Name *</label>
+                <Input
+                  value={editForm.last_name}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, last_name: e.target.value }))}
+                  placeholder="Enter last name"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <Input
+                value={editForm.phone}
+                onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="Enter phone number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Email</label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Enter email address"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Address</label>
+              <Input
+                value={editForm.address}
+                onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                placeholder="Enter address"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">District/Ward</label>
+              <Input
+                value={editForm.district_ward}
+                onChange={(e) => setEditForm(prev => ({ ...prev, district_ward: e.target.value }))}
+                placeholder="Enter district or ward"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Tax ID (TIN)</label>
+              <Input
+                value={editForm.tax_id}
+                onChange={(e) => setEditForm(prev => ({ ...prev, tax_id: e.target.value }))}
+                placeholder="Enter tax identification number"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsEditDialogOpen(false);
+              resetEditForm();
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Save Changes
                 </>
               )}
             </Button>
