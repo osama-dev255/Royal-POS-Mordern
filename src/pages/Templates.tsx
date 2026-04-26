@@ -129,16 +129,16 @@ interface SavedDeliveryNote {
 // Initial delivery note data
 const initialDeliveryNoteData: DeliveryNoteData = {
   businessName: "KILANGO INVESTMENT LTD",
-  businessAddress: "123 Business Street, City, Country",
-  businessPhone: "+1234567890",
-  businessEmail: "info@yourbusiness.com",
+  businessAddress: "P.O.BOX 64, Muheza - Tanga - Tanzania.",
+  businessPhone: "+255 711 299 266",
+  businessEmail: "kilangogroup1@gmail.com",
   customerName: "Customer Name",
   customerAddress1: "Customer Address Line 1",
   customerAddress2: "Customer Address Line 2",
-  customerPhone: "+1234567890",
+  customerPhone: "+255 ",
   customerEmail: "customer@example.com",
   deliveryNoteNumber: "DN-001",
-  date: "2026-02-24", // Will be updated to current date when preview tab is accessed
+  date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
   deliveryDate: "",
   vehicle: "",
   driver: "",
@@ -1078,9 +1078,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   ]);
   
   const initialDeliveryNoteData: DeliveryNoteData = {
-    businessName: "YOUR BUSINESS NAME",
-    businessAddress: "123 Business Street, City, Country",
-    businessPhone: "+1234567890",
+    businessName: "KILANGO INVESTMENT LTD",
+    businessAddress: "P.O.BOX 64, Muheza - Tanga - Tanzania.",
+    businessPhone: "+255 711 299 266",
     businessEmail: "info@yourbusiness.com",
     customerName: "Customer Name",
     customerAddress1: "Customer Address Line 1",
@@ -1088,7 +1088,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     customerPhone: "+1234567890",
     customerEmail: "customer@example.com",
     deliveryNoteNumber: "DN-001",
-    date: "11/30/2025",
+    date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
     deliveryDate: "",
     vehicle: "",
     driver: "",
@@ -2460,7 +2460,16 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           driver: deliveryNoteData.driver,
           deliveryNotes: deliveryNoteData.deliveryNotes,
           outletId: outletId,
-          creditBroughtForward: deliveryNoteData.creditBroughtForward || 0
+          creditBroughtForward: deliveryNoteData.creditBroughtForward || 0,
+          // Additional fields from DeliveryDetails view (matching exact View Display)
+          businessName: deliveryNoteData.businessName,
+          businessAddress: deliveryNoteData.businessAddress,
+          preparedByName: deliveryNoteData.preparedByName,
+          preparedByDate: deliveryNoteData.preparedByDate,
+          driverName: deliveryNoteData.driverName,
+          driverDate: deliveryNoteData.driverDate,
+          receivedByName: deliveryNoteData.receivedByName,
+          receivedByDate: deliveryNoteData.receivedByDate
         };
         
         await saveDelivery(deliveryToSave);
@@ -4767,7 +4776,16 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           driver: deliveryNoteData.driver,
           deliveryNotes: deliveryNoteData.deliveryNotes,
           outletId: outletId,
-          creditBroughtForward: deliveryNoteData.creditBroughtForward || 0
+          creditBroughtForward: deliveryNoteData.creditBroughtForward || 0,
+          // Additional fields from DeliveryDetails view (matching exact View Display)
+          businessName: deliveryNoteData.businessName,
+          businessAddress: deliveryNoteData.businessAddress,
+          preparedByName: deliveryNoteData.preparedByName,
+          preparedByDate: deliveryNoteData.preparedByDate,
+          driverName: deliveryNoteData.driverName,
+          driverDate: deliveryNoteData.driverDate,
+          receivedByName: deliveryNoteData.receivedByName,
+          receivedByDate: deliveryNoteData.receivedByDate
         };
         
         await saveDelivery(deliveryToSave);

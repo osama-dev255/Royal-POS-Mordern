@@ -58,7 +58,16 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
           outlet_id: delivery.outletId,
           source_type: delivery.sourceType || 'investment',
           source_outlet_id: delivery.sourceOutletId || null,
-          credit_brought_forward: delivery.creditBroughtForward || 0
+          credit_brought_forward: delivery.creditBroughtForward || 0,
+          // Additional fields from DeliveryDetails view (matching exact View Display)
+          business_name: (delivery as any).businessName || null,
+          business_address: (delivery as any).businessAddress || null,
+          prepared_by_name: (delivery as any).preparedByName || null,
+          prepared_by_date: (delivery as any).preparedByDate || null,
+          driver_name: (delivery as any).driverName || null,
+          driver_date: (delivery as any).driverDate || null,
+          received_by_name: (delivery as any).receivedByName || null,
+          received_by_date: (delivery as any).receivedByDate || null
         });
         
       if (error) {
@@ -180,7 +189,16 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
         outletId: dbDelivery.outlet_id,
         sourceType: dbDelivery.source_type || 'investment',
         sourceOutletId: dbDelivery.source_outlet_id,
-        creditBroughtForward: dbDelivery.credit_brought_forward || 0
+        creditBroughtForward: dbDelivery.credit_brought_forward || 0,
+        // Additional fields from DeliveryDetails view (matching exact View Display)
+        businessName: dbDelivery.business_name,
+        businessAddress: dbDelivery.business_address,
+        preparedByName: dbDelivery.prepared_by_name,
+        preparedByDate: dbDelivery.prepared_by_date,
+        driverName: dbDelivery.driver_name,
+        driverDate: dbDelivery.driver_date,
+        receivedByName: dbDelivery.received_by_name,
+        receivedByDate: dbDelivery.received_by_date
       }));
       
       return deliveries;
@@ -315,7 +333,16 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         outlet_id: updatedDelivery.outletId,
         source_type: updatedDelivery.sourceType || 'investment',
         source_outlet_id: updatedDelivery.sourceOutletId || null,
-        credit_brought_forward: updatedDelivery.creditBroughtForward || 0
+        credit_brought_forward: updatedDelivery.creditBroughtForward || 0,
+        // Additional fields from DeliveryDetails view (matching exact View Display)
+        business_name: (updatedDelivery as any).businessName || null,
+        business_address: (updatedDelivery as any).businessAddress || null,
+        prepared_by_name: (updatedDelivery as any).preparedByName || null,
+        prepared_by_date: (updatedDelivery as any).preparedByDate || null,
+        driver_name: (updatedDelivery as any).driverName || null,
+        driver_date: (updatedDelivery as any).driverDate || null,
+        received_by_name: (updatedDelivery as any).receivedByName || null,
+        received_by_date: (updatedDelivery as any).receivedByDate || null
       };
       
       console.log('📦 Update data:', JSON.stringify(updateData, null, 2));
@@ -453,7 +480,16 @@ export const getDeliveriesByOutletId = async (outletId: string): Promise<Deliver
         outletId: dbDelivery.outlet_id,
         sourceType: dbDelivery.source_type || 'investment',
         sourceOutletId: dbDelivery.source_outlet_id,
-        creditBroughtForward: dbDelivery.credit_brought_forward || 0
+        creditBroughtForward: dbDelivery.credit_brought_forward || 0,
+        // Additional fields from DeliveryDetails view (matching exact View Display)
+        businessName: dbDelivery.business_name,
+        businessAddress: dbDelivery.business_address,
+        preparedByName: dbDelivery.prepared_by_name,
+        preparedByDate: dbDelivery.prepared_by_date,
+        driverName: dbDelivery.driver_name,
+        driverDate: dbDelivery.driver_date,
+        receivedByName: dbDelivery.received_by_name,
+        receivedByDate: dbDelivery.received_by_date
       }));
       
       return deliveries;

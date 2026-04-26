@@ -262,7 +262,16 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
         total: calculatedTotal,
         amountReceived: editingDelivery.amountReceived || 0,
         change: editingDelivery.change || 0,
-        outletId: editingDelivery.outletId // Preserve the outlet ID
+        outletId: editingDelivery.outletId, // Preserve the outlet ID
+        // Include all new fields that match View Delivery
+        businessName: (editingDelivery as any).businessName,
+        businessAddress: (editingDelivery as any).businessAddress,
+        preparedByName: (editingDelivery as any).preparedByName,
+        preparedByDate: (editingDelivery as any).preparedByDate,
+        driverName: (editingDelivery as any).driverName,
+        driverDate: (editingDelivery as any).driverDate,
+        receivedByName: (editingDelivery as any).receivedByName,
+        receivedByDate: (editingDelivery as any).receivedByDate
       };
       
       console.log('📦 Final updated delivery:', updatedDelivery);
@@ -416,15 +425,43 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
             </DialogHeader>
             
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Customer Name</label>
-                  <Input 
-                    value={editingDelivery.customer}
-                    readOnly
-                    className="bg-gray-100"
-                  />
+              {/* FROM and TO Sections */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* FROM Section */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase">From:</h3>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Business Name</label>
+                    <Input 
+                      value={(editingDelivery as any).businessName || ''}
+                      onChange={(e) => setEditingDelivery(prev => prev ? {...prev, businessName: e.target.value} as any : null)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Business Address</label>
+                    <Input 
+                      value={(editingDelivery as any).businessAddress || ''}
+                      onChange={(e) => setEditingDelivery(prev => prev ? {...prev, businessAddress: e.target.value} as any : null)}
+                    />
+                  </div>
                 </div>
+
+                {/* TO Section */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase">To:</h3>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Customer Name</label>
+                    <Input 
+                      value={editingDelivery.customer}
+                      readOnly
+                      className="bg-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Info */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Delivery Note Number</label>
                   <Input 
@@ -445,6 +482,14 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                     <option value="delivered">Delivered</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date</label>
+                  <Input 
+                    type="date"
+                    value={editingDelivery.date}
+                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, date: e.target.value} : null)}
+                  />
                 </div>
               </div>
               
@@ -471,59 +516,6 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                   value={editingDelivery.deliveryNotes || ''}
                   onChange={(e) => setEditingDelivery(prev => prev ? {...prev, deliveryNotes: e.target.value} : null)}
                 />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Subtotal</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingDelivery.subtotal || 0}
-                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, subtotal: parseFloat(e.target.value) || 0} : null)}
-                    className="bg-gray-100"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tax</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingDelivery.tax || 0}
-                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, tax: parseFloat(e.target.value) || 0} : null)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Discount</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingDelivery.discount || 0}
-                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, discount: parseFloat(e.target.value) || 0} : null)}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Amount Received</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingDelivery.amountReceived || 0}
-                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, amountReceived: parseFloat(e.target.value) || 0} : null)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Change</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingDelivery.change || 0}
-                    onChange={(e) => setEditingDelivery(prev => prev ? {...prev, change: parseFloat(e.target.value) || 0} : null)}
-                  />
-                </div>
               </div>
               
               <div>
@@ -624,29 +616,74 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                 </div>
               </div>
               
-              <div className="flex justify-end gap-4 pt-4 border-t">
-                <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Subtotal:</div>
-                  <div className="text-sm text-muted-foreground">Tax:</div>
-                  <div className="text-sm text-muted-foreground">Discount:</div>
-                  <div className="text-sm text-muted-foreground">Total:</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm">
-                    {formatCurrency(editableItems.reduce((sum, item) => sum + ((item.price || item.unitPrice || 0) * (item.quantity || 0)), 0))}
+              {/* Signature Section */}
+              <div className="border-t pt-4">
+                <h3 className="text-base font-bold mb-3 text-center">Authorization & Signatures</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Prepared By */}
+                  <div>
+                    <h4 className="font-bold mb-3">Prepared By</h4>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Name</label>
+                        <Input 
+                          value={(editingDelivery as any).preparedByName || ''}
+                          onChange={(e) => setEditingDelivery(prev => prev ? {...prev, preparedByName: e.target.value} as any : null)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Date</label>
+                        <Input 
+                          type="date"
+                          value={(editingDelivery as any).preparedByDate || ''}
+                          onChange={(e) => setEditingDelivery(prev => prev ? {...prev, preparedByDate: e.target.value} as any : null)}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm">
-                    {formatCurrency(editingDelivery.tax || 0)}
+                  
+                  {/* Driver Signature */}
+                  <div>
+                    <h4 className="font-bold mb-3">Driver Signature</h4>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Name</label>
+                        <Input 
+                          value={(editingDelivery as any).driverName || editingDelivery.driver || ''}
+                          onChange={(e) => setEditingDelivery(prev => prev ? {...prev, driverName: e.target.value} as any : null)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Date</label>
+                        <Input 
+                          type="date"
+                          value={(editingDelivery as any).driverDate || ''}
+                          onChange={(e) => setEditingDelivery(prev => prev ? {...prev, driverDate: e.target.value} as any : null)}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm">
-                    -{formatCurrency(editingDelivery.discount || 0)}
-                  </div>
-                  <div className="text-xl font-bold">
-                    {formatCurrency(
-                      (editableItems.reduce((sum, item) => sum + ((item.price || item.unitPrice || 0) * (item.quantity || 0)), 0)) + 
-                      (editingDelivery.tax || 0) - 
-                      (editingDelivery.discount || 0)
-                    )}
+                  
+                  {/* Received By */}
+                  <div>
+                    <h4 className="font-bold mb-3">Received By</h4>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Name</label>
+                        <Input 
+                          value={(editingDelivery as any).receivedByName || ''}
+                          onChange={(e) => setEditingDelivery(prev => prev ? {...prev, receivedByName: e.target.value} as any : null)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Date</label>
+                        <Input 
+                          type="date"
+                          value={(editingDelivery as any).receivedByDate || ''}
+                          onChange={(e) => setEditingDelivery(prev => prev ? {...prev, receivedByDate: e.target.value} as any : null)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
