@@ -93,7 +93,11 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     vehicleNumber: '',
     paymentMethod: 'credit',
     status: 'pending',
-    notes: ''
+    notes: '',
+    preparedByName: '',
+    preparedByDate: '',
+    receivedByName: '',
+    receivedByDate: ''
   });
   const [deliveryItems, setDeliveryItems] = useState<Array<{
     id: string;
@@ -198,6 +202,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           // Add source business info for DeliveryDetails component
           businessName: outgoing.source_business_name || null,
           businessAddress: outgoing.source_address || null,
+          preparedByName: outgoing.prepared_by_name || null,
+          preparedByDate: outgoing.prepared_by_date || null,
+          receivedByName: outgoing.received_by_name || null,
+          receivedByDate: outgoing.received_by_date || null,
           itemsList: items.map((item: any) => ({
             description: item.product_name || item.description,
             quantity: item.quantity,
@@ -727,7 +735,11 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           status: newDeliveryForm.status,
           driver_name: newDeliveryForm.driverName || null,
           vehicle_number: newDeliveryForm.vehicleNumber || null,
-          delivery_notes: newDeliveryForm.notes || null
+          delivery_notes: newDeliveryForm.notes || null,
+          prepared_by_name: newDeliveryForm.preparedByName || null,
+          prepared_by_date: newDeliveryForm.preparedByDate || null,
+          received_by_name: newDeliveryForm.receivedByName || null,
+          received_by_date: newDeliveryForm.receivedByDate || null
         })
         .select()
         .single();
@@ -859,7 +871,11 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         vehicleNumber: '',
         paymentMethod: 'credit',
         status: 'pending',
-        notes: ''
+        notes: '',
+        preparedByName: '',
+        preparedByDate: '',
+        receivedByName: '',
+        receivedByDate: ''
       });
       setDeliveryItems([]);
 
@@ -1476,6 +1492,54 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                 placeholder="Additional notes for this delivery"
                 rows={3}
               />
+            </div>
+
+            {/* Authorization & Signatures Section */}
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3">Authorization & Signatures</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="preparedByName">Prepared By Name</Label>
+                  <Input
+                    id="preparedByName"
+                    value={newDeliveryForm.preparedByName}
+                    onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, preparedByName: e.target.value }))}
+                    placeholder="Name of person preparing"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="preparedByDate">Prepared By Date</Label>
+                  <Input
+                    id="preparedByDate"
+                    type="date"
+                    value={newDeliveryForm.preparedByDate}
+                    onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, preparedByDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="receivedByName">Received By Name</Label>
+                  <Input
+                    id="receivedByName"
+                    value={newDeliveryForm.receivedByName}
+                    onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, receivedByName: e.target.value }))}
+                    placeholder="Name of person receiving"
+                  />
+                  <p className="text-xs text-muted-foreground">(Signature Required)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="receivedByDate">Received By Date</Label>
+                  <Input
+                    id="receivedByDate"
+                    type="date"
+                    value={newDeliveryForm.receivedByDate}
+                    onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, receivedByDate: e.target.value }))}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Items Section */}
