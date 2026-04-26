@@ -83,8 +83,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [showEditProductDropdown, setShowEditProductDropdown] = useState(false);
   const [newDeliveryForm, setNewDeliveryForm] = useState({
-    deliveryNoteNumber: `DO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
+    deliveryNoteNumber: `DO-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(Date.now()).slice(-6)}`,
     deliveryDate: new Date().toISOString().split('T')[0],
+    sourceBusinessName: '',
+    sourceAddress: '',
     destinationOutlet: '',
     destinationAddress: '',
     driverName: '',
@@ -112,6 +114,22 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     loadDeliveries();
     loadOutlets();
   }, [outletId]);
+
+  // Set source address when current outlet is loaded
+  useEffect(() => {
+    if (outlets.length > 0 && outletId) {
+      const currentOutlet = outlets.find(o => o.id === outletId);
+      if (currentOutlet) {
+        // Use address if available, otherwise use location
+        const outletAddress = currentOutlet.address || currentOutlet.location || '';
+        setNewDeliveryForm(prev => ({
+          ...prev,
+          sourceBusinessName: currentOutlet.name || '',
+          sourceAddress: outletAddress
+        }));
+      }
+    }
+  }, [outlets, outletId]);
 
   const loadOutlets = async () => {
     try {
@@ -177,6 +195,9 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           deliveryNotes: outgoing.delivery_notes,
           outletId: outgoing.outlet_id,
           deliveryType: 'out', // Mark as outgoing delivery
+          // Add source business info for DeliveryDetails component
+          businessName: outgoing.source_business_name || null,
+          businessAddress: outgoing.source_address || null,
           itemsList: items.map((item: any) => ({
             description: item.product_name || item.description,
             quantity: item.quantity,
@@ -696,6 +717,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           outlet_id: outletId,
           delivery_note_number: newDeliveryForm.deliveryNoteNumber,
           delivery_date: new Date(newDeliveryForm.deliveryDate).toISOString(),
+          source_business_name: newDeliveryForm.sourceBusinessName || null,
+          source_address: newDeliveryForm.sourceAddress || null,
           destination_outlet: newDeliveryForm.destinationOutlet,
           destination_address: newDeliveryForm.destinationAddress || null,
           items_count: deliveryItems.length,
@@ -826,8 +849,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       // Close dialog and reset form
       setShowNewDeliveryDialog(false);
       setNewDeliveryForm({
-        deliveryNoteNumber: `DO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
+        deliveryNoteNumber: `DO-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(Date.now()).slice(-6)}`,
         deliveryDate: new Date().toISOString().split('T')[0],
+        sourceBusinessName: '',
+        sourceAddress: '',
         destinationOutlet: '',
         destinationAddress: '',
         driverName: '',
@@ -1333,6 +1358,31 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                   onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sourceBusinessName">Source/From Outlet Business Name</Label>
+              <Input
+                id="sourceBusinessName"
+                value={newDeliveryForm.sourceBusinessName}
+                readOnly
+                className="bg-muted"
+                placeholder="Business name will be auto-populated"
+              />
+              <p className="text-xs text-muted-foreground">Auto-populated from current outlet</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sourceAddress">Source/From Outlet Address</Label>
+              <Textarea
+                id="sourceAddress"
+                value={newDeliveryForm.sourceAddress}
+                readOnly
+                className="bg-muted"
+                placeholder="Address will be auto-populated from current outlet"
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground">Auto-populated from current outlet</p>
             </div>
 
             <div className="space-y-2">
