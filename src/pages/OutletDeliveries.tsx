@@ -44,6 +44,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabaseClient";
 import { getOutlets, Outlet, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
+import { DeliveryDetails } from "@/components/DeliveryDetails";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
@@ -61,6 +62,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   });
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewingDelivery, setViewingDelivery] = useState<DeliveryData | null>(null);
   const [showNewDeliveryDialog, setShowNewDeliveryDialog] = useState(false);
   const [editingDelivery, setEditingDelivery] = useState<DeliveryData | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -277,102 +279,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   };
 
   const handleViewDelivery = (delivery: DeliveryData) => {
-    // Open delivery details in a new window/tab
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      const itemsList = delivery.itemsList || [];
-      const itemsHtml = itemsList.map((item: any) => `
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;">${item.description || item.name || 'N/A'}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.quantity || item.delivered || 0}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency(item.rate || item.price || 0)}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatCurrency((item.quantity || item.delivered || 0) * (item.rate || item.price || 0))}</td>
-        </tr>
-      `).join('');
-
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Delivery Note - ${delivery.deliveryNoteNumber}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .header h1 { margin: 0; color: #333; }
-            .header p { margin: 5px 0; color: #666; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .info-box { background: #f5f5f5; padding: 15px; border-radius: 5px; }
-            .info-box h3 { margin-top: 0; color: #555; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { background: #f0f0f0; padding: 10px; text-align: left; border: 1px solid #ddd; }
-            .total-row { font-weight: bold; background: #f9f9f9; }
-            .status-badge { 
-              display: inline-block; 
-              padding: 5px 15px; 
-              border-radius: 15px; 
-              font-size: 14px; 
-              font-weight: bold;
-              text-transform: uppercase;
-            }
-            .status-delivered { background: #d4edda; color: #155724; }
-            .status-in-transit { background: #cce5ff; color: #004085; }
-            .status-pending { background: #fff3cd; color: #856404; }
-            .status-cancelled { background: #f8d7da; color: #721c24; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>DELIVERY NOTE</h1>
-            <p><strong>${delivery.deliveryNoteNumber}</strong></p>
-            <span class="status-badge status-${delivery.status}">${delivery.status}</span>
-          </div>
-          
-          <div class="info-grid">
-            <div class="info-box">
-              <h3>Delivery Information</h3>
-              <p><strong>Date:</strong> ${delivery.date}</p>
-              <p><strong>Customer:</strong> ${delivery.customer}</p>
-              <p><strong>Driver:</strong> ${delivery.driver || 'N/A'}</p>
-              <p><strong>Vehicle:</strong> ${delivery.vehicle || 'N/A'}</p>
-            </div>
-            <div class="info-box">
-              <h3>Summary</h3>
-              <p><strong>Total Items:</strong> ${delivery.items}</p>
-              <p><strong>Total Value:</strong> ${formatCurrency(delivery.total)}</p>
-              ${delivery.paymentMethod ? `<p><strong>Payment Method:</strong> ${delivery.paymentMethod}</p>` : ''}
-            </div>
-          </div>
-          
-          <h3>Items Delivered</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th style="text-align: center;">Quantity</th>
-                <th style="text-align: right;">Rate</th>
-                <th style="text-align: right;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-              <tr class="total-row">
-                <td colspan="3" style="text-align: right; padding: 10px;"><strong>Total:</strong></td>
-                <td style="text-align: right; padding: 10px;"><strong>${formatCurrency(delivery.total)}</strong></td>
-              </tr>
-            </tbody>
-          </table>
-          
-          ${delivery.deliveryNotes ? `
-            <div style="margin-top: 30px; padding: 15px; background: #f9f9f9; border-radius: 5px;">
-              <h3>Delivery Notes</h3>
-              <p>${delivery.deliveryNotes}</p>
-            </div>
-          ` : ''}
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
+    // Set the delivery to view in the dialog
+    setViewingDelivery(delivery);
   };
 
   const handleEditDelivery = (delivery: DeliveryData) => {
@@ -839,8 +747,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               await supabase
                 .from('inventory_products')
                 .update({
-                  quantity: newSourceQuantity,
-                  available_quantity: newSourceQuantity
+                  quantity: newSourceQuantity
+                  // available_quantity is a generated column, don't set it directly
                 })
                 .eq('id', sourceProduct.id);
             }
@@ -860,8 +768,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               await supabase
                 .from('inventory_products')
                 .update({
-                  quantity: newDestQuantity,
-                  available_quantity: newDestQuantity
+                  quantity: newDestQuantity
+                  // available_quantity is a generated column, don't set it directly
                 })
                 .eq('id', destProduct.id);
             } else {
@@ -872,7 +780,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                   outlet_id: destinationOutletData.id,
                   name: item.description,
                   quantity: item.quantity,
-                  available_quantity: item.quantity,
+                  // available_quantity is a generated column, don't set it directly
                   unit_cost: 0,
                   selling_price: item.rate
                 });
@@ -1964,8 +1872,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             const { error: updateError } = await supabase
                               .from('inventory_products')
                               .update({
-                                quantity: newSourceQuantity,
-                                available_quantity: newSourceQuantity
+                                quantity: newSourceQuantity
+                                // available_quantity is a generated column, don't set it directly
                               })
                               .eq('id', sourceProduct.id);
                             
@@ -1993,8 +1901,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             const { error: updateError } = await supabase
                               .from('inventory_products')
                               .update({
-                                quantity: newDestQuantity,
-                                available_quantity: newDestQuantity
+                                quantity: newDestQuantity
+                                // available_quantity is a generated column, don't set it directly
                               })
                               .eq('id', destProduct.id);
                             
@@ -2008,7 +1916,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                                 outlet_id: destinationOutletData.id,
                                 name: itemName,
                                 quantity: itemQuantity,
-                                available_quantity: itemQuantity,
+                                // available_quantity is a generated column, don't set it directly
                                 unit_cost: 0,
                                 selling_price: itemRate,
                                 category: 'General'
@@ -2263,6 +2171,29 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               {editItemIndex !== null ? 'Update Item' : 'Add Item'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Delivery Details Dialog */}
+      <Dialog open={!!viewingDelivery} onOpenChange={(open) => !open && setViewingDelivery(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Delivery Details</DialogTitle>
+          </DialogHeader>
+          {viewingDelivery && (
+            <DeliveryDetails
+              delivery={viewingDelivery}
+              onBack={() => setViewingDelivery(null)}
+              onPrint={() => {
+                // Reuse the existing print function
+                handlePrintDelivery(viewingDelivery);
+              }}
+              onDownload={() => {
+                // Reuse the existing download function
+                handleDownloadDelivery(viewingDelivery);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

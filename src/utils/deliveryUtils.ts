@@ -187,7 +187,8 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
         driver: dbDelivery.driver,
         deliveryNotes: dbDelivery.delivery_notes,
         outletId: dbDelivery.outlet_id,
-        sourceType: dbDelivery.source_type || 'investment',
+        // If source_outlet_id exists, it's from another outlet; otherwise it's from investment
+        sourceType: dbDelivery.source_type || (dbDelivery.source_outlet_id ? 'outlet' : 'investment'),
         sourceOutletId: dbDelivery.source_outlet_id,
         creditBroughtForward: dbDelivery.credit_brought_forward || 0,
         // Additional fields from DeliveryDetails view (matching exact View Display)
@@ -478,7 +479,8 @@ export const getDeliveriesByOutletId = async (outletId: string): Promise<Deliver
         driver: dbDelivery.driver,
         deliveryNotes: dbDelivery.delivery_notes,
         outletId: dbDelivery.outlet_id,
-        sourceType: dbDelivery.source_type || 'investment',
+        // If source_outlet_id exists, it's from another outlet; otherwise it's from investment
+        sourceType: dbDelivery.source_type || (dbDelivery.source_outlet_id ? 'outlet' : 'investment'),
         sourceOutletId: dbDelivery.source_outlet_id,
         creditBroughtForward: dbDelivery.credit_brought_forward || 0,
         // Additional fields from DeliveryDetails view (matching exact View Display)
