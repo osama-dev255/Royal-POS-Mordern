@@ -38,7 +38,8 @@ import {
   HandCoins,
   CreditCard,
   FolderOpen,
-  ShoppingCart
+  ShoppingCart,
+  Loader2
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -1122,6 +1123,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [filteredOutlets, setFilteredOutlets] = useState<Outlet[]>([]);
   const [showOutletDropdown, setShowOutletDropdown] = useState<boolean>(false);
   const [loadingOutlets, setLoadingOutlets] = useState<boolean>(true);
+  const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
   
   const [savedDeliveryNotes, setSavedDeliveryNotes] = useState<SavedDeliveryNote[]>(() => {
     const saved = localStorage.getItem('savedDeliveryNotes');
@@ -4702,6 +4704,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   // Save delivery note to localStorage
   // Function to save delivery note to the global saved deliveries system
   const handleSaveDeliveryNote = async () => {
+    // Prevent double submission
+    if (isSavingDeliveryNote) {
+      console.warn('⚠️ Save already in progress...');
+      return;
+    }
+
+    // Set saving state to true
+    setIsSavingDeliveryNote(true);
+
     // Use the same approach as handleSaveTemplate for delivery notes
     const currentTemplate = templates.find(t => t.id === selectedTemplate || t.id === viewingTemplate);
     
@@ -4811,8 +4822,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       } catch (error) {
         console.error('Error saving delivery:', error);
         alert('Error saving delivery. Please try again.');
+      } finally {
+        // Reset saving state
+        setIsSavingDeliveryNote(false);
       }
     } else {
+      // For other cases, save to local saved delivery notes
+      try {
       // For other cases, save to local saved delivery notes
       if (!deliveryNoteName.trim()) {
         const deliveryNoteNumber = getNextDeliveryNoteNumber();
@@ -4858,6 +4874,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           deliveryNoteNumber: nextDeliveryNoteNumber
         }));
       }, 100);
+      } catch (error) {
+        console.error('Error saving delivery note:', error);
+        alert('Error saving delivery note. Please try again.');
+      } finally {
+        // Reset saving state
+        setIsSavingDeliveryNote(false);
+      }
     }
   };
 
@@ -7985,8 +8008,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                         className="w-48 h-10"
                       />
                     )}
-                    <Button onClick={async () => {
-                      if (currentTemplate?.type === "order-form") {
+                    <Button 
+                      disabled={isSavingDeliveryNote}
+                      onClick={async () => {
+                        if (isSavingDeliveryNote) {
+                          console.warn('⚠️ Save already in progress...');
+                          return;
+                        }
+                        
+                        if (currentTemplate?.type === "order-form") {
                         alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
                       } else if (currentTemplate?.type === "invoice") {
                         // Automatically save invoice to saved invoices
@@ -8199,8 +8229,17 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                         handleSaveDeliveryNote();
                       }
                     }}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
+                      {isSavingDeliveryNote ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save
+                        </>
+                      )}
                     </Button>
                     {currentTemplate?.type === "customer-settlement" && (
                       <Button 
