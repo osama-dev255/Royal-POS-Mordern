@@ -77,6 +77,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<SavedSale>>({});
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
   const [itemSearchTerms, setItemSearchTerms] = useState<Record<number, string>>({});
@@ -890,6 +891,12 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       return;
     }
     
+    // Prevent double submission
+    if (isSaving) {
+      console.warn('⚠️ Save already in progress...');
+      return;
+    }
+    
     // Check if any item's selling price is less than or equal to cost price
     for (const item of editFormData.items || []) {
       if (item.quantity > 0) {
@@ -910,6 +917,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         }
       }
     }
+    
+    // Set saving state to true
+    setIsSaving(true);
     
     try {
       console.log('💾 Starting debt record update...', selectedSale.id);
@@ -1003,14 +1013,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
           description: "Debt record updated successfully and inventory recalculated"
         });
         
-        // Close the edit dialog
-        setIsEditDialogOpen(false);
-        
         // Refresh the entire list from database to get updated data
         await fetchSavedDebts();
         
         // Refresh inventory products
-        fetchInventoryProducts();
+        await fetchInventoryProducts();
+        
+        // Close the edit dialog AFTER data is refreshed
+        setIsEditDialogOpen(false);
         
         // If view dialog is open, refresh selectedSale from the updated list
         if (isViewDialogOpen && selectedSale) {
@@ -1077,6 +1087,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         description: `Failed to update debt record: ${errorMessage}`,
         variant: "destructive"
       });
+    } finally {
+      // Reset saving state
+      setIsSaving(false);
     }
   };
 
@@ -1959,13 +1972,22 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
               </div>
               
               <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
                   <X className="h-4 w-4 mr-1" />
                   Cancel
                 </Button>
-                <Button onClick={handleUpdate}>
-                  <Save className="h-4 w-4 mr-1" />
-                  Save Changes
+                <Button onClick={handleUpdate} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-1" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

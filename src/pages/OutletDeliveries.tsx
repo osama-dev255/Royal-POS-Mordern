@@ -36,7 +36,8 @@ import {
   ChevronDown,
   Plus,
   Pencil,
-  Building
+  Building,
+  Loader2
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -78,6 +79,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   const [loadingOutlets, setLoadingOutlets] = useState(false);
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [isSavingDelivery, setIsSavingDelivery] = useState(false);
+  const [isEditingDelivery, setIsEditingDelivery] = useState(false);
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [editProductSearchTerm, setEditProductSearchTerm] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
@@ -705,6 +708,34 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       return;
     }
 
+    // Validate required fields: Driver Name, Prepared By Name, Prepared By Date
+    if (!newDeliveryForm.driverName || !newDeliveryForm.driverName.trim()) {
+      toast({
+        title: "Error",
+        description: "Driver Name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!newDeliveryForm.preparedByName || !newDeliveryForm.preparedByName.trim()) {
+      toast({
+        title: "Error",
+        description: "Prepared By Name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!newDeliveryForm.preparedByDate) {
+      toast({
+        title: "Error",
+        description: "Prepared By Date is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (deliveryItems.length === 0) {
       toast({
         title: "Error",
@@ -713,6 +744,15 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       });
       return;
     }
+
+    // Prevent double submission
+    if (isSavingDelivery) {
+      console.warn('⚠️ Save already in progress...');
+      return;
+    }
+
+    // Set saving state to true
+    setIsSavingDelivery(true);
 
     try {
       // Calculate totals
@@ -888,6 +928,9 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         description: error.message || "Failed to create delivery",
         variant: "destructive"
       });
+    } finally {
+      // Reset saving state
+      setIsSavingDelivery(false);
     }
   };
 
@@ -1435,12 +1478,13 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="driverName">Driver Name</Label>
+                <Label htmlFor="driverName">Driver Name *</Label>
                 <Input
                   id="driverName"
                   value={newDeliveryForm.driverName}
                   onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, driverName: e.target.value }))}
                   placeholder="e.g., John Doe"
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -1500,21 +1544,23 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="preparedByName">Prepared By Name</Label>
+                  <Label htmlFor="preparedByName">Prepared By Name *</Label>
                   <Input
                     id="preparedByName"
                     value={newDeliveryForm.preparedByName}
                     onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, preparedByName: e.target.value }))}
                     placeholder="Name of person preparing"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="preparedByDate">Prepared By Date</Label>
+                  <Label htmlFor="preparedByDate">Prepared By Date *</Label>
                   <Input
                     id="preparedByDate"
                     type="date"
                     value={newDeliveryForm.preparedByDate}
                     onChange={(e) => setNewDeliveryForm(prev => ({ ...prev, preparedByDate: e.target.value }))}
+                    required
                   />
                 </div>
               </div>
@@ -1611,11 +1657,18 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewDeliveryDialog(false)}>
+            <Button variant="outline" onClick={() => setShowNewDeliveryDialog(false)} disabled={isSavingDelivery}>
               Cancel
             </Button>
-            <Button onClick={handleCreateDelivery}>
-              Save Delivery
+            <Button onClick={handleCreateDelivery} disabled={isSavingDelivery}>
+              {isSavingDelivery ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Save Delivery'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1902,11 +1955,20 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isEditingDelivery}>
               Cancel
             </Button>
             <Button onClick={async () => {
+              // Prevent double submission
+              if (isEditingDelivery) {
+                console.warn('⚠️ Save already in progress...');
+                return;
+              }
+
               if (!editingDelivery) return;
+              
+              // Set editing state to true
+              setIsEditingDelivery(true);
               
               try {
                 const totalAmount = calculateEditTotal();
@@ -2155,9 +2217,19 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                   description: error.message || "Failed to update delivery",
                   variant: "destructive"
                 });
+              } finally {
+                // Reset editing state
+                setIsEditingDelivery(false);
               }
             }}>
-              Save Changes
+              {isEditingDelivery ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Save Changes'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
