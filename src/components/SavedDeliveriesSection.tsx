@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Truck, Download, Printer, Eye, Calendar, Edit } from "lucide-react";
+import { Search, Truck, Download, Printer, Eye, Calendar, Edit, Loader2, Save } from "lucide-react";
 import { SavedDeliveriesCard } from "./SavedDeliveriesCard";
 import { getSavedDeliveries, deleteDelivery, DeliveryData, updateDelivery } from "@/utils/deliveryUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -33,6 +33,7 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
   const [editingDelivery, setEditingDelivery] = useState<DeliveryData | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editableItems, setEditableItems] = useState<any[]>([]);
+  const [isSavingDelivery, setIsSavingDelivery] = useState(false);
 
   // Load saved deliveries from database
   useEffect(() => {
@@ -237,6 +238,15 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
   const handleSaveEditedDelivery = async () => {
     if (!editingDelivery) return;
     
+    // Prevent double submission
+    if (isSavingDelivery) {
+      console.warn('⚠️ Save already in progress...');
+      return;
+    }
+
+    // Set saving state to true
+    setIsSavingDelivery(true);
+    
     try {
       console.log('💾 Saving edited delivery...', editingDelivery.id);
       
@@ -291,6 +301,9 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
       console.error('❌ Error updating delivery:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       alert(`❌ Error updating delivery: ${errorMessage}\n\nPlease check the console for more details.`);
+    } finally {
+      // Reset saving state
+      setIsSavingDelivery(false);
     }
   };
 
@@ -693,13 +706,25 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
               <Button 
                 variant="outline" 
                 onClick={() => setIsEditModalOpen(false)}
+                disabled={isSavingDelivery}
               >
                 Cancel
               </Button>
               <Button 
                 onClick={handleSaveEditedDelivery}
+                disabled={isSavingDelivery}
               >
-                Save Changes
+                {isSavingDelivery ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
