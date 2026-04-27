@@ -140,7 +140,7 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   customerEmail: "customer@example.com",
   deliveryNoteNumber: "DN-001",
   date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
-  deliveryDate: "",
+  deliveryDate: new Date().toISOString().split('T')[0], // Default to today
   vehicle: "",
   driver: "",
   items: [
@@ -153,9 +153,9 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   totalQuantity: 0, // Will be calculated dynamically
   totalPackages: 3,
   preparedByName: "",
-  preparedByDate: "",
+  preparedByDate: new Date().toISOString().split('T')[0], // Default to today
   driverName: "",
-  driverDate: "",
+  driverDate: new Date().toISOString().split('T')[0], // Default to today
   receivedByName: "",
   receivedByDate: "",
   // Financial fields
@@ -1090,7 +1090,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     customerEmail: "customer@example.com",
     deliveryNoteNumber: "DN-001",
     date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
-    deliveryDate: "",
+    deliveryDate: new Date().toISOString().split('T')[0], // Default to today
     vehicle: "",
     driver: "",
     items: [
@@ -1103,9 +1103,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     totalQuantity: 0, // Will be calculated dynamically
     totalPackages: 3,
     preparedByName: "",
-    preparedByDate: "",
+    preparedByDate: new Date().toISOString().split('T')[0], // Default to today
     driverName: "",
-    driverDate: "",
+    driverDate: new Date().toISOString().split('T')[0], // Default to today
     receivedByName: "",
     receivedByDate: "",
     // Financial fields
@@ -11570,43 +11570,155 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                           </div>
                           
                           <div>
-                            <h4 className="font-bold">TO:</h4>
+                            <h4 className="font-bold mb-2">TO:</h4>
                             <div className="relative command-autocomplete">
-                              <Command className="rounded-lg border" cmdk-root="">
-                                <CommandInput
-                                  placeholder="Search outlet name..."
-                                  value={deliveryNoteData.customerName}
-                                  onValueChange={(value) => {
-                                    handleDeliveryNoteChange("customerName", value);
-                                    filterOutlets(value);
-                                  }}
-                                  onFocus={() => {
-                                    // When focusing, show all outlets to allow selection
-                                    setFilteredOutlets(outlets);
-                                    setShowOutletDropdown(outlets.length > 0);
-                                  }}
-                                  onBlur={() => {
-                                    // Dropdown will be closed by click outside handler
-                                  }}
-                                />
+                              <Command className="rounded-lg border shadow-sm">
+                                <div className="flex items-center border-b px-3">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="mr-2 h-4 w-4 shrink-0 opacity-50"
+                                  >
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="m21 21-4.3-4.3" />
+                                  </svg>
+                                  <CommandInput
+                                    placeholder="Search outlet by name, location, or phone..."
+                                    value={deliveryNoteData.customerName}
+                                    onValueChange={(value) => {
+                                      handleDeliveryNoteChange("customerName", value);
+                                      filterOutlets(value);
+                                    }}
+                                    onFocus={() => {
+                                      // When focusing, show all outlets to allow selection
+                                      setFilteredOutlets(outlets);
+                                      setShowOutletDropdown(outlets.length > 0);
+                                    }}
+                                    onBlur={() => {
+                                      // Dropdown will be closed by click outside handler
+                                    }}
+                                    className="flex-1 h-10 placeholder:text-muted-foreground focus-visible:outline-none"
+                                  />
+                                  {deliveryNoteData.customerName && (
+                                    <button
+                                      onClick={() => {
+                                        handleDeliveryNoteChange("customerName", "");
+                                        handleDeliveryNoteChange("customerAddress1", "");
+                                        handleDeliveryNoteChange("customerPhone", "");
+                                        handleDeliveryNoteChange("customerEmail", "");
+                                        setFilteredOutlets([]);
+                                      }}
+                                      className="ml-2 hover:bg-gray-100 p-1 rounded"
+                                    >
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        className="h-4 w-4"
+                                      >
+                                        <path d="M18 6 6 18" />
+                                        <path d="m6 6 12 12" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
                                 {showOutletDropdown && (
-                                  <CommandList className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+                                  <CommandList className="max-h-64 overflow-auto">
                                     {loadingOutlets ? (
-                                      <CommandEmpty>Loading outlets...</CommandEmpty>
+                                      <div className="p-4 text-center text-sm text-muted-foreground">
+                                        Loading outlets...
+                                      </div>
                                     ) : filteredOutlets.length > 0 ? (
                                       <CommandGroup>
                                         {filteredOutlets.map((outlet) => (
                                           <CommandItem
                                             key={outlet.id}
                                             onSelect={() => handleOutletSelect(outlet)}
-                                            className="cursor-pointer hover:bg-gray-100 p-2"
+                                            className="cursor-pointer py-3 px-4 hover:bg-gray-50 border-b last:border-b-0"
                                           >
-                                            {outlet.name}
+                                            <div className="flex flex-col gap-1 w-full">
+                                              <div className="flex items-center gap-2">
+                                                <svg
+                                                  xmlns="http://www.w3.org/2000/svg"
+                                                  width="24"
+                                                  height="24"
+                                                  viewBox="0 0 24 24"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  strokeWidth="2"
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                  className="h-4 w-4 text-primary"
+                                                >
+                                                  <path d="M15 21v-8a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v8" />
+                                                  <path d="M9 11V6a3 3 0 0 1 3-3 3 3 0 0 1 3 3v5" />
+                                                  <path d="M4 21h16" />
+                                                  <path d="M4 11h16" />
+                                                </svg>
+                                                <span className="font-semibold text-sm">{outlet.name}</span>
+                                              </div>
+                                              <div className="flex items-center gap-4 text-xs text-muted-foreground ml-6">
+                                                {outlet.location && (
+                                                  <div className="flex items-center gap-1">
+                                                    <svg
+                                                      xmlns="http://www.w3.org/2000/svg"
+                                                      width="24"
+                                                      height="24"
+                                                      viewBox="0 0 24 24"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      strokeWidth="2"
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      className="h-3 w-3"
+                                                    >
+                                                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                                                      <circle cx="12" cy="10" r="3" />
+                                                    </svg>
+                                                    <span>{outlet.location}</span>
+                                                  </div>
+                                                )}
+                                                {outlet.phone && (
+                                                  <div className="flex items-center gap-1">
+                                                    <svg
+                                                      xmlns="http://www.w3.org/2000/svg"
+                                                      width="24"
+                                                      height="24"
+                                                      viewBox="0 0 24 24"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      strokeWidth="2"
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      className="h-3 w-3"
+                                                    >
+                                                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                                                    </svg>
+                                                    <span>{outlet.phone}</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
                                           </CommandItem>
                                         ))}
                                       </CommandGroup>
                                     ) : (
-                                      <CommandEmpty>No outlets found.</CommandEmpty>
+                                      <div className="p-4 text-center text-sm text-muted-foreground">
+                                        No outlets found.
+                                      </div>
                                     )}
                                   </CommandList>
                                 )}
@@ -11652,12 +11764,32 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                             <div className="text-sm">{deliveryNoteData.date}</div>
                           </div>
                           <div>
-                            <div className="text-sm font-medium">Delivery Date:</div>
-                            <Input
-                              value={deliveryNoteData.deliveryDate || ""}
-                              onChange={(e) => handleDeliveryNoteChange("deliveryDate", e.target.value)}
-                              className="text-sm p-1 h-6"
-                            />
+                            <div className="text-sm font-medium mb-1">Delivery Date:</div>
+                            <div className="relative">
+                              <Input
+                                type="date"
+                                value={deliveryNoteData.deliveryDate || ""}
+                                onChange={(e) => handleDeliveryNoteChange("deliveryDate", e.target.value)}
+                                className="text-sm p-1 h-9 pr-10"
+                              />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"
+                              >
+                                <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                                <line x1="16" x2="16" y1="2" y2="6" />
+                                <line x1="8" x2="8" y1="2" y2="6" />
+                                <line x1="3" x2="21" y1="10" y2="10" />
+                              </svg>
+                            </div>
                           </div>
                           <div>
                             <div className="text-sm font-medium">Vehicle #:</div>
@@ -11900,11 +12032,31 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               </div>
                               <div>
                                 <span>Date:</span>
-                                <Input 
-                                  value={deliveryNoteData.preparedByDate}
-                                  onChange={(e) => handleDeliveryNoteChange("preparedByDate", e.target.value)}
-                                  className="w-full h-6 p-1 text-sm mt-1"
-                                />
+                                <div className="relative mt-1">
+                                  <Input 
+                                    type="date"
+                                    value={deliveryNoteData.preparedByDate}
+                                    onChange={(e) => handleDeliveryNoteChange("preparedByDate", e.target.value)}
+                                    className="w-full h-8 p-1 text-sm pr-8"
+                                  />
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none"
+                                  >
+                                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                                    <line x1="16" x2="16" y1="2" y2="6" />
+                                    <line x1="8" x2="8" y1="2" y2="6" />
+                                    <line x1="3" x2="21" y1="10" y2="10" />
+                                  </svg>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -11922,11 +12074,31 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               </div>
                               <div>
                                 <span>Date:</span>
-                                <Input 
-                                  value={deliveryNoteData.driverDate}
-                                  onChange={(e) => handleDeliveryNoteChange("driverDate", e.target.value)}
-                                  className="w-full h-6 p-1 text-sm mt-1"
-                                />
+                                <div className="relative mt-1">
+                                  <Input 
+                                    type="date"
+                                    value={deliveryNoteData.driverDate}
+                                    onChange={(e) => handleDeliveryNoteChange("driverDate", e.target.value)}
+                                    className="w-full h-8 p-1 text-sm pr-8"
+                                  />
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none"
+                                  >
+                                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                                    <line x1="16" x2="16" y1="2" y2="6" />
+                                    <line x1="8" x2="8" y1="2" y2="6" />
+                                    <line x1="3" x2="21" y1="10" y2="10" />
+                                  </svg>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -11944,11 +12116,31 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               </div>
                               <div>
                                 <span>Date:</span>
-                                <Input 
-                                  value={deliveryNoteData.receivedByDate}
-                                  onChange={(e) => handleDeliveryNoteChange("receivedByDate", e.target.value)}
-                                  className="w-full h-6 p-1 text-sm mt-1"
-                                />
+                                <div className="relative mt-1">
+                                  <Input 
+                                    type="date"
+                                    value={deliveryNoteData.receivedByDate}
+                                    onChange={(e) => handleDeliveryNoteChange("receivedByDate", e.target.value)}
+                                    className="w-full h-8 p-1 text-sm pr-8"
+                                  />
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none"
+                                  >
+                                    <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                                    <line x1="16" x2="16" y1="2" y2="6" />
+                                    <line x1="8" x2="8" y1="2" y2="6" />
+                                    <line x1="3" x2="21" y1="10" y2="10" />
+                                  </svg>
+                                </div>
                               </div>
                               <div className="text-xs mt-2">(Signature Required)</div>
                             </div>
