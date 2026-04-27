@@ -888,7 +888,12 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               driver: newDeliveryForm.driverName || null,
               vehicle: newDeliveryForm.vehicleNumber || null,
               delivery_notes: newDeliveryForm.notes || null,
-              items_list: deliveryItemsList
+              items_list: deliveryItemsList,
+              // Set source tracking fields for proper categorization
+              source_outlet_id: outletId, // The outlet that sent this delivery
+              source_type: 'outlet', // This came from another outlet
+              source_business_name: newDeliveryForm.sourceBusinessName || null,
+              source_address: newDeliveryForm.sourceAddress || null
             });
         }
       }
@@ -2153,7 +2158,12 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             driver: editingDelivery.driver || null,
                             vehicle: editingDelivery.vehicle || null,
                             delivery_notes: editingDelivery.deliveryNotes || null,
-                            items_list: deliveryItemsList
+                            items_list: deliveryItemsList,
+                            // Ensure source tracking fields are set correctly
+                            source_outlet_id: outletId,
+                            source_type: 'outlet',
+                            source_business_name: editingDelivery.businessName || null,
+                            source_address: editingDelivery.businessAddress || null
                           })
                           .eq('id', existingDeliveryIn.id);
 
@@ -2179,7 +2189,12 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             driver: editingDelivery.driver || null,
                             vehicle: editingDelivery.vehicle || null,
                             delivery_notes: editingDelivery.deliveryNotes || null,
-                            items_list: deliveryItemsList
+                            items_list: deliveryItemsList,
+                            // Set source tracking fields for proper categorization
+                            source_outlet_id: outletId,
+                            source_type: 'outlet',
+                            source_business_name: editingDelivery.businessName || null,
+                            source_address: editingDelivery.businessAddress || null
                           });
 
                         if (insertError) {
