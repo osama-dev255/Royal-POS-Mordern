@@ -1324,6 +1324,25 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                         {delivery.vehicle || 'N/A'}
                       </div>
                     </div>
+                    
+                    {/* Products Summary Display - CSV Style */}
+                    {delivery.itemsList && delivery.itemsList.length > 0 && (
+                      <div className="border-t pt-3 mt-3">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5" />
+                          Products Summary:
+                        </div>
+                        <div className="bg-gray-50 rounded-md p-2.5">
+                          <p className="text-xs font-mono leading-relaxed break-words text-gray-700">
+                            {delivery.itemsList.map((item, index) => {
+                              const productName = item.description || item.name || 'N/A';
+                              const quantity = item.quantity || item.delivered || 0;
+                              return `${productName} (${quantity})`;
+                            }).join(', ')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold">{formatCurrency(delivery.total)}</p>
