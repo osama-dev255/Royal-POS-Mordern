@@ -316,7 +316,8 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
       // Validate numeric fields to prevent NaN serialization errors
       const updateData = {
         delivery_note_number: updatedDelivery.deliveryNoteNumber,
-        date: updatedDelivery.date,
+        // Convert empty string dates to null to avoid database errors
+        date: updatedDelivery.date || null,
         customer: updatedDelivery.customer,
         items: updatedDelivery.items || 0,
         total: updatedDelivery.total || 0,

@@ -65,6 +65,11 @@ export const SavedDeliveriesCard = ({
   };
 
   const formatDate = (dateString: string) => {
+    // If it's already in YYYY-MM-DD format, return as-is to avoid timezone conversion
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    // Otherwise, parse and format (for backwards compatibility)
     return new Date(dateString).toLocaleDateString();
   };
 

@@ -127,6 +127,15 @@ interface SavedDeliveryNote {
   updatedAt: string;
 }
 
+// Helper function to get local date in YYYY-MM-DD format (avoids timezone issues)
+const getLocalDate = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // Initial delivery note data
 const initialDeliveryNoteData: DeliveryNoteData = {
   businessName: "KILANGO INVESTMENT LTD",
@@ -139,8 +148,8 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   customerPhone: "+255 ",
   customerEmail: "customer@example.com",
   deliveryNoteNumber: "DN-001",
-  date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
-  deliveryDate: new Date().toISOString().split('T')[0], // Default to today
+  date: getLocalDate(), // Current local date
+  deliveryDate: getLocalDate(), // Default to today (local)
   vehicle: "",
   driver: "",
   items: [
@@ -153,9 +162,9 @@ const initialDeliveryNoteData: DeliveryNoteData = {
   totalQuantity: 0, // Will be calculated dynamically
   totalPackages: 3,
   preparedByName: "",
-  preparedByDate: new Date().toISOString().split('T')[0], // Default to today
+  preparedByDate: getLocalDate(), // Default to today (local)
   driverName: "",
-  driverDate: new Date().toISOString().split('T')[0], // Default to today
+  driverDate: getLocalDate(), // Default to today (local)
   receivedByName: "",
   receivedByDate: "",
   // Financial fields
@@ -1089,8 +1098,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     customerPhone: "+1234567890",
     customerEmail: "customer@example.com",
     deliveryNoteNumber: "DN-001",
-    date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
-    deliveryDate: new Date().toISOString().split('T')[0], // Default to today
+    date: getLocalDate(), // Current local date
+    deliveryDate: getLocalDate(), // Default to today (local)
     vehicle: "",
     driver: "",
     items: [
@@ -1103,9 +1112,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     totalQuantity: 0, // Will be calculated dynamically
     totalPackages: 3,
     preparedByName: "",
-    preparedByDate: new Date().toISOString().split('T')[0], // Default to today
+    preparedByDate: getLocalDate(), // Default to today (local)
     driverName: "",
-    driverDate: new Date().toISOString().split('T')[0], // Default to today
+    driverDate: getLocalDate(), // Default to today (local)
     receivedByName: "",
     receivedByDate: "",
     // Financial fields
