@@ -464,6 +464,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                     >
                       <Pencil className="h-4 w-4 text-blue-500" />
                     </Button>
+                    {/* Delete button hidden - commented out
                     <Button
                       variant="ghost"
                       size="sm"
@@ -471,6 +472,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
+                    */}
                   </div>
                 </div>
               </CardHeader>
@@ -568,6 +570,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                       >
                         <Pencil className="h-4 w-4 text-blue-500" />
                       </Button>
+                      {/* Delete button hidden - commented out
                       <Button
                         variant="ghost"
                         size="sm"
@@ -575,6 +578,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
+                      */}
                     </div>
                   </TableCell>
                 </TableRow>

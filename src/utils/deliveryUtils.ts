@@ -374,12 +374,29 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         console.log('✅ Database update successful');
         dbUpdateSuccessful = true;
         
-        // Update outlet inventory if delivery is from Investment to an outlet and status is 'delivered'
-        if (updatedDelivery.outletId && updatedDelivery.status === 'delivered' && updateData.source_type === 'investment') {
+        // Update outlet inventory ONLY if delivery status changed TO 'delivered'
+        // First, check the original status from database
+        const { data: originalDelivery } = await supabase
+          .from('saved_delivery_notes')
+          .select('status, source_type, outlet_id')
+          .eq('id', updatedDelivery.id)
+          .single();
+        
+        // Only update inventory if:
+        // 1. Delivery is to an outlet
+        // 2. Status is now 'delivered'
+        // 3. Source is from investment
+        // 4. Original status was NOT 'delivered' (prevents double-updating)
+        if (updatedDelivery.outletId && 
+            updatedDelivery.status === 'delivered' && 
+            (updateData.source_type === 'investment' || originalDelivery?.source_type === 'investment') &&
+            originalDelivery?.status !== 'delivered') {
+          
           try {
-            console.log('📦 Updating outlet inventory for delivery edit...');
+            console.log('📦 Updating outlet inventory for delivery edit (status changed to delivered)...');
             console.log('📍 Outlet ID:', updatedDelivery.outletId);
             console.log('📋 Items:', updatedDelivery.itemsList?.length || 0);
+            console.log('🔄 Status changed from:', originalDelivery?.status, '→ delivered');
             
             // Get current inventory products for the destination outlet
             const { data: outletInventory, error: inventoryError } = await supabase
@@ -450,6 +467,8 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
             console.error('❌ Error updating outlet inventory:', inventoryError);
             // Don't fail the entire update if inventory update fails
           }
+        } else if (originalDelivery?.status === 'delivered') {
+          console.log('⏭️ Skipping inventory update - delivery was already marked as delivered');
         }
       }
     } else {
