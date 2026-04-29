@@ -373,6 +373,84 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
       } else {
         console.log('✅ Database update successful');
         dbUpdateSuccessful = true;
+        
+        // Update outlet inventory if delivery is from Investment to an outlet and status is 'delivered'
+        if (updatedDelivery.outletId && updatedDelivery.status === 'delivered' && updateData.source_type === 'investment') {
+          try {
+            console.log('📦 Updating outlet inventory for delivery edit...');
+            console.log('📍 Outlet ID:', updatedDelivery.outletId);
+            console.log('📋 Items:', updatedDelivery.itemsList?.length || 0);
+            
+            // Get current inventory products for the destination outlet
+            const { data: outletInventory, error: inventoryError } = await supabase
+              .from('inventory_products')
+              .select('*')
+              .eq('outlet_id', updatedDelivery.outletId);
+            
+            if (inventoryError) {
+              console.error('❌ Error loading outlet inventory:', inventoryError);
+            } else {
+              console.log('📊 Current outlet inventory:', outletInventory?.length || 0, 'products');
+              
+              // Update or create inventory products for each delivered item
+              const itemsList = updatedDelivery.itemsList || [];
+              for (const item of itemsList) {
+                const productName = item.name || item.description;
+                const deliveredQty = item.quantity || item.delivered || 0;
+                
+                if (!productName || deliveredQty <= 0) {
+                  console.log('⏭️ Skipping item (no name or quantity):', productName, deliveredQty);
+                  continue;
+                }
+                
+                // Check if product already exists in outlet inventory
+                const existingProduct = outletInventory?.find(p => p.name === productName);
+                
+                if (existingProduct) {
+                  // Update existing product quantity
+                  const newQuantity = (existingProduct.quantity || 0) + deliveredQty;
+                  
+                  const { error: updateError } = await supabase
+                    .from('inventory_products')
+                    .update({
+                      quantity: newQuantity
+                      // available_quantity is auto-calculated by generated column
+                    })
+                    .eq('id', existingProduct.id);
+                    
+                  if (updateError) {
+                    console.error(`❌ Error updating ${productName}:`, updateError);
+                  } else {
+                    console.log(`✅ Updated ${productName}: ${existingProduct.quantity} → ${newQuantity}`);
+                  }
+                } else {
+                  // Create new product in outlet inventory
+                  const { error: insertError } = await supabase
+                    .from('inventory_products')
+                    .insert({
+                      outlet_id: updatedDelivery.outletId,
+                      name: productName,
+                      quantity: deliveredQty,
+                      // available_quantity is auto-calculated
+                      unit_cost: 0,
+                      selling_price: item.rate || item.price || 0
+                    });
+                    
+                  if (insertError) {
+                    console.error(`❌ Error creating ${productName}:`, insertError);
+                  } else {
+                    console.log(`✅ Created ${productName} with quantity: ${deliveredQty}`);
+                  }
+                }
+              }
+              
+              console.log('✅ Outlet inventory update completed');
+            }
+          } catch (inventoryError) {
+            console.error('❌ Error updating outlet inventory:', inventoryError);
+            // Don't fail the entire update if inventory update fails
+          }
+        }
       }
     } else {
       console.warn('⚠️ No authenticated user found');

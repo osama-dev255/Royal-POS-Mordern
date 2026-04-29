@@ -58,6 +58,7 @@ import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettl
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
 import { getProducts, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
+import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
   id: string;
@@ -4818,8 +4819,85 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         await updateGRNQuantitiesBasedOnDelivered(quantityItems);
         await updateProductStockBasedOnDelivered(quantityItems);
         
+        // Update outlet inventory if delivery is to a registered outlet
+        if (outletId) {
+          try {
+            console.log('📦 Updating outlet inventory for delivery from Investment...');
+            console.log('📍 Outlet ID:', outletId);
+            console.log('📋 Items to add:', deliveryNoteData.items.length);
+            
+            // Get current inventory products for the destination outlet
+            const { data: outletInventory, error: inventoryError } = await supabase
+              .from('inventory_products')
+              .select('*')
+              .eq('outlet_id', outletId);
+            
+            if (inventoryError) {
+              console.error('❌ Error loading outlet inventory:', inventoryError);
+            } else {
+              console.log('📊 Current outlet inventory:', outletInventory?.length || 0, 'products');
+            }
+            
+            // Update or create inventory products for each delivered item
+            for (const item of deliveryNoteData.items) {
+              const productName = item.description;
+              const deliveredQty = item.quantity || 0;
+              
+              if (!productName || deliveredQty <= 0) {
+                console.log('⏭️ Skipping item (no name or quantity):', productName, deliveredQty);
+                continue;
+              }
+              
+              // Check if product already exists in outlet inventory
+              const existingProduct = outletInventory?.find(p => p.name === productName);
+              
+              if (existingProduct) {
+                // Update existing product quantity
+                const newQuantity = (existingProduct.quantity || 0) + deliveredQty;
+                
+                const { error: updateError } = await supabase
+                  .from('inventory_products')
+                  .update({
+                    quantity: newQuantity
+                    // available_quantity is auto-calculated by generated column
+                  })
+                  .eq('id', existingProduct.id);
+                  
+                if (updateError) {
+                  console.error(`❌ Error updating ${productName}:`, updateError);
+                } else {
+                  console.log(`✅ Updated ${productName}: ${existingProduct.quantity} → ${newQuantity}`);
+                }
+              } else {
+                // Create new product in outlet inventory
+                const { error: insertError } = await supabase
+                  .from('inventory_products')
+                  .insert({
+                    outlet_id: outletId,
+                    name: productName,
+                    quantity: deliveredQty,
+                    // available_quantity is auto-calculated
+                    unit_cost: 0,
+                    selling_price: item.rate || 0
+                  });
+                  
+                if (insertError) {
+                  console.error(`❌ Error creating ${productName}:`, insertError);
+                } else {
+                  console.log(`✅ Created ${productName} with quantity: ${deliveredQty}`);
+                }
+              }
+            }
+            
+            console.log('✅ Outlet inventory update completed');
+          } catch (inventoryError) {
+            console.error('❌ Error updating outlet inventory:', inventoryError);
+            // Don't fail the entire save if inventory update fails
+          }
+        }
+        
         if (isKilangoInvestment && isCustomerFromOutlets) {
-          alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity for KILANGO INVESTMENT LTD.`);
+          alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity for KILANGO INVESTMENT LTD.\n\n✅ Outlet inventory has been updated with delivered products.`);
         } else {
           alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity.`);
         }
