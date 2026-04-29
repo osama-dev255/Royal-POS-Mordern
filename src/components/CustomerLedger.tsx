@@ -18,7 +18,10 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  X
+  X,
+  FileText,
+  Share2,
+  FileSpreadsheet
 } from "lucide-react";
 import { getOutletDebtsByCustomerId, getOutletDebtPaymentsByDebtId, OutletCustomer, OutletDebt } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
@@ -183,6 +186,109 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
     link.click();
   };
 
+  // Export to Excel (XLS)
+  const handleExportExcel = () => {
+    // Create Excel-compatible HTML table
+    const tableContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Customer Ledger</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+      </head>
+      <body>
+        <h2>Customer Ledger - ${customer.first_name} ${customer.last_name}</h2>
+        <table border="1">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Debit (Sales)</th>
+              <th>Credit (Payments)</th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredEntries.map(entry => `
+              <tr>
+                <td>${entry.date}</td>
+                <td>${entry.description}</td>
+                <td>${entry.debit > 0 ? entry.debit.toFixed(2) : '-'}</td>
+                <td>${entry.credit > 0 ? entry.credit.toFixed(2) : '-'}</td>
+                <td>${entry.balance.toFixed(2)} ${entry.balance > 0 ? 'Dr' : entry.balance < 0 ? 'Cr' : ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Totals</strong></td>
+              <td><strong>${totalDebits.toFixed(2)}</strong></td>
+              <td><strong>${totalCredits.toFixed(2)}</strong></td>
+              <td><strong>${currentBalance.toFixed(2)} ${currentBalance > 0 ? 'Dr' : currentBalance < 0 ? 'Cr' : ''}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([tableContent], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${customer.first_name}_${customer.last_name}_ledger_${new Date().toISOString().split('T')[0]}.xls`;
+    link.click();
+  };
+
+  // Download as PDF
+  const handleDownloadPDF = () => {
+    window.print();
+  };
+
+  // Share as PDF
+  const handleSharePDF = async () => {
+    if (navigator.share) {
+      try {
+        // Create a simple text representation for sharing
+        const shareText = `Customer Ledger - ${customer.first_name} ${customer.last_name}\n\n` +
+          `Total Debits: ${formatCurrency(totalDebits)}\n` +
+          `Total Credits: ${formatCurrency(totalCredits)}\n` +
+          `Current Balance: ${formatCurrency(Math.abs(currentBalance))} ${currentBalance > 0 ? '(OWES)' : currentBalance < 0 ? '(CREDIT)' : '(CLEARED)'}\n\n` +
+          `Transactions:\n` +
+          filteredEntries.map(entry => 
+            `${entry.date} - ${entry.description} - Debit: ${entry.debit > 0 ? formatCurrency(entry.debit) : '-'} - Credit: ${entry.credit > 0 ? formatCurrency(entry.credit) : '-'} - Balance: ${formatCurrency(Math.abs(entry.balance))}`
+          ).join('\n');
+
+        await navigator.share({
+          title: `Customer Ledger - ${customer.first_name} ${customer.last_name}`,
+          text: shareText,
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      const shareText = `Customer Ledger - ${customer.first_name} ${customer.last_name}\n\n` +
+        `Total Debits: ${formatCurrency(totalDebits)}\n` +
+        `Total Credits: ${formatCurrency(totalCredits)}\n` +
+        `Current Balance: ${formatCurrency(Math.abs(currentBalance))}`;
+      
+      navigator.clipboard.writeText(shareText);
+      alert('Ledger summary copied to clipboard!');
+    }
+  };
+
   // Print Ledger
   const handlePrint = () => {
     window.print();
@@ -259,12 +365,12 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
         </CardContent>
       </Card>
 
-      {/* Search and Date Range */}
+      {/* Search, Date Range, and Actions */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             {/* Search Bar */}
-            <div className="relative">
+            <div className="flex-1 min-w-[200px] relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search transactions..."
@@ -275,7 +381,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
             </div>
 
             {/* Date Range Picker */}
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center gap-2">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -332,35 +438,45 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
                 </Button>
               )}
             </div>
+
+            {/* Actions Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDownloadPDF}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download in .pdf
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSharePDF}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share in .pdf
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export in .xls
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export to CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handlePrint}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Ledger
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={clearFilters}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardContent>
       </Card>
-
-      {/* Actions Button */}
-      <div className="flex justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Actions
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export to CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print Ledger
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={clearFilters}>
-              <Search className="h-4 w-4 mr-2" />
-              Clear Filters
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
