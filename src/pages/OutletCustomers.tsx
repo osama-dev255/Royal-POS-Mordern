@@ -38,6 +38,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
+import { CustomerLedger } from "@/components/CustomerLedger";
 
 interface OutletCustomersProps {
   onBack: () => void;
@@ -54,6 +55,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const [editingCustomer, setEditingCustomer] = useState<OutletCustomer | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
+  const [selectedCustomerForLedger, setSelectedCustomerForLedger] = useState<OutletCustomer | null>(null);
   const { toast } = useToast();
 
   // Form state for new customer - aligned with SalesCart
@@ -113,6 +115,14 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCustomerClick = (customer: OutletCustomer) => {
+    setSelectedCustomerForLedger(customer);
+  };
+
+  const handleBackFromLedger = () => {
+    setSelectedCustomerForLedger(null);
   };
 
   const filteredCustomers = customers.filter(customer =>
@@ -317,6 +327,16 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
 
   return (
     <div className="container mx-auto py-6 px-4">
+      {/* Show Customer Ledger if a customer is selected */}
+      {selectedCustomerForLedger ? (
+        <CustomerLedger 
+          customer={selectedCustomerForLedger}
+          outletId={outletId!}
+          onBack={handleBackFromLedger}
+        />
+      ) : (
+        /* Show Customer List */
+        <>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
@@ -445,7 +465,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         /* Card View */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCustomers.map((customer) => (
-            <Card key={customer.id} className="hover:shadow-lg transition-shadow">
+            <Card key={customer.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleCustomerClick(customer)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
@@ -541,7 +561,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             </TableHeader>
             <TableBody>
               {filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow key={customer.id} className="cursor-pointer hover:bg-gray-50" onClick={() => handleCustomerClick(customer)}>
                   <TableCell className="font-medium">
                     {customer.first_name} {customer.last_name}
                   </TableCell>
@@ -775,6 +795,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   );
 };
