@@ -3,19 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   ArrowLeft, 
   User, 
   Phone, 
   Mail, 
-  Calendar,
+  Calendar as CalendarIcon,
   Search, 
   Download, 
   Filter, 
   Printer, 
   TrendingUp,
   TrendingDown,
-  DollarSign
+  DollarSign,
+  X
 } from "lucide-react";
 import { getOutletDebtsByCustomerId, getOutletDebtPaymentsByDebtId, OutletCustomer, OutletDebt } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
@@ -52,6 +55,8 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
   
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [filteredEntries, setFilteredEntries] = useState<LedgerEntry[]>([]);
 
   useEffect(() => {
@@ -122,7 +127,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
     }
   };
 
-  // Filter entries based on search term
+  // Filter entries based on search term and date range
   useEffect(() => {
     let filtered = [...ledgerEntries];
 
@@ -134,8 +139,26 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
       );
     }
 
+    // Apply date range filter
+    if (dateFrom) {
+      filtered = filtered.filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= dateFrom;
+      });
+    }
+
+    if (dateTo) {
+      // Make end date inclusive (end of day)
+      const endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate <= endDate;
+      });
+    }
+
     setFilteredEntries(filtered);
-  }, [searchTerm, ledgerEntries]);
+  }, [searchTerm, dateFrom, dateTo, ledgerEntries]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -168,6 +191,8 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
   // Clear filters
   const clearFilters = () => {
     setSearchTerm('');
+    setDateFrom(undefined);
+    setDateTo(undefined);
   };
 
   const formatDate = (dateString: string) => {
@@ -226,7 +251,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
             )}
             {customer.address && (
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                 <span>{customer.address}</span>
               </div>
             )}
@@ -234,12 +259,12 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
         </CardContent>
       </Card>
 
-      {/* Search, Date Range, and Actions */}
+      {/* Search and Date Range */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <div className="flex flex-col gap-4">
             {/* Search Bar */}
-            <div className="flex-1 relative">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search transactions..."
@@ -249,32 +274,93 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
               />
             </div>
 
-            {/* Actions Button */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Actions
+            {/* Date Range Picker */}
+            <div className="flex items-center justify-end gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={dateFrom ? "default" : "outline"}
+                    size="sm"
+                    className="w-[140px] justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFrom ? dateFrom.toLocaleDateString() : "From Date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={dateTo ? "default" : "outline"}
+                    size="sm"
+                    className="w-[140px] justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateTo ? dateTo.toLocaleDateString() : "To Date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {(dateFrom || dateTo) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setDateFrom(undefined);
+                    setDateTo(undefined);
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export to CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handlePrint}>
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Ledger
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={clearFilters}>
-                  <Search className="h-4 w-4 mr-2" />
-                  Clear Filters
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Actions Button */}
+      <div className="flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Filter className="h-4 w-4 mr-2" />
+              Actions
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export to CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Ledger
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={clearFilters}>
+              <Search className="h-4 w-4 mr-2" />
+              Clear Filters
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
