@@ -1450,6 +1450,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         <Printer className="h-4 w-4 mr-1" />
                         Print
                       </Button>
+                      {/* Delete button hidden - commented out
                       <Button 
                         size="sm" 
                         variant="destructive"
@@ -1458,6 +1459,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
                       </Button>
+                      */}
                     </div>
                   </div>
                 </div>
