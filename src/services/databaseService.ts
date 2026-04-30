@@ -5277,3 +5277,132 @@ export const deleteOutletMobileSaleItem = async (id: string): Promise<boolean> =
     return false;
   }
 };
+
+// ============================================
+// OUTLET PAYMENTS CRUD FUNCTIONS
+// ============================================
+
+export interface OutletPayment {
+  id?: string;
+  outlet_id: string;
+  transaction_id: string;
+  payment_date?: string;
+  warehouse?: string;
+  amount: number;
+  payment_method: 'cash' | 'card' | 'mobile' | 'debt';
+  status: 'completed' | 'pending' | 'failed';
+  description?: string;
+  payment_type: 'outlet' | 'kilango' | 'other';
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const createOutletPayment = async (payment: Omit<OutletPayment, 'id'>): Promise<OutletPayment | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_payments')
+      .insert([{
+        outlet_id: payment.outlet_id,
+        transaction_id: payment.transaction_id,
+        payment_date: payment.payment_date || new Date().toISOString().split('T')[0],
+        warehouse: payment.warehouse,
+        amount: payment.amount,
+        payment_method: payment.payment_method,
+        status: payment.status,
+        description: payment.description,
+        payment_type: payment.payment_type,
+        created_by: payment.created_by
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Outlet payment created:', data.transaction_id);
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet payment:', error);
+    return null;
+  }
+};
+
+export const getOutletPayments = async (): Promise<OutletPayment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_payments')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet payments:', error);
+    return [];
+  }
+};
+
+export const getOutletPaymentsByOutletId = async (outletId: string): Promise<OutletPayment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_payments')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet payments by outlet:', error);
+    return [];
+  }
+};
+
+export const getOutletPaymentsByType = async (outletId: string, paymentType: 'outlet' | 'kilango' | 'other'): Promise<OutletPayment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_payments')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('payment_type', paymentType)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet payments by type:', error);
+    return [];
+  }
+};
+
+export const updateOutletPayment = async (id: string, payment: Partial<OutletPayment>): Promise<OutletPayment | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_payments')
+      .update(payment)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Outlet payment updated:', data.transaction_id);
+    return data;
+  } catch (error) {
+    console.error('Error updating outlet payment:', error);
+    return null;
+  }
+};
+
+export const deleteOutletPayment = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_payments')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet payment:', error);
+    return false;
+  }
+};

@@ -31,10 +31,12 @@ import {
   Download,
   Share2,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { getOutlets, Outlet, createOutletPayment, getOutletPaymentsByOutletId, OutletPayment } from "@/services/databaseService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -55,87 +57,6 @@ interface Payment {
   type: 'outlet' | 'kilango' | 'other';
 }
 
-// Mock data for outlet payments
-const generateMockPayments = (outletId: string): Payment[] => [
-  {
-    id: `pay-${outletId}-1`,
-    transactionId: "TXN-2026-001",
-    date: "2026-03-13",
-    customer: "John Smith",
-    amount: 125000,
-    method: 'cash',
-    status: 'completed',
-    description: "Payment for invoice #INV-001",
-    type: 'outlet'
-  },
-  {
-    id: `pay-${outletId}-2`,
-    transactionId: "TXN-2026-002",
-    date: "2026-03-12",
-    customer: "Sarah Johnson",
-    amount: 89000,
-    method: 'card',
-    status: 'completed',
-    description: "Payment for invoice #INV-002",
-    type: 'kilango'
-  },
-  {
-    id: `pay-${outletId}-3`,
-    transactionId: "TXN-2026-003",
-    date: "2026-03-11",
-    customer: "Michael Brown",
-    amount: 234000,
-    method: 'mobile',
-    status: 'pending',
-    description: "Payment for invoice #INV-003",
-    type: 'outlet'
-  },
-  {
-    id: `pay-${outletId}-4`,
-    transactionId: "TXN-2026-004",
-    date: "2026-03-10",
-    customer: "Emily Davis",
-    amount: 56700,
-    method: 'debt',
-    status: 'pending',
-    description: "Debt payment - partial",
-    type: 'other'
-  },
-  {
-    id: `pay-${outletId}-5`,
-    transactionId: "TXN-2026-005",
-    date: "2026-03-09",
-    customer: "David Wilson",
-    amount: 178000,
-    method: 'cash',
-    status: 'completed',
-    description: "Payment for invoice #INV-005",
-    type: 'kilango'
-  },
-  {
-    id: `pay-${outletId}-6`,
-    transactionId: "TXN-2026-006",
-    date: "2026-03-08",
-    customer: "Kilango Investment Ltd",
-    amount: 450000,
-    method: 'card',
-    status: 'pending',
-    description: "Monthly franchise fee",
-    type: 'kilango'
-  },
-  {
-    id: `pay-${outletId}-7`,
-    transactionId: "TXN-2026-007",
-    date: "2026-03-07",
-    customer: "Supplier ABC",
-    amount: 320000,
-    method: 'mobile',
-    status: 'completed',
-    description: "Supplier payment",
-    type: 'other'
-  }
-];
-
 export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -150,10 +71,13 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
   const [dueFromDeliveries, setDueFromDeliveries] = useState(0);
   const [loadingDeliveries, setLoadingDeliveries] = useState(true);
+  const [availableOutlets, setAvailableOutlets] = useState<Outlet[]>([]);
+  const [loadingOutlets, setLoadingOutlets] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const [newPaymentForm, setNewPaymentForm] = useState({
     transactionId: `PAY-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
     date: new Date().toISOString().split('T')[0],
-    customer: '',
+    customer: 'Kilango Investment LTD',
     amount: 0,
     method: 'cash' as 'cash' | 'card' | 'mobile' | 'debt',
     status: 'completed' as 'completed' | 'pending' | 'failed',
@@ -167,6 +91,41 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
     loadDueFromDeliveries();
   }, [outletId]);
 
+  // Reload due amount when section changes
+  useEffect(() => {
+    if (outletId) {
+      loadDueFromDeliveries();
+    }
+  }, [activeSection]);
+
+  // Reload due amount when payments change (after saving a new payment)
+  useEffect(() => {
+    if (outletId && payments.length > 0) {
+      loadDueFromDeliveries();
+    }
+  }, [payments]);
+
+  // Load outlets when dialog opens
+  useEffect(() => {
+    if (showNewPaymentDialog) {
+      loadOutlets();
+    }
+  }, [showNewPaymentDialog]);
+
+  const loadOutlets = async () => {
+    try {
+      setLoadingOutlets(true);
+      const outlets = await getOutlets();
+      setAvailableOutlets(outlets);
+      console.log('✅ Loaded outlets:', outlets.length);
+    } catch (error) {
+      console.error('Error loading outlets:', error);
+      setAvailableOutlets([]);
+    } finally {
+      setLoadingOutlets(false);
+    }
+  };
+
   const loadPayments = async () => {
     if (!outletId) {
       setPayments([]);
@@ -176,9 +135,24 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
 
     try {
       setLoading(true);
-      // TODO: Replace with actual API call to fetch payments
-      const mockData = generateMockPayments(outletId);
-      setPayments(mockData);
+      // Fetch payments from database
+      const dbPayments = await getOutletPaymentsByOutletId(outletId);
+      
+      // Map database payments to Payment interface
+      const mappedPayments: Payment[] = dbPayments.map(p => ({
+        id: p.id || '',
+        transactionId: p.transaction_id,
+        date: p.payment_date || '',
+        customer: p.warehouse || '',
+        amount: p.amount,
+        method: p.payment_method,
+        status: p.status,
+        description: p.description || '',
+        type: p.payment_type
+      }));
+      
+      setPayments(mappedPayments);
+      console.log('✅ Loaded payments:', mappedPayments.length);
     } catch (error) {
       console.error("Error loading payments:", error);
       toast({
@@ -200,24 +174,54 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
 
     try {
       setLoadingDeliveries(true);
-      // Fetch deliveries from other outlets (source_outlet_id is not null)
-      const { data: deliveries, error } = await supabase
+      
+      let query = supabase
         .from('saved_delivery_notes')
         .select('total, status')
-        .eq('outlet_id', outletId)
-        .not('source_outlet_id', 'is', null);
+        .eq('outlet_id', outletId);
+
+      // Filter based on active section
+      if (activeSection === 'kilango') {
+        // Kilango Investment: Get deliveries from investment (source_outlet_id is null)
+        query = query.is('source_outlet_id', null);
+      } else if (activeSection === 'outlet') {
+        // Outlet Payments: Get deliveries from other outlets (source_outlet_id is not null)
+        query = query.not('source_outlet_id', 'is', null);
+      } else {
+        // All or Other: Get all deliveries
+        // No additional filter
+      }
+
+      const { data: deliveries, error } = await query;
 
       if (error) {
         console.error('Error loading deliveries:', error);
         setDueFromDeliveries(0);
       } else {
-        // Calculate total amount from deliveries (all deliveries from other outlets are considered due)
-        const totalDue = deliveries?.reduce((sum, delivery) => {
+        // Calculate total amount from deliveries
+        const totalDeliveries = deliveries?.reduce((sum, delivery) => {
           return sum + (delivery.total || 0);
         }, 0) || 0;
+
+        // Calculate total paid payments for this section
+        const totalPaid = payments
+          .filter(p => p.type === activeSection || activeSection === 'all')
+          .filter(p => p.status === 'completed')
+          .reduce((sum, p) => sum + p.amount, 0);
         
-        setDueFromDeliveries(totalDue);
-        console.log('✅ Due from deliveries:', totalDue, 'from', deliveries?.length, 'deliveries');
+        // Amount Due = Total Deliveries - Paid Payments
+        const amountDue = Math.max(0, totalDeliveries - totalPaid);
+        
+        setDueFromDeliveries(amountDue);
+        
+        const sourceType = activeSection === 'kilango' ? 'investment' : activeSection === 'outlet' ? 'other outlets' : 'all';
+        console.log('✅ Amount Due Calculation:', {
+          totalDeliveries,
+          totalPaid,
+          amountDue,
+          source: sourceType,
+          deliveryCount: deliveries?.length
+        });
       }
     } catch (error) {
       console.error('Error loading due from deliveries:', error);
@@ -231,31 +235,57 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
     if (!newPaymentForm.customer || newPaymentForm.amount <= 0) {
       toast({
         title: "Error",
-        description: "Please fill in customer and amount",
+        description: "Please fill in warehouse and amount",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!outletId) {
+      toast({
+        title: "Error",
+        description: "Outlet ID is missing",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      const newPayment: Payment = {
-        id: `pay-${Date.now()}`,
-        ...newPaymentForm
+      setSavingPayment(true);
+      
+      // Create payment in database
+      const paymentData = {
+        outlet_id: outletId,
+        transaction_id: newPaymentForm.transactionId,
+        payment_date: newPaymentForm.date,
+        warehouse: newPaymentForm.customer,
+        amount: newPaymentForm.amount,
+        payment_method: newPaymentForm.method,
+        status: newPaymentForm.status,
+        description: newPaymentForm.description,
+        payment_type: newPaymentForm.type
       };
 
-      setPayments(prev => [newPayment, ...prev]);
+      const result = await createOutletPayment(paymentData);
+      
+      if (!result) {
+        throw new Error('Failed to create payment in database');
+      }
 
       toast({
         title: "Success",
-        description: "Payment created successfully"
+        description: "Payment saved successfully"
       });
+
+      // Reload payments from database
+      await loadPayments();
 
       // Reset form
       setShowNewPaymentDialog(false);
       setNewPaymentForm({
         transactionId: `PAY-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
         date: new Date().toISOString().split('T')[0],
-        customer: '',
+        customer: 'Kilango Investment LTD',
         amount: 0,
         method: 'cash',
         status: 'completed',
@@ -269,6 +299,8 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
         description: error.message || "Failed to create payment",
         variant: "destructive"
       });
+    } finally {
+      setSavingPayment(false);
     }
   };
   
@@ -594,7 +626,11 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
                       )}
                     </p>
                     <p className="text-xs text-yellow-700 mt-1">
-                      From Other Outlets (Deliveries In)
+                      {activeSection === 'kilango' 
+                        ? 'From Investment (Deliveries In)' 
+                        : activeSection === 'outlet'
+                        ? 'From Other Outlets (Deliveries In)'
+                        : 'From All Deliveries (Deliveries In)'}
                     </p>
                   </div>
                   <Clock className="h-10 w-10 text-yellow-600" />
@@ -840,13 +876,26 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
 
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="paymentCustomer">Customer *</Label>
-              <Input
-                id="paymentCustomer"
+              <Label htmlFor="paymentWarehouse">Warehouse</Label>
+              <select
+                id="paymentWarehouse"
                 value={newPaymentForm.customer}
                 onChange={(e) => setNewPaymentForm(prev => ({ ...prev, customer: e.target.value }))}
-                placeholder="Enter customer name"
-              />
+                className="w-full px-3 py-2 border rounded-md"
+                disabled={loadingOutlets}
+              >
+                <option value="Kilango Investment LTD">Kilango Investment LTD</option>
+                {availableOutlets
+                  .filter(outlet => outlet.status === 'active')
+                  .map(outlet => (
+                    <option key={outlet.id} value={outlet.name}>
+                      {outlet.name} {outlet.location ? `(${outlet.location})` : ''}
+                    </option>
+                  ))}
+              </select>
+              {loadingOutlets && (
+                <p className="text-xs text-muted-foreground">Loading warehouses...</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -914,11 +963,18 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewPaymentDialog(false)}>
+            <Button variant="outline" onClick={() => setShowNewPaymentDialog(false)} disabled={savingPayment}>
               Cancel
             </Button>
-            <Button onClick={handleCreatePayment} className="bg-green-600 hover:bg-green-700">
-              Create Payment
+            <Button onClick={handleCreatePayment} className="bg-green-600 hover:bg-green-700" disabled={savingPayment}>
+              {savingPayment ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Payment'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
