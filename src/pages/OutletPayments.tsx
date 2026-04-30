@@ -34,6 +34,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -146,8 +147,9 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'all' | 'outlet' | 'kilango' | 'other'>('all');
-  const [activeStatus, setActiveStatus] = useState<'all' | 'due' | 'paid'>('all');
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false);
+  const [dueFromDeliveries, setDueFromDeliveries] = useState(0);
+  const [loadingDeliveries, setLoadingDeliveries] = useState(true);
   const [newPaymentForm, setNewPaymentForm] = useState({
     transactionId: `PAY-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`,
     date: new Date().toISOString().split('T')[0],
@@ -162,6 +164,7 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
 
   useEffect(() => {
     loadPayments();
+    loadDueFromDeliveries();
   }, [outletId]);
 
   const loadPayments = async () => {
@@ -185,6 +188,42 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDueFromDeliveries = async () => {
+    if (!outletId) {
+      setDueFromDeliveries(0);
+      setLoadingDeliveries(false);
+      return;
+    }
+
+    try {
+      setLoadingDeliveries(true);
+      // Fetch deliveries from other outlets (source_outlet_id is not null)
+      const { data: deliveries, error } = await supabase
+        .from('saved_delivery_notes')
+        .select('total, status')
+        .eq('outlet_id', outletId)
+        .not('source_outlet_id', 'is', null);
+
+      if (error) {
+        console.error('Error loading deliveries:', error);
+        setDueFromDeliveries(0);
+      } else {
+        // Calculate total amount from deliveries (all deliveries from other outlets are considered due)
+        const totalDue = deliveries?.reduce((sum, delivery) => {
+          return sum + (delivery.total || 0);
+        }, 0) || 0;
+        
+        setDueFromDeliveries(totalDue);
+        console.log('✅ Due from deliveries:', totalDue, 'from', deliveries?.length, 'deliveries');
+      }
+    } catch (error) {
+      console.error('Error loading due from deliveries:', error);
+      setDueFromDeliveries(0);
+    } finally {
+      setLoadingDeliveries(false);
     }
   };
 
@@ -264,13 +303,8 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
 
     // Section filter
     const matchesSection = activeSection === 'all' || payment.type === activeSection;
-
-    // Status tab filter (due = pending, paid = completed)
-    const matchesStatusTab = activeStatus === 'all' || 
-      (activeStatus === 'due' && payment.status === 'pending') ||
-      (activeStatus === 'paid' && payment.status === 'completed');
     
-    return matchesSearch && matchesStatus && matchesMethod && matchesDateRange && matchesSection && matchesStatusTab;
+    return matchesSearch && matchesStatus && matchesMethod && matchesDateRange && matchesSection;
   });
 
   const formatCurrency = (amount: number) => {
@@ -544,38 +578,57 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
             </Button>
           </div>
 
-          {/* Status Sub-Tabs and New Payment Button */}
-          <div className="flex flex-col md:flex-row gap-3 mt-3 pt-3 border-t">
-            <div className="flex gap-2 flex-1">
-              <Button
-                variant={activeStatus === 'all' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveStatus('all')}
-              >
-                All
-              </Button>
-              <Button
-                variant={activeStatus === 'due' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveStatus('due')}
-                className="text-yellow-600"
-              >
-                <Clock className="h-4 w-4 mr-1" />
-                Due Payments
-              </Button>
-              <Button
-                variant={activeStatus === 'paid' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveStatus('paid')}
-                className="text-green-600"
-              >
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Paid Payments
-              </Button>
-            </div>
+          {/* Due and Paid Payments Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t">
+            {/* Amount Due Card */}
+            <Card className="bg-yellow-50 border-yellow-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-yellow-800">Amount Due</p>
+                    <p className="text-2xl font-bold text-yellow-900">
+                      {loadingDeliveries ? (
+                        <span className="text-lg">Loading...</span>
+                      ) : (
+                        formatCurrency(dueFromDeliveries)
+                      )}
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      From Other Outlets (Deliveries In)
+                    </p>
+                  </div>
+                  <Clock className="h-10 w-10 text-yellow-600" />
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* New Payment Button - Only show for specific sections */}
-            {activeSection !== 'all' && (
+            {/* Paid Payments Card */}
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Paid Payments</p>
+                    <p className="text-2xl font-bold text-green-900">
+                      {formatCurrency(
+                        payments
+                          .filter(p => p.type === activeSection || activeSection === 'all')
+                          .filter(p => p.status === 'completed')
+                          .reduce((sum, p) => sum + p.amount, 0)
+                      )}
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">
+                      {payments.filter(p => p.type === activeSection || activeSection === 'all').filter(p => p.status === 'completed').length} completed transactions
+                    </p>
+                  </div>
+                  <CheckCircle className="h-10 w-10 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* New Payment Button - Only show for specific sections */}
+          {activeSection !== 'all' && (
+            <div className="mt-3 pt-3 border-t">
               <Button
                 onClick={() => {
                   setNewPaymentForm(prev => ({
@@ -584,12 +637,12 @@ export const OutletPayments = ({ onBack, outletId }: OutletPaymentsProps) => {
                   }));
                   setShowNewPaymentDialog(true);
                 }}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 w-full"
               >
                 + New Payment
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
