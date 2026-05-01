@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Wallet, Users, Truck, FileText, Filter, Download, Printer, FileSpreadsheet, Loader2, UserPlus } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Wallet, Users, Truck, FileText, Filter, Download, Printer, FileSpreadsheet, Loader2, UserPlus, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -56,6 +56,8 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPartyDialogOpen, setIsPartyDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PayableReceivable | null>(null);
@@ -94,8 +96,8 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
         partyId: settlement.customer_id || "",
         partyName: "Customer", // We'll update this with actual customer names
         type: "receivable" as const,
-        amount: settlement.amount,
-        dueDate: settlement.settlement_date,
+        amount: settlement.settlement_amount || 0,
+        dueDate: settlement.date,
         status: "pending" as const, // Simplified for this example
         paymentMethod: settlement.payment_method,
         referenceNumber: settlement.reference_number,
@@ -182,11 +184,14 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
         // Create customer settlement
         const settlementData = {
           customer_id: newItem.partyId,
-          amount: newItem.amount,
+          customer_name: "Unknown Customer",
+          settlement_amount: newItem.amount,
           payment_method: newItem.paymentMethod || "",
           reference_number: newItem.referenceNumber || "",
           notes: newItem.notes || "",
-          settlement_date: newItem.dueDate || new Date().toISOString()
+          date: newItem.dueDate || new Date().toISOString(),
+          time: new Date().toLocaleTimeString(),
+          status: "pending"
         };
 
         const result = await createCustomerSettlement(settlementData);
@@ -256,11 +261,14 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
         // Update customer settlement
         const settlementData = {
           customer_id: editingItem.partyId,
-          amount: editingItem.amount,
+          customer_name: "Unknown Customer",
+          settlement_amount: editingItem.amount,
           payment_method: editingItem.paymentMethod || "",
           reference_number: editingItem.referenceNumber || "",
           notes: editingItem.notes || "",
-          settlement_date: editingItem.dueDate || new Date().toISOString()
+          date: editingItem.dueDate || new Date().toISOString(),
+          time: new Date().toLocaleTimeString(),
+          status: "pending"
         };
 
         const result = await updateCustomerSettlement(editingItem.id, settlementData);
@@ -472,7 +480,20 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
     const matchesType = typeFilter === "all" || item.type === typeFilter;
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
     
-    return matchesSearch && matchesType && matchesStatus;
+    // Date range filtering
+    const matchesDateRange = () => {
+      if (!dateFrom && !dateTo) return true;
+      
+      const itemDate = item.dueDate ? new Date(item.dueDate) : null;
+      if (!itemDate) return false;
+      
+      const fromMatch = !dateFrom || itemDate >= dateFrom;
+      const toMatch = !dateTo || itemDate <= dateTo;
+      
+      return fromMatch && toMatch;
+    };
+    
+    return matchesSearch && matchesType && matchesStatus && matchesDateRange();
   });
 
   return (
@@ -491,7 +512,7 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
             <p className="text-muted-foreground">Manage accounts payable and receivable</p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -502,30 +523,46 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
               />
             </div>
             
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-32">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Type" />
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={dateFrom ? new Date(dateFrom).toISOString().split('T')[0] : ''}
+                  onChange={(e) => setDateFrom(e.target.value ? new Date(e.target.value) : undefined)}
+                  placeholder="mm/dd/yyyy"
+                  className="pl-8 w-full sm:w-32"
+                />
+              </div>
+              <span className="text-muted-foreground">to</span>
+              <div className="relative">
+                <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={dateTo ? new Date(dateTo).toISOString().split('T')[0] : ''}
+                  onChange={(e) => setDateTo(e.target.value ? new Date(e.target.value) : undefined)}
+                  placeholder="mm/dd/yyyy"
+                  className="pl-8 w-full sm:w-32"
+                />
+              </div>
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="receivable">Receivables</SelectItem>
-                <SelectItem value="payable">Payables</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="customer-settlements">Customer Settlements</SelectItem>
+                <SelectItem value="commission">Commission</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
             
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
+            <Button onClick={() => openAddDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Settlement
+            </Button>
             
             <Button onClick={() => PrintUtils.printSalesReport(payablesReceivables)}>
               <Printer className="h-4 w-4 mr-2" />
@@ -816,39 +853,26 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
         </div>
          
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Receivables</CardTitle>
+              <CardTitle className="text-sm font-medium">Customers Owe</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalReceivables)}</div>
-              <p className="text-xs text-muted-foreground">Amount owed to you</p>
+              <p className="text-xs text-muted-foreground">Outstanding customer balances</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Payables</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalPayables)}</div>
-              <p className="text-xs text-muted-foreground">Amount you owe</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Position</CardTitle>
+              <CardTitle className="text-sm font-medium">Customers Paid</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalReceivables - totalPayables)}</div>
-              <p className="text-xs text-muted-foreground">
-                {totalReceivables >= totalPayables ? "Positive" : "Negative"} cash flow
-              </p>
+              <div className="text-2xl font-bold">{formatCurrency(totalPayables)}</div>
+              <p className="text-xs text-muted-foreground">Amount received from customers</p>
             </CardContent>
           </Card>
         </div>

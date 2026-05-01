@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import {
   FileText,
   TrendingUp,
   X,
-  Edit
+  Edit,
+  Search
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
@@ -67,6 +68,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   
   // Commission receipt form
   const [commissionFrom, setCommissionFrom] = useState('');
@@ -882,10 +884,17 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     }
   };
 
-  // Filter receipts by type
-  const filteredReceipts = activeTab === 'all'
-    ? receipts 
-    : receipts.filter(r => r.type === activeTab);
+  // Filter receipts by type and search term
+  const filteredReceipts = receipts.filter(receipt => {
+    const matchesType = activeTab === 'all' || receipt.type === activeTab;
+    
+    const matchesSearch = 
+      !searchTerm || 
+      receipt.customer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      receipt.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesType && matchesSearch;
+  });
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -903,42 +912,67 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         </div>
       </div>
 
-      {/* Date Range Filter - Right Aligned */}
-      <div className="flex justify-end mb-4">
-        <Card className="w-auto">
-          <CardContent className="p-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+      {/* Search Bar Tab - Receivables Layout */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Receivables</h1>
+          <p className="text-muted-foreground">Manage all outlet receivables</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search settlements by name..."
+              className="pl-8 w-full sm:w-64"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="h-8 w-[140px]"
-                placeholder="From"
+                className="pl-8 w-full sm:w-32"
+                placeholder="mm/dd/yyyy"
               />
+            </div>
+            <span className="text-muted-foreground">to</span>
+            <div className="relative">
+              <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="h-8 w-[140px]"
-                placeholder="To"
+                className="pl-8 w-full sm:w-32"
+                placeholder="mm/dd/yyyy"
               />
-              {(startDate || endDate) && (
-                <Button 
-                  size="sm" 
-                  variant="ghost"
-                  onClick={() => {
-                    setStartDate('');
-                    setEndDate('');
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as any)}
+            className="pl-8 pr-3 py-2 border border-input bg-background rounded-md text-sm w-full sm:w-40"
+          >
+            <option value="all">All</option>
+            <option value="sales">Customer Settlements</option>
+            <option value="commission">Commission</option>
+            <option value="other">Other</option>
+          </select>
+          
+          {!showNewForm && activeTab !== 'all' && (
+            <Button 
+              onClick={() => setShowNewForm(true)} 
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              New Settlement
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -964,36 +998,26 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
 
       {/* Customer Settlements Summary Cards - Only show in 'sales' tab */}
       {activeTab === 'sales' && !showNewForm && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Customers Owe Card */}
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground mb-1">Customers Owe</p>
-                  <p className="text-xl font-bold text-orange-600">{formatCurrency(totalCustomerDebt)}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Outstanding customer balances</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 ml-2">
-                  <TrendingUp className="h-5 w-5 text-orange-600" />
-                </div>
-              </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Customers Owe</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalCustomerDebt)}</div>
+              <p className="text-xs text-muted-foreground">Outstanding customer balances</p>
             </CardContent>
           </Card>
 
           {/* Customers Paid Card */}
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground mb-1">Customers Paid</p>
-                  <p className="text-xl font-bold text-green-600">{formatCurrency(totalCustomerPaid)}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Payments received</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 ml-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                </div>
-              </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Customers Paid</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalCustomerPaid)}</div>
+              <p className="text-xs text-muted-foreground">Amount received from customers</p>
             </CardContent>
           </Card>
         </div>

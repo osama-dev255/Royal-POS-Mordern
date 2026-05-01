@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Users, Wallet, Calendar, CreditCard } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Users, Wallet, Calendar, CreditCard, Building } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { getSavedSettlements, deleteCustomerSettlement, saveCustomerSettlement, updateCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from "@/utils/customerSettlementUtils";
+import { getOutlets, Outlet } from "@/services/databaseService";
 
 interface Settlement {
   id: string;
@@ -59,6 +60,8 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [outletFilter, setOutletFilter] = useState("all");
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [newSettlement, setNewSettlement] = useState<Omit<Settlement, "id">>({
@@ -75,24 +78,28 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
   });
   const { toast } = useToast();
   
-  // Fetch saved settlements when component mounts
+  // Fetch saved settlements and outlets when component mounts
   useEffect(() => {
-    const fetchSettlements = async () => {
+    const fetchSettlementsAndOutlets = async () => {
       try {
         const savedSettlements = await getSavedSettlements();
         const mappedSettlements = savedSettlements.map(mapSavedSettlementToSettlement);
         setSettlements(mappedSettlements);
+        
+        // Fetch outlets for filtering
+        const outletData = await getOutlets();
+        setOutlets(outletData);
       } catch (error) {
-        console.error('Error fetching customer settlements:', error);
+        console.error('Error fetching customer settlements or outlets:', error);
         toast({
           title: "Error",
-          description: "Failed to load customer settlements",
+          description: "Failed to load customer settlements or outlets",
           variant: "destructive"
         });
       }
     };
     
-    fetchSettlements();
+    fetchSettlementsAndOutlets();
   }, [toast]);
 
   const handleAddSettlement = async () => {
@@ -278,7 +285,11 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
     
     const matchesStatus = statusFilter === "all" || settlement.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    // For now, we'll assume settlements are associated with outlets through customer relationships
+    // In a complete implementation, this would be enhanced with proper outlet settlement data
+    const matchesOutlet = outletFilter === "all";
+    
+    return matchesSearch && matchesStatus && matchesOutlet;
   });
 
   return (
@@ -297,7 +308,7 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
             <p className="text-muted-foreground">Manage customer debt settlements and payments</p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -307,6 +318,20 @@ export const CustomerSettlements = ({ username, onBack, onLogout }: { username: 
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            
+            <Select value={outletFilter} onValueChange={setOutletFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Outlets" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Outlets</SelectItem>
+                {outlets.map(outlet => (
+                  <SelectItem key={outlet.id} value={outlet.id}>
+                    {outlet.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-32">
