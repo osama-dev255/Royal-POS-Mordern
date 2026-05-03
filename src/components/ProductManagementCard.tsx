@@ -347,7 +347,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                   <Label htmlFor="name">Product Name *</Label>
                   <Input
                     id="name"
-                    value={editingProduct ? editingProduct.name : newProduct.name}
+                    value={editingProduct ? (editingProduct.name ?? "") : newProduct.name}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, name: e.target.value}) 
@@ -386,7 +386,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                   <Label htmlFor="sku">SKU</Label>
                   <Input
                     id="sku"
-                    value={editingProduct ? editingProduct.sku : newProduct.sku}
+                    value={editingProduct ? (editingProduct.sku ?? "") : newProduct.sku}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, sku: e.target.value}) 
@@ -399,7 +399,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                   <Label htmlFor="barcode">Barcode</Label>
                   <Input
                     id="barcode"
-                    value={editingProduct ? editingProduct.barcode : newProduct.barcode}
+                    value={editingProduct ? (editingProduct.barcode ?? "") : newProduct.barcode}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, barcode: e.target.value}) 
@@ -439,7 +439,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                     id="cost_price"
                     type="number"
                     step="0.01"
-                    value={editingProduct ? editingProduct.cost_price : newProduct.cost_price}
+                    value={editingProduct ? (editingProduct.cost_price ?? 0) : newProduct.cost_price}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, cost_price: parseFloat(e.target.value) || 0}) 
@@ -454,7 +454,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                     id="selling_price"
                     type="number"
                     step="0.01"
-                    value={editingProduct ? editingProduct.selling_price : newProduct.selling_price}
+                    value={editingProduct ? (editingProduct.selling_price ?? 0) : newProduct.selling_price}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, selling_price: parseFloat(e.target.value) || 0}) 
@@ -469,7 +469,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                     id="wholesale_price"
                     type="number"
                     step="0.01"
-                    value={editingProduct ? editingProduct.wholesale_price : newProduct.wholesale_price}
+                    value={editingProduct ? (editingProduct.wholesale_price ?? 0) : newProduct.wholesale_price}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, wholesale_price: parseFloat(e.target.value) || 0}) 
@@ -485,7 +485,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                   <Input
                     id="stock_quantity"
                     type="number"
-                    value={editingProduct ? editingProduct.stock_quantity : newProduct.stock_quantity}
+                    value={editingProduct ? (editingProduct.stock_quantity ?? 0) : newProduct.stock_quantity}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, stock_quantity: parseInt(e.target.value) || 0}) 
@@ -499,7 +499,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                   <Input
                     id="min_stock"
                     type="number"
-                    value={editingProduct ? editingProduct.min_stock_level : newProduct.min_stock_level}
+                    value={editingProduct ? (editingProduct.min_stock_level ?? 0) : newProduct.min_stock_level}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, min_stock_level: parseInt(e.target.value) || 0}) 
@@ -513,7 +513,7 @@ export const ProductManagementCard = ({ searchTerm, refreshTrigger }: ProductMan
                   <Input
                     id="max_stock"
                     type="number"
-                    value={editingProduct ? editingProduct.max_stock_level : newProduct.max_stock_level}
+                    value={editingProduct ? (editingProduct.max_stock_level ?? 0) : newProduct.max_stock_level}
                     onChange={(e) => 
                       editingProduct 
                         ? setEditingProduct({...editingProduct, max_stock_level: parseInt(e.target.value) || 0}) 
