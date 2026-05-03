@@ -449,7 +449,7 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
                       name: productName,
                       quantity: deliveredQty,
                       // available_quantity is auto-calculated
-                      unit_cost: 0,
+                      unit_cost: item.rate ?? 0,
                       selling_price: item.rate || item.price || 0
                     });
                     

@@ -793,8 +793,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         description: item.description,
         quantity: item.quantity,
         delivered_quantity: item.quantity,
-        unit_cost: 0, // Can be added later
-        selling_price: item.rate,
+        unit_cost: item.rate ?? 0,
+        selling_price: item.rate ?? 0,
         total_cost: 0,
         total_price: item.quantity * item.rate
       }));
