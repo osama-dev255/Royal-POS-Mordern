@@ -41,7 +41,8 @@ import {
   Share2,
   Download,
   FileOutput,
-  Calendar
+  Calendar,
+  Info
 } from "lucide-react";
 import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
@@ -324,6 +325,29 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     
     return matchesSearch && matchesCategory && matchesDateRange;
   });
+
+  // Ensure we have inventory data before filtering
+  const displayInventory = inventory.length > 0 ? filteredInventory : [];
+
+  // Helper function to highlight search terms in text
+  const highlightText = (text: string, searchTerm: string): JSX.Element => {
+    if (!searchTerm || !text) return <span>{text}</span>;
+    
+    const regex = new RegExp(`(${searchTerm})`, 'gi');
+    const parts = text.split(regex);
+    
+    return (
+      <span>
+        {parts.map((part, i) => {
+          const isMatch = regex.test(part);
+          if (isMatch) {
+            return <span key={i} className="bg-yellow-200 text-yellow-800 px-1 rounded">{part}</span>;
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
+  };
 
   const categories = ['all', ...new Set(inventory.map(item => item.category))];
 
@@ -673,13 +697,13 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       {/* Inventory Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredInventory.map((item) => (
+         {displayInventory.map((item) => (
             <Card key={item.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-lg">{item.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{item.sku}</p>
+                    <CardTitle className="text-lg">{highlightText(item.name, searchTerm)}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{highlightText(item.sku, searchTerm)}</p>
                   </div>
                   <Badge className={getStatusColor(item.status)}>
                     {item.status.replace('-', ' ')}
@@ -754,12 +778,12 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInventory.map((item) => (
+                  {displayInventory.map((item) => (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-4">
-                        <div className="font-medium">{item.name}</div>
+                        <div className="font-medium">{highlightText(item.name, searchTerm)}</div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{item.sku}</td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground">{highlightText(item.sku, searchTerm)}</td>
                       <td className="py-3 px-4">{item.category}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
