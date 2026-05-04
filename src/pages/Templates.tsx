@@ -4653,14 +4653,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                   delivered: deliveredDifference  // Use the difference to adjust inventory
                 }];
                 
-                try {
-                  // Update both GRN and product database stock
-                  await updateGRNQuantitiesBasedOnDelivered(deliveredItems);
-                  await updateProductStockBasedOnDelivered(deliveredItems);
-                  console.log(`GRN and product database quantities updated for delivered change: ${deliveredDifference} for item: ${item.description}`);
-                } catch (error) {
-                  console.error('Error updating GRN and product database quantities for delivered change:', error);
-                }
+                // Removed redundant GRN and product stock updates - outlet inventory update handles this
               }
             }, 0);
           }
@@ -4816,8 +4809,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           description: item.description,
           delivered: item.quantity || 0  // Use quantity field for inventory reduction
         }));
-        await updateGRNQuantitiesBasedOnDelivered(quantityItems);
-        await updateProductStockBasedOnDelivered(quantityItems);
+        // Removed redundant GRN and product stock updates - outlet inventory update handles this
         
         // Update outlet inventory if delivery is to a registered outlet
         if (outletId) {

@@ -30,6 +30,15 @@ export interface DeliveryData {
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
   try {
+    // Deduplication check using localStorage
+    const PROCESSED_DELIVERY_KEY = 'processedDelivery';
+    const processedDelivery = localStorage.getItem(PROCESSED_DELIVERY_KEY);
+    
+    if (processedDelivery === delivery.id) {
+      console.log(`⏭️ Skipping duplicate delivery save for ${delivery.id} - already processed`);
+      return;
+    }
+    
     // Save to database first (source of truth)
     let dbSaveSuccessful = false;
     const { data: { user } } = await supabase.auth.getUser();
@@ -132,6 +141,9 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
     
     // Store consolidated list in localStorage
     localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(deliveriesToStore));
+    
+    // Mark this delivery as processed to prevent duplicate updates
+    localStorage.setItem(PROCESSED_DELIVERY_KEY, delivery.id);
     
   } catch (error) {
     console.error('Error saving delivery:', error);
@@ -313,6 +325,13 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
       
       console.log('📝 User role:', userData?.role);
       
+      // First, check the original status from database
+      const { data: originalDelivery } = await supabase
+        .from('saved_delivery_notes')
+        .select('status, source_type, outlet_id')
+        .eq('id', updatedDelivery.id)
+        .single();
+      
       // Validate numeric fields to prevent NaN serialization errors
       const updateData = {
         delivery_note_number: updatedDelivery.deliveryNoteNumber,
@@ -374,59 +393,56 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         console.log('✅ Database update successful');
         dbUpdateSuccessful = true;
         
-        // Update outlet inventory ONLY if delivery status changed TO 'delivered'
-        // First, check the original status from database
-        const { data: originalDelivery } = await supabase
-          .from('saved_delivery_notes')
-          .select('status, source_type, outlet_id')
-          .eq('id', updatedDelivery.id)
-          .single();
-        
+        // Update outlet inventory only ONCE per delivery
+        // Track processed deliveries to prevent duplicate updates
+        const PROCESSED_DELIVERIES_KEY = 'processedInvestmentDeliveries';
+        let processedDeliveries = JSON.parse(localStorage.getItem(PROCESSED_DELIVERIES_KEY) || '[]');
+                
         // Only update inventory if:
         // 1. Delivery is to an outlet
-        // 2. Status is now 'delivered'
-        // 3. Source is from investment
-        // 4. Original status was NOT 'delivered' (prevents double-updating)
+        // 2. Source is from investment
+        // 3. We have items to process
+        // 4. This delivery hasn't been processed before
         if (updatedDelivery.outletId && 
-            updatedDelivery.status === 'delivered' && 
             (updateData.source_type === 'investment' || originalDelivery?.source_type === 'investment') &&
-            originalDelivery?.status !== 'delivered') {
-          
+            (updatedDelivery.itemsList?.length || 0) > 0 &&
+            !processedDeliveries.includes(updatedDelivery.id)) {
+                  
           try {
-            console.log('📦 Updating outlet inventory for delivery edit (status changed to delivered)...');
+            console.log('📦 Updating outlet inventory for investment delivery...');
             console.log('📍 Outlet ID:', updatedDelivery.outletId);
             console.log('📋 Items:', updatedDelivery.itemsList?.length || 0);
-            console.log('🔄 Status changed from:', originalDelivery?.status, '→ delivered');
-            
+            console.log('🔄 Delivery status:', updatedDelivery.status);
+                    
             // Get current inventory products for the destination outlet
             const { data: outletInventory, error: inventoryError } = await supabase
               .from('inventory_products')
               .select('*')
               .eq('outlet_id', updatedDelivery.outletId);
-            
+                    
             if (inventoryError) {
               console.error('❌ Error loading outlet inventory:', inventoryError);
             } else {
               console.log('📊 Current outlet inventory:', outletInventory?.length || 0, 'products');
-              
-              // Update or create inventory products for each delivered item
+                      
+              // Process each delivered item
               const itemsList = updatedDelivery.itemsList || [];
               for (const item of itemsList) {
                 const productName = item.name || item.description;
                 const deliveredQty = item.quantity || item.delivered || 0;
-                
+                        
                 if (!productName || deliveredQty <= 0) {
                   console.log('⏭️ Skipping item (no name or quantity):', productName, deliveredQty);
                   continue;
                 }
-                
+                        
                 // Check if product already exists in outlet inventory
                 const existingProduct = outletInventory?.find(p => p.name === productName);
-                
+                        
                 if (existingProduct) {
                   // Update existing product quantity
                   const newQuantity = (existingProduct.quantity || 0) + deliveredQty;
-                  
+                          
                   const { error: updateError } = await supabase
                     .from('inventory_products')
                     .update({
@@ -434,7 +450,7 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
                       // available_quantity is auto-calculated by generated column
                     })
                     .eq('id', existingProduct.id);
-                    
+                          
                   if (updateError) {
                     console.error(`❌ Error updating ${productName}:`, updateError);
                   } else {
@@ -452,7 +468,7 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
                       unit_cost: item.rate ?? 0,
                       selling_price: item.rate || item.price || 0
                     });
-                    
+                          
                   if (insertError) {
                     console.error(`❌ Error creating ${productName}:`, insertError);
                   } else {
@@ -460,15 +476,20 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
                   }
                 }
               }
-              
+                      
               console.log('✅ Outlet inventory update completed');
+                      
+              // Mark this delivery as processed to prevent duplicates
+              processedDeliveries.push(updatedDelivery.id);
+              localStorage.setItem(PROCESSED_DELIVERIES_KEY, JSON.stringify(processedDeliveries));
+              console.log(`✅ Marked delivery ${updatedDelivery.id} as processed`);
             }
           } catch (inventoryError) {
             console.error('❌ Error updating outlet inventory:', inventoryError);
             // Don't fail the entire update if inventory update fails
           }
-        } else if (originalDelivery?.status === 'delivered') {
-          console.log('⏭️ Skipping inventory update - delivery was already marked as delivered');
+        } else if (processedDeliveries.includes(updatedDelivery.id)) {
+          console.log(`⏭️ Skipping inventory update - delivery ${updatedDelivery.id} already processed`);
         }
       }
     } else {

@@ -805,97 +805,95 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
       if (itemsError) throw itemsError;
 
-      // Update inventory for both source and destination outlets
-      if (newDeliveryForm.status === 'delivered') {
-        // Find destination outlet ID
-        const destinationOutletData = outlets.find(o => o.name === newDeliveryForm.destinationOutlet);
-        
-        if (destinationOutletData) {
-          // Update inventory for each item
-          for (const item of deliveryItems) {
-            // Deduct from source outlet inventory
-            const sourceProduct = inventoryProducts.find(p => p.name === item.description);
+      // Update inventory for both source and destination outlets (status-independent)
+      // Find destination outlet ID
+      const destinationOutletData = outlets.find(o => o.name === newDeliveryForm.destinationOutlet);
+      
+      if (destinationOutletData) {
+        // Update inventory for each item
+        for (const item of deliveryItems) {
+          // Deduct from source outlet inventory
+          const sourceProduct = inventoryProducts.find(p => p.name === item.description);
+          
+          if (sourceProduct) {
+            const newSourceQuantity = Math.max(0, (sourceProduct.available_quantity || 0) - item.quantity);
             
-            if (sourceProduct) {
-              const newSourceQuantity = Math.max(0, (sourceProduct.available_quantity || 0) - item.quantity);
-              
-              await supabase
-                .from('inventory_products')
-                .update({
-                  quantity: newSourceQuantity
-                  // available_quantity is a generated column, don't set it directly
-                })
-                .eq('id', sourceProduct.id);
-            }
-
-            // Add to destination outlet inventory
-            const { data: destProducts } = await supabase
+            await supabase
               .from('inventory_products')
-              .select('*')
-              .eq('outlet_id', destinationOutletData.id)
-              .eq('name', item.description);
-
-            if (destProducts && destProducts.length > 0) {
-              // Product exists in destination, update quantity
-              const destProduct = destProducts[0];
-              const newDestQuantity = (destProduct.available_quantity || 0) + item.quantity;
-              
-              await supabase
-                .from('inventory_products')
-                .update({
-                  quantity: newDestQuantity
-                  // available_quantity is a generated column, don't set it directly
-                })
-                .eq('id', destProduct.id);
-            } else {
-              // Product doesn't exist in destination, create it
-              await supabase
-                .from('inventory_products')
-                .insert({
-                  outlet_id: destinationOutletData.id,
-                  name: item.description,
-                  quantity: item.quantity,
-                  // available_quantity is a generated column, don't set it directly
-                  unit_cost: 0,
-                  selling_price: item.rate
-                });
-            }
+              .update({
+                quantity: newSourceQuantity
+                // available_quantity is a generated column, don't set it directly
+              })
+              .eq('id', sourceProduct.id);
           }
 
-          // Also save to saved_delivery_notes for destination outlet (Deliveries In)
-          const deliveryItemsList = deliveryItems.map(item => ({
-            description: item.description,
-            name: item.description,
-            quantity: item.quantity,
-            delivered: item.quantity,
-            rate: item.rate,
-            price: item.rate,
-            sellingPrice: item.rate,
-            unitPrice: item.rate
-          }));
+          // Add to destination outlet inventory
+          const { data: destProducts } = await supabase
+            .from('inventory_products')
+            .select('*')
+            .eq('outlet_id', destinationOutletData.id)
+            .eq('name', item.description);
 
-          await supabase
-            .from('saved_delivery_notes')
-            .insert({
-              outlet_id: destinationOutletData.id,
-              delivery_note_number: newDeliveryForm.deliveryNoteNumber,
-              date: new Date(newDeliveryForm.deliveryDate).toISOString(),
-              customer: outlets.find(o => o.id === outletId)?.name || 'Unknown Outlet',
-              items: deliveryItems.length,
-              total: totalAmount,
-              payment_method: newDeliveryForm.paymentMethod,
-              status: newDeliveryForm.status,
-              driver: newDeliveryForm.driverName || null,
-              vehicle: newDeliveryForm.vehicleNumber || null,
-              delivery_notes: newDeliveryForm.notes || null,
-              items_list: deliveryItemsList,
-              // Set source tracking fields for proper categorization
-              source_outlet_id: outletId, // The outlet that sent this delivery
-              source_type: 'outlet', // This came from another outlet
-              source_business_name: newDeliveryForm.sourceBusinessName || null,
-              source_address: newDeliveryForm.sourceAddress || null
-            });
+          if (destProducts && destProducts.length > 0) {
+            // Product exists in destination, update quantity
+            const destProduct = destProducts[0];
+            const newDestQuantity = (destProduct.available_quantity || 0) + item.quantity;
+            
+            await supabase
+              .from('inventory_products')
+              .update({
+                quantity: newDestQuantity
+                // available_quantity is a generated column, don't set it directly
+              })
+              .eq('id', destProduct.id);
+          } else {
+            // Product doesn't exist in destination, create it
+            await supabase
+              .from('inventory_products')
+              .insert({
+                outlet_id: destinationOutletData.id,
+                name: item.description,
+                quantity: item.quantity,
+                // available_quantity is a generated column, don't set it directly
+                unit_cost: 0,
+                selling_price: item.rate
+              });
+          }
         }
+
+        // Also save to saved_delivery_notes for destination outlet (Deliveries In)
+        const deliveryItemsList = deliveryItems.map(item => ({
+          description: item.description,
+          name: item.description,
+          quantity: item.quantity,
+          delivered: item.quantity,
+          rate: item.rate,
+          price: item.rate,
+          sellingPrice: item.rate,
+          unitPrice: item.rate
+        }));
+
+        await supabase
+          .from('saved_delivery_notes')
+          .insert({
+            outlet_id: destinationOutletData.id,
+            delivery_note_number: newDeliveryForm.deliveryNoteNumber,
+            date: new Date(newDeliveryForm.deliveryDate).toISOString(),
+            customer: outlets.find(o => o.id === outletId)?.name || 'Unknown Outlet',
+            items: deliveryItems.length,
+            total: totalAmount,
+            payment_method: newDeliveryForm.paymentMethod,
+            status: newDeliveryForm.status,
+            driver: newDeliveryForm.driverName || null,
+            vehicle: newDeliveryForm.vehicleNumber || null,
+            delivery_notes: newDeliveryForm.notes || null,
+            items_list: deliveryItemsList,
+            // Set source tracking fields for proper categorization
+            source_outlet_id: outletId, // The outlet that sent this delivery
+            source_type: 'outlet', // This came from another outlet
+            source_business_name: newDeliveryForm.sourceBusinessName || null,
+            source_address: newDeliveryForm.sourceAddress || null
+          });
       }
 
       toast({
@@ -2043,100 +2041,96 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                     if (insertError) throw insertError;
                   }
 
-                  // Update inventory if status is 'delivered'
-                  if (editingDelivery.status === 'delivered') {
-                    const destinationOutletData = outlets.find(o => o.name === editingDelivery.customer);
-                    
-                    if (destinationOutletData) {
-                      try {
-                        // Reload inventory products to get latest quantities
-                        const currentInventoryProducts = await getInventoryProductsByOutlet(outletId);
+                  // Update inventory for all outlet deliveries (status-independent)
+                  const destinationOutletData = outlets.find(o => o.name === editingDelivery.customer);
+                  
+                  if (destinationOutletData) {
+                    try {
+                      // Reload inventory products to get latest quantities
+                      const currentInventoryProducts = await getInventoryProductsByOutlet(outletId);
+                      
+                      // Update inventory for each item
+                      for (const item of editingItems) {
+                        const itemName = item.description || item.name;
+                        const itemQuantity = item.quantity || item.delivered || 0;
+                        const itemRate = item.rate || item.price || 0;
+
+                        if (!itemName || !itemName.trim()) {
+                          console.warn('Skipping item with empty name');
+                          continue;
+                        }
+
+                        // Deduct from source outlet inventory
+                        const sourceProduct = currentInventoryProducts.find(p => p.name === itemName);
                         
-                        // Update inventory for each item
-                        for (const item of editingItems) {
-                          const itemName = item.description || item.name;
-                          const itemQuantity = item.quantity || item.delivered || 0;
-                          const itemRate = item.rate || item.price || 0;
-
-                          if (!itemName || !itemName.trim()) {
-                            console.warn('Skipping item with empty name');
-                            continue;
-                          }
-
-                          // Deduct from source outlet inventory
-                          const sourceProduct = currentInventoryProducts.find(p => p.name === itemName);
+                        if (sourceProduct) {
+                          const newSourceQuantity = Math.max(0, (sourceProduct.available_quantity || 0) - itemQuantity);
                           
-                          if (sourceProduct) {
-                            const newSourceQuantity = Math.max(0, (sourceProduct.available_quantity || 0) - itemQuantity);
-                            
-                            const { error: updateError } = await supabase
-                              .from('inventory_products')
-                              .update({
-                                quantity: newSourceQuantity
-                                // available_quantity is a generated column, don't set it directly
-                              })
-                              .eq('id', sourceProduct.id);
-                            
-                            if (updateError) {
-                              console.error('Error updating source inventory:', updateError);
-                            }
-                          }
-
-                          // Add to destination outlet inventory
-                          const { data: destProducts, error: fetchError } = await supabase
+                          const { error: updateError } = await supabase
                             .from('inventory_products')
-                            .select('*')
-                            .eq('outlet_id', destinationOutletData.id)
-                            .eq('name', itemName);
-
-                          if (fetchError) {
-                            console.error('Error fetching destination product:', fetchError);
-                            continue;
-                          }
-
-                          if (destProducts && destProducts.length > 0) {
-                            const destProduct = destProducts[0];
-                            const newDestQuantity = (destProduct.available_quantity || 0) + itemQuantity;
-                            
-                            const { error: updateError } = await supabase
-                              .from('inventory_products')
-                              .update({
-                                quantity: newDestQuantity
-                                // available_quantity is a generated column, don't set it directly
-                              })
-                              .eq('id', destProduct.id);
-                            
-                            if (updateError) {
-                              console.error('Error updating destination inventory:', updateError);
-                            }
-                          } else {
-                            const { error: insertError } = await supabase
-                              .from('inventory_products')
-                              .insert({
-                                outlet_id: destinationOutletData.id,
-                                name: itemName,
-                                quantity: itemQuantity,
-                                // available_quantity is a generated column, don't set it directly
-                                unit_cost: 0,
-                                selling_price: itemRate,
-                                category: 'General'
-                              });
-                            
-                            if (insertError) {
-                              console.error('Error creating destination product:', insertError);
-                            }
+                            .update({
+                              quantity: newSourceQuantity
+                              // available_quantity is a generated column, don't set it directly
+                            })
+                            .eq('id', sourceProduct.id);
+                          
+                          if (updateError) {
+                            console.error('Error updating source inventory:', updateError);
                           }
                         }
-                      } catch (inventoryError) {
-                        console.error('Error updating inventory:', inventoryError);
-                        // Don't throw - allow the delivery edit to succeed even if inventory update fails
+
+                        // Add to destination outlet inventory
+                        const { data: destProducts, error: fetchError } = await supabase
+                          .from('inventory_products')
+                          .select('*')
+                          .eq('outlet_id', destinationOutletData.id)
+                          .eq('name', itemName);
+
+                        if (fetchError) {
+                          console.error('Error fetching destination product:', fetchError);
+                          continue;
+                        }
+
+                        if (destProducts && destProducts.length > 0) {
+                          const destProduct = destProducts[0];
+                          const newDestQuantity = (destProduct.available_quantity || 0) + itemQuantity;
+                          
+                          const { error: updateError } = await supabase
+                            .from('inventory_products')
+                            .update({
+                              quantity: newDestQuantity
+                              // available_quantity is a generated column, don't set it directly
+                            })
+                            .eq('id', destProduct.id);
+                          
+                          if (updateError) {
+                            console.error('Error updating destination inventory:', updateError);
+                          }
+                        } else {
+                          const { error: insertError } = await supabase
+                            .from('inventory_products')
+                            .insert({
+                              outlet_id: destinationOutletData.id,
+                              name: itemName,
+                              quantity: itemQuantity,
+                              // available_quantity is a generated column, don't set it directly
+                              unit_cost: 0,
+                              selling_price: itemRate,
+                              category: 'General'
+                            });
+                          
+                          if (insertError) {
+                            console.error('Error creating destination product:', insertError);
+                          }
+                        }
                       }
+                    } catch (inventoryError) {
+                      console.error('Error updating inventory:', inventoryError);
+                      // Don't throw - allow the delivery edit to succeed even if inventory update fails
                     }
                   }
 
                   // Update the delivery in destination outlet's saved_delivery_notes (Deliveries In)
-                  const destinationOutletData = outlets.find(o => o.name === editingDelivery.customer);
-                  
                   if (destinationOutletData) {
                     try {
                       // Prepare items list for saved_delivery_notes
@@ -2181,8 +2175,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             // Ensure source tracking fields are set correctly
                             source_outlet_id: outletId,
                             source_type: 'outlet',
-                            source_business_name: editingDelivery.businessName || null,
-                            source_address: editingDelivery.businessAddress || null
+                            source_business_name: outlets.find(o => o.id === outletId)?.name || null,
+                            source_address: outlets.find(o => o.id === outletId)?.address || outlets.find(o => o.id === outletId)?.location || null
                           })
                           .eq('id', existingDeliveryIn.id);
 
@@ -2212,8 +2206,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             // Set source tracking fields for proper categorization
                             source_outlet_id: outletId,
                             source_type: 'outlet',
-                            source_business_name: editingDelivery.businessName || null,
-                            source_address: editingDelivery.businessAddress || null
+                            source_business_name: outlets.find(o => o.id === outletId)?.name || null,
+                            source_address: outlets.find(o => o.id === outletId)?.address || outlets.find(o => o.id === outletId)?.location || null
                           });
 
                         if (insertError) {
