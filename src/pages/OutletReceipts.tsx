@@ -1666,7 +1666,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                       <div className="border-t-2 border-blue-300 pt-3 flex justify-between items-center">
                         <span className="text-base font-bold text-blue-900">New Balance:</span>
                         <span className="text-2xl font-bold text-blue-900">
-                          {formatCurrency(selectedReceipt.newBalance || 0)}
+                          {formatCurrency((selectedReceipt.previousBalance || 0) - (selectedReceipt.amountPaid || 0))}
                         </span>
                       </div>
                     </div>
