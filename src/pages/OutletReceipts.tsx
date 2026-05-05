@@ -427,7 +427,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     setSaving(true);
     
     try {
-      const newBalance = Math.max(0, (editingSettlement.previousBalance || 0) - editPaymentAmount);
+      const newBalance = (editingSettlement.previousBalance || 0) - editPaymentAmount;
       
       // Update the settlement in database
       const result = await updateOutletCustomerSettlement(editingSettlement.id, {
