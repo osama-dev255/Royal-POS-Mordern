@@ -1898,7 +1898,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-green-900">New Balance:</span>
                     <span className="text-2xl font-bold text-green-700">
-                      {formatCurrency(Math.max(0, (editingSettlement.previousBalance || 0) - editPaymentAmount))}
+                      {formatCurrency((editingSettlement.previousBalance || 0) - editPaymentAmount)}
                     </span>
                   </div>
                 </div>
