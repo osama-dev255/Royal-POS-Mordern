@@ -1175,7 +1175,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                         <div className="flex justify-between font-bold text-lg pt-2 border-t">
                           <span>Remaining Balance:</span>
                           <span className={settlementPreviousBalance - settlementPaymentAmount <= 0 ? "text-green-600" : "text-orange-600"}>
-                            {formatCurrency(Math.max(0, settlementPreviousBalance - settlementPaymentAmount))}
+                            {formatCurrency(settlementPreviousBalance - settlementPaymentAmount)}
                           </span>
                         </div>
                         {settlementPreviousBalance - settlementPaymentAmount <= 0 && settlementPreviousBalance > 0 && (

@@ -7699,8 +7699,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       
       // Calculate new balance when previous balance or amount paid changes
       if (field === 'previousBalance' || field === 'amountPaid') {
-        const prevBalance = field === 'previousBalance' ? Number(value) : prev.previousBalance;
-        const amountPaid = field === 'amountPaid' ? Number(value) : prev.amountPaid;
+        const prevBalance = field === 'previousBalance' ? (Number(value) || 0) : (prev.previousBalance || 0);
+        const amountPaid = field === 'amountPaid' ? (Number(value) || 0) : (prev.amountPaid || 0);
         updatedData.newBalance = prevBalance - amountPaid;
       }
       
@@ -8195,7 +8195,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                             cashierName: customerSettlementData.cashierName || "System",
                             previousBalance: customerSettlementData.previousBalance || 0,
                             amountPaid: customerSettlementData.amountPaid || 0,
-                            newBalance: customerSettlementData.newBalance || 0,
+                            // Calculate newBalance correctly: previousBalance - amountPaid
+                            // This ensures overpayments show negative balances (credits) instead of 0
+                            newBalance: (customerSettlementData.previousBalance || 0) - (customerSettlementData.amountPaid || 0),
                             notes: customerSettlementData.notes || "",
                             date: new Date().toISOString().split('T')[0], // Current date
                             time: new Date().toLocaleTimeString(), // Current time

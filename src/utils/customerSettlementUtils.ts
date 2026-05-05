@@ -54,9 +54,13 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
       settlement.id = Date.now().toString();
     }
     
+    // Calculate newBalance correctly: previousBalance - amountPaid
+    // This ensures overpayments show negative balances (credits) instead of 0
+    const calculatedNewBalance = (settlement.previousBalance || 0) - (settlement.amountPaid || 0);
+    
     // First, save to localStorage for immediate availability
     const savedSettlements = await getSavedSettlements();
-    const updatedSettlements = [...savedSettlements, settlement];
+    const updatedSettlements = [...savedSettlements, {...settlement, newBalance: calculatedNewBalance}];
     localStorage.setItem(SAVED_SETTLEMENTS_KEY, JSON.stringify(updatedSettlements));
     
     // Then save to database with user context
@@ -76,7 +80,7 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
           cashier_name: settlement.cashierName || 'System',
           previous_balance: settlement.previousBalance || 0,
           amount_paid: settlement.amountPaid || 0,
-          new_balance: settlement.newBalance || 0,
+          new_balance: calculatedNewBalance,
           notes: settlement.notes || '',
           date: settlement.date || new Date().toISOString().split('T')[0],
           time: settlement.time || new Date().toLocaleTimeString(),
@@ -105,7 +109,7 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
           cashier_name: settlement.cashierName || 'System',
           previous_balance: settlement.previousBalance || 0,
           amount_paid: settlement.amountPaid || 0,
-          new_balance: settlement.newBalance || 0,
+          new_balance: calculatedNewBalance,
           notes: settlement.notes || '',
           date: settlement.date || new Date().toISOString().split('T')[0],
           time: settlement.time || new Date().toLocaleTimeString(),
