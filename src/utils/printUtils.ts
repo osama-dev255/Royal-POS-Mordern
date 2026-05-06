@@ -1014,12 +1014,13 @@ export class PrintUtils {
         return '○ PENDING';
       };
       
-      // Use the responsive HTML template
+      // Use the responsive HTML template - Bank Slip Format
       const settlementContent = `<!DOCTYPE html>
 <html>
   <head>
     <title>Settlement Statement ${receiptNumber}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       * {
         margin: 0;
@@ -1036,23 +1037,24 @@ export class PrintUtils {
       }
       
       body {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 12px;
-        line-height: 1.5;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 11px;
+        line-height: 1.6;
         padding: 20px;
-        color: #000;
+        color: #1a1a1a;
+        background: #f5f5f5;
       }
       
       .statement-container {
         max-width: 800px;
         margin: 0 auto;
-        padding: 20px;
         background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       }
       
       @media print {
         @page {
-          margin: 15mm;
+          margin: 0;
           size: A4 portrait;
         }
         
@@ -1060,6 +1062,7 @@ export class PrintUtils {
           width: 210mm;
           margin: 0;
           padding: 0;
+          background: #fff;
         }
         
         body {
@@ -1067,8 +1070,8 @@ export class PrintUtils {
         }
         
         .statement-container {
-          max-width: 180mm;
-          padding: 0;
+          max-width: 100%;
+          box-shadow: none;
         }
         
         * {
@@ -1077,278 +1080,419 @@ export class PrintUtils {
         }
       }
       
-      .header-section {
-        text-align: center;
-        padding-bottom: 8px;
-        margin-bottom: 10px;
-        border-bottom: 2px solid #000;
+      /* Official Header */
+      .official-header {
+        background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+        color: #fff;
+        padding: 20px 30px;
+        border-bottom: 4px solid #000;
       }
-      .logo-area {
-        font-size: 20px;
-        font-weight: 900;
+      
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+      }
+      
+      .company-info h1 {
+        font-size: 24px;
+        font-weight: 800;
         letter-spacing: 2px;
-        margin-bottom: 3px;
+        margin-bottom: 5px;
         text-transform: uppercase;
       }
-      .business-details {
+      
+      .company-details {
+        font-size: 10px;
+        line-height: 1.8;
+        opacity: 0.9;
+      }
+      
+      .document-badge {
+        background: #fff;
+        color: #000;
+        padding: 8px 16px;
         font-size: 11px;
-        line-height: 1.4;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        border: 2px solid #fff;
+      }
+      
+      .document-meta {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255,255,255,0.2);
+      }
+      
+      .meta-item {
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .meta-label {
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        opacity: 0.8;
+        margin-bottom: 3px;
+      }
+      
+      .meta-value {
+        font-size: 12px;
+        font-weight: 700;
+      }
+      
+      /* Customer Section */
+      .customer-section {
+        padding: 20px 30px;
+        background: #fafafa;
+        border-bottom: 2px solid #e0e0e0;
+      }
+      
+      .section-header {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #666;
+        margin-bottom: 10px;
+      }
+      
+      .customer-name {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a1a1a;
         margin-bottom: 5px;
       }
-      .statement-title {
-        background: #000;
-        color: #fff;
-        padding: 4px 8px;
-        font-size: 14px;
-        font-weight: 900;
-        letter-spacing: 3px;
-        text-align: center;
-        margin: 8px 0;
-        text-transform: uppercase;
-      }
-      .meta-info {
-        display: flex;
-        justify-content: space-between;
+      
+      .customer-details {
         font-size: 11px;
-        margin-bottom: 10px;
-        padding: 6px;
-        background: #f5f5f5;
-      }
-      .meta-label {
-        font-weight: 700;
-        display: block;
-        font-size: 10px;
-        text-transform: uppercase;
-        margin-bottom: 2px;
         color: #666;
       }
-      .meta-value {
-        font-weight: 600;
+      
+      /* Transaction Table */
+      .transaction-section {
+        padding: 20px 30px;
       }
-      .customer-section {
-        margin-bottom: 10px;
-        padding: 6px;
-        background: #fafafa;
-        border-left: 3px solid #000;
+      
+      .transaction-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
       }
-      .section-label {
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 4px;
-        color: #000;
-      }
-      .customer-name {
-        font-size: 14px;
-        font-weight: 900;
-        margin-bottom: 2px;
-      }
-      .transaction-box {
-        margin: 10px 0;
-        background: #fff;
-        border: 1px solid #000;
-      }
-      .transaction-header {
-        background: #000;
+      
+      .transaction-table thead {
+        background: #1a1a1a;
         color: #fff;
-        padding: 4px 6px;
-        font-size: 11px;
-        font-weight: 900;
+      }
+      
+      .transaction-table th {
+        padding: 12px 15px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
       }
-      .transaction-body {
-        padding: 8px 6px;
-      }
-      .transaction-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 6px;
-        font-size: 11px;
-      }
-      .transaction-row:last-child {
-        margin-bottom: 0;
-      }
-      .row-label {
-        font-weight: 600;
-        color: #333;
-      }
-      .row-value {
-        font-weight: 700;
+      
+      .transaction-table th:last-child {
         text-align: right;
       }
-      .calculation-section {
-        margin: 10px 0;
-        background: #f0f0f0;
-        border: 1px solid #000;
+      
+      .transaction-table tbody tr {
+        border-bottom: 1px solid #e0e0e0;
       }
-      .calc-header {
-        background: #333;
-        color: #fff;
-        padding: 4px 6px;
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+      
+      .transaction-table tbody tr:last-child {
+        border-bottom: 2px solid #1a1a1a;
       }
-      .calc-body {
-        padding: 8px 6px;
-      }
-      .calc-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 4px 0;
+      
+      .transaction-table td {
+        padding: 12px 15px;
         font-size: 11px;
       }
-      .calc-row:last-child {
-        border-bottom: none;
+      
+      .transaction-table td:last-child {
+        text-align: right;
+        font-weight: 600;
       }
-      .calc-row.grand-total {
-        border-top: 2px solid #000;
-        margin-top: 4px;
-        padding-top: 6px;
-        font-size: 11px;
-        font-weight: 900;
-        background: #fff;
-        padding: 6px;
-        margin: 4px -6px -8px -6px;
+      
+      .label-cell {
+        color: #666;
+        font-weight: 500;
       }
-      .payment-badge {
-        display: inline-block;
-        background: #000;
-        color: #fff;
-        padding: 3px 8px;
-        font-size: 11px;
-        font-weight: 900;
-        letter-spacing: 1px;
-        margin-top: 4px;
-        text-transform: uppercase;
-      }
-      .status-badge {
-        display: block;
-        text-align: center;
-        padding: 6px;
-        font-size: 11px;
-        font-weight: 900;
-        letter-spacing: 2px;
-        margin: 10px 0;
-        border: 2px solid #000;
-        background: #fff;
-      }
-      .footer-section {
-        margin-top: 10px;
-        padding-top: 8px;
-        text-align: center;
-        border-top: 1px dashed #000;
-      }
-      .footer-message {
-        font-size: 11px;
+      
+      .value-cell {
         font-weight: 700;
-        margin-bottom: 3px;
+        color: #1a1a1a;
+      }
+      
+      .payment-method-badge {
+        display: inline-block;
+        background: #1a1a1a;
+        color: #fff;
+        padding: 4px 12px;
+        font-size: 10px;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
       }
+      
+      /* Summary Box */
+      .summary-section {
+        padding: 20px 30px;
+        background: #f5f5f5;
+        border-top: 2px solid #e0e0e0;
+      }
+      
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      
+      .summary-card {
+        background: #fff;
+        padding: 15px;
+        border: 1px solid #e0e0e0;
+      }
+      
+      .summary-label {
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #666;
+        margin-bottom: 8px;
+      }
+      
+      .summary-value {
+        font-size: 20px;
+        font-weight: 800;
+        color: #1a1a1a;
+      }
+      
+      .summary-value.positive {
+        color: #22c55e;
+      }
+      
+      .summary-value.negative {
+        color: #ef4444;
+      }
+      
+      /* Status Badge */
+      .status-section {
+        text-align: center;
+        padding: 15px 30px;
+        border-top: 2px solid #e0e0e0;
+      }
+      
+      .status-badge {
+        display: inline-block;
+        padding: 10px 30px;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        border: 3px solid #1a1a1a;
+        color: #1a1a1a;
+        background: #fff;
+      }
+      
+      .status-badge.settled {
+        background: #1a1a1a;
+        color: #fff;
+      }
+      
+      /* Authorization Section */
+      .authorization-section {
+        padding: 20px 30px;
+        border-top: 2px solid #e0e0e0;
+      }
+      
+      .auth-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      
+      .auth-item {
+        padding: 12px;
+        background: #fafafa;
+        border: 1px solid #e0e0e0;
+      }
+      
+      .auth-label {
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #666;
+        margin-bottom: 6px;
+      }
+      
+      .auth-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1a1a1a;
+      }
+      
+      /* Footer */
+      .official-footer {
+        padding: 20px 30px;
+        background: #1a1a1a;
+        color: #fff;
+        text-align: center;
+        border-top: 4px solid #000;
+      }
+      
+      .footer-message {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+      }
+      
       .footer-sub {
         font-size: 10px;
-        color: #666;
-        line-height: 1.3;
+        opacity: 0.8;
+        line-height: 1.5;
+      }
+      
+      .footer-ref {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.2);
+        font-size: 10px;
+        font-family: monospace;
+        letter-spacing: 1px;
       }
     </style>
   </head>
   <body>
     <div class="statement-container">
-      <div class="header-section">
-        <div class="logo-area">${businessName}</div>
-        <div class="business-details">
-          ${businessAddress}<br>
-          Tel: ${businessPhone}
-          ${businessEmail ? `<br>${businessEmail}` : ''}
+      <!-- Official Header -->
+      <div class="official-header">
+        <div class="header-top">
+          <div class="company-info">
+            <h1>${businessName}</h1>
+            <div class="company-details">
+              ${businessAddress}<br>
+              Tel: ${businessPhone}
+              ${businessEmail ? `<br>${businessEmail}` : ''}
+            </div>
+          </div>
+          <div class="document-badge">Payment Statement</div>
+        </div>
+        <div class="document-meta">
+          <div class="meta-item">
+            <span class="meta-label">Receipt No</span>
+            <span class="meta-value">${receiptNumber}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Date</span>
+            <span class="meta-value">${dateStr}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Time</span>
+            <span class="meta-value">${timeStr}</span>
+          </div>
         </div>
       </div>
       
-      <div class="statement-title">Payment Statement</div>
-      
-      <div class="meta-info">
-        <div>
-          <span class="meta-label">Receipt No</span>
-          <span class="meta-value">${receiptNumber}</span>
-        </div>
-        <div style="text-align: right;">
-          <span class="meta-label">Date & Time</span>
-          <span class="meta-value">${dateStr}<br>${timeStr}</span>
-        </div>
-      </div>
-      
+      <!-- Customer Section -->
       <div class="customer-section">
-        <div class="section-label">Settled By</div>
+        <div class="section-header">Settled By</div>
         <div class="customer-name">${customerName}</div>
       </div>
       
-      <div class="transaction-box">
-        <div class="transaction-header">Payment Details</div>
-        <div class="transaction-body">
-          <div class="transaction-row">
-            <span class="row-label">Payment Mode</span>
-            <span class="payment-badge">${paymentMethodUpper}</span>
-          </div>
-        </div>
+      <!-- Transaction Details -->
+      <div class="transaction-section">
+        <div class="section-header">Payment Details</div>
+        <table class="transaction-table">
+          <tbody>
+            <tr>
+              <td class="label-cell">Payment Method</td>
+              <td><span class="payment-method-badge">${paymentMethodUpper}</span></td>
+            </tr>
+            ${previousBalance > 0 ? `
+            <tr>
+              <td class="label-cell">Opening Balance</td>
+              <td class="value-cell">${formatCurrency(previousBalance)}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td class="label-cell">Payment Amount</td>
+              <td class="value-cell">${formatCurrency(amountPaid)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       
-      <div class="calculation-section">
-        <div class="calc-header">Account Summary</div>
-        <div class="calc-body">
+      <!-- Summary Section -->
+      <div class="summary-section">
+        <div class="section-header">Account Summary</div>
+        <div class="summary-grid">
           ${previousBalance > 0 ? `
-          <div class="calc-row">
-            <span>Opening Balance</span>
-            <span class="row-value">${formatCurrency(previousBalance)}</span>
+          <div class="summary-card">
+            <div class="summary-label">Opening Balance</div>
+            <div class="summary-value">${formatCurrency(previousBalance)}</div>
           </div>
           ` : ''}
-          <div class="calc-row">
-            <span>Payment Received</span>
-            <span class="row-value">- ${formatCurrency(amountPaid)}</span>
+          <div class="summary-card">
+            <div class="summary-label">Amount Paid</div>
+            <div class="summary-value positive">${formatCurrency(amountPaid)}</div>
           </div>
-          <div class="calc-row grand-total">
-            <span>Closing Balance</span>
-            <span class="row-value">${formatCurrency(newBalance)}</span>
+          <div class="summary-card">
+            <div class="summary-label">Closing Balance</div>
+            <div class="summary-value ${newBalance === 0 ? 'positive' : 'negative'}">${formatCurrency(newBalance)}</div>
           </div>
         </div>
       </div>
       
-      <div class="status-badge">${getStatusBadge()}</div>
+      <!-- Status Section -->
+      <div class="status-section">
+        <div class="status-badge ${newBalance === 0 ? 'settled' : ''}">${getStatusBadge()}</div>
+      </div>
       
+      <!-- Authorization Section -->
       ${cashier || preparedBy || approvedBy ? `
-      <div class="transaction-box" style="margin-top: 10px;">
-        <div class="transaction-header">Authorization</div>
-        <div class="transaction-body">
-          <div style="display: flex; justify-content: space-between; gap: 10px;">
-            ${cashier ? `
-            <div style="flex: 1;">
-              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Cashier</div>
-              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; font-size: 11px;">${cashier}</div>
-            </div>
-            ` : ''}
-            ${preparedBy ? `
-            <div style="flex: 1;">
-              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Prepared By</div>
-              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; font-size: 11px;">${preparedBy}</div>
-            </div>
-            ` : ''}
-            <div style="flex: 1;">
-              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Approved By</div>
-              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; min-height: 20px; font-size: 11px;">${approvedBy || '_______________________'}</div>
-            </div>
+      <div class="authorization-section">
+        <div class="section-header">Authorization</div>
+        <div class="auth-grid">
+          ${cashier ? `
+          <div class="auth-item">
+            <div class="auth-label">Cashier</div>
+            <div class="auth-value">${cashier}</div>
+          </div>
+          ` : ''}
+          ${preparedBy ? `
+          <div class="auth-item">
+            <div class="auth-label">Prepared By</div>
+            <div class="auth-value">${preparedBy}</div>
+          </div>
+          ` : ''}
+          <div class="auth-item">
+            <div class="auth-label">Approved By</div>
+            <div class="auth-value">${approvedBy || '_______________________'}</div>
           </div>
         </div>
       </div>
       ` : ''}
       
-      <div class="footer-section">
+      <!-- Official Footer -->
+      <div class="official-footer">
         <div class="footer-message">Thank You For Your Payment</div>
         <div class="footer-sub">
-          This is a computer-generated statement<br>
-          and does not require signature
+          This is a computer-generated statement and does not require signature
         </div>
+        <div class="footer-ref">REF: ${receiptNumber}</div>
       </div>
     </div>
     
