@@ -427,11 +427,30 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     doc.setFont(undefined, 'bold');
     doc.text(`Total: ${formatCurrency(delivery.total)}`, 14, finalY + 10);
     
+    // Add Products Summary section
+    if (itemsList.length > 0) {
+      const productsSummary = itemsList.map((item: any) => {
+        const productName = item.description || item.name || 'N/A';
+        const quantity = item.quantity || item.delivered || 0;
+        return `${productName} (${quantity})`;
+      }).join(', ');
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('Products Summary:', 14, finalY + 20);
+      doc.setFont(undefined, 'normal');
+      
+      // Split long text to fit on page
+      const splitSummary = doc.splitTextToSize(productsSummary, 180);
+      doc.text(splitSummary, 14, finalY + 26);
+    }
+    
     if (delivery.deliveryNotes) {
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      doc.text('Notes:', 14, finalY + 20);
-      doc.text(delivery.deliveryNotes, 14, finalY + 26);
+      const notesY = itemsList.length > 0 ? finalY + 40 : finalY + 20;
+      doc.text('Notes:', 14, notesY);
+      doc.text(delivery.deliveryNotes, 14, notesY + 6);
     }
     
     const filename = `delivery-${delivery.deliveryNoteNumber}-${new Date().toISOString().split('T')[0]}.pdf`;
@@ -441,6 +460,14 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
   const handleExportDeliveryXLS = (delivery: DeliveryData) => {
     const itemsList = delivery.itemsList || [];
+    
+    // Generate Products Summary
+    const productsSummary = itemsList.map((item: any) => {
+      const productName = item.description || item.name || 'N/A';
+      const quantity = item.quantity || item.delivered || 0;
+      return `${productName} (${quantity})`;
+    }).join(', ');
+    
     let html = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
       <head><meta charset="UTF-8"><style>td, th { padding: 5px; border: 1px solid #ccc; } th { background: #f59e0b; color: white; }</style></head>
@@ -463,6 +490,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     
     html += `
           <tr style="font-weight: bold;"><td colspan="3" style="text-align: right;">Total:</td><td>${delivery.total}</td></tr>
+          <tr><td colspan="4" style="font-weight: bold; padding-top: 10px;">Products Summary:</td></tr>
+          <tr><td colspan="4">${productsSummary}</td></tr>
         </table>
         ${delivery.deliveryNotes ? `<p><strong>Notes:</strong> ${delivery.deliveryNotes}</p>` : ''}
       </body></html>
@@ -513,11 +542,30 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     doc.setFont(undefined, 'bold');
     doc.text(`Total: ${formatCurrency(delivery.total)}`, 14, finalY + 10);
     
+    // Add Products Summary section
+    if (itemsList.length > 0) {
+      const productsSummary = itemsList.map((item: any) => {
+        const productName = item.description || item.name || 'N/A';
+        const quantity = item.quantity || item.delivered || 0;
+        return `${productName} (${quantity})`;
+      }).join(', ');
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('Products Summary:', 14, finalY + 20);
+      doc.setFont(undefined, 'normal');
+      
+      // Split long text to fit on page
+      const splitSummary = doc.splitTextToSize(productsSummary, 180);
+      doc.text(splitSummary, 14, finalY + 26);
+    }
+    
     if (delivery.deliveryNotes) {
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      doc.text('Notes:', 14, finalY + 20);
-      doc.text(delivery.deliveryNotes, 14, finalY + 26);
+      const notesY = itemsList.length > 0 ? finalY + 40 : finalY + 20;
+      doc.text('Notes:', 14, notesY);
+      doc.text(delivery.deliveryNotes, 14, notesY + 6);
     }
     
     const pdfBlob = doc.output('blob');
@@ -547,79 +595,420 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     }
 
     const totalValue = filteredDeliveries.reduce((sum, d) => sum + d.total, 0);
+    const totalItems = filteredDeliveries.reduce((sum, d) => sum + d.items, 0);
+    const completedCount = filteredDeliveries.filter(d => d.status === 'delivered' || d.status === 'completed').length;
+    const inTransitCount = filteredDeliveries.filter(d => d.status === 'in-transit').length;
+    const pendingCount = filteredDeliveries.filter(d => d.status === 'pending').length;
+    
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast({ title: "Print Failed", description: "Please allow popups", variant: "destructive" });
       return;
     }
 
-    const rows = filteredDeliveries.map(d => `
+    const rows = filteredDeliveries.map((d, index) => {
+      // Generate Products Summary for each delivery
+      const productsSummary = d.itemsList && d.itemsList.length > 0 
+        ? d.itemsList.map((item: any) => {
+            const productName = item.description || item.name || 'N/A';
+            const quantity = item.quantity || item.delivered || 0;
+            return `${productName} (${quantity})`;
+          }).join(', ')
+        : 'N/A';
+      
+      // Status badge styling
+      let statusBg = '#f8d7da';
+      let statusColor = '#721c24';
+      if (d.status === 'delivered' || d.status === 'completed') {
+        statusBg = '#d4edda';
+        statusColor = '#155724';
+      } else if (d.status === 'in-transit') {
+        statusBg = '#cce5ff';
+        statusColor = '#004085';
+      } else if (d.status === 'pending') {
+        statusBg = '#fff3cd';
+        statusColor = '#856404';
+      }
+      
+      return `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.deliveryNoteNumber}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.date}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.customer}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;"><span style="padding: 3px 10px; border-radius: 10px; background: ${d.status === 'delivered' ? '#d4edda' : d.status === 'in-transit' ? '#cce5ff' : d.status === 'pending' ? '#fff3cd' : '#f8d7da'}; color: ${d.status === 'delivered' ? '#155724' : d.status === 'in-transit' ? '#004085' : d.status === 'pending' ? '#856404' : '#721c24'}; font-size: 12px;">${d.status}</span></td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${d.items}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${formatCurrency(d.total)}</td>
+        <td class="note-number">${d.deliveryNoteNumber}</td>
+        <td class="date">${d.date}</td>
+        <td class="customer">${d.customer}</td>
+        <td class="status">
+          <span class="status-badge">
+            ${d.status}
+          </span>
+        </td>
+        <td class="items">${d.items}</td>
+        <td class="total">${formatCurrency(d.total)}</td>
+        <td class="products-summary">${productsSummary}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
+
+    const now = new Date();
+    const dateString = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const timeString = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Deliveries Report</title>
+        <title>Outlet Deliveries Report</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #f59e0b; padding-bottom: 20px; }
-          .header h1 { font-size: 28px; color: #f59e0b; margin-bottom: 10px; }
-          .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
-          .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; }
-          .stat-card h3 { font-size: 12px; color: #666; margin-bottom: 5px; text-transform: uppercase; }
-          .stat-card p { font-size: 20px; font-weight: bold; color: #f59e0b; }
-          table { width: 100%; border-collapse: collapse; }
-          th { background: #f59e0b; color: white; padding: 10px; text-align: left; }
-          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+          @media print {
+            @page {
+              size: A4 landscape;
+              margin: 15mm;
+            }
+          }
+          
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            padding: 20px;
+            background: white;
+            color: #000;
+          }
+          
+          .report-container {
+            max-width: 1400px;
+            margin: 0 auto;
+          }
+          
+          /* Header Section */
+          .header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+          
+          .header-left h1 {
+            font-size: 24px;
+            color: #000;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          
+          .header-left .subtitle {
+            font-size: 12px;
+            color: #666;
+          }
+          
+          .header-right {
+            text-align: right;
+            font-size: 11px;
+            color: #666;
+          }
+          
+          .header-right .date-time {
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 3px;
+          }
+          
+          /* Summary Cards */
+          .summary-section {
+            margin-bottom: 20px;
+          }
+          
+          .summary-section h2 {
+            font-size: 14px;
+            color: #000;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          
+          .stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+          }
+          
+          .stat-card {
+            background: #f5f5f5;
+            padding: 12px;
+            border-left: 3px solid #000;
+          }
+          
+          .stat-card h3 {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: bold;
+          }
+          
+          .stat-card .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #000;
+          }
+          
+          /* Table Section */
+          .table-section {
+            margin-bottom: 20px;
+          }
+          
+          .table-section h2 {
+            font-size: 14px;
+            color: #000;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+          }
+          
+          thead {
+            background: #000;
+            color: white;
+          }
+          
+          th {
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 9px;
+          }
+          
+          th.right {
+            text-align: right;
+          }
+          
+          th.center {
+            text-align: center;
+          }
+          
+          tbody tr {
+            border-bottom: 1px solid #ddd;
+          }
+          
+          tbody tr:nth-child(even) {
+            background: #f9f9f9;
+          }
+          
+          td {
+            padding: 8px 6px;
+            vertical-align: top;
+          }
+          
+          .note-number {
+            font-weight: bold;
+            color: #000;
+            font-family: 'Courier New', monospace;
+          }
+          
+          .date {
+            color: #666;
+            white-space: nowrap;
+          }
+          
+          .customer {
+            font-weight: bold;
+          }
+          
+          .status {
+            text-align: center;
+          }
+          
+          .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          
+          .items {
+            text-align: center;
+            font-weight: bold;
+          }
+          
+          .total {
+            text-align: right;
+            font-weight: bold;
+            color: #000;
+            font-size: 11px;
+            white-space: nowrap;
+          }
+          
+          .products-summary {
+            font-size: 9px;
+            color: #333;
+            line-height: 1.3;
+            max-width: 250px;
+          }
+          
+          /* Footer */
+          .footer {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 2px solid #000;
+          }
+          
+          .footer .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f5f5f5;
+            border: 1px solid #000;
+            margin-bottom: 30px;
+          }
+          
+          .footer .total-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #000;
+            text-transform: uppercase;
+          }
+          
+          .footer .total-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+          }
+          
+          .footer .signature {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+          }
+          
+          .footer .signature-line {
+            width: 200px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+          }
+          
+          .footer .notice {
+            margin-top: 15px;
+            font-size: 9px;
+            color: #666;
+            text-align: center;
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>OUTLET DELIVERIES REPORT</h1>
-          <p>Generated: ${new Date().toLocaleString()}</p>
-        </div>
-        <div class="stats">
-          <div class="stat-card">
-            <h3>Total Deliveries</h3>
-            <p>${filteredDeliveries.length}</p>
+        <div class="report-container">
+          <!-- Header -->
+          <div class="header">
+            <div class="header-left">
+              <h1>OUTLET DELIVERIES REPORT</h1>
+              <div class="subtitle">Comprehensive Delivery Tracking & Management</div>
+            </div>
+            <div class="header-right">
+              <div class="date-time">${dateString}</div>
+              <div>${timeString}</div>
+              <div style="margin-top: 5px; font-size: 10px; color: #999;">Report ID: RPT-${now.getTime().toString().slice(-8)}</div>
+            </div>
           </div>
-          <div class="stat-card">
-            <h3>Total Items</h3>
-            <p>${filteredDeliveries.reduce((sum, d) => sum + d.items, 0)}</p>
+          
+          <!-- Summary Section -->
+          <div class="summary-section">
+            <h2>Summary Overview</h2>
+            <div class="stats">
+              <div class="stat-card">
+                <h3>Total Deliveries</h3>
+                <div class="value">${filteredDeliveries.length}</div>
+              </div>
+              <div class="stat-card">
+                <h3>Total Items</h3>
+                <div class="value">${totalItems.toLocaleString()}</div>
+              </div>
+              <div class="stat-card">
+                <h3>Total Value</h3>
+                <div class="value">${formatCurrency(totalValue)}</div>
+              </div>
+              <div class="stat-card">
+                <h3>Completed</h3>
+                <div class="value">${completedCount}</div>
+              </div>
+              <div class="stat-card">
+                <h3>In Transit</h3>
+                <div class="value">${inTransitCount}</div>
+              </div>
+            </div>
           </div>
-          <div class="stat-card">
-            <h3>Total Value</h3>
-            <p>${formatCurrency(totalValue)}</p>
+          
+          <!-- Table Section -->
+          <div class="table-section">
+            <h2>Delivery Details</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 120px;">Note Number</th>
+                  <th style="width: 90px;">Date</th>
+                  <th style="width: 140px;">Customer</th>
+                  <th style="width: 90px;" class="center">Status</th>
+                  <th style="width: 60px;" class="center">Items</th>
+                  <th style="width: 110px;" class="right">Total Value</th>
+                  <th>Products Summary</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
           </div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Note Number</th>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th style="text-align: center;">Items</th>
-              <th style="text-align: right;">Total Value</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div class="footer">
-          <p>End of Report</p>
+          
+          <!-- Footer -->
+          <div class="footer">
+            <div class="total-row">
+              <div class="total-label">Grand Total Value</div>
+              <div class="total-value">${formatCurrency(totalValue)}</div>
+            </div>
+            
+            <div class="signature">
+              <div class="signature-line">
+                Prepared By
+              </div>
+              <div class="signature-line">
+                Verified By
+              </div>
+              <div class="signature-line">
+                Approved By
+              </div>
+            </div>
+            
+            <div class="notice">
+              This is a system-generated report. For questions, please contact the outlet manager.
+            </div>
+          </div>
         </div>
       </body>
       </html>
     `);
+    
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
   };
@@ -640,16 +1029,37 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     doc.text(`Total Deliveries: ${filteredDeliveries.length}`, 14, 36);
     doc.text(`Total Value: ${formatCurrency(totalValue)}`, 14, 42);
     
-    const tableData = filteredDeliveries.map(d => [
-      d.deliveryNoteNumber, d.date, d.customer, d.status, d.items.toString(), formatCurrency(d.total)
-    ]);
+    const tableData = filteredDeliveries.map(d => {
+      // Generate Products Summary for each delivery
+      const productsSummary = d.itemsList && d.itemsList.length > 0 
+        ? d.itemsList.map((item: any) => {
+            const productName = item.description || item.name || 'N/A';
+            const quantity = item.quantity || item.delivered || 0;
+            return `${productName} (${quantity})`;
+          }).join(', ')
+        : 'N/A';
+      
+      return [
+        d.deliveryNoteNumber, 
+        d.date, 
+        d.customer, 
+        d.status, 
+        d.items.toString(), 
+        formatCurrency(d.total),
+        productsSummary
+      ];
+    });
     
     autoTable(doc, {
       startY: 50,
-      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value']],
+      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value', 'Products Summary']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [245, 158, 11] },
+      styles: { fontSize: 8 },
+      columnStyles: {
+        6: { cellWidth: 60 } // Wider column for Products Summary
+      }
     });
     
     const filename = `deliveries-${new Date().toISOString().split('T')[0]}.pdf`;
@@ -668,13 +1078,22 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
       <head><meta charset="UTF-8"><style>td, th { padding: 5px; border: 1px solid #ccc; } th { background: #f59e0b; color: white; }</style></head>
       <body><table>
-        <tr><td colspan="6" style="font-weight: bold;">Outlet Deliveries Report</td></tr>
-        <tr><td colspan="6">Total Deliveries: ${filteredDeliveries.length} | Total Value: ${formatCurrency(totalValue)}</td></tr>
-        <tr><th>Note Number</th><th>Date</th><th>Customer</th><th>Status</th><th>Items</th><th>Total Value</th></tr>
+        <tr><td colspan="7" style="font-weight: bold;">Outlet Deliveries Report</td></tr>
+        <tr><td colspan="7">Total Deliveries: ${filteredDeliveries.length} | Total Value: ${formatCurrency(totalValue)}</td></tr>
+        <tr><th>Note Number</th><th>Date</th><th>Customer</th><th>Status</th><th>Items</th><th>Total Value</th><th>Products Summary</th></tr>
     `;
     
     filteredDeliveries.forEach(d => {
-      html += `<tr><td>${d.deliveryNoteNumber}</td><td>${d.date}</td><td>${d.customer}</td><td>${d.status}</td><td>${d.items}</td><td>${d.total}</td></tr>`;
+      // Generate Products Summary for each delivery
+      const productsSummary = d.itemsList && d.itemsList.length > 0 
+        ? d.itemsList.map((item: any) => {
+            const productName = item.description || item.name || 'N/A';
+            const quantity = item.quantity || item.delivered || 0;
+            return `${productName} (${quantity})`;
+          }).join(', ')
+        : 'N/A';
+      
+      html += `<tr><td>${d.deliveryNoteNumber}</td><td>${d.date}</td><td>${d.customer}</td><td>${d.status}</td><td>${d.items}</td><td>${d.total}</td><td>${productsSummary}</td></tr>`;
     });
     
     html += '</table></body></html>';
