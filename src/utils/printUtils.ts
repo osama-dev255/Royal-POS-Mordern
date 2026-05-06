@@ -1036,20 +1036,33 @@ export class PrintUtils {
     <style>
       @media print {
         @page {
-          margin: 0;
-          size: A4;
+          margin: 10mm;
+          size: A4 portrait;
         }
-        body {
+        html, body {
+          width: 210mm;
+          height: 297mm;
           margin: 0;
           padding: 0;
+          overflow: hidden;
+        }
+        * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .no-print {
-          display: none;
+          display: none !important;
         }
       }
       @page {
+        margin: 10mm;
+        size: A4 portrait;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
         margin: 0;
-        size: A4;
+        padding: 0;
       }
       * {
         margin: 0;
@@ -1069,7 +1082,7 @@ export class PrintUtils {
       }
       .statement-container {
         width: 100%;
-        max-width: 210mm;
+        max-width: 190mm;
         margin: 0 auto;
         padding: 8px;
         background: #fff;
