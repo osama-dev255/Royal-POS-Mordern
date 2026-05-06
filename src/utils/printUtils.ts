@@ -973,6 +973,9 @@ export class PrintUtils {
   static printCustomerSettlementMobile(settlement: any) {
     console.log('Using mobile print approach for customer settlement...');
     
+    // Hide the loading indicator before showing modal
+    this.hideLoadingIndicator();
+    
     // Create a modal dialog for mobile printing with a clear print button
     const modal = document.createElement('div');
     modal.style.position = 'fixed';
@@ -1084,9 +1087,442 @@ export class PrintUtils {
     
     if (confirmBtn) {
       confirmBtn.addEventListener('click', () => {
-        // Use the standard print method for mobile
-        this.printCustomerSettlement(settlement);
+        // Remove the modal first
         document.body.removeChild(modal);
+        
+        // Show loading indicator again
+        this.showLoadingIndicator('Preparing print...');
+        
+        // Directly use iframe print method for mobile
+        const printFrame = document.createElement('iframe');
+        printFrame.style.position = 'absolute';
+        printFrame.style.top = '-1000px';
+        printFrame.style.left = '-1000px';
+        document.body.appendChild(printFrame);
+        
+        const printDocument = printFrame.contentDocument || printFrame.contentWindow?.document;
+        if (!printDocument) {
+          this.hideLoadingIndicator();
+          console.error('Could not access print frame document');
+          return;
+        }
+        
+        // Use the same settlement content generation as desktop
+        const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+        const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
+        const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
+        const businessEmail = localStorage.getItem('businessEmail') || '';
+        
+        const receiptNumber = settlement.receiptNumber || `SETTLE-${Date.now()}`;
+        const receiptDate = new Date(settlement.date || new Date());
+        const dateStr = receiptDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        
+        const customerName = settlement.customer?.name || 'Walk-in Customer';
+        const paymentMethod = settlement.paymentMethod || 'Cash';
+        const paymentMethodUpper = paymentMethod.toUpperCase();
+        
+        const previousBalance = settlement.previousDebtBalance || 0;
+        const amountPaid = settlement.debtPaymentAmount || settlement.amountPaid || 0;
+        const newBalance = settlement.newBalance || (previousBalance - amountPaid);
+        
+        const cashier = settlement.cashier || 'Not Assigned';
+        const preparedBy = settlement.preparedBy || 'Not Assigned';
+        const approvedBy = settlement.approvedBy || '';
+        
+        const formatCurrency = (amount: number) => {
+          return `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+        
+        const getStatusBadge = () => {
+          if (newBalance === 0) return '✓ FULLY SETTLED';
+          if (amountPaid > 0 && newBalance > 0) return '◐ PARTIAL PAYMENT';
+          return '○ PENDING';
+        };
+        
+        // Use the same HTML template as desktop (the responsive one we just created)
+        const settlementContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>Settlement Statement ${receiptNumber}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      @media print {
+        @page {
+          margin: 0;
+          size: A4;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        .no-print {
+          display: none;
+        }
+      }
+      @page {
+        margin: 0;
+        size: A4;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 10mm;
+        background: #fff;
+        color: #000;
+      }
+      .statement-container {
+        width: 100%;
+        max-width: 210mm;
+        margin: 0 auto;
+        padding: 8px;
+        background: #fff;
+      }
+      .header-section {
+        text-align: center;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+      }
+      .logo-area {
+        font-size: 20px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+      }
+      .business-details {
+        font-size: 11px;
+        line-height: 1.4;
+        margin-bottom: 5px;
+      }
+      .statement-title {
+        background: #000;
+        color: #fff;
+        padding: 4px 8px;
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: 3px;
+        text-align: center;
+        margin: 8px 0;
+        text-transform: uppercase;
+      }
+      .meta-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        margin-bottom: 10px;
+        padding: 6px;
+        background: #f5f5f5;
+      }
+      .meta-label {
+        font-weight: 700;
+        display: block;
+        font-size: 10px;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+        color: #666;
+      }
+      .meta-value {
+        font-weight: 600;
+      }
+      .customer-section {
+        margin-bottom: 10px;
+        padding: 6px;
+        background: #fafafa;
+      }
+      .section-label {
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+        color: #000;
+      }
+      .customer-name {
+        font-size: 14px;
+        font-weight: 900;
+        margin-bottom: 2px;
+      }
+      .transaction-box {
+        margin: 10px 0;
+        background: #fff;
+      }
+      .transaction-header {
+        background: #000;
+        color: #fff;
+        padding: 4px 6px;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .transaction-body {
+        padding: 8px 6px;
+      }
+      .transaction-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        font-size: 11px;
+      }
+      .transaction-row:last-child {
+        margin-bottom: 0;
+      }
+      .row-label {
+        font-weight: 600;
+        color: #333;
+      }
+      .row-value {
+        font-weight: 700;
+        text-align: right;
+      }
+      .amount-negative {
+        color: #000;
+        text-decoration: line-through;
+      }
+      .calculation-section {
+        margin: 10px 0;
+        background: #f0f0f0;
+      }
+      .calc-header {
+        background: #333;
+        color: #fff;
+        padding: 4px 6px;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .calc-body {
+        padding: 8px 6px;
+      }
+      .calc-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 11px;
+      }
+      .calc-row:last-child {
+        border-bottom: none;
+      }
+      .calc-row.grand-total {
+        border-top: 2px solid #000;
+        margin-top: 4px;
+        padding-top: 6px;
+        font-size: 11px;
+        font-weight: 900;
+        background: #fff;
+        padding: 6px;
+        margin: 4px -6px -8px -6px;
+      }
+      .payment-badge {
+        display: inline-block;
+        background: #000;
+        color: #fff;
+        padding: 3px 8px;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        text-transform: uppercase;
+      }
+      .status-badge {
+        display: block;
+        text-align: center;
+        padding: 6px;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        margin: 10px 0;
+        background: #fff;
+      }
+      .footer-section {
+        margin-top: 10px;
+        padding-top: 8px;
+        text-align: center;
+      }
+      .footer-message {
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 3px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .footer-sub {
+        font-size: 10px;
+        color: #666;
+        line-height: 1.3;
+      }
+      .barcode-area {
+        margin-top: 8px;
+        padding: 4px;
+        background: #f5f5f5;
+        font-size: 11px;
+        font-family: 'Libre Barcode 39', cursive;
+        text-align: center;
+      }
+      .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        font-size: 50px;
+        font-weight: 900;
+        color: rgba(0, 0, 0, 0.03);
+        pointer-events: none;
+        z-index: 0;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="statement-container">
+      <div class="watermark">SETTLEMENT</div>
+      
+      <div class="header-section">
+        <div class="logo-area">${businessName}</div>
+        <div class="business-details">
+          ${businessAddress}<br>
+          Tel: ${businessPhone}
+          ${businessEmail ? `<br>${businessEmail}` : ''}
+        </div>
+      </div>
+      
+      <div class="statement-title">Payment Statement</div>
+      
+      <div class="meta-info">
+        <div>
+          <span class="meta-label">Receipt No</span>
+          <span class="meta-value">${receiptNumber}</span>
+        </div>
+        <div style="text-align: right;">
+          <span class="meta-label">Date & Time</span>
+          <span class="meta-value">${dateStr}<br>${timeStr}</span>
+        </div>
+      </div>
+      
+      <div class="customer-section">
+        <div class="section-label">Settled By</div>
+        <div class="customer-name">${customerName}</div>
+      </div>
+      
+      <div class="transaction-box">
+        <div class="transaction-header">Payment Details</div>
+        <div class="transaction-body">
+          <div class="transaction-row">
+            <span class="row-label">Payment Mode</span>
+            <span class="payment-badge">${paymentMethodUpper}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="calculation-section">
+        <div class="calc-header">Account Summary</div>
+        <div class="calc-body">
+          ${previousBalance > 0 ? `
+          <div class="calc-row">
+            <span>Opening Balance</span>
+            <span class="row-value">${formatCurrency(previousBalance)}</span>
+          </div>
+          ` : ''}
+          <div class="calc-row">
+            <span>Payment Received</span>
+            <span class="row-value amount-negative">- ${formatCurrency(amountPaid)}</span>
+          </div>
+          <div class="calc-row grand-total">
+            <span>Closing Balance</span>
+            <span class="row-value">${formatCurrency(newBalance)}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="status-badge">${getStatusBadge()}</div>
+      
+      ${cashier || preparedBy || approvedBy ? `
+      <div class="transaction-box" style="margin-top: 10px;">
+        <div class="transaction-header">Authorization</div>
+        <div class="transaction-body">
+          <div style="display: flex; justify-content: space-between; gap: 10px;">
+            ${cashier ? `
+            <div style="flex: 1;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Cashier</div>
+              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; font-size: 11px;">${cashier}</div>
+            </div>
+            ` : ''}
+            ${preparedBy ? `
+            <div style="flex: 1;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Prepared By</div>
+              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; font-size: 11px;">${preparedBy}</div>
+            </div>
+            ` : ''}
+            <div style="flex: 1;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px;">Approved By</div>
+              <div style="font-weight: 600; padding: 4px; background: #f5f5f5; min-height: 20px; font-size: 11px;">${approvedBy || '_______________________'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+      
+      <div class="footer-section">
+        <div class="footer-message">Thank You For Your Payment</div>
+        <div class="footer-sub">
+          This is a computer-generated statement<br>
+          and does not require signature
+        </div>
+        <div class="barcode-area">
+          *${receiptNumber}*
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      window.onload = function() {
+        setTimeout(function() {
+          window.print();
+        }, 300);
+      }
+    </script>
+  </body>
+</html>`;
+        
+        // Write content to iframe and print
+        printDocument.open();
+        printDocument.write(settlementContent);
+        printDocument.close();
+        
+        // Wait for content to load before printing
+        printFrame.onload = () => {
+          try {
+            printFrame.contentWindow?.focus();
+            printFrame.contentWindow?.print();
+          } catch (error) {
+            console.error('Error during printing:', error);
+          } finally {
+            setTimeout(() => {
+              if (printFrame.parentNode) {
+                printFrame.parentNode.removeChild(printFrame);
+              }
+              this.hideLoadingIndicator();
+            }, 1000);
+          }
+        };
+        
+        setTimeout(() => {
+          if (printFrame.parentNode) {
+            printFrame.parentNode.removeChild(printFrame);
+          }
+          this.hideLoadingIndicator();
+        }, 5000);
       });
     }
     
