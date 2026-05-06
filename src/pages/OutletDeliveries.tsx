@@ -594,6 +594,47 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       return;
     }
 
+    // Determine report title based on current filter
+    let reportTitle = 'ALL DELIVERIES REPORT';
+    let reportSubtitle = 'Comprehensive Delivery Tracking & Management';
+    let filterInfo = '';
+    
+    if (sectionFilter === 'in') {
+      reportTitle = 'DELIVERIES IN REPORT';
+      
+      // Add source filter information for Deliveries In
+      if (sourceFilter === 'investment') {
+        reportSubtitle = 'Incoming Deliveries from Investment (Main Warehouse)';
+        filterInfo = 'Source: Investment (Main Warehouse)';
+      } else if (sourceFilter === 'outlet') {
+        reportSubtitle = 'Incoming Deliveries from Other Outlets';
+        filterInfo = 'Source: Other Outlets';
+      } else {
+        reportSubtitle = 'Incoming Deliveries from All Sources';
+        filterInfo = 'Source: All Sources (Investment & Outlets)';
+      }
+    } else if (sectionFilter === 'out') {
+      reportTitle = 'DELIVERIES OUT REPORT';
+      
+      // Extract unique destinations from filtered deliveries
+      const uniqueDestinations = [...new Set(
+        filteredDeliveries
+          .map(d => d.customer)
+          .filter(Boolean)
+      )];
+      
+      if (uniqueDestinations.length === 1) {
+        reportSubtitle = 'Outgoing Deliveries to Destination';
+        filterInfo = `Destination: ${uniqueDestinations[0]}`;
+      } else if (uniqueDestinations.length > 1) {
+        reportSubtitle = `Outgoing Deliveries to ${uniqueDestinations.length} Destinations`;
+        filterInfo = `Destinations: ${uniqueDestinations.join(', ')}`;
+      } else {
+        reportSubtitle = 'Outgoing Deliveries from Outlet';
+        filterInfo = 'Destinations: All Destinations';
+      }
+    }
+
     const totalValue = filteredDeliveries.reduce((sum, d) => sum + d.total, 0);
     const totalItems = filteredDeliveries.reduce((sum, d) => sum + d.items, 0);
     const completedCount = filteredDeliveries.filter(d => d.status === 'delivered' || d.status === 'completed').length;
@@ -723,6 +764,16 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             font-weight: bold;
             color: #000;
             margin-bottom: 3px;
+          }
+          
+          .source-info {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-left: 3px solid #000;
+            font-size: 11px;
+            font-weight: bold;
+            color: #000;
           }
           
           /* Summary Cards */
@@ -923,8 +974,9 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           <!-- Header -->
           <div class="header">
             <div class="header-left">
-              <h1>OUTLET DELIVERIES REPORT</h1>
-              <div class="subtitle">Comprehensive Delivery Tracking & Management</div>
+              <h1>${reportTitle}</h1>
+              <div class="subtitle">${reportSubtitle}</div>
+              ${filterInfo ? `<div class="source-info">${filterInfo}</div>` : ''}
             </div>
             <div class="header-right">
               <div class="date-time">${dateString}</div>
