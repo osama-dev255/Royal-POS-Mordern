@@ -1014,13 +1014,13 @@ export class PrintUtils {
         return '○ PENDING';
       };
       
-      // Use the responsive HTML template - Bank Slip Format
+      // Use the responsive HTML template - Clean Bank Slip Format
       const settlementContent = `<!DOCTYPE html>
 <html>
   <head>
     <title>Settlement Statement ${receiptNumber}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       * {
         margin: 0;
@@ -1041,15 +1041,15 @@ export class PrintUtils {
         font-size: 11px;
         line-height: 1.6;
         padding: 20px;
-        color: #1a1a1a;
-        background: #f5f5f5;
+        color: #333;
+        background: #fff;
       }
       
       .statement-container {
         max-width: 800px;
         margin: 0 auto;
         background: #fff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        position: relative;
       }
       
       @media print {
@@ -1071,7 +1071,6 @@ export class PrintUtils {
         
         .statement-container {
           max-width: 100%;
-          box-shadow: none;
         }
         
         * {
@@ -1080,12 +1079,27 @@ export class PrintUtils {
         }
       }
       
-      /* Official Header */
+      /* Watermark */
+      .watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-30deg);
+        font-size: 80px;
+        font-weight: 700;
+        color: rgba(0, 0, 0, 0.03);
+        pointer-events: none;
+        z-index: 0;
+        white-space: nowrap;
+        letter-spacing: 10px;
+      }
+      
+      /* Clean Header */
       .official-header {
-        background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
-        color: #fff;
-        padding: 20px 30px;
-        border-bottom: 4px solid #000;
+        padding: 25px 30px;
+        border-bottom: 2px solid #e0e0e0;
+        position: relative;
+        z-index: 1;
       }
       
       .header-top {
@@ -1096,28 +1110,28 @@ export class PrintUtils {
       }
       
       .company-info h1 {
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: 2px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #333;
         margin-bottom: 5px;
         text-transform: uppercase;
+        letter-spacing: 1px;
       }
       
       .company-details {
         font-size: 10px;
         line-height: 1.8;
-        opacity: 0.9;
+        color: #666;
       }
       
       .document-badge {
-        background: #fff;
-        color: #000;
-        padding: 8px 16px;
-        font-size: 11px;
-        font-weight: 700;
+        padding: 6px 14px;
+        font-size: 10px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 2px;
-        border: 2px solid #fff;
+        letter-spacing: 1px;
+        color: #333;
+        border: 1px solid #333;
       }
       
       .document-meta {
@@ -1125,7 +1139,7 @@ export class PrintUtils {
         grid-template-columns: repeat(3, 1fr);
         gap: 15px;
         padding-top: 15px;
-        border-top: 1px solid rgba(255,255,255,0.2);
+        border-top: 1px solid #e0e0e0;
       }
       
       .meta-item {
@@ -1138,46 +1152,45 @@ export class PrintUtils {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
-        opacity: 0.8;
+        color: #999;
         margin-bottom: 3px;
       }
       
       .meta-value {
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 600;
+        color: #333;
       }
       
       /* Customer Section */
       .customer-section {
         padding: 20px 30px;
         background: #fafafa;
-        border-bottom: 2px solid #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
+        position: relative;
+        z-index: 1;
       }
       
       .section-header {
-        font-size: 10px;
-        font-weight: 700;
+        font-size: 9px;
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 2px;
-        color: #666;
-        margin-bottom: 10px;
+        color: #999;
+        margin-bottom: 8px;
       }
       
       .customer-name {
         font-size: 18px;
-        font-weight: 700;
-        color: #1a1a1a;
-        margin-bottom: 5px;
-      }
-      
-      .customer-details {
-        font-size: 11px;
-        color: #666;
+        font-weight: 600;
+        color: #333;
       }
       
       /* Transaction Table */
       .transaction-section {
         padding: 20px 30px;
+        position: relative;
+        z-index: 1;
       }
       
       .transaction-table {
@@ -1187,17 +1200,18 @@ export class PrintUtils {
       }
       
       .transaction-table thead {
-        background: #1a1a1a;
-        color: #fff;
+        background: transparent;
       }
       
       .transaction-table th {
-        padding: 12px 15px;
+        padding: 10px 15px;
         text-align: left;
-        font-size: 10px;
-        font-weight: 700;
+        font-size: 9px;
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
+        color: #999;
+        border-bottom: 1px solid #e0e0e0;
       }
       
       .transaction-table th:last-child {
@@ -1205,16 +1219,17 @@ export class PrintUtils {
       }
       
       .transaction-table tbody tr {
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid #f0f0f0;
       }
       
       .transaction-table tbody tr:last-child {
-        border-bottom: 2px solid #1a1a1a;
+        border-bottom: 1px solid #e0e0e0;
       }
       
       .transaction-table td {
         padding: 12px 15px;
         font-size: 11px;
+        color: #333;
       }
       
       .transaction-table td:last-child {
@@ -1228,33 +1243,35 @@ export class PrintUtils {
       }
       
       .value-cell {
-        font-weight: 700;
-        color: #1a1a1a;
+        font-weight: 600;
+        color: #333;
       }
       
       .payment-method-badge {
         display: inline-block;
-        background: #1a1a1a;
-        color: #fff;
-        padding: 4px 12px;
+        padding: 4px 10px;
         font-size: 10px;
-        font-weight: 700;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.5px;
+        color: #333;
+        border: 1px solid #333;
       }
       
       /* Summary Box */
       .summary-section {
         padding: 20px 30px;
-        background: #f5f5f5;
-        border-top: 2px solid #e0e0e0;
+        background: #fafafa;
+        border-top: 1px solid #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
+        position: relative;
+        z-index: 1;
       }
       
       .summary-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 20px;
-        margin-bottom: 20px;
       }
       
       .summary-card {
@@ -1268,52 +1285,42 @@ export class PrintUtils {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #666;
+        color: #999;
         margin-bottom: 8px;
       }
       
       .summary-value {
         font-size: 20px;
-        font-weight: 800;
-        color: #1a1a1a;
-      }
-      
-      .summary-value.positive {
-        color: #22c55e;
-      }
-      
-      .summary-value.negative {
-        color: #ef4444;
+        font-weight: 700;
+        color: #333;
       }
       
       /* Status Badge */
       .status-section {
         text-align: center;
-        padding: 15px 30px;
-        border-top: 2px solid #e0e0e0;
+        padding: 20px 30px;
+        position: relative;
+        z-index: 1;
       }
       
       .status-badge {
         display: inline-block;
-        padding: 10px 30px;
-        font-size: 13px;
-        font-weight: 800;
+        padding: 8px 25px;
+        font-size: 12px;
+        font-weight: 700;
         letter-spacing: 2px;
         text-transform: uppercase;
-        border: 3px solid #1a1a1a;
-        color: #1a1a1a;
+        color: #333;
+        border: 2px solid #333;
         background: #fff;
-      }
-      
-      .status-badge.settled {
-        background: #1a1a1a;
-        color: #fff;
       }
       
       /* Authorization Section */
       .authorization-section {
         padding: 20px 30px;
-        border-top: 2px solid #e0e0e0;
+        border-top: 1px solid #e0e0e0;
+        position: relative;
+        z-index: 1;
       }
       
       .auth-grid {
@@ -1333,51 +1340,55 @@ export class PrintUtils {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #666;
+        color: #999;
         margin-bottom: 6px;
       }
       
       .auth-value {
         font-size: 12px;
         font-weight: 600;
-        color: #1a1a1a;
+        color: #333;
       }
       
       /* Footer */
       .official-footer {
         padding: 20px 30px;
-        background: #1a1a1a;
-        color: #fff;
         text-align: center;
-        border-top: 4px solid #000;
+        border-top: 1px solid #e0e0e0;
+        position: relative;
+        z-index: 1;
       }
       
       .footer-message {
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 1px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #333;
         margin-bottom: 5px;
       }
       
       .footer-sub {
         font-size: 10px;
-        opacity: 0.8;
+        color: #999;
         line-height: 1.5;
       }
       
       .footer-ref {
         margin-top: 10px;
         padding-top: 10px;
-        border-top: 1px solid rgba(255,255,255,0.2);
+        border-top: 1px solid #e0e0e0;
         font-size: 10px;
         font-family: monospace;
+        color: #666;
         letter-spacing: 1px;
       }
     </style>
   </head>
   <body>
     <div class="statement-container">
-      <!-- Official Header -->
+      <!-- Watermark -->
+      <div class="watermark">SETTLEMENT</div>
+      
+      <!-- Clean Header -->
       <div class="official-header">
         <div class="header-top">
           <div class="company-info">
@@ -1416,6 +1427,12 @@ export class PrintUtils {
       <div class="transaction-section">
         <div class="section-header">Payment Details</div>
         <table class="transaction-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Details</th>
+            </tr>
+          </thead>
           <tbody>
             <tr>
               <td class="label-cell">Payment Method</td>
@@ -1447,18 +1464,18 @@ export class PrintUtils {
           ` : ''}
           <div class="summary-card">
             <div class="summary-label">Amount Paid</div>
-            <div class="summary-value positive">${formatCurrency(amountPaid)}</div>
+            <div class="summary-value">${formatCurrency(amountPaid)}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">Closing Balance</div>
-            <div class="summary-value ${newBalance === 0 ? 'positive' : 'negative'}">${formatCurrency(newBalance)}</div>
+            <div class="summary-value">${formatCurrency(newBalance)}</div>
           </div>
         </div>
       </div>
       
       <!-- Status Section -->
       <div class="status-section">
-        <div class="status-badge ${newBalance === 0 ? 'settled' : ''}">${getStatusBadge()}</div>
+        <div class="status-badge">${getStatusBadge()}</div>
       </div>
       
       <!-- Authorization Section -->
@@ -1486,7 +1503,7 @@ export class PrintUtils {
       </div>
       ` : ''}
       
-      <!-- Official Footer -->
+      <!-- Clean Footer -->
       <div class="official-footer">
         <div class="footer-message">Thank You For Your Payment</div>
         <div class="footer-sub">
