@@ -979,21 +979,8 @@ export class PrintUtils {
     // Show a brief loading message
     this.showLoadingIndicator('Preparing print...');
     
-    // Directly use iframe print method for mobile (no preview modal)
+    // Use a new window approach for better PDF export control
     setTimeout(() => {
-      const printFrame = document.createElement('iframe');
-      printFrame.style.position = 'absolute';
-      printFrame.style.top = '-1000px';
-      printFrame.style.left = '-1000px';
-      document.body.appendChild(printFrame);
-      
-      const printDocument = printFrame.contentDocument || printFrame.contentWindow?.document;
-      if (!printDocument) {
-        this.hideLoadingIndicator();
-        console.error('Could not access print frame document');
-        return;
-      }
-      
       // Use the same settlement content generation as desktop
       const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
       const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
@@ -1034,63 +1021,67 @@ export class PrintUtils {
     <title>Settlement Statement ${receiptNumber}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      @media print {
-        @page {
-          margin: 10mm;
-          size: A4 portrait;
-        }
-        html, body {
-          width: 210mm;
-          height: 297mm;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-        }
-        * {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        .no-print {
-          display: none !important;
-        }
-      }
-      @page {
-        margin: 10mm;
-        size: A4 portrait;
-      }
-      html, body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
+      
       body {
         font-family: 'Courier New', Courier, monospace;
         font-size: 12px;
         line-height: 1.5;
-        width: 100%;
-        max-width: 100%;
-        margin: 0 auto;
-        padding: 10mm;
-        background: #fff;
+        padding: 20px;
         color: #000;
       }
+      
       .statement-container {
-        width: 100%;
-        max-width: 190mm;
+        max-width: 800px;
         margin: 0 auto;
-        padding: 8px;
+        padding: 20px;
         background: #fff;
       }
+      
+      @media print {
+        @page {
+          margin: 15mm;
+          size: A4 portrait;
+        }
+        
+        html, body {
+          width: 210mm;
+          margin: 0;
+          padding: 0;
+        }
+        
+        body {
+          padding: 0;
+        }
+        
+        .statement-container {
+          max-width: 180mm;
+          padding: 0;
+        }
+        
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      }
+      
       .header-section {
         text-align: center;
         padding-bottom: 8px;
         margin-bottom: 10px;
+        border-bottom: 2px solid #000;
       }
       .logo-area {
         font-size: 20px;
@@ -1138,6 +1129,7 @@ export class PrintUtils {
         margin-bottom: 10px;
         padding: 6px;
         background: #fafafa;
+        border-left: 3px solid #000;
       }
       .section-label {
         font-size: 10px;
@@ -1155,6 +1147,7 @@ export class PrintUtils {
       .transaction-box {
         margin: 10px 0;
         background: #fff;
+        border: 1px solid #000;
       }
       .transaction-header {
         background: #000;
@@ -1185,13 +1178,10 @@ export class PrintUtils {
         font-weight: 700;
         text-align: right;
       }
-      .amount-negative {
-        color: #000;
-        text-decoration: line-through;
-      }
       .calculation-section {
         margin: 10px 0;
         background: #f0f0f0;
+        border: 1px solid #000;
       }
       .calc-header {
         background: #333;
@@ -1243,12 +1233,14 @@ export class PrintUtils {
         font-weight: 900;
         letter-spacing: 2px;
         margin: 10px 0;
+        border: 2px solid #000;
         background: #fff;
       }
       .footer-section {
         margin-top: 10px;
         padding-top: 8px;
         text-align: center;
+        border-top: 1px dashed #000;
       }
       .footer-message {
         font-size: 11px;
@@ -1262,32 +1254,10 @@ export class PrintUtils {
         color: #666;
         line-height: 1.3;
       }
-      .barcode-area {
-        margin-top: 8px;
-        padding: 4px;
-        background: #f5f5f5;
-        font-size: 11px;
-        font-family: 'Libre Barcode 39', cursive;
-        text-align: center;
-      }
-      .watermark {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(-45deg);
-        font-size: 50px;
-        font-weight: 900;
-        color: rgba(0, 0, 0, 0.03);
-        pointer-events: none;
-        z-index: 0;
-        white-space: nowrap;
-      }
     </style>
   </head>
   <body>
     <div class="statement-container">
-      <div class="watermark">SETTLEMENT</div>
-      
       <div class="header-section">
         <div class="logo-area">${businessName}</div>
         <div class="business-details">
@@ -1336,7 +1306,7 @@ export class PrintUtils {
           ` : ''}
           <div class="calc-row">
             <span>Payment Received</span>
-            <span class="row-value amount-negative">- ${formatCurrency(amountPaid)}</span>
+            <span class="row-value">- ${formatCurrency(amountPaid)}</span>
           </div>
           <div class="calc-row grand-total">
             <span>Closing Balance</span>
@@ -1379,9 +1349,6 @@ export class PrintUtils {
           This is a computer-generated statement<br>
           and does not require signature
         </div>
-        <div class="barcode-area">
-          *${receiptNumber}*
-        </div>
       </div>
     </div>
     
@@ -1389,40 +1356,27 @@ export class PrintUtils {
       window.onload = function() {
         setTimeout(function() {
           window.print();
-        }, 300);
+        }, 500);
       }
     </script>
   </body>
 </html>`;
       
-      // Write content to iframe and print
-      printDocument.open();
-      printDocument.write(settlementContent);
-      printDocument.close();
+      // Open in a new window for better PDF control
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
       
-      // Wait for content to load before printing
-      printFrame.onload = () => {
-        try {
-          printFrame.contentWindow?.focus();
-          printFrame.contentWindow?.print();
-        } catch (error) {
-          console.error('Error during printing:', error);
-        } finally {
-          setTimeout(() => {
-            if (printFrame.parentNode) {
-              printFrame.parentNode.removeChild(printFrame);
-            }
-            this.hideLoadingIndicator();
-          }, 1000);
-        }
-      };
-      
-      setTimeout(() => {
-        if (printFrame.parentNode) {
-          printFrame.parentNode.removeChild(printFrame);
-        }
+      if (!printWindow) {
         this.hideLoadingIndicator();
-      }, 5000);
+        alert('Please allow popups for this site to print the settlement');
+        return;
+      }
+      
+      printWindow.document.open();
+      printWindow.document.write(settlementContent);
+      printWindow.document.close();
+      
+      // Hide loading indicator after window opens
+      this.hideLoadingIndicator();
     }, 100);
   }
 
