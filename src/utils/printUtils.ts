@@ -1101,12 +1101,13 @@ export class PrintUtils {
         border-bottom: 2px solid #e0e0e0;
         position: relative;
         z-index: 1;
+        text-align: center;
       }
       
       .header-top {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
+        flex-direction: column;
+        align-items: center;
         margin-bottom: 20px;
       }
       
@@ -1126,13 +1127,15 @@ export class PrintUtils {
       }
       
       .document-badge {
+        margin-top: 15px;
         padding: 8px 18px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #333;
-        border: 2px solid #333;
+        border: none;
+        background: transparent;
       }
       
       .document-meta {
@@ -1298,12 +1301,12 @@ export class PrintUtils {
       .status-badge {
         display: inline-block;
         padding: 10px 30px;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
         letter-spacing: 2px;
         text-transform: uppercase;
         color: #333;
-        border: 2px solid #ccc;
+        border: none;
         background: transparent;
       }
       
