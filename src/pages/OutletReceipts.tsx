@@ -250,21 +250,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       }));
       
       // Load customer settlement receipts from database
-      let customerSettlements = await getOutletCustomerSettlementsByOutletId(outletId);
-      
-      // Apply date filter to settlements if set
-      if (startDate || endDate) {
-        customerSettlements = customerSettlements.filter(settlement => {
-          const settlementDate = new Date(settlement.settlement_date || '');
-          if (startDate && settlementDate < new Date(startDate)) return false;
-          if (endDate) {
-            const endDateTime = new Date(endDate);
-            endDateTime.setHours(23, 59, 59, 999);
-            if (settlementDate > endDateTime) return false;
-          }
-          return true;
-        });
-      }
+      const customerSettlements = await getOutletCustomerSettlementsByOutletId(outletId);
       
       console.log('Customer settlements from database:', customerSettlements);
       const customerSettlementsFormatted = customerSettlements.map(s => ({
@@ -402,6 +388,12 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       return;
     }
     
+    setShareReceipt(receipt);
+    setShareDialogOpen(true);
+  };
+  
+  // Handle share receipt for commission and other types
+  const handleShareReceipt = (receipt: ReceiptSale) => {
     setShareReceipt(receipt);
     setShareDialogOpen(true);
   };
@@ -1275,7 +1267,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     }
   };
 
-  // Filter receipts by type and search term
+  // Filter receipts by type, search term, and date range
   const filteredReceipts = receipts.filter(receipt => {
     const matchesType = activeTab === 'all' || receipt.type === activeTab;
     
@@ -1284,7 +1276,23 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       receipt.customer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       receipt.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesType && matchesSearch;
+    // Apply date range filter
+    let matchesDate = true;
+    if (startDate || endDate) {
+      const receiptDate = new Date(receipt.date);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (receiptDate < start) matchesDate = false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (receiptDate > end) matchesDate = false;
+      }
+    }
+    
+    return matchesType && matchesSearch && matchesDate;
   });
 
   return (
@@ -1309,7 +1317,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <h1 className="text-2xl font-bold">Receivables</h1>
           <p className="text-muted-foreground">Manage all outlet receivables</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1319,29 +1327,53 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="pl-8 w-full sm:w-32"
-                placeholder="mm/dd/yyyy"
-              />
+          
+          {/* Date Range Filter Toggle */}
+          <Button 
+            variant={showDateFilter ? "default" : "outline"} 
+            size="sm"
+            onClick={() => setShowDateFilter(!showDateFilter)}
+            className="gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            {showDateFilter ? "Hide Dates" : "Filter Dates"}
+          </Button>
+          
+          {/* Date Range Inputs */}
+          {showDateFilter && (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-36"
+                />
+              </div>
+              <span className="text-sm text-muted-foreground">to</span>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-36"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => { setStartDate(''); setEndDate(''); }}
+                  className="h-8 px-2"
+                  title="Clear dates"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            <span className="text-muted-foreground">to</span>
-            <div className="relative">
-              <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="pl-8 w-full sm:w-32"
-                placeholder="mm/dd/yyyy"
-              />
-            </div>
-          </div>
+          )}
           
           <select
             value={activeTab}
@@ -1964,7 +1996,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleShareSettlement(receipt)}
-                          title="Share as PDF"
+                          title="Share Settlement"
                         >
                           <Share2 className="h-4 w-4" />
                         </Button>
@@ -1977,6 +2009,16 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                         >
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
+                        </Button>
+                      )}
+                      {(receipt.type === 'commission' || receipt.type === 'other') && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShareReceipt(receipt)}
+                          title="Share Receipt"
+                        >
+                          <Share2 className="h-4 w-4" />
                         </Button>
                       )}
                       <Button 
@@ -2345,33 +2387,35 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Share2 className="h-5 w-5" />
-                  Share Settlement
+                  Share {shareReceipt.type === 'sales' && shareReceipt.previousBalance !== undefined ? 'Settlement' : 'Receipt'}
                 </h2>
                 <Button variant="outline" size="icon" onClick={() => setShareDialogOpen(false)}>
                   <span className="text-xl">×</span>
                 </Button>
               </div>
               
-              {/* Settlement Info */}
+              {/* Receipt Info */}
               <div className="p-4 bg-muted rounded-lg mb-4">
                 <p className="text-sm font-semibold">{shareReceipt.invoiceNumber}</p>
                 <p className="text-sm text-muted-foreground">{shareReceipt.customer}</p>
-                <p className="text-lg font-bold text-green-600 mt-2">{formatCurrency(shareReceipt.amountPaid)}</p>
+                <p className="text-lg font-bold text-green-600 mt-2">{formatCurrency(shareReceipt.total)}</p>
               </div>
               
               {/* Share Options */}
               <div className="space-y-3">
-                <Button 
-                  className="w-full justify-start gap-3" 
-                  variant="outline"
-                  onClick={shareViaWhatsApp}
-                >
-                  <MessageCircle className="h-5 w-5 text-green-600" />
-                  <div className="text-left">
-                    <div className="font-semibold">WhatsApp</div>
-                    <div className="text-xs text-muted-foreground">Share via WhatsApp message</div>
-                  </div>
-                </Button>
+                {(shareReceipt.type === 'sales' && shareReceipt.previousBalance !== undefined) && (
+                  <Button 
+                    className="w-full justify-start gap-3" 
+                    variant="outline"
+                    onClick={shareViaWhatsApp}
+                  >
+                    <MessageCircle className="h-5 w-5 text-green-600" />
+                    <div className="text-left">
+                      <div className="font-semibold">WhatsApp</div>
+                      <div className="text-xs text-muted-foreground">Share via WhatsApp message</div>
+                    </div>
+                  </Button>
+                )}
                 
                 <Button 
                   className="w-full justify-start gap-3" 
