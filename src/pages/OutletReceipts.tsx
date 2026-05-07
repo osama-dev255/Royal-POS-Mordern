@@ -25,12 +25,18 @@ import {
   TrendingUp,
   X,
   Edit,
-  Search
+  Search,
+  Share2,
+  Mail,
+  MessageCircle,
+  Download,
+  Copy
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
+import WhatsAppUtils from "@/utils/whatsappUtils";
 
 interface OutletReceiptsProps {
   onBack: () => void;
@@ -126,6 +132,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [editCashier, setEditCashier] = useState('');
   const [editPreparedBy, setEditPreparedBy] = useState('');
   const [editApprovedBy, setEditApprovedBy] = useState('');
+  
+  // Share dialog state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareReceipt, setShareReceipt] = useState<ReceiptSale | null>(null);
 
   useEffect(() => {
     fetchReceipts();
@@ -377,6 +387,164 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       };
       
       PrintUtils.printReceipt(transaction);
+    }
+  };
+  
+  // Handle share settlement - opens dialog with sharing options
+  const handleShareSettlement = (receipt: ReceiptSale) => {
+    if (receipt.type !== 'sales' || receipt.previousBalance === undefined) {
+      toast({
+        title: "Error",
+        description: "Share is only available for customer settlements",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setShareReceipt(receipt);
+    setShareDialogOpen(true);
+  };
+  
+  // Share via WhatsApp
+  const shareViaWhatsApp = () => {
+    if (!shareReceipt) return;
+    
+    const newBalance = (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid;
+    const formattedDate = new Date(shareReceipt.date).toLocaleDateString('en-TZ');
+    const formattedPreviousBalance = formatCurrency(shareReceipt.previousBalance || 0);
+    const formattedAmountPaid = formatCurrency(shareReceipt.amountPaid);
+    const formattedNewBalance = formatCurrency(newBalance);
+    
+    const message = `💰 *PAYMENT SETTLEMENT* 💰\n\n` +
+      `Receipt: ${shareReceipt.invoiceNumber}\n` +
+      `Date: ${formattedDate}\n` +
+      `Customer: ${shareReceipt.customer}\n\n` +
+      `Previous Balance: ${formattedPreviousBalance}\n` +
+      `Amount Paid: ${formattedAmountPaid}\n` +
+      `New Balance: ${formattedNewBalance}\n\n` +
+      `Payment Method: ${shareReceipt.paymentMethod}\n` +
+      (shareReceipt.cashier ? `Cashier: ${shareReceipt.cashier}\n` : '') +
+      (shareReceipt.preparedBy ? `Prepared By: ${shareReceipt.preparedBy}\n` : '') +
+      `\nThank you for your payment!`;
+    
+    WhatsAppUtils.sendWhatsAppMessage('', message);
+    setShareDialogOpen(false);
+    toast({
+      title: "Success",
+      description: "WhatsApp opened with settlement details",
+    });
+  };
+  
+  // Share via Email
+  const shareViaEmail = () => {
+    if (!shareReceipt) return;
+    
+    const newBalance = (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid;
+    const subject = `Payment Settlement - ${shareReceipt.invoiceNumber}`;
+    const body = `PAYMENT SETTLEMENT RECEIPT\n\n` +
+      `Receipt Number: ${shareReceipt.invoiceNumber}\n` +
+      `Date: ${new Date(shareReceipt.date).toLocaleDateString()}\n` +
+      `Customer: ${shareReceipt.customer}\n\n` +
+      `Previous Balance: ${formatCurrency(shareReceipt.previousBalance || 0)}\n` +
+      `Amount Paid: ${formatCurrency(shareReceipt.amountPaid)}\n` +
+      `New Balance: ${formatCurrency(newBalance)}\n\n` +
+      `Payment Method: ${shareReceipt.paymentMethod}\n` +
+      (shareReceipt.cashier ? `Cashier: ${shareReceipt.cashier}\n` : '') +
+      (shareReceipt.preparedBy ? `Prepared By: ${shareReceipt.preparedBy}\n` : '') +
+      (shareReceipt.approvedBy ? `Approved By: ${shareReceipt.approvedBy}\n` : '') +
+      `\nThank you for your payment!`;
+    
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setShareDialogOpen(false);
+    toast({
+      title: "Success",
+      description: "Email client opened with settlement details",
+    });
+  };
+  
+  // Download as PDF
+  const downloadAsPDF = () => {
+    if (!shareReceipt) return;
+    
+    PrintUtils.printCustomerSettlementMobile({
+      id: shareReceipt.id,
+      receiptNumber: shareReceipt.invoiceNumber,
+      date: shareReceipt.date,
+      customer: {
+        name: shareReceipt.customer
+      },
+      paymentMethod: shareReceipt.paymentMethod,
+      amountPaid: shareReceipt.amountPaid,
+      previousBalance: shareReceipt.previousBalance || 0,
+      newBalance: (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid,
+      cashier: shareReceipt.cashier,
+      preparedBy: shareReceipt.preparedBy,
+      approvedBy: shareReceipt.approvedBy,
+      notes: shareReceipt.notes
+    });
+    
+    setShareDialogOpen(false);
+    toast({
+      title: "Success",
+      description: "PDF opened in new window. Use Save as PDF to download.",
+    });
+  };
+  
+  // Copy to clipboard
+  const copyToClipboard = () => {
+    if (!shareReceipt) return;
+    
+    const newBalance = (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid;
+    const text = `Payment Settlement\n` +
+      `Receipt: ${shareReceipt.invoiceNumber}\n` +
+      `Date: ${new Date(shareReceipt.date).toLocaleDateString()}\n` +
+      `Customer: ${shareReceipt.customer}\n` +
+      `Previous Balance: ${formatCurrency(shareReceipt.previousBalance || 0)}\n` +
+      `Amount Paid: ${formatCurrency(shareReceipt.amountPaid)}\n` +
+      `New Balance: ${formatCurrency(newBalance)}`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+      setShareDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Settlement details copied to clipboard",
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
+    });
+  };
+  
+  // Use native share API (mobile devices)
+  const useNativeShare = async () => {
+    if (!shareReceipt) return;
+    
+    const newBalance = (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Payment Settlement - ${shareReceipt.invoiceNumber}`,
+          text: `Payment Settlement for ${shareReceipt.customer}\nReceipt: ${shareReceipt.invoiceNumber}\nAmount Paid: ${formatCurrency(shareReceipt.amountPaid)}\nNew Balance: ${formatCurrency(newBalance)}`,
+          url: window.location.href
+        });
+        setShareDialogOpen(false);
+        toast({
+          title: "Success",
+          description: "Shared successfully",
+        });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          toast({
+            title: "Error",
+            description: "Failed to share",
+            variant: "destructive",
+          });
+        }
+      }
     }
   };
   
@@ -1572,6 +1740,16 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                         <Button 
                           size="sm" 
                           variant="outline"
+                          onClick={() => handleShareSettlement(receipt)}
+                          title="Share as PDF"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {receipt.type === 'sales' && receipt.previousBalance !== undefined && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
                           onClick={() => handleEditSettlement(receipt)}
                         >
                           <Edit className="h-4 w-4 mr-1" />
@@ -1930,6 +2108,97 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                     Cancel
                   </Button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Share Dialog */}
+      {shareDialogOpen && shareReceipt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-md w-full m-4 shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Share2 className="h-5 w-5" />
+                  Share Settlement
+                </h2>
+                <Button variant="outline" size="icon" onClick={() => setShareDialogOpen(false)}>
+                  <span className="text-xl">×</span>
+                </Button>
+              </div>
+              
+              {/* Settlement Info */}
+              <div className="p-4 bg-muted rounded-lg mb-4">
+                <p className="text-sm font-semibold">{shareReceipt.invoiceNumber}</p>
+                <p className="text-sm text-muted-foreground">{shareReceipt.customer}</p>
+                <p className="text-lg font-bold text-green-600 mt-2">{formatCurrency(shareReceipt.amountPaid)}</p>
+              </div>
+              
+              {/* Share Options */}
+              <div className="space-y-3">
+                <Button 
+                  className="w-full justify-start gap-3" 
+                  variant="outline"
+                  onClick={shareViaWhatsApp}
+                >
+                  <MessageCircle className="h-5 w-5 text-green-600" />
+                  <div className="text-left">
+                    <div className="font-semibold">WhatsApp</div>
+                    <div className="text-xs text-muted-foreground">Share via WhatsApp message</div>
+                  </div>
+                </Button>
+                
+                <Button 
+                  className="w-full justify-start gap-3" 
+                  variant="outline"
+                  onClick={shareViaEmail}
+                >
+                  <Mail className="h-5 w-5 text-blue-600" />
+                  <div className="text-left">
+                    <div className="font-semibold">Email</div>
+                    <div className="text-xs text-muted-foreground">Send via email client</div>
+                  </div>
+                </Button>
+                
+                <Button 
+                  className="w-full justify-start gap-3" 
+                  variant="outline"
+                  onClick={downloadAsPDF}
+                >
+                  <Download className="h-5 w-5 text-red-600" />
+                  <div className="text-left">
+                    <div className="font-semibold">Download PDF</div>
+                    <div className="text-xs text-muted-foreground">Open PDF for downloading</div>
+                  </div>
+                </Button>
+                
+                <Button 
+                  className="w-full justify-start gap-3" 
+                  variant="outline"
+                  onClick={copyToClipboard}
+                >
+                  <Copy className="h-5 w-5 text-gray-600" />
+                  <div className="text-left">
+                    <div className="font-semibold">Copy to Clipboard</div>
+                    <div className="text-xs text-muted-foreground">Copy text details</div>
+                  </div>
+                </Button>
+                
+                {navigator.share && (
+                  <Button 
+                    className="w-full justify-start gap-3" 
+                    variant="outline"
+                    onClick={useNativeShare}
+                  >
+                    <Share2 className="h-5 w-5 text-purple-600" />
+                    <div className="text-left">
+                      <div className="font-semibold">Share...</div>
+                      <div className="text-xs text-muted-foreground">Use device sharing options</div>
+                    </div>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
