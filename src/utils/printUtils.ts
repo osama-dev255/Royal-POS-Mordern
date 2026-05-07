@@ -1038,17 +1038,18 @@ export class PrintUtils {
       
       body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.6;
-        padding: 20px;
+        padding: 30px;
         color: #333;
-        background: #fff;
+        background: #f5f5f5;
       }
       
       .statement-container {
-        max-width: 800px;
+        max-width: 1000px;
         margin: 0 auto;
         background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         position: relative;
       }
       
@@ -1096,7 +1097,7 @@ export class PrintUtils {
       
       /* Clean Header */
       .official-header {
-        padding: 25px 30px;
+        padding: 35px 40px;
         border-bottom: 2px solid #e0e0e0;
         position: relative;
         z-index: 1;
@@ -1106,39 +1107,39 @@ export class PrintUtils {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
       }
       
       .company-info h1 {
-        font-size: 22px;
+        font-size: 26px;
         font-weight: 700;
         color: #333;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
         text-transform: uppercase;
         letter-spacing: 1px;
       }
       
       .company-details {
-        font-size: 10px;
+        font-size: 11px;
         line-height: 1.8;
         color: #666;
       }
       
       .document-badge {
-        padding: 6px 14px;
-        font-size: 10px;
+        padding: 8px 18px;
+        font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #333;
-        border: 1px solid #333;
+        border: 2px solid #333;
       }
       
       .document-meta {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
-        padding-top: 15px;
+        gap: 20px;
+        padding-top: 20px;
         border-top: 1px solid #e0e0e0;
       }
       
@@ -1148,45 +1149,45 @@ export class PrintUtils {
       }
       
       .meta-label {
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #999;
-        margin-bottom: 3px;
+        margin-bottom: 5px;
       }
       
       .meta-value {
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 600;
         color: #333;
       }
       
       /* Customer Section */
       .customer-section {
-        padding: 15px 30px 15px 30px;
+        padding: 25px 40px;
         position: relative;
         z-index: 1;
       }
       
       .section-header {
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #333;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
       
       .customer-name {
-        font-size: 16px;
+        font-size: 20px;
         font-weight: 600;
         color: #333;
       }
       
       /* Transaction Table */
       .transaction-section {
-        padding: 15px 30px;
+        padding: 25px 40px;
         position: relative;
         z-index: 1;
       }
@@ -1194,7 +1195,7 @@ export class PrintUtils {
       .transaction-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 8px;
+        margin-top: 10px;
       }
       
       .transaction-table thead {
@@ -1202,14 +1203,14 @@ export class PrintUtils {
       }
       
       .transaction-table th {
-        padding: 8px 12px;
+        padding: 12px 15px;
         text-align: left;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #333;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 2px solid #e0e0e0;
       }
       
       .transaction-table th:last-child {
@@ -1221,8 +1222,8 @@ export class PrintUtils {
       }
       
       .transaction-table td {
-        padding: 10px 12px;
-        font-size: 11px;
+        padding: 14px 15px;
+        font-size: 12px;
         color: #333;
       }
       
@@ -1243,8 +1244,8 @@ export class PrintUtils {
       
       .payment-method-badge {
         display: inline-block;
-        padding: 3px 8px;
-        font-size: 10px;
+        padding: 5px 12px;
+        font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -1254,7 +1255,7 @@ export class PrintUtils {
       
       /* Summary Box */
       .summary-section {
-        padding: 15px 30px;
+        padding: 25px 40px;
         position: relative;
         z-index: 1;
       }
@@ -1262,26 +1263,26 @@ export class PrintUtils {
       .summary-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
+        gap: 25px;
       }
       
       .summary-card {
-        padding: 12px;
+        padding: 18px;
         background: transparent;
         border: none;
       }
       
       .summary-label {
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #333;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
       
       .summary-value {
-        font-size: 18px;
+        font-size: 22px;
         font-weight: 700;
         color: #333;
       }
@@ -1289,26 +1290,26 @@ export class PrintUtils {
       /* Status Badge */
       .status-section {
         text-align: center;
-        padding: 15px 30px;
+        padding: 20px 40px;
         position: relative;
         z-index: 1;
       }
       
       .status-badge {
         display: inline-block;
-        padding: 6px 20px;
-        font-size: 11px;
+        padding: 10px 30px;
+        font-size: 13px;
         font-weight: 700;
         letter-spacing: 2px;
         text-transform: uppercase;
         color: #333;
-        border: 1px solid #ccc;
+        border: 2px solid #ccc;
         background: transparent;
       }
       
       /* Authorization Section */
       .authorization-section {
-        padding: 15px 30px;
+        padding: 25px 40px;
         position: relative;
         z-index: 1;
       }
@@ -1316,56 +1317,56 @@ export class PrintUtils {
       .auth-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
+        gap: 25px;
       }
       
       .auth-item {
-        padding: 10px;
+        padding: 15px;
         background: transparent;
         border: none;
       }
       
       .auth-label {
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: #333;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
       }
       
       .auth-value {
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 600;
         color: #333;
       }
       
       /* Footer */
       .official-footer {
-        padding: 15px 30px;
+        padding: 25px 40px;
         text-align: center;
         position: relative;
         z-index: 1;
       }
       
       .footer-message {
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 600;
         color: #333;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
       }
       
       .footer-sub {
-        font-size: 10px;
+        font-size: 11px;
         color: #666;
-        line-height: 1.4;
+        line-height: 1.5;
       }
       
       .footer-ref {
-        margin-top: 8px;
-        padding-top: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
         border-top: 1px solid #e0e0e0;
-        font-size: 10px;
+        font-size: 11px;
         font-family: monospace;
         color: #666;
         letter-spacing: 1px;
