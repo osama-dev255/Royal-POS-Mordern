@@ -518,18 +518,35 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     });
   };
   
-  // Use native share API (mobile devices)
+  // Use native share API (mobile devices) - shares using standard format
   const useNativeShare = async () => {
     if (!shareReceipt) return;
     
     const newBalance = (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid;
     
+    // Generate standard formatted text for sharing
+    const settlementText = 
+`PAYMENT SETTLEMENT
+
+Receipt Number: ${shareReceipt.invoiceNumber}
+Date: ${new Date(shareReceipt.date).toLocaleDateString()}
+Customer: ${shareReceipt.customer}
+
+--- PAYMENT DETAILS ---
+
+Previous Balance: ${formatCurrency(shareReceipt.previousBalance || 0)}
+Amount Paid: ${formatCurrency(shareReceipt.amountPaid)}
+New Balance: ${formatCurrency(newBalance)}
+
+Payment Method: ${String(shareReceipt.paymentMethod).toUpperCase()}
+${shareReceipt.cashier ? `Cashier: ${shareReceipt.cashier}\n` : ''}${shareReceipt.preparedBy ? `Prepared By: ${shareReceipt.preparedBy}\n` : ''}${shareReceipt.approvedBy ? `Approved By: ${shareReceipt.approvedBy}\n` : ''}
+Thank you for your payment!`;
+    
     if (navigator.share) {
       try {
         await navigator.share({
           title: `Payment Settlement - ${shareReceipt.invoiceNumber}`,
-          text: `Payment Settlement for ${shareReceipt.customer}\nReceipt: ${shareReceipt.invoiceNumber}\nAmount Paid: ${formatCurrency(shareReceipt.amountPaid)}\nNew Balance: ${formatCurrency(newBalance)}`,
-          url: window.location.href
+          text: settlementText
         });
         setShareDialogOpen(false);
         toast({
@@ -538,6 +555,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         });
       } catch (error: any) {
         if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
           toast({
             title: "Error",
             description: "Failed to share",
