@@ -798,6 +798,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     
     const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
     const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    const totalNewBalance = filteredReceipts.reduce((sum, r) => sum + ((r.previousBalance || 0) - r.amountPaid), 0);
     const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
     
     printWindow.document.write(`
@@ -812,6 +813,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           th { background-color: #f5f5f5; font-weight: bold; }
           .header { text-align: center; margin-bottom: 30px; }
           .summary { margin: 20px 0; padding: 15px; background: #f9f9f9; }
+          .currency { text-align: right; }
           @media print { body { margin: 10px; } }
         </style>
       </head>
@@ -824,8 +826,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         </div>
         <div class="summary">
           <h3>Summary</h3>
-          <p>Total Amount Paid: ${formatCurrency(totalAmount)}</p>
           <p>Total Previous Balance: ${formatCurrency(totalPrevious)}</p>
+          <p>Total Amount Paid: ${formatCurrency(totalAmount)}</p>
+          <p>Total New Balance: ${formatCurrency(totalNewBalance)}</p>
         </div>
         <table>
           <thead>
@@ -834,21 +837,27 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               <th>Date</th>
               <th>Customer</th>
               <th>Type</th>
+              <th>Previous Balance</th>
               <th>Amount Paid</th>
+              <th>New Balance</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            ${filteredReceipts.map(r => `
+            ${filteredReceipts.map(r => {
+              const newBal = (r.previousBalance || 0) - r.amountPaid;
+              return `
               <tr>
                 <td>${r.invoiceNumber}</td>
                 <td>${new Date(r.date).toLocaleDateString()}</td>
                 <td>${r.customer}</td>
                 <td>${r.type}</td>
-                <td>${formatCurrency(r.amountPaid)}</td>
+                <td class="currency">${formatCurrency(r.previousBalance || 0)}</td>
+                <td class="currency">${formatCurrency(r.amountPaid)}</td>
+                <td class="currency">${formatCurrency(newBal)}</td>
                 <td>${r.status}</td>
               </tr>
-            `).join('')}
+            `}).join('')}
           </tbody>
         </table>
       </body>
@@ -875,6 +884,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     // Calculate totals
     const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
     const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    const totalNewBalance = filteredReceipts.reduce((sum, r) => sum + ((r.previousBalance || 0) - r.amountPaid), 0);
     const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
     
     // Create HTML table format that Excel can open as native .xls
@@ -947,55 +957,64 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       <body>
         <table>
           <tr>
-            <td colspan="7" class="header">${businessName}</td>
+            <td colspan="8" class="header">${businessName}</td>
           </tr>
           <tr>
-            <td colspan="7" class="header">RECEIVABLES SUMMARY REPORT</td>
+            <td colspan="8" class="header">RECEIVABLES SUMMARY REPORT</td>
           </tr>
           <tr>
-            <td colspan="7" class="subheader">Report Date: ${new Date().toLocaleDateString()}</td>
+            <td colspan="8" class="subheader">Report Date: ${new Date().toLocaleDateString()}</td>
           </tr>
           <tr>
-            <td colspan="7" class="subheader">Total Records: ${filteredReceipts.length}</td>
+            <td colspan="8" class="subheader">Total Records: ${filteredReceipts.length}</td>
           </tr>
           <tr>
-            <td colspan="7" class="subheader">Period: ${startDate || 'All time'} to ${endDate || 'Present'}</td>
+            <td colspan="8" class="subheader">Period: ${startDate || 'All time'} to ${endDate || 'Present'}</td>
           </tr>
-          <tr><td colspan="7"></td></tr>
+          <tr><td colspan="8"></td></tr>
           <tr>
-            <td colspan="7" class="subheader">SUMMARY</td>
+            <td colspan="8" class="subheader">SUMMARY</td>
           </tr>
           <tr class="total-row">
-            <td colspan="4">Total Amount Paid:</td>
+            <td colspan="5">Total Previous Balance:</td>
+            <td class="currency">${totalPrevious.toFixed(2)}</td>
+            <td colspan="2"></td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="5">Total Amount Paid:</td>
             <td class="currency">${totalAmount.toFixed(2)}</td>
             <td colspan="2"></td>
           </tr>
           <tr class="total-row">
-            <td colspan="4">Total Previous Balance:</td>
-            <td class="currency">${totalPrevious.toFixed(2)}</td>
+            <td colspan="5">Total New Balance:</td>
+            <td class="currency">${totalNewBalance.toFixed(2)}</td>
             <td colspan="2"></td>
           </tr>
-          <tr><td colspan="7"></td></tr>
+          <tr><td colspan="8"></td></tr>
           <tr>
             <th>Receipt #</th>
             <th>Date</th>
             <th>Customer</th>
             <th>Type</th>
             <th>Payment Method</th>
+            <th>Previous Balance</th>
             <th>Amount Paid</th>
-            <th>Status</th>
+            <th>New Balance</th>
           </tr>
-          ${filteredReceipts.map(r => `
+          ${filteredReceipts.map(r => {
+            const newBal = (r.previousBalance || 0) - r.amountPaid;
+            return `
             <tr>
               <td>${r.invoiceNumber}</td>
               <td class="date">${new Date(r.date).toLocaleDateString()}</td>
               <td>${r.customer}</td>
               <td>${r.type}</td>
               <td>${r.paymentMethod}</td>
+              <td class="currency">${(r.previousBalance || 0).toFixed(2)}</td>
               <td class="currency">${r.amountPaid.toFixed(2)}</td>
-              <td>${r.status}</td>
+              <td class="currency">${newBal.toFixed(2)}</td>
             </tr>
-          `).join('')}
+          `}).join('')}
         </table>
       </body>
       </html>
@@ -1086,6 +1105,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     // Calculate totals
     const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
     const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    const totalNewBalance = filteredReceipts.reduce((sum, r) => sum + ((r.previousBalance || 0) - r.amountPaid), 0);
     
     // Summary section
     doc.setFontSize(11);
@@ -1094,12 +1114,16 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     yPosition += 8;
     
     doc.setFontSize(10);
+    doc.text('Total Previous Balance:', 20, yPosition);
+    doc.text(formatCurrency(totalPrevious), pageWidth - 20, yPosition, { align: 'right' });
+    yPosition += 7;
+    
     doc.text('Total Amount Paid:', 20, yPosition);
     doc.text(formatCurrency(totalAmount), pageWidth - 20, yPosition, { align: 'right' });
     yPosition += 7;
     
-    doc.text('Total Previous Balance:', 20, yPosition);
-    doc.text(formatCurrency(totalPrevious), pageWidth - 20, yPosition, { align: 'right' });
+    doc.text('Total New Balance:', 20, yPosition);
+    doc.text(formatCurrency(totalNewBalance), pageWidth - 20, yPosition, { align: 'right' });
     yPosition += 12;
     
     // Divider
@@ -1110,11 +1134,11 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.text('Receipt #', 15, yPosition);
-    doc.text('Date', 45, yPosition);
-    doc.text('Customer', 70, yPosition);
-    doc.text('Type', 120, yPosition);
-    doc.text('Amount', 145, yPosition);
-    doc.text('Status', 170, yPosition);
+    doc.text('Date', 40, yPosition);
+    doc.text('Customer', 65, yPosition);
+    doc.text('Prev. Balance', 110, yPosition);
+    doc.text('Amount Paid', 140, yPosition);
+    doc.text('New Balance', 170, yPosition);
     yPosition += 6;
     
     doc.setLineWidth(0.3);
@@ -1131,12 +1155,14 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         yPosition = 20;
       }
       
-      doc.text(receipt.invoiceNumber.substring(0, 15), 15, yPosition);
-      doc.text(new Date(receipt.date).toLocaleDateString(), 45, yPosition);
-      doc.text(receipt.customer.substring(0, 20), 70, yPosition);
-      doc.text(receipt.type.toUpperCase(), 120, yPosition);
-      doc.text(formatCurrency(receipt.amountPaid), 145, yPosition);
-      doc.text(receipt.status, 170, yPosition);
+      const newBal = (receipt.previousBalance || 0) - receipt.amountPaid;
+      
+      doc.text(receipt.invoiceNumber.substring(0, 12), 15, yPosition);
+      doc.text(new Date(receipt.date).toLocaleDateString(), 40, yPosition);
+      doc.text(receipt.customer.substring(0, 18), 65, yPosition);
+      doc.text(formatCurrency(receipt.previousBalance || 0), 110, yPosition);
+      doc.text(formatCurrency(receipt.amountPaid), 140, yPosition);
+      doc.text(formatCurrency(newBal), 170, yPosition);
       
       yPosition += 5;
       
@@ -1177,15 +1203,21 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     
     // Share summary of all filtered receipts
     const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
+    const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    const totalNewBalance = filteredReceipts.reduce((sum, r) => sum + ((r.previousBalance || 0) - r.amountPaid), 0);
     
     const summaryText = `RECEIVABLES SUMMARY REPORT\n\n` +
-      `Total Records: ${filteredReceipts.length}\n` +
-      `Total Amount: ${formatCurrency(totalAmount)}\n\n` +
+      `Total Records: ${filteredReceipts.length}\n\n` +
+      `Total Previous Balance: ${formatCurrency(totalPrevious)}\n` +
+      `Total Amount Paid: ${formatCurrency(totalAmount)}\n` +
+      `Total New Balance: ${formatCurrency(totalNewBalance)}\n\n` +
       `Period: ${startDate || 'All time'} to ${endDate || 'Present'}\n\n` +
       `--- RECEIPTS ---\n\n` +
-      filteredReceipts.slice(0, 20).map(r => 
-        `${r.invoiceNumber} - ${r.customer} - ${formatCurrency(r.amountPaid)}`
-      ).join('\n') +
+      filteredReceipts.slice(0, 20).map(r => {
+        const newBal = (r.previousBalance || 0) - r.amountPaid;
+        return `${r.invoiceNumber} - ${r.customer}\n` +
+          `  Previous: ${formatCurrency(r.previousBalance || 0)} | Paid: ${formatCurrency(r.amountPaid)} | New: ${formatCurrency(newBal)}`;
+      }).join('\n') +
       (filteredReceipts.length > 20 ? `\n\n... and ${filteredReceipts.length - 20} more receipts` : '');
     
     if (navigator.share) {
