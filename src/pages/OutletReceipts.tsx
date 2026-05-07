@@ -37,6 +37,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
+import jsPDF from "jspdf";
 
 interface OutletReceiptsProps {
   onBack: () => void;
@@ -518,47 +519,251 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     });
   };
   
-  // Use native share API (mobile devices) - shares using standard format
+  // Use native share API (mobile devices) - shares PDF file matching print format
   const useNativeShare = async () => {
     if (!shareReceipt) return;
     
     const newBalance = (shareReceipt.previousBalance || 0) - shareReceipt.amountPaid;
     
-    // Generate standard formatted text for sharing
-    const settlementText = 
-`PAYMENT SETTLEMENT
-
-Receipt Number: ${shareReceipt.invoiceNumber}
-Date: ${new Date(shareReceipt.date).toLocaleDateString()}
-Customer: ${shareReceipt.customer}
-
---- PAYMENT DETAILS ---
-
-Previous Balance: ${formatCurrency(shareReceipt.previousBalance || 0)}
-Amount Paid: ${formatCurrency(shareReceipt.amountPaid)}
-New Balance: ${formatCurrency(newBalance)}
-
-Payment Method: ${String(shareReceipt.paymentMethod).toUpperCase()}
-${shareReceipt.cashier ? `Cashier: ${shareReceipt.cashier}\n` : ''}${shareReceipt.preparedBy ? `Prepared By: ${shareReceipt.preparedBy}\n` : ''}${shareReceipt.approvedBy ? `Approved By: ${shareReceipt.approvedBy}\n` : ''}
-Thank you for your payment!`;
-    
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `Payment Settlement - ${shareReceipt.invoiceNumber}`,
-          text: settlementText
+        // Generate PDF matching the exact print format
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        // Get business info
+        const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+        const businessAddress = localStorage.getItem('businessAddress') || 'P Box 64, Tanganyika Street, Muheza - Tanga';
+        const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
+        
+        let yPosition = 15;
+        
+        // Centered Header
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(businessName, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 7;
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(businessAddress, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 5;
+        
+        doc.text(`Tel: ${businessPhone}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 12;
+        
+        // Divider line
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 8;
+        
+        // Receipt No and Date/Time section
+        const receiptDate = new Date(shareReceipt.date);
+        const dateStr = receiptDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        // Left column - Receipt No
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('RECEIPT NO', 20, yPosition);
+        yPosition += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(shareReceipt.invoiceNumber, 20, yPosition);
+        
+        // Right column - Date & Time
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('DATE & TIME', pageWidth - 20, yPosition, { align: 'right' });
+        yPosition += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(dateStr, pageWidth - 20, yPosition, { align: 'right' });
+        yPosition += 5;
+        doc.text(timeStr, pageWidth - 20, yPosition, { align: 'right' });
+        yPosition += 10;
+        
+        // Settled By section
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 6;
+        
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('SETTLED BY', 20, yPosition);
+        yPosition += 6;
+        doc.setFontSize(12);
+        doc.text(shareReceipt.customer, 20, yPosition);
+        yPosition += 10;
+        
+        // Payment Details header
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 7;
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PAYMENT DETAILS', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 8;
+        
+        // Payment Mode
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Payment Mode', 20, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(String(shareReceipt.paymentMethod).toUpperCase(), 20, yPosition);
+        yPosition += 12;
+        
+        // Account Summary section
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 7;
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ACCOUNT SUMMARY', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 8;
+        
+        // Opening Balance
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Opening Balance', 20, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(formatCurrency(shareReceipt.previousBalance || 0), 20, yPosition);
+        yPosition += 8;
+        
+        // Payment Received
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Payment Received', 20, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(formatCurrency(shareReceipt.amountPaid), 20, yPosition);
+        yPosition += 8;
+        
+        // Closing Balance
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Closing Balance', 20, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(formatCurrency(newBalance), 20, yPosition);
+        yPosition += 12;
+        
+        // Authorization section
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 7;
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('AUTHORIZATION', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 10;
+        
+        // Three columns for authorization
+        const colWidth = (pageWidth - 40) / 3;
+        
+        // Cashier
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('CASHIER', 20, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(shareReceipt.cashier || 'Not Assigned', 20, yPosition);
+        
+        // Prepared By
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PREPARED BY', 20 + colWidth, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(shareReceipt.preparedBy || 'Not Assigned', 20 + colWidth, yPosition);
+        
+        // Approved By
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('APPROVED BY', 20 + colWidth * 2, yPosition);
+        yPosition += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(shareReceipt.approvedBy || '_________________', 20 + colWidth * 2, yPosition);
+        yPosition += 15;
+        
+        // Payment Status
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PAYMENT', 20, yPosition);
+        
+        const statusText = newBalance === 0 ? 'FULLY SETTLED' : (shareReceipt.amountPaid > 0 && newBalance > 0 ? 'PARTIAL PAYMENT' : 'PENDING');
+        doc.text('STATEMENT', pageWidth / 2, yPosition, { align: 'center' });
+        
+        doc.setFontSize(12);
+        doc.text(statusText, pageWidth - 20, yPosition, { align: 'right' });
+        yPosition += 15;
+        
+        // Footer
+        doc.setLineWidth(0.3);
+        doc.line(15, yPosition, pageWidth - 15, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('THANK YOU FOR YOUR PAYMENT', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 6;
+        
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('This is a computer-generated statement', pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 4;
+        doc.text('and does not require signature', pageWidth / 2, yPosition, { align: 'center' });
+        
+        // Generate PDF blob
+        const pdfBlob = doc.output('blob');
+        const pdfFile = new File([pdfBlob], `settlement-${shareReceipt.invoiceNumber}.pdf`, { 
+          type: 'application/pdf' 
         });
+        
+        // Check if we can share files
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          await navigator.share({
+            files: [pdfFile],
+            title: `Payment Settlement - ${shareReceipt.invoiceNumber}`,
+            text: `Payment Settlement for ${shareReceipt.customer}`
+          });
+        } else {
+          // Fallback to downloading if can't share files
+          doc.save(`settlement-${shareReceipt.invoiceNumber}.pdf`);
+          toast({
+            title: "Downloaded",
+            description: "PDF downloaded (file sharing not supported)",
+          });
+          setShareDialogOpen(false);
+          return;
+        }
+        
         setShareDialogOpen(false);
         toast({
           title: "Success",
-          description: "Shared successfully",
+          description: "PDF shared successfully",
         });
       } catch (error: any) {
         if (error.name !== 'AbortError') {
-          console.error('Error sharing:', error);
+          console.error('Error sharing PDF:', error);
           toast({
             title: "Error",
-            description: "Failed to share",
+            description: "Failed to share PDF",
             variant: "destructive",
           });
         }
