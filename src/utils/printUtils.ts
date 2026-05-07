@@ -1164,31 +1164,29 @@ export class PrintUtils {
       
       /* Customer Section */
       .customer-section {
-        padding: 20px 30px;
-        background: #fafafa;
-        border-bottom: 1px solid #e0e0e0;
+        padding: 15px 30px 15px 30px;
         position: relative;
         z-index: 1;
       }
       
       .section-header {
-        font-size: 9px;
-        font-weight: 600;
+        font-size: 10px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 2px;
-        color: #999;
-        margin-bottom: 8px;
+        letter-spacing: 1px;
+        color: #333;
+        margin-bottom: 6px;
       }
       
       .customer-name {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         color: #333;
       }
       
       /* Transaction Table */
       .transaction-section {
-        padding: 20px 30px;
+        padding: 15px 30px;
         position: relative;
         z-index: 1;
       }
@@ -1196,7 +1194,7 @@ export class PrintUtils {
       .transaction-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
+        margin-top: 8px;
       }
       
       .transaction-table thead {
@@ -1204,13 +1202,13 @@ export class PrintUtils {
       }
       
       .transaction-table th {
-        padding: 10px 15px;
+        padding: 8px 12px;
         text-align: left;
         font-size: 9px;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #999;
+        color: #333;
         border-bottom: 1px solid #e0e0e0;
       }
       
@@ -1219,15 +1217,11 @@ export class PrintUtils {
       }
       
       .transaction-table tbody tr {
-        border-bottom: 1px solid #f0f0f0;
-      }
-      
-      .transaction-table tbody tr:last-child {
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: none;
       }
       
       .transaction-table td {
-        padding: 12px 15px;
+        padding: 10px 12px;
         font-size: 11px;
         color: #333;
       }
@@ -1249,21 +1243,18 @@ export class PrintUtils {
       
       .payment-method-badge {
         display: inline-block;
-        padding: 4px 10px;
+        padding: 3px 8px;
         font-size: 10px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: #333;
-        border: 1px solid #333;
+        border: 1px solid #ccc;
       }
       
       /* Summary Box */
       .summary-section {
-        padding: 20px 30px;
-        background: #fafafa;
-        border-top: 1px solid #e0e0e0;
-        border-bottom: 1px solid #e0e0e0;
+        padding: 15px 30px;
         position: relative;
         z-index: 1;
       }
@@ -1271,26 +1262,26 @@ export class PrintUtils {
       .summary-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
+        gap: 15px;
       }
       
       .summary-card {
-        background: #fff;
-        padding: 15px;
-        border: 1px solid #e0e0e0;
+        padding: 12px;
+        background: transparent;
+        border: none;
       }
       
       .summary-label {
         font-size: 9px;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #999;
-        margin-bottom: 8px;
+        color: #333;
+        margin-bottom: 6px;
       }
       
       .summary-value {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 700;
         color: #333;
       }
@@ -1298,27 +1289,26 @@ export class PrintUtils {
       /* Status Badge */
       .status-section {
         text-align: center;
-        padding: 20px 30px;
+        padding: 15px 30px;
         position: relative;
         z-index: 1;
       }
       
       .status-badge {
         display: inline-block;
-        padding: 8px 25px;
-        font-size: 12px;
+        padding: 6px 20px;
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: 2px;
         text-transform: uppercase;
         color: #333;
-        border: 2px solid #333;
-        background: #fff;
+        border: 1px solid #ccc;
+        background: transparent;
       }
       
       /* Authorization Section */
       .authorization-section {
-        padding: 20px 30px;
-        border-top: 1px solid #e0e0e0;
+        padding: 15px 30px;
         position: relative;
         z-index: 1;
       }
@@ -1326,22 +1316,22 @@ export class PrintUtils {
       .auth-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
+        gap: 15px;
       }
       
       .auth-item {
-        padding: 12px;
-        background: #fafafa;
-        border: 1px solid #e0e0e0;
+        padding: 10px;
+        background: transparent;
+        border: none;
       }
       
       .auth-label {
         font-size: 9px;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: #999;
-        margin-bottom: 6px;
+        color: #333;
+        margin-bottom: 5px;
       }
       
       .auth-value {
@@ -1352,9 +1342,8 @@ export class PrintUtils {
       
       /* Footer */
       .official-footer {
-        padding: 20px 30px;
+        padding: 15px 30px;
         text-align: center;
-        border-top: 1px solid #e0e0e0;
         position: relative;
         z-index: 1;
       }
@@ -1363,18 +1352,18 @@ export class PrintUtils {
         font-size: 11px;
         font-weight: 600;
         color: #333;
-        margin-bottom: 5px;
+        margin-bottom: 4px;
       }
       
       .footer-sub {
         font-size: 10px;
-        color: #999;
-        line-height: 1.5;
+        color: #666;
+        line-height: 1.4;
       }
       
       .footer-ref {
-        margin-top: 10px;
-        padding-top: 10px;
+        margin-top: 8px;
+        padding-top: 8px;
         border-top: 1px solid #e0e0e0;
         font-size: 10px;
         font-family: monospace;
