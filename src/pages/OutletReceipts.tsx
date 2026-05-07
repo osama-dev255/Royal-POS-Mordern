@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 import { 
   ArrowLeft, 
   Receipt,
@@ -30,12 +37,16 @@ import {
   Mail,
   MessageCircle,
   Download,
-  Copy
+  Copy,
+  FileSpreadsheet,
+  FileDown,
+  MoreVertical
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
+import { ExportUtils } from "@/utils/exportUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import jsPDF from "jspdf";
 
@@ -763,6 +774,445 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     }
   };
   
+  // Action dropdown handlers for receipts list
+  const handlePrintPDF = () => {
+    if (filteredReceipts.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No receipts to print",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Print summary report of all filtered receipts
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Please allow popups to print",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
+    const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receivables Summary Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .summary { margin: 20px 0; padding: 15px; background: #f9f9f9; }
+          @media print { body { margin: 10px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${businessName}</h1>
+          <h2>RECEIVABLES SUMMARY REPORT</h2>
+          <p>Report Date: ${new Date().toLocaleDateString()}</p>
+          <p>Total Records: ${filteredReceipts.length}</p>
+        </div>
+        <div class="summary">
+          <h3>Summary</h3>
+          <p>Total Amount Paid: ${formatCurrency(totalAmount)}</p>
+          <p>Total Previous Balance: ${formatCurrency(totalPrevious)}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Receipt #</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Type</th>
+              <th>Amount Paid</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredReceipts.map(r => `
+              <tr>
+                <td>${r.invoiceNumber}</td>
+                <td>${new Date(r.date).toLocaleDateString()}</td>
+                <td>${r.customer}</td>
+                <td>${r.type}</td>
+                <td>${formatCurrency(r.amountPaid)}</td>
+                <td>${r.status}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+  
+  const handleExportXLS = () => {
+    if (filteredReceipts.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No receipts to export",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Calculate totals
+    const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
+    const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+    
+    // Create HTML table format that Excel can open as native .xls
+    const htmlTable = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Receivables Report</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table {
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+          }
+          .header {
+            background-color: #4472C4;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            font-size: 14pt;
+            padding: 10px;
+          }
+          .subheader {
+            background-color: #D9E2F3;
+            font-weight: bold;
+            padding: 5px;
+            font-size: 11pt;
+          }
+          th {
+            background-color: #4472C4;
+            color: white;
+            font-weight: bold;
+            padding: 8px;
+            border: 1px solid #2F5496;
+            font-size: 10pt;
+          }
+          td {
+            padding: 6px 8px;
+            border: 1px solid #B4C6E7;
+            font-size: 10pt;
+          }
+          tr:nth-child(even) {
+            background-color: #D9E2F3;
+          }
+          .currency {
+            text-align: right;
+            mso-number-format:"\\#\\,\\#\\#0\\.00";
+          }
+          .date {
+            mso-number-format:"Short Date";
+          }
+          .total-row {
+            background-color: #E2EFDA;
+            font-weight: bold;
+          }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr>
+            <td colspan="7" class="header">${businessName}</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="header">RECEIVABLES SUMMARY REPORT</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subheader">Report Date: ${new Date().toLocaleDateString()}</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subheader">Total Records: ${filteredReceipts.length}</td>
+          </tr>
+          <tr>
+            <td colspan="7" class="subheader">Period: ${startDate || 'All time'} to ${endDate || 'Present'}</td>
+          </tr>
+          <tr><td colspan="7"></td></tr>
+          <tr>
+            <td colspan="7" class="subheader">SUMMARY</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="4">Total Amount Paid:</td>
+            <td class="currency">${totalAmount.toFixed(2)}</td>
+            <td colspan="2"></td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="4">Total Previous Balance:</td>
+            <td class="currency">${totalPrevious.toFixed(2)}</td>
+            <td colspan="2"></td>
+          </tr>
+          <tr><td colspan="7"></td></tr>
+          <tr>
+            <th>Receipt #</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Payment Method</th>
+            <th>Amount Paid</th>
+            <th>Status</th>
+          </tr>
+          ${filteredReceipts.map(r => `
+            <tr>
+              <td>${r.invoiceNumber}</td>
+              <td class="date">${new Date(r.date).toLocaleDateString()}</td>
+              <td>${r.customer}</td>
+              <td>${r.type}</td>
+              <td>${r.paymentMethod}</td>
+              <td class="currency">${r.amountPaid.toFixed(2)}</td>
+              <td>${r.status}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </body>
+      </html>
+    `;
+    
+    // Create blob with Excel MIME type
+    const blob = new Blob([htmlTable], { 
+      type: 'application/vnd.ms-excel;charset=utf-8' 
+    });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `receivables-report-${new Date().toISOString().split('T')[0]}.xls`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Success",
+      description: `Exported ${filteredReceipts.length} receipts to Excel file`,
+    });
+  };
+  
+  const handleDownloadPDF = () => {
+    if (filteredReceipts.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No receipts to download",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Generate PDF summary report for all filtered receipts
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+    const businessAddress = localStorage.getItem('businessAddress') || 'P Box 64, Tanganyika Street, Muheza - Tanga';
+    const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
+    
+    let yPosition = 15;
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(businessName, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 7;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(businessAddress, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 5;
+    
+    doc.text(`Tel: ${businessPhone}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 12;
+    
+    // Title
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RECEIVABLES SUMMARY REPORT', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 8;
+    
+    // Date range
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const reportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`Report Date: ${reportDate}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 6;
+    
+    if (startDate || endDate) {
+      const dateRange = `${startDate || 'Start'} to ${endDate || 'End'}`;
+      doc.text(`Period: ${dateRange}`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 6;
+    }
+    
+    doc.text(`Total Records: ${filteredReceipts.length}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 10;
+    
+    // Divider
+    doc.setLineWidth(0.5);
+    doc.line(15, yPosition, pageWidth - 15, yPosition);
+    yPosition += 8;
+    
+    // Calculate totals
+    const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
+    const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
+    
+    // Summary section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SUMMARY', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 8;
+    
+    doc.setFontSize(10);
+    doc.text('Total Amount Paid:', 20, yPosition);
+    doc.text(formatCurrency(totalAmount), pageWidth - 20, yPosition, { align: 'right' });
+    yPosition += 7;
+    
+    doc.text('Total Previous Balance:', 20, yPosition);
+    doc.text(formatCurrency(totalPrevious), pageWidth - 20, yPosition, { align: 'right' });
+    yPosition += 12;
+    
+    // Divider
+    doc.line(15, yPosition, pageWidth - 15, yPosition);
+    yPosition += 8;
+    
+    // Table header
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Receipt #', 15, yPosition);
+    doc.text('Date', 45, yPosition);
+    doc.text('Customer', 70, yPosition);
+    doc.text('Type', 120, yPosition);
+    doc.text('Amount', 145, yPosition);
+    doc.text('Status', 170, yPosition);
+    yPosition += 6;
+    
+    doc.setLineWidth(0.3);
+    doc.line(15, yPosition, pageWidth - 15, yPosition);
+    yPosition += 6;
+    
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    
+    filteredReceipts.forEach((receipt, index) => {
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      doc.text(receipt.invoiceNumber.substring(0, 15), 15, yPosition);
+      doc.text(new Date(receipt.date).toLocaleDateString(), 45, yPosition);
+      doc.text(receipt.customer.substring(0, 20), 70, yPosition);
+      doc.text(receipt.type.toUpperCase(), 120, yPosition);
+      doc.text(formatCurrency(receipt.amountPaid), 145, yPosition);
+      doc.text(receipt.status, 170, yPosition);
+      
+      yPosition += 5;
+      
+      // Alternating row background
+      if (index % 2 === 0) {
+        doc.setFillColor(245, 245, 245);
+        doc.rect(15, yPosition - 5, pageWidth - 30, 5, 'F');
+      }
+    });
+    
+    // Footer
+    yPosition += 10;
+    doc.setLineWidth(0.5);
+    doc.line(15, yPosition, pageWidth - 15, yPosition);
+    yPosition += 8;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text('This is a computer-generated report', pageWidth / 2, yPosition, { align: 'center' });
+    
+    doc.save(`receivables-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    
+    toast({
+      title: "Success",
+      description: `Downloaded PDF report with ${filteredReceipts.length} receipts`,
+    });
+  };
+  
+  const handleShareFile = () => {
+    if (filteredReceipts.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No receipts to share",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Share summary of all filtered receipts
+    const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
+    
+    const summaryText = `RECEIVABLES SUMMARY REPORT\n\n` +
+      `Total Records: ${filteredReceipts.length}\n` +
+      `Total Amount: ${formatCurrency(totalAmount)}\n\n` +
+      `Period: ${startDate || 'All time'} to ${endDate || 'Present'}\n\n` +
+      `--- RECEIPTS ---\n\n` +
+      filteredReceipts.slice(0, 20).map(r => 
+        `${r.invoiceNumber} - ${r.customer} - ${formatCurrency(r.amountPaid)}`
+      ).join('\n') +
+      (filteredReceipts.length > 20 ? `\n\n... and ${filteredReceipts.length - 20} more receipts` : '');
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'Receivables Summary Report',
+        text: summaryText
+      }).then(() => {
+        toast({
+          title: "Success",
+          description: "Report shared successfully",
+        });
+      }).catch((error: any) => {
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
+        }
+      });
+    } else {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(summaryText).then(() => {
+        toast({
+          title: "Copied",
+          description: "Report summary copied to clipboard",
+        });
+      });
+    }
+  };
+  
   // Handle edit settlement
   const handleEditSettlement = (receipt: ReceiptSale) => {
     setEditingSettlement(receipt);
@@ -1374,6 +1824,45 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               )}
             </div>
           )}
+          
+          {/* Action Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="gap-2"
+                title="Actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+                Actions
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => fetchReceipts()}>
+                <Loader2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handlePrintPDF()}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportXLS()}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export XLS
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownloadPDF()}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Download PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleShareFile()}>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share File
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <select
             value={activeTab}
