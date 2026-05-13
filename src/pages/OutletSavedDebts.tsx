@@ -541,6 +541,83 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     });
   };
 
+  const handleExportSingleDebtXLS = (sale: SavedSale) => {
+    // Generate Excel-compatible HTML table for single debt
+    const remaining = sale.total - (sale.amountPaid || 0);
+    const status = sale.amountPaid === 0 ? 'Unpaid' : 
+                   (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial';
+    
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head>
+        <meta charset="UTF-8">
+        <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+        <x:Name>Debt Invoice</x:Name>
+        <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+        </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+        <style>
+          td, th { padding: 5px; border: 1px solid #ccc; }
+          th { background-color: #2980b9; color: white; }
+          .header { font-size: 16px; font-weight: bold; }
+          .label { font-weight: bold; background-color: #f0f0f0; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td class="header" colspan="4">Debt Invoice Details</td></tr>
+          <tr><td class="label">Invoice Number</td><td colspan="3">${sale.invoiceNumber}</td></tr>
+          <tr><td class="label">Date</td><td colspan="3">${sale.date}</td></tr>
+          <tr><td class="label">Customer</td><td colspan="3">${sale.customer || 'Walk-in Customer'}</td></tr>
+          ${sale.dueDate ? `<tr><td class="label">Due Date</td><td colspan="3">${sale.dueDate}</td></tr>` : ''}
+          ${sale.salesman ? `<tr><td class="label">Salesman</td><td colspan="3">${sale.salesman}</td></tr>` : ''}
+          ${sale.driver ? `<tr><td class="label">Driver</td><td colspan="3">${sale.driver}</td></tr>` : ''}
+          ${sale.truck ? `<tr><td class="label">Truck</td><td colspan="3">${sale.truck}</td></tr>` : ''}
+          <tr><td colspan="4"></td></tr>
+          <tr><th>Item Name</th><th>Quantity</th><th>Unit Price</th><th>Total</th></tr>
+    `;
+    
+    sale.items.forEach(item => {
+      const itemTotal = item.quantity * item.price;
+      html += `<tr>
+        <td>${item.name}</td>
+        <td>${item.quantity}</td>
+        <td>${item.price.toFixed(2)}</td>
+        <td>${itemTotal.toFixed(2)}</td>
+      </tr>`;
+    });
+    
+    html += `
+          <tr><td colspan="4"></td></tr>
+          <tr><td class="label" colspan="3">Subtotal</td><td>${sale.subtotal.toFixed(2)}</td></tr>
+          <tr><td class="label" colspan="3">Tax (18%)</td><td>${sale.tax.toFixed(2)}</td></tr>
+          ${sale.creditBroughtForward && sale.creditBroughtForward > 0 ? `<tr><td class="label" colspan="3">Credit Brought Forward</td><td>${sale.creditBroughtForward.toFixed(2)}</td></tr>` : ''}
+          ${sale.adjustments && sale.adjustments !== 0 ? `<tr><td class="label" colspan="3">Adjustments${sale.adjustmentReason ? ` (${sale.adjustmentReason})` : ''}</td><td>${sale.adjustments.toFixed(2)}</td></tr>` : ''}
+          <tr><td class="label" colspan="3" style="font-size: 14px;"><strong>Total Amount</strong></td><td style="font-size: 14px;"><strong>${sale.total.toFixed(2)}</strong></td></tr>
+          <tr><td colspan="4"></td></tr>
+          <tr><td class="label" colspan="3">Amount Paid</td><td>${(sale.amountPaid || 0).toFixed(2)}</td></tr>
+          <tr><td class="label" colspan="3">Remaining Balance</td><td>${remaining.toFixed(2)}</td></tr>
+          <tr><td class="label" colspan="3">Status</td><td>${status}</td></tr>
+        </table>
+      </body>
+      </html>
+    `;
+    
+    // Download as XLS
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = `debt-${sale.invoiceNumber}-${new Date().toISOString().split('T')[0]}.xls`;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export Complete",
+      description: `Excel file downloaded: ${filename}`,
+    });
+  };
+
   const handleSharePDF = async () => {
     // Get filtered sales
     const filteredSales = sales.filter(sale => {
@@ -1449,6 +1526,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       >
                         <Printer className="h-4 w-4 mr-1" />
                         Print
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleExportSingleDebtXLS(sale)}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Export
                       </Button>
                       {/* Delete button hidden - commented out
                       <Button 
