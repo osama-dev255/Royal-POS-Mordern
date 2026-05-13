@@ -948,7 +948,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       console.log('✅ Old inventory quantities reversed');
       
       // Step 3: Update the debt record with all fields
-      // Map status to valid payment_status values: unpaid, partial, paid
+      // Map status to valid payment_status values: unpaid, partial, paid, cancelled
       const validPaymentStatus = editFormData.status === 'outstanding' ? 'unpaid' : editFormData.status;
       
       const updatedDebt = await updateOutletDebt(selectedSale.id, {
@@ -1960,6 +1960,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
                     <option value="refunded">Refunded</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>

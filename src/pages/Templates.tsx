@@ -1305,8 +1305,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
-
-  const [deliveryNoteName, setDeliveryNoteName] = useState<string>("");
     
   // Function to generate a unique customer ID
   const generateCustomerId = () => {
@@ -2346,7 +2344,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   useEffect(() => {
     if (activeTab === "preview") {
       const deliveryNoteNumber = getNextDeliveryNoteNumber();
-      setDeliveryNoteName(deliveryNoteNumber);
       
       // Calculate total quantity from items (use quantity first, then delivered as fallback)
       const calculatedTotalQuantity = deliveryNoteData.items.reduce((sum, item) => sum + Number(item.quantity || item.delivered || 0), 0);
@@ -2489,7 +2486,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         // Show the delivery note options dialog after saving
         showDeliveryNoteOptionsDialog();
         
-        // Don't reset here - let the user choose an option first
+        // Auto-increment delivery note number and reset fields for next entry
+        setTimeout(() => {
+          resetAndIncrementDeliveryNote();
+        }, 500);
       } catch (error) {
         console.error('Error saving delivery:', error);
         alert('Error saving delivery. Please try again.');
@@ -2574,13 +2574,46 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     });
   };
   
-  // Function to reset delivery note data to initial state
-  const resetDeliveryNoteData = () => {
+  // Reset delivery note data to initial state with new incremented number
+  const resetAndIncrementDeliveryNote = () => {
+    // Generate the next delivery note number
+    const nextDeliveryNoteNumber = getNextDeliveryNoteNumber();
+    
+    // Reset all delivery note data with fresh values
     setDeliveryNoteData({
       ...initialDeliveryNoteData,
-      deliveryNoteNumber: `DN-${new Date().getTime()}`, // Generate new delivery note number
-      date: new Date().toISOString().split('T')[0], // Set to current date
+      deliveryNoteNumber: nextDeliveryNoteNumber,
+      date: getLocalDate(),
+      deliveryDate: getLocalDate(),
+      preparedByDate: getLocalDate(),
+      driverDate: getLocalDate(),
+      receivedByDate: '',
+      // Reset financial fields
+      subtotal: 0,
+      tax: 0,
+      discount: 0,
+      total: 0,
+      amountPaid: 0,
+      creditBroughtForward: 0,
+      amountDue: 0,
+      // Reset items to empty array
+      items: [],
+      totalItems: 0,
+      totalQuantity: 0,
+      totalPackages: 0,
+      // Reset text fields
+      deliveryNotes: '',
+      preparedByName: '',
+      driverName: '',
+      receivedByName: '',
+      vehicle: '',
+      driver: ''
     });
+  };
+  
+  // Function to reset delivery note data to initial state
+  const resetDeliveryNoteData = () => {
+    resetAndIncrementDeliveryNote();
   };
 
   // Function to reset sales order data to initial state
@@ -4909,9 +4942,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       // For other cases, save to local saved delivery notes
       try {
       // For other cases, save to local saved delivery notes
-      if (!deliveryNoteName.trim()) {
+      if (!deliveryNoteData.deliveryNoteNumber || !deliveryNoteData.deliveryNoteNumber.trim()) {
         const deliveryNoteNumber = getNextDeliveryNoteNumber();
-        setDeliveryNoteName(deliveryNoteNumber);
         
         // Also update the delivery note number in the data
         setDeliveryNoteData(prev => ({
@@ -4925,7 +4957,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       
       const newSavedNote: SavedDeliveryNote = {
         id: Date.now().toString(),
-        name: deliveryNoteName || getNextDeliveryNoteNumber(),
+        name: deliveryNoteData.deliveryNoteNumber || getNextDeliveryNoteNumber(),
         data: {
           ...deliveryNoteData,
           totalQuantity: totals.totalQuantity, // Save calculated total
@@ -4942,17 +4974,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       
       alert(`Delivery note "${newSavedNote.name}" saved successfully!`);
       
-      // Generate next number for the next delivery note
+      // Auto-increment and reset for next delivery note
       setTimeout(() => {
-        const nextDeliveryNoteNumber = getNextDeliveryNoteNumber();
-        setDeliveryNoteName(nextDeliveryNoteNumber);
-        
-        // Also update the delivery note number in the data
-        setDeliveryNoteData(prev => ({
-          ...prev,
-          deliveryNoteNumber: nextDeliveryNoteNumber
-        }));
-      }, 100);
+        resetAndIncrementDeliveryNote();
+      }, 500);
       } catch (error) {
         console.error('Error saving delivery note:', error);
         alert('Error saving delivery note. Please try again.');
@@ -4968,7 +4993,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     const note = savedDeliveryNotes.find(n => n.id === noteId);
     if (note) {
       setDeliveryNoteData(note.data);
-      setDeliveryNoteName(note.name);
       setActiveTab("preview"); // Switch to preview tab to show the loaded data
       alert(`Delivery note "${note.name}" loaded successfully!`);
     }
@@ -8078,15 +8102,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                         onChange={(e) => setGrnData(prev => ({ ...prev, grnNumber: e.target.value }))}
                         className="w-48 h-10"
                       />
-                    ) : (
+                    ) : currentTemplate?.type === "sales-order" ? (
                       <Input
                         type="text"
-                        placeholder="Delivery Note Name"
-                        value={deliveryNoteName}
-                        onChange={(e) => setDeliveryNoteName(e.target.value)}
+                        placeholder="Sales Order Number"
+                        value={salesOrderData.orderNumber}
+                        onChange={(e) => handleSalesOrderChange("orderNumber", e.target.value)}
                         className="w-48 h-10"
                       />
-                    )}
+                    ) : null}
                     <Button 
                       disabled={isSavingDeliveryNote}
                       onClick={async () => {
@@ -12560,6 +12584,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                           if (printFrame.parentNode) {
                             printFrame.parentNode.removeChild(printFrame);
                           }
+                          // Auto-refresh after printing - reset all fields and increment number
+                          resetAndIncrementDeliveryNote();
                         }, 1000);
                       }
                     };
@@ -12601,6 +12627,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                       // Remove temporary container after PDF generation
                       setTimeout(() => {
                         document.body.removeChild(tempContainer);
+                        // Auto-refresh after downloading - reset all fields and increment number
+                        resetAndIncrementDeliveryNote();
                       }, 1000);
                     });
                   });
@@ -12671,6 +12699,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                     alert('Error sharing delivery note. Please try again.');
                   }
                   closeDeliveryNoteOptionsDialog();
+                  // Auto-refresh after sharing - reset all fields and increment number
+                  setTimeout(() => {
+                    resetAndIncrementDeliveryNote();
+                  }, 300);
                 }}
                 className="w-full flex items-center justify-start"
                 variant="outline"
@@ -12696,6 +12728,18 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 3. JSON
 Enter choice (1-3):`);
                   
+                  // Execute the chosen export
+                  if (exportChoice) {
+                    const choice = parseInt(exportChoice);
+                    if (choice >= 1 && choice <= 3) {
+                      exportOptions[choice - 1].action();
+                      // Auto-refresh after exporting - reset all fields and increment number
+                      setTimeout(() => {
+                        resetAndIncrementDeliveryNote();
+                      }, 500);
+                    }
+                  }
+                  
                   closeDeliveryNoteOptionsDialog();
                 }}
                 className="w-full flex items-center justify-start"
@@ -12707,16 +12751,28 @@ Enter choice (1-3):`);
               
               <Button 
                 onClick={() => {
-                  // Save to saved deliveries
+                  // Save to saved deliveries and reset for next entry
                   alert('Delivery note saved to saved deliveries!');
                   closeDeliveryNoteOptionsDialog();
-                  resetDeliveryNoteData();
+                  resetAndIncrementDeliveryNote();
                 }}
                 className="w-full flex items-center justify-start"
                 variant="outline"
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save to Saved Deliveries
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  // Create new delivery note - reset all fields
+                  closeDeliveryNoteOptionsDialog();
+                  resetAndIncrementDeliveryNote();
+                }}
+                className="w-full flex items-center justify-start bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Delivery Note
               </Button>
             </div>
             
