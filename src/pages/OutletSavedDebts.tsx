@@ -62,6 +62,7 @@ interface SavedSale {
   paymentMethod: string;
   status: string;
   creditBroughtForward?: number;
+  shipping?: number;
   adjustments?: number;
   adjustmentReason?: string;
   isEdited?: boolean; // Flag to track if transaction has been edited
@@ -754,6 +755,18 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       // Enrich data with customer names and item counts
       const enrichedSales = await Promise.all(
         data.map(async (debt: OutletDebt) => {
+          console.log('📄 Processing debt record:', {
+            id: debt.id,
+            invoice: debt.invoice_number,
+            subtotal: debt.subtotal,
+            tax: debt.tax_amount,
+            total: debt.total_amount,
+            amountPaid: debt.amount_paid,
+            remaining: debt.remaining_amount,
+            adjustments: debt.adjustments,
+            adjustmentReason: debt.adjustment_reason
+          });
+          
           // Fetch customer name if customer_id exists
           let customerName = 'Walk-in Customer';
           if (debt.customer_id) {
@@ -804,7 +817,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             paymentMethod: 'debt',
             status: debt.payment_status,
             creditBroughtForward: creditBroughtForward,
-            adjustments: 0,
+            shipping: debt.shipping_amount || 0,
+            adjustments: debt.adjustments || 0,
+            adjustmentReason: debt.adjustment_reason,
             salesman: debt.salesman,
             driver: debt.driver,
             truck: debt.truck
@@ -841,15 +856,28 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
   const handleEdit = (sale: SavedSale) => {
     setSelectedSale(sale);
+    console.log('📝 Opening edit dialog for sale:', sale);
+    console.log('  Financial fields:', {
+      subtotal: sale.subtotal,
+      tax: sale.tax,
+      total: sale.total,
+      amountPaid: sale.amountPaid,
+      remainingAmount: sale.remainingAmount,
+      creditBroughtForward: sale.creditBroughtForward,
+      shipping: sale.shipping,
+      adjustments: sale.adjustments
+    });
     setEditFormData({
       customer: sale.customer,
       subtotal: sale.subtotal,
       tax: sale.tax,
       creditBroughtForward: sale.creditBroughtForward,
+      shipping: sale.shipping,
       adjustments: sale.adjustments,
       adjustmentReason: sale.adjustmentReason,
       total: sale.total,
       amountPaid: sale.amountPaid,
+      remainingAmount: sale.remainingAmount,
       status: sale.status,
       dueDate: sale.dueDate,
       salesman: sale.salesman,
@@ -869,8 +897,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       if (field === 'quantity' || field === 'price') {
         const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
         const newTax = newSubtotal * 0.18; // 18% tax (display only)
+        const shipping = prev.shipping || 0;
         const adjustments = prev.adjustments || 0;
-        const newTotal = newSubtotal + adjustments; // Exclude tax from total
+        const newTotal = newSubtotal + shipping + adjustments; // Include shipping and adjustments
         const amountPaid = prev.amountPaid || 0;
         const remainingBalance = newTotal - amountPaid;
         return { 
@@ -1035,6 +1064,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         amount_paid: editFormData.amountPaid,
         remaining_amount: (editFormData.total || 0) - (editFormData.amountPaid || 0),
         payment_status: validPaymentStatus,
+        shipping_amount: editFormData.shipping,
+        adjustments: editFormData.adjustments,
+        adjustment_reason: editFormData.adjustmentReason,
         salesman: editFormData.salesman,
         driver: editFormData.driver,
         truck: editFormData.truck,
@@ -1179,7 +1211,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       subtotal: sale.subtotal,
       tax: sale.tax,
       discount: 0,
-      shipping: 0,
+      shipping: sale.shipping || 0,
       adjustments: sale.adjustments || 0,
       adjustmentReason: sale.adjustmentReason,
       total: sale.total,
@@ -1721,6 +1753,12 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   <span className="text-muted-foreground">Tax (18%)</span>
                   <span>{formatCurrency(selectedSale.tax)}</span>
                 </div>
+                {(selectedSale.shipping || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-blue-600">
+                    <span>Shipping</span>
+                    <span>{formatCurrency(selectedSale.shipping || 0)}</span>
+                  </div>
+                )}
                 {selectedSale.creditBroughtForward > 0 && (
                   <div className="flex justify-between text-sm text-orange-600">
                     <span>Credit Brought Forward</span>
@@ -1948,7 +1986,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 </div>
               </div>
               
-              {/* Subtotal, Tax, Adjustments - 3 columns */}
+              {/* Subtotal, Tax, Shipping - 3 columns */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="editSubtotal">Subtotal</Label>
@@ -1971,24 +2009,60 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   />
                 </div>
                 <div>
-                  <Label htmlFor="editAdjustments">Adjustments</Label>
+                  <Label htmlFor="editShipping">Shipping</Label>
                   <Input
-                    id="editAdjustments"
+                    id="editShipping"
                     type="number"
-                    value={editFormData.adjustments || 0}
+                    value={editFormData.shipping || 0}
                     onChange={(e) => {
-                      const adjustmentsValue = parseFloat(e.target.value) || 0;
-                      const newTotal = editFormData.subtotal + adjustmentsValue; // Exclude tax
+                      const shippingValue = parseFloat(e.target.value) || 0;
+                      const adjustments = editFormData.adjustments || 0;
+                      const newTotal = (editFormData.subtotal || 0) + shippingValue + adjustments;
                       const remainingBalance = newTotal - (editFormData.amountPaid || 0);
                       setEditFormData({
-                        ...editFormData, 
-                        adjustments: adjustmentsValue,
+                        ...editFormData,
+                        shipping: shippingValue,
                         total: newTotal,
                         remainingAmount: remainingBalance
                       });
                     }}
                   />
                 </div>
+              </div>
+              
+              {/* Credit Brought Forward field */}
+              <div>
+                <Label htmlFor="editCreditBroughtForward">Credit Brought Forward</Label>
+                <Input
+                  id="editCreditBroughtForward"
+                  type="number"
+                  value={editFormData.creditBroughtForward || 0}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                  title="Previous balance from customer's earlier debts"
+                />
+              </div>
+              
+              {/* Adjustments field */}
+              <div>
+                <Label htmlFor="editAdjustments">Adjustments</Label>
+                <Input
+                  id="editAdjustments"
+                  type="number"
+                  value={editFormData.adjustments || 0}
+                  onChange={(e) => {
+                    const adjustmentsValue = parseFloat(e.target.value) || 0;
+                    const shipping = editFormData.shipping || 0;
+                    const newTotal = (editFormData.subtotal || 0) + shipping + adjustmentsValue; // Include shipping
+                    const remainingBalance = newTotal - (editFormData.amountPaid || 0);
+                    setEditFormData({
+                      ...editFormData, 
+                      adjustments: adjustmentsValue,
+                      total: newTotal,
+                      remainingAmount: remainingBalance
+                    });
+                  }}
+                />
               </div>
               
               {editFormData.adjustments !== 0 && (

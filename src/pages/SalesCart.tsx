@@ -721,6 +721,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             amount_paid: actualAmountPaid,
             remaining_amount: remainingNewDebt, // Can be negative for overpayment (credit balance)
             payment_status: paymentStatus,
+            shipping_amount: parseFloat(shippingCost) || 0,
+            adjustments: adjustmentsAmount,
+            adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
             notes: `Debt for sale ${createdSale.id || 'unknown'}${remainingNewDebt < 0 ? ' - OVERPAID' : ''}`,
             salesman: salesman || null,
             driver: driver || null,

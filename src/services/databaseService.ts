@@ -4077,6 +4077,9 @@ export interface OutletDebt {
   amount_paid: number;
   remaining_amount: number;
   payment_status: string; // 'unpaid', 'partial', 'paid'
+  shipping_amount?: number;
+  adjustments?: number;
+  adjustment_reason?: string;
   notes?: string;
   reference_number?: string;
   salesman?: string;
