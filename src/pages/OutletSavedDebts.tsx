@@ -62,6 +62,7 @@ interface SavedSale {
   paymentMethod: string;
   status: string;
   creditBroughtForward?: number;
+  debtPaymentAmount?: number;
   shipping?: number;
   adjustments?: number;
   adjustmentReason?: string;
@@ -817,6 +818,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             paymentMethod: 'debt',
             status: debt.payment_status,
             creditBroughtForward: creditBroughtForward,
+            debtPaymentAmount: debt.debt_payment_amount || 0,
             shipping: debt.shipping_amount || 0,
             adjustments: debt.adjustments || 0,
             adjustmentReason: debt.adjustment_reason,

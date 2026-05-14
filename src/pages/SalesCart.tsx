@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -683,10 +683,21 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             const newRemainingAmount = debt.remaining_amount - paymentTowardThisDebt;
             const newAmountPaid = debt.amount_paid + paymentTowardThisDebt;
             
+            // Create payment record for tracking
+            await createOutletDebtPayment({
+              debt_id: debt.id!,
+              amount: paymentTowardThisDebt,
+              payment_method: 'cash', // Default to cash, can be enhanced later
+              payment_date: new Date().toISOString(),
+              notes: `Payment from sale ${createdSale.id || 'unknown'}`,
+              created_by: null
+            });
+            console.log(`📝 Created payment record for debt ${debt.id}: ${paymentTowardThisDebt}`);
+            
             if (newRemainingAmount <= 0) {
               // Fully paid - delete the debt
               await deleteOutletDebt(debt.id);
-              console.log(`Cleared debt ${debt.id}`);
+              console.log(`✅ Cleared debt ${debt.id}`);
             } else {
               // Partially paid - update amounts
               await updateOutletDebt(debt.id, { 
@@ -694,7 +705,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                 remaining_amount: newRemainingAmount,
                 payment_status: 'partial'
               });
-              console.log(`Reduced debt ${debt.id} remaining to ${newRemainingAmount}`);
+              console.log(`📉 Reduced debt ${debt.id} remaining to ${newRemainingAmount}`);
             }
             
             remainingPayment -= paymentTowardThisDebt;
@@ -721,6 +732,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             amount_paid: actualAmountPaid,
             remaining_amount: remainingNewDebt, // Can be negative for overpayment (credit balance)
             payment_status: paymentStatus,
+            debt_payment_amount: debtPaymentNum, // Amount paid toward previous debts
             shipping_amount: parseFloat(shippingCost) || 0,
             adjustments: adjustmentsAmount,
             adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
