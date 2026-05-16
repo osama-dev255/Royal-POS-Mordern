@@ -119,23 +119,12 @@ export const updateGRNQuantitiesBasedOnDelivered = async (deliveryItems: Array<{
   try {
     console.log('Starting updateGRNQuantitiesBasedOnDelivered with items:', deliveryItems);
     
-    // Deduplication check using localStorage
-    const PROCESSED_GRN_ITEMS_KEY = 'processedGRNItems';
-    let processedGRNItems = JSON.parse(localStorage.getItem(PROCESSED_GRN_ITEMS_KEY) || '[]');
-    
     // Get all saved GRNs
     const savedGRNs = await getSavedGRNs();
     console.log('Found', savedGRNs.length, 'saved GRNs');
     
     // For each delivered item, find the corresponding GRN item and update its soldout quantity
     for (const deliveredItem of deliveryItems) {
-      // Skip if already processed
-      const itemKey = `${deliveredItem.description}-${deliveredItem.delivered}`;
-      if (processedGRNItems.includes(itemKey)) {
-        console.log(`⏭️ Skipping GRN update for ${deliveredItem.description} - already processed`);
-        continue;
-      }
-      
       console.log(`Processing delivered item: ${deliveredItem.description}, delivered: ${deliveredItem.delivered}`);
       
       let itemUpdated = false;
@@ -185,10 +174,6 @@ export const updateGRNQuantitiesBasedOnDelivered = async (deliveryItems: Array<{
           
           itemUpdated = true;
           
-          // Mark as processed
-          processedGRNItems.push(itemKey);
-          localStorage.setItem(PROCESSED_GRN_ITEMS_KEY, JSON.stringify(processedGRNItems));
-          
           // Break after updating the first matching GRN item
           break;
         } else {
@@ -219,22 +204,11 @@ export const updateProductStockBasedOnDelivered = async (deliveryItems: Array<{
   try {
     console.log('Starting updateProductStockBasedOnDelivered with items:', deliveryItems);
     
-    // Deduplication check using localStorage
-    const PROCESSED_PRODUCT_ITEMS_KEY = 'processedProductItems';
-    let processedProductItems = JSON.parse(localStorage.getItem(PROCESSED_PRODUCT_ITEMS_KEY) || '[]');
-    
     const { getProducts, updateProduct } = await import('@/services/databaseService');
     const allProducts = await getProducts();
     
     // For each delivered item, find the corresponding product and update its stock
     for (const deliveredItem of deliveryItems) {
-      // Skip if already processed
-      const itemKey = `${deliveredItem.description}-${deliveredItem.delivered}`;
-      if (processedProductItems.includes(itemKey)) {
-        console.log(`⏭️ Skipping product stock update for ${deliveredItem.description} - already processed`);
-        continue;
-      }
-      
       console.log(`Processing delivered item: ${deliveredItem.description}, delivered: ${deliveredItem.delivered}`);
       
       // Find product that matches the description
@@ -256,10 +230,6 @@ export const updateProductStockBasedOnDelivered = async (deliveryItems: Array<{
         await updateProduct(product.id!, updatedProduct);
         
         console.log(`Successfully updated product ${product.name} stock to ${newStock}`);
-        
-        // Mark as processed
-        processedProductItems.push(itemKey);
-        localStorage.setItem(PROCESSED_PRODUCT_ITEMS_KEY, JSON.stringify(processedProductItems));
       } else {
         console.warn(`No matching product found for delivered item: ${deliveredItem.description}`);
       }

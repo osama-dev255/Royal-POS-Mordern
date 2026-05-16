@@ -57,7 +57,7 @@ import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettl
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
-import { getProducts, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
+import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
@@ -4836,90 +4836,46 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         };
         
         await saveDelivery(deliveryToSave);
+        console.log('✅ saveDelivery() completed');
+        console.log('📊 Delivery status saved as:', deliveryToSave.status);
+        console.log('ℹ️ No JavaScript inventory update should happen - checking for database triggers...');
+        
+        // CRITICAL DIAGNOSTIC: Log what we're about to do
+        console.log('📋 Next steps:');
+        console.log('   1. Update GRN quantities (grn_items table)');
+        console.log('   2. Update product stock (products table)');
+        console.log('   3. DO NOT update outlet inventory (inventory_products table)');
+        console.log('   4. If database trigger fires (status="delivered"), it will update inventory_products automatically');
+        console.log('   5. Current status is "completed" so trigger should NOT fire');
         
         // Update GRN quantities for consumed items based on quantity field
         const quantityItems = deliveryNoteData.items.map(item => ({
           description: item.description,
           delivered: item.quantity || 0  // Use quantity field for inventory reduction
         }));
-        // Removed redundant GRN and product stock updates - outlet inventory update handles this
         
-        // Update outlet inventory if delivery is to a registered outlet
-        if (outletId) {
-          try {
-            console.log('📦 Updating outlet inventory for delivery from Investment...');
-            console.log('📍 Outlet ID:', outletId);
-            console.log('📋 Items to add:', deliveryNoteData.items.length);
-            
-            // Get current inventory products for the destination outlet
-            const { data: outletInventory, error: inventoryError } = await supabase
-              .from('inventory_products')
-              .select('*')
-              .eq('outlet_id', outletId);
-            
-            if (inventoryError) {
-              console.error('❌ Error loading outlet inventory:', inventoryError);
-            } else {
-              console.log('📊 Current outlet inventory:', outletInventory?.length || 0, 'products');
-            }
-            
-            // Update or create inventory products for each delivered item
-            for (const item of deliveryNoteData.items) {
-              const productName = item.description;
-              const deliveredQty = item.quantity || 0;
-              
-              if (!productName || deliveredQty <= 0) {
-                console.log('⏭️ Skipping item (no name or quantity):', productName, deliveredQty);
-                continue;
-              }
-              
-              // Check if product already exists in outlet inventory
-              const existingProduct = outletInventory?.find(p => p.name === productName);
-              
-              if (existingProduct) {
-                // Update existing product quantity
-                const newQuantity = (existingProduct.quantity || 0) + deliveredQty;
-                
-                const { error: updateError } = await supabase
-                  .from('inventory_products')
-                  .update({
-                    quantity: newQuantity
-                    // available_quantity is auto-calculated by generated column
-                  })
-                  .eq('id', existingProduct.id);
-                  
-                if (updateError) {
-                  console.error(`❌ Error updating ${productName}:`, updateError);
-                } else {
-                  console.log(`✅ Updated ${productName}: ${existingProduct.quantity} → ${newQuantity}`);
-                }
-              } else {
-                // Create new product in outlet inventory
-                const { error: insertError } = await supabase
-                  .from('inventory_products')
-                  .insert({
-                    outlet_id: outletId,
-                    name: productName,
-                    quantity: deliveredQty,
-                    // available_quantity is auto-calculated
-                    unit_cost: 0,
-                    selling_price: item.rate || 0
-                  });
-                  
-                if (insertError) {
-                  console.error(`❌ Error creating ${productName}:`, insertError);
-                } else {
-                  console.log(`✅ Created ${productName} with quantity: ${deliveredQty}`);
-                }
-              }
-            }
-            
-            console.log('✅ Outlet inventory update completed');
-          } catch (inventoryError) {
-            console.error('❌ Error updating outlet inventory:', inventoryError);
-            // Don't fail the entire save if inventory update fails
-          }
+        // Update GRN soldout quantities (this tracks what was delivered from GRN)
+        try {
+          console.log('📉 Updating GRN quantities for delivered items...');
+          await updateGRNQuantitiesBasedOnDelivered(quantityItems);
+          console.log('✅ GRN quantities updated successfully');
+        } catch (error) {
+          console.error('❌ Error updating GRN quantities:', error);
+          // Continue even if GRN update fails
         }
+        
+        // Update product stock in products table (decrement stock)
+        try {
+          console.log('📉 Decrementing product stock for delivered items...');
+          await updateProductStockBasedOnDelivered(quantityItems);
+          console.log('✅ Product stock decremented successfully');
+        } catch (error) {
+          console.error('❌ Error updating product stock:', error);
+          // Continue even if product stock update fails
+        }
+        
+        // NOTE: Outlet inventory update is handled by saveDelivery() in deliveryUtils.ts
+        // No need to update it here to avoid double-updating
         
         if (isKilangoInvestment && isCustomerFromOutlets) {
           alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity for KILANGO INVESTMENT LTD.\n\n✅ Outlet inventory has been updated with delivered products.`);

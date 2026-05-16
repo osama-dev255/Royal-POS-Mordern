@@ -30,16 +30,10 @@ export interface DeliveryData {
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
   try {
-    // Deduplication check using localStorage
-    const PROCESSED_DELIVERY_KEY = 'processedDelivery';
-    const processedDelivery = localStorage.getItem(PROCESSED_DELIVERY_KEY);
+    console.log('💾 Saving delivery to database:', delivery.deliveryNoteNumber);
     
-    if (processedDelivery === delivery.id) {
-      console.log(`⏭️ Skipping duplicate delivery save for ${delivery.id} - already processed`);
-      return;
-    }
-    
-    // Save to database first (source of truth)
+    // NOTE: Database trigger has been DISABLED due to double-update bug
+    // We now handle inventory updates in JavaScript to ensure single update
     let dbSaveSuccessful = false;
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -142,8 +136,91 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
     // Store consolidated list in localStorage
     localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(deliveriesToStore));
     
-    // Mark this delivery as processed to prevent duplicate updates
-    localStorage.setItem(PROCESSED_DELIVERY_KEY, delivery.id);
+    // CRITICAL: Update outlet inventory in JavaScript ONLY ONCE
+    // (Database trigger has been disabled)
+    if (dbSaveSuccessful && delivery.outletId && delivery.itemsList && delivery.itemsList.length > 0) {
+      try {
+        console.log('📦 Updating outlet inventory in JavaScript (trigger disabled)...');
+        console.log('📍 Outlet ID:', delivery.outletId);
+        console.log('📋 Items:', delivery.itemsList.length);
+        
+        // Get fresh inventory data
+        const { data: outletInventory, error: inventoryError } = await supabase
+          .from('inventory_products')
+          .select('*')
+          .eq('outlet_id', delivery.outletId);
+        
+        if (inventoryError) {
+          console.error('❌ Error loading inventory:', inventoryError);
+        } else {
+          console.log('📊 Current inventory products:', outletInventory?.length || 0);
+          
+          // Process each item
+          for (const item of delivery.itemsList) {
+            const productName = item.name || item.description;
+            const deliveredQty = item.quantity || item.delivered || 0;
+            
+            if (!productName || deliveredQty <= 0) {
+              console.log('⏭️ Skip:', productName, deliveredQty);
+              continue;
+            }
+            
+            // Get FRESH quantity from database (not cached)
+            const existingProduct = outletInventory?.find(p => p.name === productName);
+            
+            if (existingProduct) {
+              // Re-query to get absolute latest value
+              const { data: freshData } = await supabase
+                .from('inventory_products')
+                .select('quantity')
+                .eq('id', existingProduct.id)
+                .single();
+              
+              const currentQty = freshData?.quantity || existingProduct.quantity || 0;
+              const newQty = currentQty + deliveredQty;
+              
+              console.log(`📝 ${productName}: ${currentQty} + ${deliveredQty} = ${newQty}`);
+              
+              const { error: updateError } = await supabase
+                .from('inventory_products')
+                .update({ quantity: newQty })
+                .eq('id', existingProduct.id);
+              
+              if (updateError) {
+                console.error(`❌ Error updating ${productName}:`, updateError);
+              } else {
+                console.log(`✅ Updated ${productName} to ${newQty}`);
+              }
+            } else {
+              // Create new product
+              console.log(`🆕 Creating ${productName} with qty ${deliveredQty}`);
+              
+              const { error: insertError } = await supabase
+                .from('inventory_products')
+                .insert({
+                  outlet_id: delivery.outletId,
+                  name: productName,
+                  quantity: deliveredQty,
+                  unit_cost: item.rate ?? 0,
+                  selling_price: item.rate || item.price || 0
+                });
+              
+              if (insertError) {
+                console.error(`❌ Error creating ${productName}:`, insertError);
+              } else {
+                console.log(`✅ Created ${productName}`);
+              }
+            }
+          }
+          
+          console.log('✅ Inventory update completed');
+        }
+      } catch (error) {
+        console.error('❌ Inventory update error:', error);
+      }
+    }
+    
+    console.log('✅ Delivery saved successfully:', delivery.deliveryNoteNumber);
     
   } catch (error) {
     console.error('Error saving delivery:', error);
@@ -393,104 +470,11 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         console.log('✅ Database update successful');
         dbUpdateSuccessful = true;
         
-        // Update outlet inventory only ONCE per delivery
-        // Track processed deliveries to prevent duplicate updates
-        const PROCESSED_DELIVERIES_KEY = 'processedInvestmentDeliveries';
-        let processedDeliveries = JSON.parse(localStorage.getItem(PROCESSED_DELIVERIES_KEY) || '[]');
-                
-        // Only update inventory if:
-        // 1. Delivery is to an outlet
-        // 2. Source is from investment
-        // 3. We have items to process
-        // 4. This delivery hasn't been processed before
-        if (updatedDelivery.outletId && 
-            (updateData.source_type === 'investment' || originalDelivery?.source_type === 'investment') &&
-            (updatedDelivery.itemsList?.length || 0) > 0 &&
-            !processedDeliveries.includes(updatedDelivery.id)) {
-                  
-          try {
-            console.log('📦 Updating outlet inventory for investment delivery...');
-            console.log('📍 Outlet ID:', updatedDelivery.outletId);
-            console.log('📋 Items:', updatedDelivery.itemsList?.length || 0);
-            console.log('🔄 Delivery status:', updatedDelivery.status);
-                    
-            // Get current inventory products for the destination outlet
-            const { data: outletInventory, error: inventoryError } = await supabase
-              .from('inventory_products')
-              .select('*')
-              .eq('outlet_id', updatedDelivery.outletId);
-                    
-            if (inventoryError) {
-              console.error('❌ Error loading outlet inventory:', inventoryError);
-            } else {
-              console.log('📊 Current outlet inventory:', outletInventory?.length || 0, 'products');
-                      
-              // Process each delivered item
-              const itemsList = updatedDelivery.itemsList || [];
-              for (const item of itemsList) {
-                const productName = item.name || item.description;
-                const deliveredQty = item.quantity || item.delivered || 0;
-                        
-                if (!productName || deliveredQty <= 0) {
-                  console.log('⏭️ Skipping item (no name or quantity):', productName, deliveredQty);
-                  continue;
-                }
-                        
-                // Check if product already exists in outlet inventory
-                const existingProduct = outletInventory?.find(p => p.name === productName);
-                        
-                if (existingProduct) {
-                  // Update existing product quantity
-                  const newQuantity = (existingProduct.quantity || 0) + deliveredQty;
-                          
-                  const { error: updateError } = await supabase
-                    .from('inventory_products')
-                    .update({
-                      quantity: newQuantity
-                      // available_quantity is auto-calculated by generated column
-                    })
-                    .eq('id', existingProduct.id);
-                          
-                  if (updateError) {
-                    console.error(`❌ Error updating ${productName}:`, updateError);
-                  } else {
-                    console.log(`✅ Updated ${productName}: ${existingProduct.quantity} → ${newQuantity}`);
-                  }
-                } else {
-                  // Create new product in outlet inventory
-                  const { error: insertError } = await supabase
-                    .from('inventory_products')
-                    .insert({
-                      outlet_id: updatedDelivery.outletId,
-                      name: productName,
-                      quantity: deliveredQty,
-                      // available_quantity is auto-calculated
-                      unit_cost: item.rate ?? 0,
-                      selling_price: item.rate || item.price || 0
-                    });
-                          
-                  if (insertError) {
-                    console.error(`❌ Error creating ${productName}:`, insertError);
-                  } else {
-                    console.log(`✅ Created ${productName} with quantity: ${deliveredQty}`);
-                  }
-                }
-              }
-                      
-              console.log('✅ Outlet inventory update completed');
-                      
-              // Mark this delivery as processed to prevent duplicates
-              processedDeliveries.push(updatedDelivery.id);
-              localStorage.setItem(PROCESSED_DELIVERIES_KEY, JSON.stringify(processedDeliveries));
-              console.log(`✅ Marked delivery ${updatedDelivery.id} as processed`);
-            }
-          } catch (inventoryError) {
-            console.error('❌ Error updating outlet inventory:', inventoryError);
-            // Don't fail the entire update if inventory update fails
-          }
-        } else if (processedDeliveries.includes(updatedDelivery.id)) {
-          console.log(`⏭️ Skipping inventory update - delivery ${updatedDelivery.id} already processed`);
-        }
+        // NOTE: Inventory update for NEW deliveries is handled by saveDelivery()
+        // This updateDelivery() function should NOT update inventory to prevent double-counting
+        // When editing a delivery, the user should manually adjust inventory if needed
+        console.log('ℹ️ Skipping inventory update in updateDelivery() - handled by saveDelivery() for new deliveries');
+        console.log('ℹ️ If editing delivery quantities, manually adjust outlet inventory');
       }
     } else {
       console.warn('⚠️ No authenticated user found');

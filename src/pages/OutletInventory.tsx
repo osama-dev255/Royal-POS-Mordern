@@ -59,7 +59,9 @@ interface InventoryItem {
   name: string;
   sku: string;
   category: string;
-  quantity: number;
+  quantity: number; // Available stock (for backward compatibility)
+  totalReceived: number; // Total received from deliveries
+  soldQuantity: number; // Total sold
   minStock: number;
   maxStock: number;
   unitPrice: number;
@@ -178,16 +180,20 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       
       // Convert database inventory to InventoryItem format (all values from DB)
       const inventoryItems: InventoryItem[] = dbInventory.map(item => {
-        const availableQty = item.available_quantity || Math.max(0, item.quantity - (item.sold_quantity || 0));
+        const totalReceived = item.quantity || 0;
+        const soldQty = item.sold_quantity || 0;
+        const availableQty = item.available_quantity || Math.max(0, totalReceived - soldQty);
         
         return {
           id: `${item.outlet_id}-${item.name}`,
           name: item.name,
           sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
           category: item.category || 'General',
-          quantity: availableQty,
-          minStock: item.min_stock || Math.floor(item.quantity * 0.2),
-          maxStock: item.max_stock || Math.floor(item.quantity * 1.5),
+          quantity: availableQty, // Available stock (for backward compatibility)
+          totalReceived: totalReceived, // Total received from deliveries
+          soldQuantity: soldQty, // Total sold
+          minStock: item.min_stock || Math.floor(totalReceived * 0.2),
+          maxStock: item.max_stock || Math.floor(totalReceived * 1.5),
           unitPrice: item.unit_cost,
           sellingPrice: item.selling_price,
           totalValue: availableQty * item.unit_cost,
@@ -250,7 +256,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       const dbProducts = await getAvailableInventoryByOutlet(propOutletId);
       
       return dbProducts.map((product: InventoryProduct) => {
-        const availableQuantity = product.available_quantity || Math.max(0, product.quantity - (product.sold_quantity || 0));
+        const totalReceived = product.quantity || 0;
+        const soldQty = product.sold_quantity || 0;
+        const availableQuantity = product.available_quantity || Math.max(0, totalReceived - soldQty);
         const newStatus = availableQuantity > (product.min_stock || 0) 
           ? 'in-stock' 
           : availableQuantity > 0 
@@ -262,7 +270,9 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
           name: product.name,
           sku: product.sku || '',
           category: product.category || 'General',
-          quantity: availableQuantity,
+          quantity: availableQuantity, // Available stock
+          totalReceived: totalReceived, // Total received
+          soldQuantity: soldQty, // Total sold
           minStock: product.min_stock || 0,
           maxStock: product.max_stock || 0,
           unitPrice: product.unit_cost,
@@ -732,8 +742,20 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                     <span className="text-muted-foreground">Total Price:</span>
                     <span className="font-semibold">{formatCurrency(item.sellingPrice * item.quantity)}</span>
                   </div>
-                  <div className="pt-2">
+                  <div className="pt-2 border-t">
                     <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium text-blue-700">Available Stock</span>
+                      <span className="font-bold text-blue-700">{item.quantity}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">Total Received</span>
+                      <span className="font-medium">{item.totalReceived}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">Total Sold</span>
+                      <span className="font-medium">{item.soldQuantity}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-2 mt-2">
                       <span>Stock Level</span>
                       <span className="font-medium">{item.quantity} / {item.maxStock}</span>
                     </div>
@@ -787,11 +809,18 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                       <td className="py-3 px-4">{item.category}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{item.quantity}</span>
-                          <Progress 
-                            value={getStockProgress(item.quantity, item.maxStock)} 
-                            className="w-20 h-2"
-                          />
+                          <div>
+                            <div className="font-medium text-blue-700">{item.quantity}</div>
+                            <div className="text-xs text-muted-foreground">Available</div>
+                          </div>
+                          <div className="border-l pl-2">
+                            <div className="text-xs">{item.totalReceived}</div>
+                            <div className="text-xs text-muted-foreground">Received</div>
+                          </div>
+                          <div className="border-l pl-2">
+                            <div className="text-xs">{item.soldQuantity}</div>
+                            <div className="text-xs text-muted-foreground">Sold</div>
+                          </div>
                         </div>
                       </td>
                       <td className="py-3 px-4">{formatCurrency(item.unitPrice)}</td>
