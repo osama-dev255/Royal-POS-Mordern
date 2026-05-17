@@ -512,8 +512,19 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     
     filteredSales.forEach(sale => {
       const remaining = sale.total - (sale.amountPaid || 0);
-      const status = sale.amountPaid === 0 ? 'Unpaid' : 
-                     (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial';
+      
+      // Use actual status from database
+      let status = sale.status || '';
+      if (!status || !['paid', 'partial', 'unpaid', 'cancelled', 'refunded'].includes(status.toLowerCase())) {
+        // Fallback to calculated status
+        const amountPaid = sale.amountPaid || 0;
+        status = amountPaid === 0 ? 'Unpaid' : 
+                 amountPaid >= sale.total ? 'Paid' : 'Partial';
+      } else {
+        // Capitalize first letter
+        status = status.charAt(0).toUpperCase() + status.slice(1);
+      }
+      
       html += `<tr>
         <td>${sale.invoiceNumber}</td>
         <td>${sale.date}</td>
@@ -546,8 +557,18 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleExportSingleDebtXLS = (sale: SavedSale) => {
     // Generate Excel-compatible HTML table for single debt
     const remaining = sale.total - (sale.amountPaid || 0);
-    const status = sale.amountPaid === 0 ? 'Unpaid' : 
-                   (sale.amountPaid || 0) >= sale.total ? 'Paid' : 'Partial';
+    
+    // Use actual status from database, fallback to calculated status
+    let status = sale.status || '';
+    if (!status || !['paid', 'partial', 'unpaid', 'cancelled', 'refunded'].includes(status.toLowerCase())) {
+      // Fallback to calculated status if database status is invalid
+      const amountPaid = sale.amountPaid || 0;
+      status = amountPaid === 0 ? 'Unpaid' : 
+               amountPaid >= sale.total ? 'Paid' : 'Partial';
+    } else {
+      // Capitalize first letter
+      status = status.charAt(0).toUpperCase() + status.slice(1);
+    }
     
     let html = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
@@ -1056,8 +1077,20 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       console.log('✅ Old inventory quantities reversed');
       
       // Step 3: Update the debt record with all fields
-      // Map status to valid payment_status values: unpaid, partial, paid, cancelled
-      const validPaymentStatus = editFormData.status === 'outstanding' ? 'unpaid' : editFormData.status;
+      // Valid payment_status values: 'paid', 'partial', 'unpaid', 'cancelled', 'refunded'
+      let validPaymentStatus = editFormData.status;
+      
+      // Map any invalid values to valid ones
+      if (editFormData.status === 'outstanding') {
+        validPaymentStatus = 'unpaid';
+        console.warn('⚠️ Mapped "outstanding" to "unpaid"');
+      } else if (!['paid', 'partial', 'unpaid', 'cancelled', 'refunded'].includes(editFormData.status)) {
+        // Default to unpaid for any unknown value
+        validPaymentStatus = 'unpaid';
+        console.warn(`⚠️ Unknown status "${editFormData.status}", mapping to "unpaid"`);
+      }
+      
+      console.log('📝 Payment status:', validPaymentStatus);
       
       const updatedDebt = await updateOutletDebt(selectedSale.id, {
         subtotal: editFormData.subtotal,
@@ -1499,13 +1532,22 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 const total = sale.total || 0;
                 const remaining = total - amountPaid;
                 
+                // Determine status badge based on actual payment_status from database
                 let statusBadge;
-                if (amountPaid === 0) {
+                const dbStatus = sale.status?.toLowerCase();
+                
+                if (dbStatus === 'cancelled') {
+                  statusBadge = <Badge className="bg-gray-100 text-gray-800">Cancelled</Badge>;
+                } else if (dbStatus === 'refunded') {
+                  statusBadge = <Badge className="bg-purple-100 text-purple-800">Refunded</Badge>;
+                } else if (dbStatus === 'paid') {
+                  statusBadge = <Badge className="bg-green-100 text-green-800">Paid</Badge>;
+                } else if (dbStatus === 'partial') {
+                  statusBadge = <Badge className="bg-yellow-100 text-yellow-800">Partial</Badge>;
+                } else if (dbStatus === 'unpaid' || amountPaid === 0) {
                   statusBadge = <Badge className="bg-red-100 text-red-800">Unpaid</Badge>;
                 } else if (amountPaid > total) {
                   statusBadge = <Badge className="bg-blue-100 text-blue-800">Overpaid</Badge>;
-                } else if (remaining === 0) {
-                  statusBadge = <Badge className="bg-green-100 text-green-800">Paid</Badge>;
                 } else {
                   statusBadge = <Badge className="bg-yellow-100 text-yellow-800">Partial</Badge>;
                 }
@@ -1607,7 +1649,30 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 const total = selectedSale.total || 0;
                 const remaining = total - amountPaid;
                 
-                if (amountPaid === 0) {
+                // Use actual database status
+                const dbStatus = selectedSale.status?.toLowerCase();
+                
+                if (dbStatus === 'cancelled') {
+                  return (
+                    <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-800">CANCELLED</span>
+                        <Badge className="bg-gray-600 text-white">Cancelled</Badge>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-1">This debt has been cancelled</p>
+                    </div>
+                  );
+                } else if (dbStatus === 'refunded') {
+                  return (
+                    <div className="p-3 bg-purple-100 border border-purple-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-purple-800">REFUNDED</span>
+                        <Badge className="bg-purple-600 text-white">Refunded</Badge>
+                      </div>
+                      <p className="text-sm text-purple-700 mt-1">Payment has been refunded</p>
+                    </div>
+                  );
+                } else if (amountPaid === 0) {
                   return (
                     <div className="p-3 bg-red-100 border border-red-300 rounded-lg">
                       <div className="flex items-center justify-between">
@@ -1661,12 +1726,16 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   <p className="font-semibold">{selectedSale.invoiceNumber}</p>
                 </div>
                 <Badge className={
-                  selectedSale.amountPaid === 0 ? 'bg-red-100 text-red-800' :
-                  selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' :
-                  'bg-yellow-100 text-yellow-800'
+                  selectedSale.status?.toLowerCase() === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                  selectedSale.status?.toLowerCase() === 'refunded' ? 'bg-purple-100 text-purple-800' :
+                  selectedSale.status?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' :
+                  selectedSale.status?.toLowerCase() === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
                 }>
-                  {selectedSale.amountPaid === 0 ? 'Unpaid' :
-                   selectedSale.amountPaid >= selectedSale.total ? 'Paid' : 'Partial'}
+                  {selectedSale.status?.toLowerCase() === 'cancelled' ? 'Cancelled' :
+                   selectedSale.status?.toLowerCase() === 'refunded' ? 'Refunded' :
+                   selectedSale.status?.toLowerCase() === 'paid' ? 'Paid' :
+                   selectedSale.status?.toLowerCase() === 'partial' ? 'Partial' : 'Unpaid'}
                 </Badge>
               </div>
 
@@ -1804,15 +1873,19 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-sm font-medium">Payment Method</span>
+                <span className="text-sm font-medium">Payment Status</span>
                 <Badge className={
-                  selectedSale.amountPaid === 0 ? 'bg-red-100 text-red-800' :
-                  selectedSale.amountPaid >= selectedSale.total ? 'bg-green-100 text-green-800' :
-                  'bg-yellow-100 text-yellow-800'
+                  selectedSale.status?.toLowerCase() === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                  selectedSale.status?.toLowerCase() === 'refunded' ? 'bg-purple-100 text-purple-800' :
+                  selectedSale.status?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' :
+                  selectedSale.status?.toLowerCase() === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
                 }>
                   <FileText className="h-3 w-3 mr-1" />
-                  {selectedSale.amountPaid === 0 ? 'Unpaid Debt' :
-                   selectedSale.amountPaid >= selectedSale.total ? 'Paid (was Debt)' : 'Partial Payment'}
+                  {selectedSale.status?.toLowerCase() === 'cancelled' ? 'Cancelled' :
+                   selectedSale.status?.toLowerCase() === 'refunded' ? 'Refunded' :
+                   selectedSale.status?.toLowerCase() === 'paid' ? 'Paid' :
+                   selectedSale.status?.toLowerCase() === 'partial' ? 'Partial' : 'Unpaid'}
                 </Badge>
               </div>
             </div>
@@ -2120,8 +2193,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
-                    <option value="refunded">Refunded</option>
                     <option value="cancelled">Cancelled</option>
+                    <option value="refunded">Refunded</option>
                   </select>
                 </div>
               </div>
