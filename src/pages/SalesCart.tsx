@@ -719,9 +719,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           // Determine payment status based on amount paid
           const paymentStatus = remainingNewDebt <= 0 ? 'paid' : (actualAmountPaid > 0 ? 'partial' : 'unpaid');
           
+          console.log('💰 Creating debt record with credit brought forward:', creditBroughtForward);
+          
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
+            customer_name: selectedCustomer.name || `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() || 'Unknown Customer',
             invoice_number: `INV-${Date.now()}`, // Generate unique invoice number
             debt_date: new Date().toISOString(),
             due_date: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -732,6 +735,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             amount_paid: actualAmountPaid,
             remaining_amount: remainingNewDebt, // Can be negative for overpayment (credit balance)
             payment_status: paymentStatus,
+            credit_brought_forward: creditBroughtForward, // Store customer's previous balance
             debt_payment_amount: debtPaymentNum, // Amount paid toward previous debts
             shipping_amount: parseFloat(shippingCost) || 0,
             adjustments: adjustmentsAmount,

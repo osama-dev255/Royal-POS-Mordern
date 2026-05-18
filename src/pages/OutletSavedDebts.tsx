@@ -789,9 +789,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             adjustmentReason: debt.adjustment_reason
           });
           
-          // Fetch customer name if customer_id exists
+          // Fetch customer name if customer_id exists or use customer_name from database
           let customerName = 'Walk-in Customer';
-          if (debt.customer_id) {
+          if (debt.customer_name) {
+            // Use customer_name directly from database (new approach)
+            customerName = debt.customer_name;
+          } else if (debt.customer_id) {
+            // Fallback: Fetch from customer table (old approach)
             const customer = await getOutletCustomerById(debt.customer_id);
             if (customer) {
               customerName = `${customer.first_name} ${customer.last_name}`.trim();
@@ -809,9 +813,11 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
           }));
           
           // Calculate customer's previous balance (credit brought forward)
-          // Sum of all other debts for this customer created before this debt
-          let creditBroughtForward = 0;
-          if (debt.customer_id && debt.created_at) {
+          // Use stored value from database if available, otherwise calculate
+          let creditBroughtForward = debt.credit_brought_forward || 0;
+          
+          // If no stored value, calculate from previous debts (backward compatibility)
+          if (!debt.credit_brought_forward && debt.customer_id && debt.created_at) {
             const allCustomerDebts = await getOutletDebtsByCustomerId(outletId, debt.customer_id);
             // Filter debts created before this one and sum their remaining amounts
             creditBroughtForward = allCustomerDebts
@@ -1091,6 +1097,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       }
       
       console.log('📝 Payment status:', validPaymentStatus);
+      console.log('👤 Customer name:', editFormData.customer);
+      console.log('💰 Credit brought forward:', editFormData.creditBroughtForward);
       
       const updatedDebt = await updateOutletDebt(selectedSale.id, {
         subtotal: editFormData.subtotal,
@@ -1099,6 +1107,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         amount_paid: editFormData.amountPaid,
         remaining_amount: (editFormData.total || 0) - (editFormData.amountPaid || 0),
         payment_status: validPaymentStatus,
+        customer_name: editFormData.customer,
+        credit_brought_forward: editFormData.creditBroughtForward,
         shipping_amount: editFormData.shipping,
         adjustments: editFormData.adjustments,
         adjustment_reason: editFormData.adjustmentReason,
@@ -2114,7 +2124,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                   value={editFormData.creditBroughtForward || 0}
                   readOnly
                   className="bg-muted cursor-not-allowed"
-                  title="Previous balance from customer's earlier debts"
+                  title="Previous balance from customer's earlier debts (read-only)"
                 />
               </div>
               

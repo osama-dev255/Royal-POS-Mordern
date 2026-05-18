@@ -4066,6 +4066,7 @@ export interface OutletDebt {
   id?: string;
   outlet_id: string;
   customer_id?: string;
+  customer_name?: string;
   user_id?: string;
   invoice_number: string;
   debt_date?: string;
@@ -4076,8 +4077,9 @@ export interface OutletDebt {
   total_amount: number;
   amount_paid: number;
   remaining_amount: number;
-  payment_status: string; // 'unpaid', 'partial', 'paid'
+  payment_status: string; // 'unpaid', 'partial', 'paid', 'cancelled', 'refunded'
   debt_payment_amount?: number; // Amount paid toward previous debts
+  credit_brought_forward?: number; // Previous balance from customer's earlier debts
   shipping_amount?: number;
   adjustments?: number;
   adjustment_reason?: string;
