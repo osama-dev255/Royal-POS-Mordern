@@ -179,11 +179,20 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
               const currentQty = freshData?.quantity || existingProduct.quantity || 0;
               const newQty = currentQty + deliveredQty;
               
+              // Get unit cost and selling price from delivery item
+              const unitCost = item.rate ?? item.price ?? existingProduct.unit_cost ?? 0;
+              const sellingPrice = item.sellingPrice ?? item.rate ?? item.price ?? existingProduct.selling_price ?? 0;
+              
               console.log(`📝 ${productName}: ${currentQty} + ${deliveredQty} = ${newQty}`);
+              console.log(`💰 ${productName}: unit_cost=${unitCost}, selling_price=${sellingPrice}`);
               
               const { error: updateError } = await supabase
                 .from('inventory_products')
-                .update({ quantity: newQty })
+                .update({ 
+                  quantity: newQty,
+                  unit_cost: unitCost,
+                  selling_price: sellingPrice
+                })
                 .eq('id', existingProduct.id);
               
               if (updateError) {
