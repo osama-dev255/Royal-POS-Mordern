@@ -40,6 +40,7 @@ interface StockItem {
 
 export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [isEditing, setIsEditing] = useState<string | null>(null);
@@ -123,20 +124,29 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
 
   const savePhysicalCounts = async () => {
     if (!outletId) return;
+    
+    // Prevent duplicate saves
+    if (saving) {
+      console.log('⏳ Save already in progress, ignoring duplicate click');
+      return;
+    }
       
-    // Save physical counts to localStorage (for UI persistence)
-    const physicalCountsKey = `outlet_${outletId}_physical_counts`;
-    const physicalCounts: Record<string, number> = {};
-      
-    stockItems.forEach(item => {
-      physicalCounts[item.id] = item.physicalCount;
-    });
-  
-    localStorage.setItem(physicalCountsKey, JSON.stringify(physicalCounts));
-  
-    // Update sold quantities in database based on physical count
-    // Formula: Sold = Available Stock - Physical Count
     try {
+      setSaving(true);
+      console.log('💾 Starting stock take save...');
+      
+      // Save physical counts to localStorage (for UI persistence)
+      const physicalCountsKey = `outlet_${outletId}_physical_counts`;
+      const physicalCounts: Record<string, number> = {};
+        
+      stockItems.forEach(item => {
+        physicalCounts[item.id] = item.physicalCount;
+      });
+    
+      localStorage.setItem(physicalCountsKey, JSON.stringify(physicalCounts));
+  
+      // Update sold quantities in database based on physical count
+      // Formula: Sold = Available Stock - Physical Count
       for (const item of stockItems) {
         const calculatedSoldQty = Math.max(0, item.stockRemain - item.physicalCount);
           
@@ -217,6 +227,8 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
         description: "Failed to save stock take to database",
         variant: "destructive"
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -265,9 +277,18 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           <h1 className="text-2xl font-bold">Stock Take</h1>
           <p className="text-muted-foreground">Physical inventory count for this outlet</p>
         </div>
-        <Button onClick={savePhysicalCounts}>
-          <Save className="h-4 w-4 mr-2" />
-          Save Stock Take
+        <Button onClick={savePhysicalCounts} disabled={saving}>
+          {saving ? (
+            <>
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Stock Take
+            </>
+          )}
         </Button>
       </div>
 
