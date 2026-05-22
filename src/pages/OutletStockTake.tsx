@@ -135,7 +135,13 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       setSaving(true);
       console.log('💾 Starting stock take save...');
       
-      // Save physical counts to localStorage (for UI persistence)
+      // Generate stock take number first (used for both localStorage and database)
+      const stockTakeNumber = `STK-${Date.now().toString(36).toUpperCase()}`;
+      console.log('📋 Stock Take Number:', stockTakeNumber);
+      
+      // HYBRID APPROACH: Save to both localStorage AND database
+      
+      // 1. Save physical counts to localStorage (for UI persistence & offline support)
       const physicalCountsKey = `outlet_${outletId}_physical_counts`;
       const physicalCounts: Record<string, number> = {};
         
@@ -144,6 +150,46 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       });
     
       localStorage.setItem(physicalCountsKey, JSON.stringify(physicalCounts));
+      console.log('✅ Physical counts saved to localStorage');
+
+      // 2. Save physical counts to database (for audit trail & multi-user support)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          console.log('💾 Saving physical counts to database for audit trail...');
+          
+          // Save individual physical counts with audit trail
+          const physicalCountRecords = stockItems.map(item => ({
+            outlet_id: outletId,
+            stock_take_number: stockTakeNumber,
+            product_name: item.name,
+            product_sku: item.sku,
+            physical_count: item.physicalCount,
+            available_stock: item.stockRemain,
+            calculated_sold: item.stockRemain - item.physicalCount,
+            unit_cost: item.unitCost,
+            unit_price: item.unitPrice,
+            counted_by: user.id,
+            counted_at: new Date().toISOString()
+          }));
+          
+          const { error: countsError } = await supabase
+            .from('stock_take_physical_counts')
+            .upsert(physicalCountRecords, {
+              onConflict: 'outlet_id,stock_take_number,product_name'
+            });
+          
+          if (countsError) {
+            console.error('⚠️ Error saving physical counts to database:', countsError);
+            // Don't fail the entire save if audit trail fails
+          } else {
+            console.log(`✅ Saved ${physicalCountRecords.length} physical count records to database`);
+          }
+        }
+      } catch (dbError) {
+        console.error('⚠️ Database save failed (continuing with localStorage):', dbError);
+      }
   
       // Update sold quantities in database based on physical count
       // Formula: Sold = Available Stock - Physical Count
@@ -161,9 +207,6 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           .eq('name', item.name);
       }
   
-      // Generate stock take number
-      const stockTakeNumber = `STK-${Date.now().toString(36).toUpperCase()}`;
-        
       // Calculate totals for saving
       const totalCalculatedSold = stockItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
       const totalCosts = stockItems.reduce((sum, item) => {
