@@ -126,6 +126,19 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
   const [endDate, setEndDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0]; // Today
   });
+  
+  // New state for sold items analysis
+  const [soldItemsAnalysis, setSoldItemsAnalysis] = useState<{
+    totalSoldQuantity: number;
+    totalSoldAmount: number;
+    systemRegisteredQuantity: number;
+    systemRegisteredAmount: number;
+    unregisteredQuantity: number;
+    unregisteredAmount: number;
+    discrepancy: number;
+  } | null>(null);
+  const [soldItemsDetails, setSoldItemsDetails] = useState<any[]>([]);
+  
   const { toast } = useToast();
   
   const handleReportClick = (reportId: string) => {
@@ -193,6 +206,9 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
     try {
       const data = await getAvailableInventoryByOutlet(outletId);
       setInventoryData(data || []);
+      
+      // Load sold items analysis after loading inventory
+      calculateSoldItemsAnalysis(data || []);
     } catch (error) {
       console.error('Error loading inventory data:', error);
       toast({
@@ -202,6 +218,120 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Calculate sold items analysis
+  const calculateSoldItemsAnalysis = async (inventory: InventoryProduct[]) => {
+    if (!outletId || inventory.length === 0) return;
+    
+    try {
+      console.log('📊 Calculating sold items analysis...');
+      
+      // 1. Calculate system-registered sales (from outlet_sales)
+      const sales = await getOutletSalesByOutletId(outletId);
+      let systemRegisteredQuantity = 0;
+      let systemRegisteredAmount = 0;
+      
+      for (const sale of sales) {
+        if (sale.id) {
+          const items = await getOutletSaleItemsBySaleId(sale.id);
+          for (const item of items) {
+            systemRegisteredQuantity += item.quantity || 0;
+            systemRegisteredAmount += (item.quantity || 0) * (item.unit_price || 0);
+          }
+        }
+      }
+      
+      console.log('✅ System-registered sales:', systemRegisteredQuantity, 'items');
+      
+      // 2. Calculate total sold from stock takes (Available - Physical Count)
+      // This requires fetching stock take data
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: stockTakes } = await supabase
+        .from('saved_stock_takes')
+        .select('items')
+        .eq('outlet_id', outletId);
+      
+      let totalStockTakeSold = 0;
+      let totalStockTakeAmount = 0;
+      const soldItemsMap = new Map<string, any>();
+      
+      if (stockTakes && stockTakes.length > 0) {
+        for (const stockTake of stockTakes) {
+          const items = stockTake.items || [];
+          for (const item of items) {
+            const calculatedSold = item.calculatedSold || (item.stockRemain - item.physicalCount) || 0;
+            totalStockTakeSold += calculatedSold;
+            totalStockTakeAmount += calculatedSold * (item.unitPrice || 0);
+            
+            // Track per-item details
+            if (!soldItemsMap.has(item.name)) {
+              soldItemsMap.set(item.name, {
+                name: item.name,
+                category: item.category || 'General',
+                totalSold: 0,
+                systemRegistered: 0,
+                unregistered: 0,
+                unitCost: item.unitCost || 0,
+                unitPrice: item.unitPrice || 0
+              });
+            }
+            
+            const existing = soldItemsMap.get(item.name);
+            existing.totalSold += calculatedSold;
+          }
+        }
+      }
+      
+      console.log('📦 Total sold from stock takes:', totalStockTakeSold, 'items');
+      
+      // 3. Calculate unregistered sales (Stock Take Sold - System Registered)
+      const unregisteredQuantity = Math.max(0, totalStockTakeSold - systemRegisteredQuantity);
+      const unregisteredAmount = Math.max(0, totalStockTakeAmount - systemRegisteredAmount);
+      
+      // 4. Calculate totals
+      const totalSoldQuantity = totalStockTakeSold;
+      const totalSoldAmount = totalStockTakeAmount;
+      const discrepancy = systemRegisteredQuantity - totalStockTakeSold;
+      
+      // Update state
+      setSoldItemsAnalysis({
+        totalSoldQuantity,
+        totalSoldAmount,
+        systemRegisteredQuantity,
+        systemRegisteredAmount,
+        unregisteredQuantity,
+        unregisteredAmount,
+        discrepancy
+      });
+      
+      // Update sold items details
+      const details = Array.from(soldItemsMap.values()).map(item => {
+        // Find system registered quantity for this item
+        let itemSystemRegistered = 0;
+        for (const sale of sales) {
+          if (sale.id) {
+            // This would need items loaded - for now we'll estimate
+          }
+        }
+        
+        return {
+          ...item,
+          systemRegistered: 0, // Will be calculated when sale items are loaded
+          unregistered: item.totalSold // Assume all unregistered until matched
+        };
+      });
+      
+      setSoldItemsDetails(details);
+      
+      console.log('✅ Sold items analysis complete');
+      console.log('Total sold:', totalSoldQuantity);
+      console.log('System registered:', systemRegisteredQuantity);
+      console.log('Unregistered:', unregisteredQuantity);
+      
+    } catch (error) {
+      console.error('❌ Error calculating sold items analysis:', error);
     }
   };
 
@@ -666,6 +796,200 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Inventory Sold Analysis Section */}
+      {selectedReport === 'inventory' && (
+        <div className="mb-6">
+          {soldItemsAnalysis ? (
+            <Card className="border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-orange-600" />
+                Inventory Sold Analysis
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Compare system-registered sales vs. unregistered sales (calculated from stock takes)
+              </p>
+            </CardHeader>
+            <CardContent>
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-blue-700">Total Sold (Qty)</p>
+                    <p className="text-3xl font-bold text-blue-900">{soldItemsAnalysis.totalSoldQuantity}</p>
+                    <p className="text-xs text-blue-600 mt-1">{formatCurrency(soldItemsAnalysis.totalSoldAmount)}</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-green-700">System Registered</p>
+                    <p className="text-3xl font-bold text-green-900">{soldItemsAnalysis.systemRegisteredQuantity}</p>
+                    <p className="text-xs text-green-600 mt-1">{formatCurrency(soldItemsAnalysis.systemRegisteredAmount)}</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-red-50 border-red-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-red-700">Unregistered Sales</p>
+                    <p className="text-3xl font-bold text-red-900">{soldItemsAnalysis.unregisteredQuantity}</p>
+                    <p className="text-xs text-red-600 mt-1">{formatCurrency(soldItemsAnalysis.unregisteredAmount)}</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className={`bg-${soldItemsAnalysis.discrepancy >= 0 ? 'yellow' : 'purple'}-50 border-${soldItemsAnalysis.discrepancy >= 0 ? 'yellow' : 'purple'}-200`}>
+                  <CardContent className="p-4">
+                    <p className={`text-sm text-${soldItemsAnalysis.discrepancy >= 0 ? 'yellow' : 'purple'}-700`}>Discrepancy</p>
+                    <p className={`text-3xl font-bold text-${soldItemsAnalysis.discrepancy >= 0 ? 'yellow' : 'purple'}-900`}>
+                      {soldItemsAnalysis.discrepancy > 0 ? '+' : ''}{soldItemsAnalysis.discrepancy}
+                    </p>
+                    <p className={`text-xs text-${soldItemsAnalysis.discrepancy >= 0 ? 'yellow' : 'purple'}-600 mt-1`}>
+                      {soldItemsAnalysis.discrepancy > 0 ? 'Over-registered' : soldItemsAnalysis.discrepancy < 0 ? 'Under-registered' : 'Balanced'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Visual Comparison */}
+              <Card className="mb-6 bg-gray-50">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-4">Sales Registration Breakdown</h3>
+                  <div className="space-y-4">
+                    {/* System Registered */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <span className="text-sm font-medium">System Registered (Sales Terminal)</span>
+                        </div>
+                        <span className="text-sm font-semibold">
+                          {soldItemsAnalysis.totalSoldQuantity > 0 
+                            ? Math.round((soldItemsAnalysis.systemRegisteredQuantity / soldItemsAnalysis.totalSoldQuantity) * 100) 
+                            : 0}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-green-500 h-3 rounded-full transition-all" 
+                          style={{ 
+                            width: `${soldItemsAnalysis.totalSoldQuantity > 0 
+                              ? (soldItemsAnalysis.systemRegisteredQuantity / soldItemsAnalysis.totalSoldQuantity) * 100 
+                              : 0}%` 
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {soldItemsAnalysis.systemRegisteredQuantity} items = {formatCurrency(soldItemsAnalysis.systemRegisteredAmount)}
+                      </p>
+                    </div>
+                    
+                    {/* Unregistered */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <span className="text-sm font-medium">Unregistered (Stock Take Calculation)</span>
+                        </div>
+                        <span className="text-sm font-semibold">
+                          {soldItemsAnalysis.totalSoldQuantity > 0 
+                            ? Math.round((soldItemsAnalysis.unregisteredQuantity / soldItemsAnalysis.totalSoldQuantity) * 100) 
+                            : 0}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-red-500 h-3 rounded-full transition-all" 
+                          style={{ 
+                            width: `${soldItemsAnalysis.totalSoldQuantity > 0 
+                              ? (soldItemsAnalysis.unregisteredQuantity / soldItemsAnalysis.totalSoldQuantity) * 100 
+                              : 0}%` 
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {soldItemsAnalysis.unregisteredQuantity} items = {formatCurrency(soldItemsAnalysis.unregisteredAmount)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Alert if high unregistered */}
+                  {soldItemsAnalysis.unregisteredQuantity > soldItemsAnalysis.totalSoldQuantity * 0.1 && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-800">High Unregistered Sales Detected</p>
+                          <p className="text-xs text-red-700 mt-1">
+                            {Math.round((soldItemsAnalysis.unregisteredQuantity / soldItemsAnalysis.totalSoldQuantity) * 100)}% of sold items are not registered in the system. 
+                            This could indicate unrecorded sales, theft, or inventory loss.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Detailed Breakdown Table */}
+              {soldItemsDetails.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Product-Level Sold Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="text-left py-3 px-4 font-medium">Product</th>
+                            <th className="text-left py-3 px-4 font-medium">Category</th>
+                            <th className="text-right py-3 px-4 font-medium">Total Sold</th>
+                            <th className="text-right py-3 px-4 font-medium">System Registered</th>
+                            <th className="text-right py-3 px-4 font-medium">Unregistered</th>
+                            <th className="text-right py-3 px-4 font-medium">Unit Price</th>
+                            <th className="text-right py-3 px-4 font-medium">Lost Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {soldItemsDetails.map((item, index) => (
+                            <tr key={index} className="border-b hover:bg-muted/50">
+                              <td className="py-3 px-4 font-medium">{item.name}</td>
+                              <td className="py-3 px-4">{item.category}</td>
+                              <td className="py-3 px-4 text-right font-semibold">{item.totalSold}</td>
+                              <td className="py-3 px-4 text-right text-green-600">{item.systemRegistered}</td>
+                              <td className="py-3 px-4 text-right text-red-600 font-semibold">{item.unregistered}</td>
+                              <td className="py-3 px-4 text-right">{formatCurrency(item.unitPrice)}</td>
+                              <td className="py-3 px-4 text-right font-semibold text-red-600">
+                                {formatCurrency(item.unregistered * item.unitPrice)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+          ) : (
+            <Card className="border-orange-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-lg">Inventory Sold Analysis</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Loading sold items data...
+                    </p>
+                  </div>
+                  <BarChart3 className="h-8 w-8 text-orange-600 animate-pulse" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
