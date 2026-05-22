@@ -156,8 +156,11 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         
+        console.log('👤 Current user:', user?.id);
+        
         if (user) {
           console.log('💾 Saving physical counts to database for audit trail...');
+          console.log('📊 Total items to save:', stockItems.length);
           
           // Save individual physical counts with audit trail
           const physicalCountRecords = stockItems.map(item => ({
@@ -174,21 +177,28 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
             counted_at: new Date().toISOString()
           }));
           
-          const { error: countsError } = await supabase
+          console.log('📦 Sample record:', physicalCountRecords[0]);
+          
+          const { data: savedData, error: countsError } = await supabase
             .from('stock_take_physical_counts')
             .upsert(physicalCountRecords, {
               onConflict: 'outlet_id,stock_take_number,product_name'
             });
           
           if (countsError) {
-            console.error('⚠️ Error saving physical counts to database:', countsError);
+            console.error('❌ Error saving physical counts to database:', countsError);
+            console.error('Error details:', JSON.stringify(countsError, null, 2));
             // Don't fail the entire save if audit trail fails
           } else {
             console.log(`✅ Saved ${physicalCountRecords.length} physical count records to database`);
+            console.log('Saved data:', savedData);
           }
+        } else {
+          console.warn('⚠️ No authenticated user found - skipping database save');
         }
       } catch (dbError) {
-        console.error('⚠️ Database save failed (continuing with localStorage):', dbError);
+        console.error('❌ Database save failed (continuing with localStorage):', dbError);
+        console.error('Error details:', dbError);
       }
   
       // Update sold quantities in database based on physical count
