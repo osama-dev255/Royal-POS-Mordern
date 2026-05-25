@@ -18,7 +18,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, createCustomerLedgerEntry, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -616,6 +616,26 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         throw new Error("Failed to create sale record");
       }
 
+      // Create ledger entry for cash/card/mobile sales (DEBIT)
+      if (selectedCustomer && outletId && (paymentMethod === 'cash' || paymentMethod === 'card' || paymentMethod === 'mobile')) {
+        const saleType = `${paymentMethod}_sale` as 'cash_sale' | 'card_sale' | 'mobile_sale';
+        
+        await createCustomerLedgerEntry({
+          outlet_id: outletId,
+          customer_id: selectedCustomer.id,
+          transaction_type: saleType,
+          reference_id: createdSale.id || '',
+          reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
+          debit_amount: totalWithTax,
+          credit_amount: 0,
+          transaction_date: new Date().toISOString(),
+          description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Sale - ${createdSale.invoice_number}`,
+          payment_method: paymentMethod,
+          notes: `Sale total: ${totalWithTax}`
+        });
+        console.log(`📊 Created ledger entry for ${paymentMethod} sale: ${totalWithTax}`);
+      }
+
       // Create sale items for each product in the cart - run in parallel for speed
       const itemsWithQuantity = cart.filter(item => item.quantity > 0);
       const saleItemPromises = itemsWithQuantity.map(async (item) => {
@@ -687,12 +707,14 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             await createOutletDebtPayment({
               debt_id: debt.id!,
               amount: paymentTowardThisDebt,
-              payment_method: 'cash', // Default to cash, can be enhanced later
+              payment_method: paymentMethod, // Use actual payment method
               payment_date: new Date().toISOString(),
               notes: `Payment from sale ${createdSale.id || 'unknown'}`,
               created_by: null
             });
             console.log(`📝 Created payment record for debt ${debt.id}: ${paymentTowardThisDebt}`);
+            // NOTE: Database trigger (trigger_debt_payment_ledger_entry) automatically creates ledger entry
+            // No need to manually create ledger entry here to avoid double-counting
             
             if (newRemainingAmount <= 0) {
               // Fully paid - delete the debt
@@ -787,6 +809,24 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               console.log(`  ✅ Created debt item: ${productName}, qty: ${item.quantity}`);
             }
             console.log('✅ All debt items created');
+            
+            // If customer paid some amount for current sale, record as CREDIT
+            if (actualAmountPaid > 0) {
+              console.log(`💰 Recording amount paid for current sale: ${actualAmountPaid}`);
+              
+              // Create debt payment record - trigger will automatically create ledger entry
+              await createOutletDebtPayment({
+                debt_id: createdDebt.id!,
+                amount: actualAmountPaid,
+                payment_method: paymentMethod,
+                payment_date: new Date().toISOString(),
+                notes: `Amount paid for current sale: ${createdDebt.invoice_number}`,
+                created_by: null
+              });
+              console.log(`📝 Created payment record for current sale: ${actualAmountPaid}`);
+              // NOTE: Database trigger (trigger_debt_payment_ledger_entry) automatically creates ledger entry
+              // No need to manually create ledger entry here to avoid double-counting
+            }
           }
         }
       } else if (paymentMethod === "debt" && selectedCustomer && !outletId) {

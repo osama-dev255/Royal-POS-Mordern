@@ -4592,6 +4592,27 @@ export interface OutletCustomerSettlement {
   updated_at?: string;
 }
 
+// ============================================
+// Customer Ledger Interface
+// ============================================
+export interface CustomerLedgerEntry {
+  id?: string;
+  outlet_id: string;
+  customer_id: string;
+  transaction_type: 'cash_sale' | 'card_sale' | 'mobile_sale' | 'credit_sale' | 'debt_payment' | 'settlement' | 'adjustment' | 'refund';
+  reference_id?: string;
+  reference_number?: string;
+  debit_amount: number;
+  credit_amount: number;
+  running_balance: number;
+  transaction_date: string;
+  description?: string;
+  payment_method?: string;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
 // Commission Receipt CRUD Operations
 export const createCommissionReceipt = async (receipt: Omit<CommissionReceipt, 'id'>): Promise<CommissionReceipt | null> => {
   try {
@@ -4812,6 +4833,103 @@ export const deleteOutletCustomerSettlement = async (id: string): Promise<boolea
   } catch (error) {
     console.error('Error deleting outlet customer settlement:', error);
     return false;
+  }
+};
+
+// ============================================
+// Customer Ledger CRUD Operations
+// ============================================
+
+export const getCustomerLedgerByCustomerId = async (
+  outletId: string,
+  customerId: string
+): Promise<CustomerLedgerEntry[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_ledger')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('customer_id', customerId)
+      .order('transaction_date', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching customer ledger:', error);
+    return [];
+  }
+};
+
+export const getCustomerLedgerBalance = async (
+  outletId: string,
+  customerId: string
+): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_ledger')
+      .select('running_balance')
+      .eq('outlet_id', outletId)
+      .eq('customer_id', customerId)
+      .order('transaction_date', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (error) {
+      // If no ledger entries exist, balance is 0
+      if (error.code === 'PGRST116') return 0;
+      throw error;
+    }
+    
+    return data?.running_balance || 0;
+  } catch (error) {
+    console.error('Error fetching customer ledger balance:', error);
+    return 0;
+  }
+};
+
+export const recalculateCustomerLedgerBalance = async (
+  outletId: string,
+  customerId: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase.rpc('recalculate_customer_ledger_balance', {
+      p_outlet_id: outletId,
+      p_customer_id: customerId
+    });
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error recalculating customer ledger balance:', error);
+    return false;
+  }
+};
+
+export const createCustomerLedgerEntry = async (
+  entry: Omit<CustomerLedgerEntry, 'id' | 'created_at' | 'running_balance'>
+): Promise<CustomerLedgerEntry | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_ledger')
+      .insert([{
+        ...entry,
+        running_balance: 0, // Will be calculated by trigger
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    // Recalculate balances after inserting
+    if (data) {
+      await recalculateCustomerLedgerBalance(entry.outlet_id, entry.customer_id);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error creating customer ledger entry:', error);
+    return null;
   }
 };
 

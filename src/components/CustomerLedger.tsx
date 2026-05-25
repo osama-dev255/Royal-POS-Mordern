@@ -23,8 +23,9 @@ import {
   Share2,
   FileSpreadsheet
 } from "lucide-react";
-import { getOutletDebtsByCustomerId, getOutletDebtPaymentsByDebtId, OutletCustomer, OutletDebt } from "@/services/databaseService";
+import { getCustomerLedgerByCustomerId, getCustomerLedgerBalance, OutletCustomer, CustomerLedgerEntry } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +46,7 @@ interface LedgerEntry {
   debit: number;
   credit: number;
   balance: number;
-  type: 'sale' | 'payment';
+  type: 'cash_sale' | 'card_sale' | 'mobile_sale' | 'credit_sale' | 'debt_payment' | 'settlement' | 'adjustment' | 'refund';
   reference: string;
 }
 
@@ -61,6 +62,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [filteredEntries, setFilteredEntries] = useState<LedgerEntry[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadLedgerData();
@@ -71,48 +73,31 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
       setLoading(true);
       const entries: LedgerEntry[] = [];
 
-      // Fetch all debts (sales) for this customer
-      const debts = await getOutletDebtsByCustomerId(outletId, customer.id!);
+      console.log('📊 Loading Customer Ledger from database table...');
+      console.log('📊 Customer:', customer.first_name, customer.last_name);
       
-      // Add debt entries (debits) and fetch payments for each debt
-      for (const debt of debts) {
+      // Fetch all ledger entries from the dedicated customer_ledger table
+      const ledgerEntries = await getCustomerLedgerByCustomerId(outletId, customer.id!);
+      
+      console.log('📊 Total ledger entries found:', ledgerEntries.length);
+      
+      // Convert database entries to LedgerEntry format
+      ledgerEntries.forEach((entry: CustomerLedgerEntry) => {
         entries.push({
-          id: `debt-${debt.id}`,
-          date: new Date(debt.created_at || debt.debt_date || new Date().toISOString()).toLocaleDateString(),
-          description: `Sale - ${debt.payment_status || 'Completed'}`,
-          debit: debt.total_amount || 0,
-          credit: 0,
-          balance: 0, // Will calculate after sorting
-          type: 'sale',
-          reference: debt.id
+          id: entry.id || `ledger-${entry.reference_id}`,
+          date: new Date(entry.transaction_date).toLocaleDateString(),
+          description: entry.description || entry.transaction_type,
+          debit: entry.debit_amount || 0,
+          credit: entry.credit_amount || 0,
+          balance: entry.running_balance || 0,
+          type: entry.transaction_type,
+          reference: entry.reference_id || ''
         });
-
-        // Fetch payments for this debt
-        const payments = await getOutletDebtPaymentsByDebtId(debt.id);
-        payments.forEach(payment => {
-          entries.push({
-            id: `payment-${payment.id}`,
-            date: new Date(payment.payment_date).toLocaleDateString(),
-            description: `Payment - ${payment.payment_method || 'Cash'}`,
-            debit: 0,
-            credit: payment.amount || 0,
-            balance: 0, // Will calculate after sorting
-            type: 'payment',
-            reference: payment.id
-          });
-        });
-      }
-
-      // Sort by date
-      entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      // Calculate running balance
-      let runningBalance = 0;
-      entries.forEach(entry => {
-        runningBalance += entry.debit - entry.credit;
-        entry.balance = runningBalance;
       });
 
+      // Get current balance from the last ledger entry
+      const currentBal = await getCustomerLedgerBalance(outletId, customer.id!);
+      
       setLedgerEntries(entries);
 
       // Calculate totals
@@ -121,10 +106,20 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
       
       setTotalDebits(debits);
       setTotalCredits(credits);
-      setCurrentBalance(runningBalance);
+      setCurrentBalance(currentBal);
+
+      console.log('✅ Ledger loaded successfully');
+      console.log('  Total Debits:', debits);
+      console.log('  Total Credits:', credits);
+      console.log('  Current Balance:', currentBal);
 
     } catch (error) {
       console.error('Error loading ledger data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load customer ledger",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -483,7 +478,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Debits (Sales)
+              Total Debits (All Sales)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -497,7 +492,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Credits (Payments)
+              Total Credits (Payments & Settlements)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -539,7 +534,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
                   <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">Date</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">Description</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">Debit (Sales)</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">Credit (Payments)</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">Credit (Payments/Settlements)</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">Balance</th>
                 </tr>
               </thead>
@@ -554,10 +549,15 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
                   filteredEntries.map((entry, index) => (
                     <tr 
                       key={entry.id} 
-                      className={`border-b hover:bg-gray-50 ${entry.type === 'sale' ? 'bg-red-50/30' : 'bg-green-50/30'}`}
+                      className={`border-b hover:bg-gray-50 ${(entry.type === 'credit_sale' || entry.type === 'cash_sale' || entry.type === 'card_sale' || entry.type === 'mobile_sale') ? 'bg-red-50/30' : 'bg-green-50/30'}`}
                     >
                       <td className="px-4 py-3 text-sm">{entry.date}</td>
-                      <td className="px-4 py-3 text-sm font-medium">{entry.description}</td>
+                      <td className="px-4 py-3 text-sm font-medium">
+                        {entry.description}
+                        {entry.type === 'settlement' && (
+                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">Settlement</Badge>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-red-600">
                         {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
                       </td>
