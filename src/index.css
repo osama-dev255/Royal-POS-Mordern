@@ -2,6 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Print Styles - Hide unnecessary elements when printing */
+@media print {
+  /* Hide navigation, buttons, and UI chrome */
+  nav,
+  header,
+  footer,
+  .no-print,
+  .sidebar,
+  .navbar,
+  button,
+  [class*="Button"],
+  [class*="DropdownMenu"],
+  [class*="Popover"],
+  [class*="Dialog"] {
+    display: none !important;
+  }
+
+  /* Optimize for print */
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  /* Show only ledger content */
+  .printing-ledger .main-content {
+    margin: 0;
+    padding: 20px;
+  }
+
+  /* Ensure tables print properly */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
