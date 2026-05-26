@@ -87,6 +87,99 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   // State for searchable dropdowns
   const [addWardOpen, setAddWardOpen] = useState(false);
   const [editWardOpen, setEditWardOpen] = useState(false);
+  const [isAddingCustomWard, setIsAddingCustomWard] = useState(false);
+  const [isAddingCustomWardEdit, setIsAddingCustomWardEdit] = useState(false);
+  const [customWard, setCustomWard] = useState("");
+  const [customWardEdit, setCustomWardEdit] = useState("");
+
+  // MUHEZA wards list (state to allow adding new wards)
+  const [muhezaWards, setMuhezaWards] = useState([
+    "MUHEZA - Amani",
+    "MUHEZA - Bwembwera",
+    "MUHEZA - Genge",
+    "MUHEZA - Kicheba",
+    "MUHEZA - Kigombe",
+    "MUHEZA - Kilulu",
+    "MUHEZA - Kisiwani",
+    "MUHEZA - Kwafungo",
+    "MUHEZA - Kwakifua",
+    "MUHEZA - Kwemkabala",
+    "MUHEZA - Lusanga",
+    "MUHEZA - Magila",
+    "MUHEZA - Magoroto",
+    "MUHEZA - Majengo",
+    "MUHEZA - Masuguru",
+    "MUHEZA - Mbaramo",
+    "MUHEZA - Mbomole",
+    "MUHEZA - Mhamba",
+    "MUHEZA - Misalai",
+    "MUHEZA - Misozwe",
+    "MUHEZA - Mkuzi",
+    "MUHEZA - Mlingano",
+    "MUHEZA - Mpapayu",
+    "MUHEZA - Mtindiro",
+    "MUHEZA - Ngomeni",
+    "MUHEZA - Nkumba",
+    "MUHEZA - Pande Darajani",
+    "MUHEZA - Potwe",
+    "MUHEZA - Songa",
+    "MUHEZA - Tanganyika",
+    "MUHEZA - Tingeni",
+    "MUHEZA - Tongwe",
+    "MUHEZA - Zira"
+  ]);
+
+  // Function to add custom ward
+  const handleAddCustomWard = () => {
+    if (customWard.trim()) {
+      const newWard = customWard.trim().toUpperCase();
+      // Check if ward already exists
+      if (!muhezaWards.includes(newWard)) {
+        setMuhezaWards(prev => [...prev, newWard].sort());
+        // Auto-select the new ward
+        setNewCustomer(prev => ({ ...prev, district_ward: newWard }));
+        setCustomWard("");
+        setIsAddingCustomWard(false);
+        setAddWardOpen(false);
+        toast({
+          title: "Success",
+          description: `Ward "${newWard}" added successfully`
+        });
+      } else {
+        toast({
+          title: "Warning",
+          description: "This ward already exists in the list",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Function to add custom ward (edit form)
+  const handleAddCustomWardEdit = () => {
+    if (customWardEdit.trim()) {
+      const newWard = customWardEdit.trim().toUpperCase();
+      // Check if ward already exists
+      if (!muhezaWards.includes(newWard)) {
+        setMuhezaWards(prev => [...prev, newWard].sort());
+        // Auto-select the new ward
+        setEditForm(prev => ({ ...prev, district_ward: newWard }));
+        setCustomWardEdit("");
+        setIsAddingCustomWardEdit(false);
+        setEditWardOpen(false);
+        toast({
+          title: "Success",
+          description: `Ward "${newWard}" added successfully`
+        });
+      } else {
+        toast({
+          title: "Warning",
+          description: "This ward already exists in the list",
+          variant: "destructive"
+        });
+      }
+    }
+  };
 
   useEffect(() => {
     loadCustomers();
@@ -313,43 +406,6 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       tax_id: ""
     });
   };
-
-  // MUHEZA wards list
-  const muhezaWards = [
-    "MUHEZA - Amani",
-    "MUHEZA - Bwembwera",
-    "MUHEZA - Genge",
-    "MUHEZA - Kicheba",
-    "MUHEZA - Kigombe",
-    "MUHEZA - Kilulu",
-    "MUHEZA - Kisiwani",
-    "MUHEZA - Kwafungo",
-    "MUHEZA - Kwakifua",
-    "MUHEZA - Kwemkabala",
-    "MUHEZA - Lusanga",
-    "MUHEZA - Magila",
-    "MUHEZA - Magoroto",
-    "MUHEZA - Majengo",
-    "MUHEZA - Masuguru",
-    "MUHEZA - Mbaramo",
-    "MUHEZA - Mbomole",
-    "MUHEZA - Mhamba",
-    "MUHEZA - Misalai",
-    "MUHEZA - Misozwe",
-    "MUHEZA - Mkuzi",
-    "MUHEZA - Mlingano",
-    "MUHEZA - Mpapayu",
-    "MUHEZA - Mtindiro",
-    "MUHEZA - Ngomeni",
-    "MUHEZA - Nkumba",
-    "MUHEZA - Pande Darajani",
-    "MUHEZA - Potwe",
-    "MUHEZA - Songa",
-    "MUHEZA - Tanganyika",
-    "MUHEZA - Tingeni",
-    "MUHEZA - Tongwe",
-    "MUHEZA - Zira"
-  ];
 
   // Calculate stats
   const totalCustomers = customers.length;
@@ -740,7 +796,50 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                           </CommandItem>
                         ))}
                       </CommandGroup>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            setIsAddingCustomWard(true);
+                            setCustomWard("");
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add New Ward...
+                        </CommandItem>
+                      </CommandGroup>
                     </CommandList>
+                    {isAddingCustomWard && (
+                      <div className="p-3 border-t">
+                        <div className="flex gap-2">
+                          <Input
+                            value={customWard}
+                            onChange={(e) => setCustomWard(e.target.value)}
+                            placeholder="Enter ward name"
+                            className="flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddCustomWard();
+                              } else if (e.key === 'Escape') {
+                                setIsAddingCustomWard(false);
+                                setCustomWard("");
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={handleAddCustomWard}>Add</Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                              setIsAddingCustomWard(false);
+                              setCustomWard("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </Command>
                 </PopoverContent>
               </Popover>
@@ -869,7 +968,50 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                           </CommandItem>
                         ))}
                       </CommandGroup>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            setIsAddingCustomWardEdit(true);
+                            setCustomWardEdit("");
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add New Ward...
+                        </CommandItem>
+                      </CommandGroup>
                     </CommandList>
+                    {isAddingCustomWardEdit && (
+                      <div className="p-3 border-t">
+                        <div className="flex gap-2">
+                          <Input
+                            value={customWardEdit}
+                            onChange={(e) => setCustomWardEdit(e.target.value)}
+                            placeholder="Enter ward name"
+                            className="flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddCustomWardEdit();
+                              } else if (e.key === 'Escape') {
+                                setIsAddingCustomWardEdit(false);
+                                setCustomWardEdit("");
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={handleAddCustomWardEdit}>Add</Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                              setIsAddingCustomWardEdit(false);
+                              setCustomWardEdit("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </Command>
                 </PopoverContent>
               </Popover>
