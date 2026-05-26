@@ -88,9 +88,11 @@ interface DeliveryNoteData {
   businessEmail: string;
   customerName: string;
   customerAddress1: string;
+  customerDistrictWard: string;
   customerAddress2: string;
   customerPhone: string;
   customerEmail: string;
+  customerTaxId: string;
   deliveryNoteNumber: string;
   date: string;
   deliveryDate: string;
@@ -246,8 +248,10 @@ interface SalesOrderData {
   businessEmail: string;
   customerName: string;
   customerAddress: string;
+  customerDistrictWard: string;
   customerPhone: string;
   customerEmail: string;
+  customerTaxId: string;
   orderDate: string;
   requiredBy: string;
   paymentTerms: string;
@@ -342,9 +346,11 @@ interface InvoiceData {
   businessEmail: string;
   clientName: string;
   clientAddress: string;
+  clientDistrictWard: string;
   clientCityState: string;
   clientPhone: string;
   clientEmail: string;
+  clientTaxId: string;
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
@@ -2182,9 +2188,11 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     businessEmail: "billing@yourbusiness.com",
     clientName: "Client Company Name",
     clientAddress: "456 Client Avenue",
+    clientDistrictWard: "MUHEZA - Magila",
     clientCityState: "Client City, State 67890",
     clientPhone: "(555) 987-6543",
     clientEmail: "accounts@clientcompany.com",
+    clientTaxId: "TIN-123456789",
     invoiceNumber: `INV-${new Date().getTime()}`,
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
@@ -2200,7 +2208,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     amountPaid: 0.00,
     creditBroughtForward: 0.00,
     terms: "Net 30",
-    notes: "Thank you for your business!.",
+    notes: "Thank you for your business!?",
     paymentOptions: "Cash , Bank Transfer, Check, or Credit Card",
     checkPayableMessage: "Please make checks payable to KILANGO GROUP LTD",
     timestamp: new Date().toLocaleString()
@@ -5242,10 +5250,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
             <div>
               <h3 class="font-bold">TO:</h3>
               <p>${deliveryNoteData.customerName}</p>
-              <p>${deliveryNoteData.customerAddress1}</p>
-              <p>${deliveryNoteData.customerAddress2}</p>
-              <p>Phone: ${deliveryNoteData.customerPhone}</p>
-              <p>Email: ${deliveryNoteData.customerEmail}</p>
+              ${deliveryNoteData.customerAddress1 ? `<p>${deliveryNoteData.customerAddress1}</p>` : ''}
+              ${deliveryNoteData.customerDistrictWard ? `<p>${deliveryNoteData.customerDistrictWard}</p>` : ''}
+              ${deliveryNoteData.customerAddress2 ? `<p>${deliveryNoteData.customerAddress2}</p>` : ''}
+              ${deliveryNoteData.customerPhone ? `<p>Phone: ${deliveryNoteData.customerPhone}</p>` : ''}
+              ${deliveryNoteData.customerEmail ? `<p>Email: ${deliveryNoteData.customerEmail}</p>` : ''}
+              ${deliveryNoteData.customerTaxId ? `<p>TIN: ${deliveryNoteData.customerTaxId}</p>` : ''}
             </div>
           </div>
           
@@ -6169,10 +6179,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           <div style="flex: 1;">
             <div style="font-weight: bold; margin-bottom: 5px;">BILL TO:</div>
             <div style="margin-bottom: 5px;">${invoiceData.clientName}</div>
-            <div style="margin-bottom: 5px;">${invoiceData.clientAddress}</div>
-            <div style="margin-bottom: 5px;">${invoiceData.clientCityState}</div>
-            <div style="margin-bottom: 5px;">Phone: ${invoiceData.clientPhone}</div>
-            <div style="margin-bottom: 5px;">Email: ${invoiceData.clientEmail}</div>
+            ${invoiceData.clientAddress ? `<div style="margin-bottom: 5px;">${invoiceData.clientAddress}</div>` : ''}
+            ${invoiceData.clientDistrictWard ? `<div style="margin-bottom: 5px;">${invoiceData.clientDistrictWard}</div>` : ''}
+            ${invoiceData.clientCityState ? `<div style="margin-bottom: 5px;">${invoiceData.clientCityState}</div>` : ''}
+            ${invoiceData.clientPhone ? `<div style="margin-bottom: 5px;">Phone: ${invoiceData.clientPhone}</div>` : ''}
+            ${invoiceData.clientEmail ? `<div style="margin-bottom: 5px;">Email: ${invoiceData.clientEmail}</div>` : ''}
+            ${invoiceData.clientTaxId ? `<div style="margin-bottom: 5px;">TIN: ${invoiceData.clientTaxId}</div>` : ''}
           </div>
         </div>
         
@@ -7230,8 +7242,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                 <p>
                   ${salesOrderData.customerName}<br/>
                   ${salesOrderData.customerAddress}<br/>
+                  ${salesOrderData.customerDistrictWard ? `${salesOrderData.customerDistrictWard}<br/>` : ''}
                   Phone: ${salesOrderData.customerPhone}<br/>
                   Email: ${salesOrderData.customerEmail}
+                  ${salesOrderData.customerTaxId ? `<br/>TIN: ${salesOrderData.customerTaxId}` : ''}
                 </p>
               </div>
             </div>

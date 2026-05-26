@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +83,10 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
     district_ward: "",
     tax_id: ""
   });
+
+  // State for searchable dropdowns
+  const [addWardOpen, setAddWardOpen] = useState(false);
+  const [editWardOpen, setEditWardOpen] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -305,6 +313,43 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       tax_id: ""
     });
   };
+
+  // MUHEZA wards list
+  const muhezaWards = [
+    "MUHEZA - Amani",
+    "MUHEZA - Bwembwera",
+    "MUHEZA - Genge",
+    "MUHEZA - Kicheba",
+    "MUHEZA - Kigombe",
+    "MUHEZA - Kilulu",
+    "MUHEZA - Kisiwani",
+    "MUHEZA - Kwafungo",
+    "MUHEZA - Kwakifua",
+    "MUHEZA - Kwemkabala",
+    "MUHEZA - Lusanga",
+    "MUHEZA - Magila",
+    "MUHEZA - Magoroto",
+    "MUHEZA - Majengo",
+    "MUHEZA - Masuguru",
+    "MUHEZA - Mbaramo",
+    "MUHEZA - Mbomole",
+    "MUHEZA - Mhamba",
+    "MUHEZA - Misalai",
+    "MUHEZA - Misozwe",
+    "MUHEZA - Mkuzi",
+    "MUHEZA - Mlingano",
+    "MUHEZA - Mpapayu",
+    "MUHEZA - Mtindiro",
+    "MUHEZA - Ngomeni",
+    "MUHEZA - Nkumba",
+    "MUHEZA - Pande Darajani",
+    "MUHEZA - Potwe",
+    "MUHEZA - Songa",
+    "MUHEZA - Tanganyika",
+    "MUHEZA - Tingeni",
+    "MUHEZA - Tongwe",
+    "MUHEZA - Zira"
+  ];
 
   // Calculate stats
   const totalCustomers = customers.length;
@@ -659,11 +704,46 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">District/Ward</label>
-              <Input
-                value={newCustomer.district_ward}
-                onChange={(e) => setNewCustomer(prev => ({ ...prev, district_ward: e.target.value }))}
-                placeholder="Enter district or ward"
-              />
+              <Popover open={addWardOpen} onOpenChange={setAddWardOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={addWardOpen}
+                    className="w-full justify-between"
+                  >
+                    {newCustomer.district_ward || "Select district/ward"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search ward..." />
+                    <CommandEmpty>No ward found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {muhezaWards.map((ward) => (
+                          <CommandItem
+                            key={ward}
+                            value={ward}
+                            onSelect={(value) => {
+                              setNewCustomer(prev => ({ ...prev, district_ward: value }));
+                              setAddWardOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                newCustomer.district_ward === ward ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {ward}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Tax ID (TIN)</label>
@@ -753,11 +833,46 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">District/Ward</label>
-              <Input
-                value={editForm.district_ward}
-                onChange={(e) => setEditForm(prev => ({ ...prev, district_ward: e.target.value }))}
-                placeholder="Enter district or ward"
-              />
+              <Popover open={editWardOpen} onOpenChange={setEditWardOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={editWardOpen}
+                    className="w-full justify-between"
+                  >
+                    {editForm.district_ward || "Select district/ward"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search ward..." />
+                    <CommandEmpty>No ward found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {muhezaWards.map((ward) => (
+                          <CommandItem
+                            key={ward}
+                            value={ward}
+                            onSelect={(value) => {
+                              setEditForm(prev => ({ ...prev, district_ward: value }));
+                              setEditWardOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                editForm.district_ward === ward ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {ward}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Tax ID (TIN)</label>

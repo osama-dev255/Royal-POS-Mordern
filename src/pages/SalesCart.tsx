@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck, Loader2 } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
@@ -96,6 +98,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [truck, setTruck] = useState<string>(""); // Truck identifier
   const [dueDate, setDueDate] = useState<string>(""); // Due date for debt transactions
   const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false); // State for adding new customer
+  const [districtWardOpen, setDistrictWardOpen] = useState(false); // State for searchable district/ward dropdown
   const [newCustomer, setNewCustomer] = useState({
     first_name: "",
     last_name: "",
@@ -105,6 +108,43 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
     district_ward: "",
     tax_id: ""
   }); // State for new customer data
+
+  // MUHEZA wards list
+  const muhezaWards = [
+    "MUHEZA - Amani",
+    "MUHEZA - Bwembwera",
+    "MUHEZA - Genge",
+    "MUHEZA - Kicheba",
+    "MUHEZA - Kigombe",
+    "MUHEZA - Kilulu",
+    "MUHEZA - Kisiwani",
+    "MUHEZA - Kwafungo",
+    "MUHEZA - Kwakifua",
+    "MUHEZA - Kwemkabala",
+    "MUHEZA - Lusanga",
+    "MUHEZA - Magila",
+    "MUHEZA - Magoroto",
+    "MUHEZA - Majengo",
+    "MUHEZA - Masuguru",
+    "MUHEZA - Mbaramo",
+    "MUHEZA - Mbomole",
+    "MUHEZA - Mhamba",
+    "MUHEZA - Misalai",
+    "MUHEZA - Misozwe",
+    "MUHEZA - Mkuzi",
+    "MUHEZA - Mlingano",
+    "MUHEZA - Mpapayu",
+    "MUHEZA - Mtindiro",
+    "MUHEZA - Ngomeni",
+    "MUHEZA - Nkumba",
+    "MUHEZA - Pande Darajani",
+    "MUHEZA - Potwe",
+    "MUHEZA - Songa",
+    "MUHEZA - Tanganyika",
+    "MUHEZA - Tingeni",
+    "MUHEZA - Tongwe",
+    "MUHEZA - Zira"
+  ];
   const { toast } = useToast();
 
   // Check user permissions on component mount
@@ -1786,12 +1826,47 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             
             <div>
               <Label htmlFor="district_ward">District/Ward</Label>
-              <Input
-                id="district_ward"
-                placeholder="District or ward"
-                value={newCustomer.district_ward}
-                onChange={(e) => setNewCustomer({...newCustomer, district_ward: e.target.value})}
-              />
+              <Popover open={districtWardOpen} onOpenChange={setDistrictWardOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={districtWardOpen}
+                    className="w-full justify-between"
+                    id="district_ward"
+                  >
+                    {newCustomer.district_ward || "Select district/ward"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search ward..." />
+                    <CommandEmpty>No ward found.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {muhezaWards.map((ward) => (
+                          <CommandItem
+                            key={ward}
+                            value={ward}
+                            onSelect={(value) => {
+                              setNewCustomer({...newCustomer, district_ward: value});
+                              setDistrictWardOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                newCustomer.district_ward === ward ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {ward}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             
             <div>
