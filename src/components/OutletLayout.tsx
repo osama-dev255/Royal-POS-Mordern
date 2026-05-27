@@ -29,7 +29,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'reports' | 'settings' | 'back';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'sales-orders' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
@@ -72,6 +72,13 @@ export const OutletLayout = ({
       icon: <TrendingUp className="h-5 w-5" />,
       view: `outlet-sales-management-${outletId}`,
       hash: `#/outlet-sales-management/${outletId}`
+    },
+    {
+      id: "sales-orders",
+      title: "Sales Orders",
+      icon: <FileText className="h-5 w-5" />,
+      view: `outlet-sales-orders-${outletId}`,
+      hash: `#/outlet-sales-orders/${outletId}`
     },
     {
       id: "customers",

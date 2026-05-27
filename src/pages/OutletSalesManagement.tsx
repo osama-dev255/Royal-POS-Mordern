@@ -37,7 +37,7 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
       title: "Sales Orders",
       description: "View and manage all sales orders",
       icon: <FileText className="h-8 w-8" />,
-      route: "#/sales-orders"
+      route: outletId ? `#/outlet-sales-orders/${outletId}` : "#/sales-orders"
     },
     {
       id: "saved-sales",

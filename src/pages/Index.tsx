@@ -73,6 +73,7 @@ import { OutletSavedCardSales } from "@/pages/OutletSavedCardSales";
 import { OutletSavedMobileSales } from "@/pages/OutletSavedMobileSales";
 import { OutletSavedDebts } from "@/pages/OutletSavedDebts";
 import { OutletSavedStockTakes } from "@/pages/OutletSavedStockTakes";
+import { OutletSalesOrders } from "@/pages/OutletSalesOrders";
 import { getUserOutlet } from "@/services/outletAccessService";
 
 // Import missing components
@@ -174,6 +175,16 @@ export const Index = () => {
         if (outletId) {
           console.log("Setting currentView to:", `outlet-stock-take-${outletId}`);
           setCurrentView(`outlet-stock-take-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-sales-orders/')) {
+        const outletId = hash.split('/')[2];
+        console.log("Extracted outlet ID for sales orders:", outletId);
+        if (outletId) {
+          console.log("Setting currentView to:", `outlet-sales-orders-${outletId}`);
+          setCurrentView(`outlet-sales-orders-${outletId}`);
         }
         return;
       }
@@ -669,6 +680,30 @@ export const Index = () => {
               onBack={() => {
                 setCurrentView(`outlet-details-${outletId}`);
                 window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet sales orders view
+    if (currentView.startsWith('outlet-sales-orders-')) {
+      const outletId = currentView.substring('outlet-sales-orders-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="sales-orders"
+        >
+          <div className="p-6">
+            <OutletSalesOrders
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-sales-management-${outletId}`);
+                window.location.hash = `#/outlet-sales-management/${outletId}`;
               }}
             />
           </div>
