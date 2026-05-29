@@ -774,8 +774,9 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     const daysOnLeave = employeeAttendance.filter(r => r.status === 'on_leave').length;
     const daysSick = employeeAttendance.filter(r => r.status === 'sick').length;
 
-    // Calculate late minutes from check_in_time (expected: 07:00)
+    // Calculate late minutes from check_in_time (expected: 07:00, 30 min grace)
     const expectedCheckIn = 7.0; // 7:00 AM in hours
+    const gracePeriodMinutes = 30; // 30 minutes grace period
     const totalLateMinutes = employeeAttendance.reduce((sum, record) => {
       if (!record.check_in_time) return sum;
       const [hours, minutes] = record.check_in_time.split(':').map(Number);
@@ -783,6 +784,9 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       const lateMinutes = Math.max(0, (actualCheckInHours - expectedCheckIn) * 60);
       return sum + lateMinutes;
     }, 0);
+
+    // Apply grace period: first 30 minutes free
+    const chargeableLateMinutes = Math.max(0, totalLateMinutes - gracePeriodMinutes);
 
     // Calculate early departure minutes
     const expectedCheckOut = 18.5; // 6:30 PM in hours (18.5)
@@ -805,15 +809,15 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     // Total attendance deduction
     const attendanceDeduction = regularAbsenceDeduction + sickAbsenceDeduction;
     
-    // Late penalty: TZS 10 per minute late
-    const latePenalty = totalLateMinutes * 10;
+    // Late penalty: TZS 10 per minute late (after 30 min grace)
+    const latePenalty = chargeableLateMinutes * 10;
     
     // Early departure penalty: TZS 10 per minute, first 20 minutes free
     const chargeableEarlyMinutes = Math.max(0, totalEarlyMinutes - 20);
     const earlyDeparturePenalty = chargeableEarlyMinutes * 10;
     
-    // Perfect attendance bonus (no absences, no late, no half days, no early departures, sick days allowed up to 2)
-    const perfectAttendanceBonus = (daysAbsent === 0 && daysLate === 0 && daysHalfDay === 0 && daysSick <= 2 && chargeableEarlyMinutes === 0 && daysPresent > 0) 
+    // Perfect attendance bonus (no absences, no chargeable late, no half days, no early departures, sick days allowed up to 2)
+    const perfectAttendanceBonus = (daysAbsent === 0 && chargeableLateMinutes === 0 && daysHalfDay === 0 && daysSick <= 2 && chargeableEarlyMinutes === 0 && daysPresent > 0) 
       ? 50 
       : 0;
 
@@ -848,6 +852,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       daysOnLeave,
       daysSick,
       totalLateMinutes,
+      chargeableLateMinutes,
       totalEarlyMinutes,
       chargeableEarlyMinutes,
       perDaySalary,
@@ -1449,14 +1454,19 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                         const [hours, minutes] = record.check_in_time.split(':').map(Number);
                         const actualCheckInHours = hours + minutes / 60;
                         const lateMinutes = Math.max(0, (actualCheckInHours - 7.0) * 60);
-                        return lateMinutes > 0 ? 'text-orange-600' : '';
+                        const chargeableMinutes = Math.max(0, lateMinutes - 30);
+                        return chargeableMinutes > 0 ? 'text-orange-600' : '';
                       })()}>
                         {(() => {
                           if (!record.check_in_time) return '0 min';
                           const [hours, minutes] = record.check_in_time.split(':').map(Number);
                           const actualCheckInHours = hours + minutes / 60;
                           const lateMinutes = Math.round(Math.max(0, (actualCheckInHours - 7.0) * 60));
-                          return `${lateMinutes} min`;
+                          const chargeableMinutes = Math.max(0, lateMinutes - 30);
+                          if (lateMinutes <= 30) {
+                            return `${lateMinutes} min (grace)`;
+                          }
+                          return `${lateMinutes} min (${chargeableMinutes} charged)`;
                         })()}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{record.notes || '-'}</TableCell>
