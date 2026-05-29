@@ -117,13 +117,74 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   // Export Functions
+  const printEmployees = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Employee List</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .header { margin-bottom: 10px; color: #666; font-size: 14px; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Employee List</h1>
+        <div class="header">Generated: ${new Date().toLocaleString()} | Total: ${filteredEmployees.length} employees</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Position</th>
+              <th>Department</th>
+              <th>Base Salary</th>
+              <th>Hire Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredEmployees.map(emp => `
+              <tr>
+                <td>${emp.employee_code}</td>
+                <td>${emp.first_name} ${emp.last_name}</td>
+                <td>${emp.position}</td>
+                <td>${emp.department || '-'}</td>
+                <td>${formatTZS(emp.base_salary)}</td>
+                <td>${new Date(emp.hire_date).toLocaleDateString()}</td>
+                <td>${emp.is_active ? 'Active' : 'Inactive'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   const exportEmployeesToPDF = () => {
     const data = filteredEmployees.map(emp => ({
       'Employee Code': emp.employee_code,
       'Name': `${emp.first_name} ${emp.last_name}`,
       'Position': emp.position,
       'Department': emp.department || '-',
-      'Base Salary': emp.base_salary,
+      'Base Salary': formatTZS(emp.base_salary),
       'Hire Date': new Date(emp.hire_date).toLocaleDateString(),
       'Status': emp.is_active ? 'Active' : 'Inactive'
     }));
@@ -143,6 +204,20 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     ExportUtils.exportToXLS(data, 'employees');
   };
 
+  const shareEmployees = async () => {
+    const textData = filteredEmployees.map(emp => 
+      `${emp.employee_code} | ${emp.first_name} ${emp.last_name} | ${emp.position} | ${formatTZS(emp.base_salary)}`
+    ).join('\n');
+    
+    const success = await ExportUtils.shareData(
+      'Employee List - Royal POS',
+      `Employee List (${filteredEmployees.length} employees):\n\n${textData}`
+    );
+    if (success) {
+      toast({ title: "Success", description: "Employee data shared successfully" });
+    }
+  };
+
   const exportAttendanceToPDF = () => {
     const data = attendanceRecords.slice(0, 50).map(record => ({
       'Employee': record.employee_name,
@@ -154,6 +229,68 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       'Notes': record.notes || '-'
     }));
     ExportUtils.exportToPDF(data, 'attendance', 'Attendance Records');
+  };
+
+  const printAttendance = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const records = attendanceRecords.slice(0, 50);
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Attendance Records</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .header { margin-bottom: 10px; color: #666; font-size: 14px; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Attendance Records</h1>
+        <div class="header">Generated: ${new Date().toLocaleString()} | Total: ${records.length} records</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Check In</th>
+              <th>Check Out</th>
+              <th>Late (min)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${records.map(record => `
+              <tr>
+                <td>${record.employee_name}</td>
+                <td>${new Date(record.attendance_date).toLocaleDateString()}</td>
+                <td>${record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' ')}</td>
+                <td>${record.check_in_time || '-'}</td>
+                <td>${record.check_out_time || '-'}</td>
+                <td>${record.late_minutes || 0}</td>
+                <td>${record.notes || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   const exportAttendanceToXLS = () => {
@@ -169,17 +306,94 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     ExportUtils.exportToXLS(data, 'attendance');
   };
 
+  const shareAttendance = async () => {
+    const records = attendanceRecords.slice(0, 50);
+    const textData = records.map(record => 
+      `${record.employee_name} | ${new Date(record.attendance_date).toLocaleDateString()} | ${record.status} | ${record.check_in_time || '-'} | ${record.check_out_time || '-'}`
+    ).join('\n');
+    
+    const success = await ExportUtils.shareData(
+      'Attendance Records - Royal POS',
+      `Attendance Records (${records.length} records):\n\n${textData}`
+    );
+    if (success) {
+      toast({ title: "Success", description: "Attendance data shared successfully" });
+    }
+  };
+
   const exportPayrollToPDF = () => {
     const data = filteredPayroll.map(record => ({
       'Employee': record.employee_name,
       'Period': `${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}`,
-      'Gross Salary': record.gross_salary,
-      'Deductions': record.total_deductions,
-      'Net Salary': record.net_salary,
+      'Gross Salary': formatTZS(record.gross_salary),
+      'Deductions': formatTZS(record.total_deductions),
+      'Net Salary': formatTZS(record.net_salary),
       'Status': record.status?.charAt(0).toUpperCase() + record.status?.slice(1),
       'Payment Date': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'
     }));
     ExportUtils.exportToPDF(data, 'payroll', 'Payroll Records');
+  };
+
+  const printPayroll = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payroll Records</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .header { margin-bottom: 10px; color: #666; font-size: 14px; }
+          .currency { text-align: right; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Payroll Records</h1>
+        <div class="header">Generated: ${new Date().toLocaleString()} | Total: ${filteredPayroll.length} records</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Period</th>
+              <th>Gross Salary</th>
+              <th>Deductions</th>
+              <th>Net Salary</th>
+              <th>Status</th>
+              <th>Payment Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredPayroll.map(record => `
+              <tr>
+                <td>${record.employee_name}</td>
+                <td>${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}</td>
+                <td class="currency">${formatTZS(record.gross_salary)}</td>
+                <td class="currency">${formatTZS(record.total_deductions)}</td>
+                <td class="currency">${formatTZS(record.net_salary)}</td>
+                <td>${record.status?.charAt(0).toUpperCase() + record.status?.slice(1)}</td>
+                <td>${record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   const exportPayrollToXLS = () => {
@@ -195,21 +409,18 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     ExportUtils.exportToXLS(data, 'payroll');
   };
 
-  const handleShare = async (section: string) => {
+  const sharePayroll = async () => {
+    const textData = filteredPayroll.map(record => 
+      `${record.employee_name} | ${new Date(record.pay_period_start).toLocaleDateString()} to ${new Date(record.pay_period_end).toLocaleDateString()} | Net: ${formatTZS(record.net_salary)} | ${record.status}`
+    ).join('\n');
+    
     const success = await ExportUtils.shareData(
-      `${section} - Royal POS`,
-      `${section} data exported from Royal POS Payroll Management`,
+      'Payroll Records - Royal POS',
+      `Payroll Records (${filteredPayroll.length} records):\n\n${textData}`
     );
     if (success) {
-      toast({
-        title: "Success",
-        description: `${section} data shared successfully`,
-      });
+      toast({ title: "Success", description: "Payroll data shared successfully" });
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   // Position and Department handlers
@@ -1062,7 +1273,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handlePrint}>
+                  <DropdownMenuItem onClick={printEmployees}>
                     <Printer className="h-4 w-4 mr-2" />
                     Print
                   </DropdownMenuItem>
@@ -1074,7 +1285,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     <Download className="h-4 w-4 mr-2" />
                     Export XLS
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleShare('Employees')}>
+                  <DropdownMenuItem onClick={shareEmployees}>
                     <Share2 className="h-4 w-4 mr-2" />
                     Share
                   </DropdownMenuItem>
@@ -1167,7 +1378,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handlePrint}>
+                  <DropdownMenuItem onClick={printAttendance}>
                     <Printer className="h-4 w-4 mr-2" />
                     Print
                   </DropdownMenuItem>
@@ -1179,7 +1390,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     <Download className="h-4 w-4 mr-2" />
                     Export XLS
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleShare('Attendance')}>
+                  <DropdownMenuItem onClick={shareAttendance}>
                     <Share2 className="h-4 w-4 mr-2" />
                     Share
                   </DropdownMenuItem>
@@ -1267,7 +1478,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handlePrint}>
+                  <DropdownMenuItem onClick={printPayroll}>
                     <Printer className="h-4 w-4 mr-2" />
                     Print
                   </DropdownMenuItem>
@@ -1279,7 +1490,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     <Download className="h-4 w-4 mr-2" />
                     Export XLS
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleShare('Payroll')}>
+                  <DropdownMenuItem onClick={sharePayroll}>
                     <Share2 className="h-4 w-4 mr-2" />
                     Share
                   </DropdownMenuItem>
