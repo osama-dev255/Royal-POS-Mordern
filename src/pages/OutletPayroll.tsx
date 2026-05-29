@@ -30,7 +30,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Check, ChevronsUpDown, Download, FileText, Printer, Share2, MoreVertical } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -61,6 +67,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ExportUtils } from "@/utils/exportUtils";
 import {
   getOutletEmployees,
   createOutletEmployee,
@@ -107,6 +114,102 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     })}`;
+  };
+
+  // Export Functions
+  const exportEmployeesToPDF = () => {
+    const data = filteredEmployees.map(emp => ({
+      'Employee Code': emp.employee_code,
+      'Name': `${emp.first_name} ${emp.last_name}`,
+      'Position': emp.position,
+      'Department': emp.department || '-',
+      'Base Salary': emp.base_salary,
+      'Hire Date': new Date(emp.hire_date).toLocaleDateString(),
+      'Status': emp.is_active ? 'Active' : 'Inactive'
+    }));
+    ExportUtils.exportToPDF(data, 'employees', 'Employee List');
+  };
+
+  const exportEmployeesToXLS = () => {
+    const data = filteredEmployees.map(emp => ({
+      'Employee Code': emp.employee_code,
+      'Name': `${emp.first_name} ${emp.last_name}`,
+      'Position': emp.position,
+      'Department': emp.department || '-',
+      'Base Salary': emp.base_salary,
+      'Hire Date': new Date(emp.hire_date).toLocaleDateString(),
+      'Status': emp.is_active ? 'Active' : 'Inactive'
+    }));
+    ExportUtils.exportToXLS(data, 'employees');
+  };
+
+  const exportAttendanceToPDF = () => {
+    const data = attendanceRecords.slice(0, 50).map(record => ({
+      'Employee': record.employee_name,
+      'Date': new Date(record.attendance_date).toLocaleDateString(),
+      'Status': record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' '),
+      'Check In': record.check_in_time || '-',
+      'Check Out': record.check_out_time || '-',
+      'Late (min)': record.late_minutes || 0,
+      'Notes': record.notes || '-'
+    }));
+    ExportUtils.exportToPDF(data, 'attendance', 'Attendance Records');
+  };
+
+  const exportAttendanceToXLS = () => {
+    const data = attendanceRecords.slice(0, 50).map(record => ({
+      'Employee': record.employee_name,
+      'Date': new Date(record.attendance_date).toLocaleDateString(),
+      'Status': record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' '),
+      'Check In': record.check_in_time || '-',
+      'Check Out': record.check_out_time || '-',
+      'Late (min)': record.late_minutes || 0,
+      'Notes': record.notes || '-'
+    }));
+    ExportUtils.exportToXLS(data, 'attendance');
+  };
+
+  const exportPayrollToPDF = () => {
+    const data = filteredPayroll.map(record => ({
+      'Employee': record.employee_name,
+      'Period': `${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}`,
+      'Gross Salary': record.gross_salary,
+      'Deductions': record.total_deductions,
+      'Net Salary': record.net_salary,
+      'Status': record.status?.charAt(0).toUpperCase() + record.status?.slice(1),
+      'Payment Date': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'
+    }));
+    ExportUtils.exportToPDF(data, 'payroll', 'Payroll Records');
+  };
+
+  const exportPayrollToXLS = () => {
+    const data = filteredPayroll.map(record => ({
+      'Employee': record.employee_name,
+      'Period': `${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}`,
+      'Gross Salary': record.gross_salary,
+      'Deductions': record.total_deductions,
+      'Net Salary': record.net_salary,
+      'Status': record.status?.charAt(0).toUpperCase() + record.status?.slice(1),
+      'Payment Date': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'
+    }));
+    ExportUtils.exportToXLS(data, 'payroll');
+  };
+
+  const handleShare = async (section: string) => {
+    const success = await ExportUtils.shareData(
+      `${section} - Royal POS`,
+      `${section} data exported from Royal POS Payroll Management`,
+    );
+    if (success) {
+      toast({
+        title: "Success",
+        description: `${section} data shared successfully`,
+      });
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   // Position and Department handlers
@@ -461,6 +564,16 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     const daysSick = employeeAttendance.filter(r => r.status === 'sick').length;
     const totalLateMinutes = employeeAttendance.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
 
+    // Calculate early departure minutes
+    const expectedCheckOut = 18.5; // 6:30 PM in hours (18.5)
+    const totalEarlyMinutes = employeeAttendance.reduce((sum, record) => {
+      if (!record.check_out_time) return sum;
+      const [hours, minutes] = record.check_out_time.split(':').map(Number);
+      const actualCheckOutHours = hours + minutes / 60;
+      const earlyMinutes = Math.max(0, (expectedCheckOut - actualCheckOutHours) * 60);
+      return sum + earlyMinutes;
+    }, 0);
+
     // Calculate attendance deductions
     // Regular absence deduction
     const regularAbsenceDeduction = daysAbsent * perDaySalary + (daysHalfDay * perDaySalary * 0.5);
@@ -475,8 +588,12 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     // Late penalty: TZS 10 per minute late
     const latePenalty = totalLateMinutes * 10;
     
-    // Perfect attendance bonus (no absences, no late, no half days, sick days allowed up to 2)
-    const perfectAttendanceBonus = (daysAbsent === 0 && daysLate === 0 && daysHalfDay === 0 && daysSick <= 2 && daysPresent > 0) 
+    // Early departure penalty: TZS 10 per minute, first 20 minutes free
+    const chargeableEarlyMinutes = Math.max(0, totalEarlyMinutes - 20);
+    const earlyDeparturePenalty = chargeableEarlyMinutes * 10;
+    
+    // Perfect attendance bonus (no absences, no late, no half days, no early departures, sick days allowed up to 2)
+    const perfectAttendanceBonus = (daysAbsent === 0 && daysLate === 0 && daysHalfDay === 0 && daysSick <= 2 && chargeableEarlyMinutes === 0 && daysPresent > 0) 
       ? 50 
       : 0;
 
@@ -494,7 +611,8 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                        payrollForm.advance_payment + 
                        payrollForm.other_deductions +
                        attendanceDeduction +
-                       latePenalty;
+                       latePenalty +
+                       earlyDeparturePenalty;
     
     const net = gross - deductions;
     
@@ -510,9 +628,12 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       daysOnLeave,
       daysSick,
       totalLateMinutes,
+      totalEarlyMinutes,
+      chargeableEarlyMinutes,
       perDaySalary,
       attendanceDeduction,
       latePenalty,
+      earlyDeparturePenalty,
       perfectAttendanceBonus
     };
   };
@@ -558,10 +679,14 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
         days_late: payroll.daysLate,
         days_half_day: payroll.daysHalfDay,
         days_on_leave: payroll.daysOnLeave,
+        days_sick: payroll.daysSick,
         total_late_minutes: payroll.totalLateMinutes,
+        total_early_minutes: payroll.totalEarlyMinutes,
+        chargeable_early_minutes: payroll.chargeableEarlyMinutes,
         per_day_salary: payroll.perDaySalary,
         attendance_deduction: payroll.attendanceDeduction,
         late_penalty: payroll.latePenalty,
+        early_departure_penalty: payroll.earlyDeparturePenalty,
         perfect_attendance_bonus: payroll.perfectAttendanceBonus
       };
 
@@ -927,6 +1052,35 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
         {/* Employees Tab */}
         <TabsContent value="employees" className="mt-4">
           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-lg font-semibold">Employee Actions</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <MoreVertical className="h-4 w-4" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handlePrint}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportEmployeesToPDF}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportEmployeesToXLS}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export XLS
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleShare('Employees')}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -1003,6 +1157,35 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
           </div>
 
           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-lg font-semibold">Attendance Actions</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <MoreVertical className="h-4 w-4" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handlePrint}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAttendanceToPDF}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAttendanceToXLS}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export XLS
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleShare('Attendance')}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -1074,6 +1257,35 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
         {/* Payroll Tab */}
         <TabsContent value="payroll" className="mt-4">
           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-lg font-semibold">Payroll Actions</CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <MoreVertical className="h-4 w-4" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handlePrint}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportPayrollToPDF}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportPayrollToXLS}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export XLS
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleShare('Payroll')}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -1687,6 +1899,10 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                           <span className="text-muted-foreground">Late Minutes:</span>
                           <span className="font-medium text-orange-600">{payroll.totalLateMinutes} min</span>
                         </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Early Departure:</span>
+                          <span className="font-medium text-red-600">{payroll.totalEarlyMinutes} min</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1727,6 +1943,18 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                       <div className="flex justify-between text-red-600 text-sm">
                         <span>Late Penalty:</span>
                         <span>-{formatTZS(payroll.latePenalty)}</span>
+                      </div>
+                    )}
+                    {payroll.earlyDeparturePenalty > 0 && (
+                      <div className="flex justify-between text-red-600 text-sm">
+                        <span>Early Departure Penalty:</span>
+                        <span>-{formatTZS(payroll.earlyDeparturePenalty)}</span>
+                      </div>
+                    )}
+                    {payroll.chargeableEarlyMinutes > 0 && (
+                      <div className="flex justify-between text-red-600 text-xs">
+                        <span>Early Minutes (Chargeable):</span>
+                        <span>{payroll.chargeableEarlyMinutes} min (20 min free)</span>
                       </div>
                     )}
                     <div className="flex justify-between text-red-600">

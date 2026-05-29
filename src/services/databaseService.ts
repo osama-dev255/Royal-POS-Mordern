@@ -5585,10 +5585,14 @@ export interface PayrollRecord {
   days_late?: number;
   days_half_day?: number;
   days_on_leave?: number;
+  days_sick?: number;
   total_late_minutes?: number;
+  total_early_minutes?: number;
+  chargeable_early_minutes?: number;
   per_day_salary?: number;
   attendance_deduction?: number;
   late_penalty?: number;
+  early_departure_penalty?: number;
   perfect_attendance_bonus?: number;
 }
 

@@ -782,4 +782,62 @@ export class ExportUtils {
     link.click();
     document.body.removeChild(link);
   }
+
+  // Export data to XLS (Excel-compatible CSV format)
+  static exportToXLS(data: any[], filename: string, sheetName: string = 'Sheet1') {
+    if (!data || data.length === 0) return;
+
+    // Create CSV content (Excel can open CSV files)
+    const headers = Object.keys(data[0]).join('\t');
+    const rows = data.map(row => 
+      Object.values(row).map(value => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        // Escape tabs and newlines
+        return str.replace(/\t/g, ' ').replace(/\n/g, ' ');
+      }).join('\t')
+    );
+    
+    const csvContent = [headers, ...rows].join('\n');
+    
+    // Create download link with XLS extension
+    const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.xls`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Share data (uses Web Share API on mobile, copies to clipboard on desktop)
+  static async shareData(title: string, text: string, data?: any[]) {
+    // Check if Web Share API is supported
+    if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: title,
+          text: text,
+        });
+        return true;
+      } catch (error) {
+        console.error('Error sharing:', error);
+        return false;
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        const content = data 
+          ? JSON.stringify(data, null, 2)
+          : text;
+        await navigator.clipboard.writeText(content);
+        return true;
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        return false;
+      }
+    }
+  }
 }
