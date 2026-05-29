@@ -108,6 +108,14 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
+  // Date Range Filters
+  const [employeeDateFrom, setEmployeeDateFrom] = useState<string>("");
+  const [employeeDateTo, setEmployeeDateTo] = useState<string>("");
+  const [attendanceDateFrom, setAttendanceDateFrom] = useState<string>("");
+  const [attendanceDateTo, setAttendanceDateTo] = useState<string>("");
+  const [payrollDateFrom, setPayrollDateFrom] = useState<string>("");
+  const [payrollDateTo, setPayrollDateTo] = useState<string>("");
+
   // Helper function to format currency in TZS with thousand separators
   const formatTZS = (amount: number): string => {
     return `TZS ${amount.toLocaleString('en-US', {
@@ -1183,17 +1191,38 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   // Filtered data
-  const filteredEmployees = employees.filter(emp => 
-    emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.position.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.position.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const empDate = emp.hire_date ? new Date(emp.hire_date) : null;
+    const matchesDateFrom = !employeeDateFrom || (empDate && empDate >= new Date(employeeDateFrom));
+    const matchesDateTo = !employeeDateTo || (empDate && empDate <= new Date(employeeDateTo + 'T23:59:59'));
+    
+    return matchesSearch && matchesDateFrom && matchesDateTo;
+  });
 
-  const filteredPayroll = payrollRecords.filter(record => 
-    record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.status?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPayroll = payrollRecords.filter(record => {
+    const matchesSearch = record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.status?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const periodStart = record.pay_period_start ? new Date(record.pay_period_start) : null;
+    const periodEnd = record.pay_period_end ? new Date(record.pay_period_end) : null;
+    const matchesDateFrom = !payrollDateFrom || (periodStart && periodStart >= new Date(payrollDateFrom));
+    const matchesDateTo = !payrollDateTo || (periodEnd && periodEnd <= new Date(payrollDateTo + 'T23:59:59'));
+    
+    return matchesSearch && matchesDateFrom && matchesDateTo;
+  });
+
+  const filteredAttendance = attendanceRecords.filter(record => {
+    const attDate = record.attendance_date ? new Date(record.attendance_date) : null;
+    const matchesDateFrom = !attendanceDateFrom || (attDate && attDate >= new Date(attendanceDateFrom));
+    const matchesDateTo = !attendanceDateTo || (attDate && attDate <= new Date(attendanceDateTo + 'T23:59:59'));
+    
+    return matchesDateFrom && matchesDateTo;
+  });
 
   // Statistics
   const totalEmployees = employees.filter(e => e.is_active).length;
@@ -1327,32 +1356,64 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-semibold">Employee Actions</CardTitle>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <MoreVertical className="h-4 w-4" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={printEmployees}>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportEmployeesToPDF}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Download PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportEmployeesToXLS}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export XLS
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={shareEmployees}>
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={employeeDateFrom}
+                    onChange={(e) => setEmployeeDateFrom(e.target.value)}
+                    className="w-40"
+                    placeholder="From Date"
+                  />
+                  <span className="text-sm text-gray-500">to</span>
+                  <Input
+                    type="date"
+                    value={employeeDateTo}
+                    onChange={(e) => setEmployeeDateTo(e.target.value)}
+                    className="w-40"
+                    placeholder="To Date"
+                  />
+                  {(employeeDateFrom || employeeDateTo) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEmployeeDateFrom("");
+                        setEmployeeDateTo("");
+                      }}
+                      className="h-9"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <MoreVertical className="h-4 w-4" />
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={printEmployees}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportEmployeesToPDF}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportEmployeesToXLS}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export XLS
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={shareEmployees}>
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -1432,21 +1493,52 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-semibold">Attendance Actions</CardTitle>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <MoreVertical className="h-4 w-4" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={printAttendance}>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportAttendanceToPDF}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Download PDF
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={attendanceDateFrom}
+                    onChange={(e) => setAttendanceDateFrom(e.target.value)}
+                    className="w-40"
+                    placeholder="From Date"
+                  />
+                  <span className="text-sm text-gray-500">to</span>
+                  <Input
+                    type="date"
+                    value={attendanceDateTo}
+                    onChange={(e) => setAttendanceDateTo(e.target.value)}
+                    className="w-40"
+                    placeholder="To Date"
+                  />
+                  {(attendanceDateFrom || attendanceDateTo) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setAttendanceDateFrom("");
+                        setAttendanceDateTo("");
+                      }}
+                      className="h-9"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <MoreVertical className="h-4 w-4" />
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={printAttendance}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportAttendanceToPDF}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download PDF
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={exportAttendanceToXLS}>
                     <Download className="h-4 w-4 mr-2" />
@@ -1458,6 +1550,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -1474,7 +1567,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendanceRecords.slice(0, 50).map((record) => (
+                  {filteredAttendance.slice(0, 50).map((record) => (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">{record.employee_name}</TableCell>
                       <TableCell>{new Date(record.attendance_date).toLocaleDateString()}</TableCell>
@@ -1549,21 +1642,52 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-semibold">Payroll Actions</CardTitle>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <MoreVertical className="h-4 w-4" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={printPayroll}>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportPayrollToPDF}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Download PDF
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={payrollDateFrom}
+                    onChange={(e) => setPayrollDateFrom(e.target.value)}
+                    className="w-40"
+                    placeholder="From Date"
+                  />
+                  <span className="text-sm text-gray-500">to</span>
+                  <Input
+                    type="date"
+                    value={payrollDateTo}
+                    onChange={(e) => setPayrollDateTo(e.target.value)}
+                    className="w-40"
+                    placeholder="To Date"
+                  />
+                  {(payrollDateFrom || payrollDateTo) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPayrollDateFrom("");
+                        setPayrollDateTo("");
+                      }}
+                      className="h-9"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <MoreVertical className="h-4 w-4" />
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={printPayroll}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportPayrollToPDF}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download PDF
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={exportPayrollToXLS}>
                     <Download className="h-4 w-4 mr-2" />
@@ -1575,6 +1699,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
