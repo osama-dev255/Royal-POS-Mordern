@@ -5594,6 +5594,7 @@ export interface PayrollRecord {
   late_penalty?: number;
   early_departure_penalty?: number;
   perfect_attendance_bonus?: number;
+  attendance_bonus?: number;
 }
 
 export const getOutletEmployees = async (outletId: string): Promise<OutletEmployee[]> => {

@@ -821,13 +821,17 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       ? 50 
       : 0;
 
+    // Monthly attendance bonus: TZS 5,000 for 28+ days present
+    const attendanceBonus = daysPresent >= 28 ? 5000 : 0;
+
     const gross = payrollForm.base_salary + 
                   payrollForm.housing_allowance + 
                   payrollForm.transport_allowance + 
                   payrollForm.meal_allowance + 
                   payrollForm.overtime_pay + 
                   payrollForm.other_allowances +
-                  perfectAttendanceBonus;
+                  perfectAttendanceBonus +
+                  attendanceBonus;
     
     const deductions = payrollForm.tax_deduction + 
                        payrollForm.social_security + 
@@ -859,7 +863,8 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       attendanceDeduction,
       latePenalty,
       earlyDeparturePenalty,
-      perfectAttendanceBonus
+      perfectAttendanceBonus,
+      attendanceBonus
     };
   };
 
@@ -912,7 +917,8 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
         attendance_deduction: payroll.attendanceDeduction,
         late_penalty: payroll.latePenalty,
         early_departure_penalty: payroll.earlyDeparturePenalty,
-        perfect_attendance_bonus: payroll.perfectAttendanceBonus
+        perfect_attendance_bonus: payroll.perfectAttendanceBonus,
+        attendance_bonus: payroll.attendanceBonus
       };
 
       if (editingPayroll?.id) {
@@ -2163,6 +2169,12 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                       <div className="flex justify-between text-green-600">
                         <span>Perfect Attendance Bonus:</span>
                         <span>+{formatTZS(payroll.perfectAttendanceBonus)}</span>
+                      </div>
+                    )}
+                    {payroll.attendanceBonus > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Monthly Attendance Bonus (28+ days):</span>
+                        <span>+{formatTZS(payroll.attendanceBonus)}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
