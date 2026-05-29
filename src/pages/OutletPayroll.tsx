@@ -1444,8 +1444,20 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                       </TableCell>
                       <TableCell>{record.check_in_time || '-'}</TableCell>
                       <TableCell>{record.check_out_time || '-'}</TableCell>
-                      <TableCell className={record.late_minutes && record.late_minutes > 0 ? 'text-orange-600' : ''}>
-                        {record.late_minutes || 0} min
+                      <TableCell className={(() => {
+                        if (!record.check_in_time) return '';
+                        const [hours, minutes] = record.check_in_time.split(':').map(Number);
+                        const actualCheckInHours = hours + minutes / 60;
+                        const lateMinutes = Math.max(0, (actualCheckInHours - 7.0) * 60);
+                        return lateMinutes > 0 ? 'text-orange-600' : '';
+                      })()}>
+                        {(() => {
+                          if (!record.check_in_time) return '0 min';
+                          const [hours, minutes] = record.check_in_time.split(':').map(Number);
+                          const actualCheckInHours = hours + minutes / 60;
+                          const lateMinutes = Math.round(Math.max(0, (actualCheckInHours - 7.0) * 60));
+                          return `${lateMinutes} min`;
+                        })()}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{record.notes || '-'}</TableCell>
                       <TableCell className="text-right">
