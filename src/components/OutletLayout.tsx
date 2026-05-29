@@ -18,7 +18,8 @@ import {
   CreditCard,
   FileText,
   TrendingUp,
-  Receipt
+  Receipt,
+  DollarSign
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'sales-orders' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'reports' | 'settings' | 'back';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'sales-orders' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'payroll' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
@@ -107,13 +108,19 @@ export const OutletLayout = ({
     {
       id: "grn",
       title: "GRN",
-      icon: <FileText className="h-5 w-5" />,
+      icon: <FileText className="h-5 w-5"/>,
       view: `outlet-grn-${outletId}`
+    },
+    {
+      id: "payroll",
+      title: "Payroll",
+      icon: <DollarSign className="h-5 w-5"/>,
+      view: `outlet-payroll-${outletId}`
     },
     {
       id: "reports",
       title: "Reports",
-      icon: <BarChart3 className="h-5 w-5" />,
+      icon: <BarChart3 className="h-5 w-5"/>,
       view: `outlet-reports-${outletId}`
     },
     {

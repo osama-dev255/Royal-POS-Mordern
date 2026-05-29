@@ -74,6 +74,7 @@ import { OutletSavedMobileSales } from "@/pages/OutletSavedMobileSales";
 import { OutletSavedDebts } from "@/pages/OutletSavedDebts";
 import { OutletSavedStockTakes } from "@/pages/OutletSavedStockTakes";
 import { OutletSalesOrders } from "@/pages/OutletSalesOrders";
+import { OutletPayroll } from "@/pages/OutletPayroll";
 import { getUserOutlet } from "@/services/outletAccessService";
 
 // Import missing components
@@ -558,6 +559,7 @@ export const Index = () => {
   const isOutletReportsView = currentView.startsWith('outlet-reports-');
   const isOutletStockTakeView = currentView.startsWith('outlet-stock-take-');
   const isOutletSettingsView = currentView.startsWith('outlet-settings-');
+  const isOutletPayrollView = currentView.startsWith('outlet-payroll-');
   const isOutletSalesManagementView = currentView.startsWith('outlet-sales-management-');
   const isOutletSavedSalesView = currentView.startsWith('outlet-saved-sales-');
   const isOutletSavedCashView = currentView.startsWith('outlet-saved-cash-');
@@ -578,6 +580,7 @@ export const Index = () => {
       !isOutletReportsView &&
       !isOutletStockTakeView &&
       !isOutletSettingsView &&
+      !isOutletPayrollView &&
       !isOutletSalesManagementView &&
       !isOutletSavedSalesView &&
       !isOutletSavedCashView &&
@@ -601,6 +604,7 @@ export const Index = () => {
                        currentView.startsWith('outlet-reports-') ||
                        currentView.startsWith('outlet-stock-take-') ||
                        currentView.startsWith('outlet-settings-') ||
+                       currentView.startsWith('outlet-payroll-') ||
                        currentView.startsWith('outlet-sales-management-') ||
                        currentView.startsWith('outlet-saved-sales-') ||
                        currentView.startsWith('outlet-saved-cash-') ||
@@ -1065,6 +1069,30 @@ export const Index = () => {
         >
           <div className="p-6">
             <OutletSettings
+              outletId={outletId}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+                window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet payroll view
+    if (currentView.startsWith('outlet-payroll-')) {
+      const outletId = currentView.substring('outlet-payroll-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="payroll"
+        >
+          <div className="p-6">
+            <OutletPayroll
               outletId={outletId}
               onBack={() => {
                 setCurrentView(`outlet-details-${outletId}`);

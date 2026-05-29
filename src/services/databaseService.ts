@@ -5530,3 +5530,334 @@ export const deleteOutletPayment = async (id: string): Promise<boolean> => {
     return false;
   }
 };
+
+// ============= PAYROLL FUNCTIONS =============
+
+export interface OutletEmployee {
+  id?: string;
+  outlet_id: string;
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
+  position: string;
+  department?: string;
+  hire_date: string;
+  base_salary: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PayrollRecord {
+  id?: string;
+  outlet_id: string;
+  employee_id: string;
+  pay_period_start: string;
+  pay_period_end: string;
+  base_salary: number;
+  housing_allowance?: number;
+  transport_allowance?: number;
+  meal_allowance?: number;
+  overtime_hours?: number;
+  overtime_pay?: number;
+  other_allowances?: number;
+  tax_deduction?: number;
+  social_security?: number;
+  health_insurance?: number;
+  advance_payment?: number;
+  other_deductions?: number;
+  gross_salary: number;
+  total_deductions: number;
+  net_salary: number;
+  status?: 'pending' | 'approved' | 'paid' | 'cancelled';
+  payment_date?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  // For display purposes
+  employee_name?: string;
+  // Attendance tracking
+  working_days?: number;
+  days_present?: number;
+  days_absent?: number;
+  days_late?: number;
+  days_half_day?: number;
+  days_on_leave?: number;
+  total_late_minutes?: number;
+  per_day_salary?: number;
+  attendance_deduction?: number;
+  late_penalty?: number;
+  perfect_attendance_bonus?: number;
+}
+
+export const getOutletEmployees = async (outletId: string): Promise<OutletEmployee[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_employees')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet employees:', error);
+    return [];
+  }
+};
+
+export const createOutletEmployee = async (employee: OutletEmployee): Promise<OutletEmployee | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_employees')
+      .insert(employee)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Outlet employee created:', data.employee_code);
+    return data;
+  } catch (error) {
+    console.error('Error creating outlet employee:', error);
+    return null;
+  }
+};
+
+export const updateOutletEmployee = async (id: string, employee: Partial<OutletEmployee>): Promise<OutletEmployee | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_employees')
+      .update(employee)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Outlet employee updated:', data.employee_code);
+    return data;
+  } catch (error) {
+    console.error('Error updating outlet employee:', error);
+    return null;
+  }
+};
+
+export const deleteOutletEmployee = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_employees')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet employee:', error);
+    return false;
+  }
+};
+
+export const getPayrollRecords = async (outletId: string): Promise<PayrollRecord[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('payroll_records')
+      .select(`
+        *,
+        outlet_employees!inner(first_name, last_name)
+      `)
+      .eq('outlet_id', outletId)
+      .order('pay_period_start', { ascending: false });
+      
+    if (error) throw error;
+    
+    // Add employee_name for display
+    const records = data?.map(record => ({
+      ...record,
+      employee_name: `${record.outlet_employees.first_name} ${record.outlet_employees.last_name}`
+    })) || [];
+    
+    return records;
+  } catch (error) {
+    console.error('Error fetching payroll records:', error);
+    return [];
+  }
+};
+
+export const createPayrollRecord = async (record: PayrollRecord): Promise<PayrollRecord | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('payroll_records')
+      .insert(record)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Payroll record created for employee:', data.employee_id);
+    return data;
+  } catch (error) {
+    console.error('Error creating payroll record:', error);
+    return null;
+  }
+};
+
+export const updatePayrollRecord = async (id: string, record: Partial<PayrollRecord>): Promise<PayrollRecord | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('payroll_records')
+      .update(record)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Payroll record updated:', data.id);
+    return data;
+  } catch (error) {
+    console.error('Error updating payroll record:', error);
+    return null;
+  }
+};
+
+export const deletePayrollRecord = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('payroll_records')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting payroll record:', error);
+    return false;
+  }
+};
+
+// ============= ATTENDANCE FUNCTIONS =============
+
+export interface AttendanceRecord {
+  id?: string;
+  outlet_id: string;
+  employee_id: string;
+  attendance_date: string;
+  status: 'present' | 'absent' | 'late' | 'half_day' | 'on_leave' | 'holiday' | 'sick';
+  check_in_time?: string;
+  check_out_time?: string;
+  expected_check_in?: string;
+  expected_check_out?: string;
+  late_minutes?: number;
+  early_departure_minutes?: number;
+  notes?: string;
+  marked_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  // For display
+  employee_name?: string;
+}
+
+export const getAttendanceRecords = async (outletId: string, employeeId?: string, startDate?: string, endDate?: string): Promise<AttendanceRecord[]> => {
+  try {
+    let query = supabase
+      .from('attendance_records')
+      .select(`
+        *,
+        outlet_employees!inner(first_name, last_name)
+      `)
+      .eq('outlet_id', outletId);
+    
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    }
+    
+    if (startDate) {
+      query = query.gte('attendance_date', startDate);
+    }
+    
+    if (endDate) {
+      query = query.lte('attendance_date', endDate);
+    }
+    
+    query = query.order('attendance_date', { ascending: false });
+    
+    const { data, error } = await query;
+      
+    if (error) throw error;
+    
+    // Add employee_name for display
+    const records = data?.map(record => ({
+      ...record,
+      employee_name: `${record.outlet_employees.first_name} ${record.outlet_employees.last_name}`
+    })) || [];
+    
+    return records;
+  } catch (error) {
+    console.error('Error fetching attendance records:', error);
+    return [];
+  }
+};
+
+export const createAttendanceRecord = async (record: AttendanceRecord): Promise<AttendanceRecord | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .insert(record)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Attendance record created:', data.attendance_date);
+    return data;
+  } catch (error) {
+    console.error('Error creating attendance record:', error);
+    return null;
+  }
+};
+
+export const updateAttendanceRecord = async (id: string, record: Partial<AttendanceRecord>): Promise<AttendanceRecord | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .update(record)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    console.log('✅ Attendance record updated:', data.id);
+    return data;
+  } catch (error) {
+    console.error('Error updating attendance record:', error);
+    return null;
+  }
+};
+
+export const deleteAttendanceRecord = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('attendance_records')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting attendance record:', error);
+    return false;
+  }
+};
+
+export const bulkCreateAttendance = async (records: AttendanceRecord[]): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('attendance_records')
+      .insert(records);
+      
+    if (error) throw error;
+    console.log(`✅ ${records.length} attendance records created`);
+    return true;
+  } catch (error) {
+    console.error('Error bulk creating attendance records:', error);
+    return false;
+  }
+};
