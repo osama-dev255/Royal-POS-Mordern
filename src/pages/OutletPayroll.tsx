@@ -219,15 +219,25 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   const exportAttendanceToPDF = () => {
-    const data = attendanceRecords.slice(0, 50).map(record => ({
-      'Employee': record.employee_name,
-      'Date': new Date(record.attendance_date).toLocaleDateString(),
-      'Status': record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' '),
-      'Check In': record.check_in_time || '-',
-      'Check Out': record.check_out_time || '-',
-      'Late (min)': record.late_minutes || 0,
-      'Notes': record.notes || '-'
-    }));
+    const data = attendanceRecords.slice(0, 50).map(record => {
+      // Calculate late minutes from check_in_time
+      let lateMinutes = 0;
+      if (record.check_in_time) {
+        const [hours, minutes] = record.check_in_time.split(':').map(Number);
+        const actualCheckInHours = hours + minutes / 60;
+        lateMinutes = Math.round(Math.max(0, (actualCheckInHours - 7.0) * 60));
+      }
+      
+      return {
+        'Employee': record.employee_name,
+        'Date': new Date(record.attendance_date).toLocaleDateString(),
+        'Status': record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' '),
+        'Check In': record.check_in_time || '-',
+        'Check Out': record.check_out_time || '-',
+        'Late (min)': lateMinutes,
+        'Notes': record.notes || '-'
+      };
+    });
     ExportUtils.exportToPDF(data, 'attendance', 'Attendance Records');
   };
 
@@ -267,17 +277,27 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
             </tr>
           </thead>
           <tbody>
-            ${records.map(record => `
+            ${records.map(record => {
+              // Calculate late minutes from check_in_time
+              let lateMinutes = 0;
+              if (record.check_in_time) {
+                const [hours, minutes] = record.check_in_time.split(':').map(Number);
+                const actualCheckInHours = hours + minutes / 60;
+                lateMinutes = Math.round(Math.max(0, (actualCheckInHours - 7.0) * 60));
+              }
+              
+              return `
               <tr>
                 <td>${record.employee_name}</td>
                 <td>${new Date(record.attendance_date).toLocaleDateString()}</td>
                 <td>${record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' ')}</td>
                 <td>${record.check_in_time || '-'}</td>
                 <td>${record.check_out_time || '-'}</td>
-                <td>${record.late_minutes || 0}</td>
+                <td>${lateMinutes}</td>
                 <td>${record.notes || '-'}</td>
               </tr>
-            `).join('')}
+              `;
+            }).join('')}
           </tbody>
         </table>
       </body>
@@ -294,23 +314,41 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   const exportAttendanceToXLS = () => {
-    const data = attendanceRecords.slice(0, 50).map(record => ({
-      'Employee': record.employee_name,
-      'Date': new Date(record.attendance_date).toLocaleDateString(),
-      'Status': record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' '),
-      'Check In': record.check_in_time || '-',
-      'Check Out': record.check_out_time || '-',
-      'Late (min)': record.late_minutes || 0,
-      'Notes': record.notes || '-'
-    }));
+    const data = attendanceRecords.slice(0, 50).map(record => {
+      // Calculate late minutes from check_in_time
+      let lateMinutes = 0;
+      if (record.check_in_time) {
+        const [hours, minutes] = record.check_in_time.split(':').map(Number);
+        const actualCheckInHours = hours + minutes / 60;
+        lateMinutes = Math.round(Math.max(0, (actualCheckInHours - 7.0) * 60));
+      }
+      
+      return {
+        'Employee': record.employee_name,
+        'Date': new Date(record.attendance_date).toLocaleDateString(),
+        'Status': record.status.charAt(0).toUpperCase() + record.status.slice(1).replace('_', ' '),
+        'Check In': record.check_in_time || '-',
+        'Check Out': record.check_out_time || '-',
+        'Late (min)': lateMinutes,
+        'Notes': record.notes || '-'
+      };
+    });
     ExportUtils.exportToXLS(data, 'attendance');
   };
 
   const shareAttendance = async () => {
     const records = attendanceRecords.slice(0, 50);
-    const textData = records.map(record => 
-      `${record.employee_name} | ${new Date(record.attendance_date).toLocaleDateString()} | ${record.status} | ${record.check_in_time || '-'} | ${record.check_out_time || '-'}`
-    ).join('\n');
+    const textData = records.map(record => {
+      // Calculate late minutes from check_in_time
+      let lateMinutes = 0;
+      if (record.check_in_time) {
+        const [hours, minutes] = record.check_in_time.split(':').map(Number);
+        const actualCheckInHours = hours + minutes / 60;
+        lateMinutes = Math.round(Math.max(0, (actualCheckInHours - 7.0) * 60));
+      }
+      
+      return `${record.employee_name} | ${new Date(record.attendance_date).toLocaleDateString()} | ${record.status} | ${record.check_in_time || '-'} | ${record.check_out_time || '-'} | ${lateMinutes} min late`;
+    }).join('\n');
     
     const success = await ExportUtils.shareData(
       'Attendance Records - Royal POS',
@@ -329,7 +367,8 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       'Deductions': formatTZS(record.total_deductions),
       'Net Salary': formatTZS(record.net_salary),
       'Status': record.status?.charAt(0).toUpperCase() + record.status?.slice(1),
-      'Payment Date': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'
+      'Payment Date': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-',
+      'Attendance Bonus': record.attendance_bonus ? formatTZS(record.attendance_bonus) : 'TZS 0'
     }));
     ExportUtils.exportToPDF(data, 'payroll', 'Payroll Records');
   };
@@ -365,6 +404,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
               <th>Gross Salary</th>
               <th>Deductions</th>
               <th>Net Salary</th>
+              <th>Attendance Bonus</th>
               <th>Status</th>
               <th>Payment Date</th>
             </tr>
@@ -377,6 +417,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                 <td class="currency">${formatTZS(record.gross_salary)}</td>
                 <td class="currency">${formatTZS(record.total_deductions)}</td>
                 <td class="currency">${formatTZS(record.net_salary)}</td>
+                <td class="currency">${record.attendance_bonus ? formatTZS(record.attendance_bonus) : 'TZS 0'}</td>
                 <td>${record.status?.charAt(0).toUpperCase() + record.status?.slice(1)}</td>
                 <td>${record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'}</td>
               </tr>
@@ -403,6 +444,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       'Gross Salary': record.gross_salary,
       'Deductions': record.total_deductions,
       'Net Salary': record.net_salary,
+      'Attendance Bonus': record.attendance_bonus || 0,
       'Status': record.status?.charAt(0).toUpperCase() + record.status?.slice(1),
       'Payment Date': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : '-'
     }));
@@ -411,7 +453,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
 
   const sharePayroll = async () => {
     const textData = filteredPayroll.map(record => 
-      `${record.employee_name} | ${new Date(record.pay_period_start).toLocaleDateString()} to ${new Date(record.pay_period_end).toLocaleDateString()} | Net: ${formatTZS(record.net_salary)} | ${record.status}`
+      `${record.employee_name} | ${new Date(record.pay_period_start).toLocaleDateString()} to ${new Date(record.pay_period_end).toLocaleDateString()} | Net: ${formatTZS(record.net_salary)} | Bonus: ${record.attendance_bonus ? formatTZS(record.attendance_bonus) : 'TZS 0'} | ${record.status}`
     ).join('\n');
     
     const success = await ExportUtils.shareData(
