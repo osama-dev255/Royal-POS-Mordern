@@ -773,7 +773,16 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     const daysHalfDay = employeeAttendance.filter(r => r.status === 'half_day').length;
     const daysOnLeave = employeeAttendance.filter(r => r.status === 'on_leave').length;
     const daysSick = employeeAttendance.filter(r => r.status === 'sick').length;
-    const totalLateMinutes = employeeAttendance.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+
+    // Calculate late minutes from check_in_time (expected: 07:00)
+    const expectedCheckIn = 7.0; // 7:00 AM in hours
+    const totalLateMinutes = employeeAttendance.reduce((sum, record) => {
+      if (!record.check_in_time) return sum;
+      const [hours, minutes] = record.check_in_time.split(':').map(Number);
+      const actualCheckInHours = hours + minutes / 60;
+      const lateMinutes = Math.max(0, (actualCheckInHours - expectedCheckIn) * 60);
+      return sum + lateMinutes;
+    }, 0);
 
     // Calculate early departure minutes
     const expectedCheckOut = 18.5; // 6:30 PM in hours (18.5)
@@ -1097,7 +1106,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
           status,
           check_in_time: status === 'present' || status === 'late' ? '07:00' : undefined,
           check_out_time: status === 'present' ? '18:30' : undefined,
-          late_minutes: status === 'late' ? 30 : 0
+          late_minutes: 0 // Will be auto-calculated from check_in_time
         }));
 
       const success = await bulkCreateAttendance(records);
