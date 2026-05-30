@@ -832,7 +832,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       const [hours, minutes] = record.check_in_time.split(':').map(Number);
       const actualCheckInHours = hours + minutes / 60;
       const lateMinutes = Math.max(0, (actualCheckInHours - expectedCheckIn) * 60);
-      return sum + lateMinutes;
+      return sum + Math.round(lateMinutes); // Round to avoid floating-point errors
     }, 0);
 
     // Apply grace period: first 30 minutes free
@@ -845,7 +845,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       const [hours, minutes] = record.check_out_time.split(':').map(Number);
       const actualCheckOutHours = hours + minutes / 60;
       const earlyMinutes = Math.max(0, (expectedCheckOut - actualCheckOutHours) * 60);
-      return sum + earlyMinutes;
+      return sum + Math.round(earlyMinutes); // Round to avoid floating-point errors
     }, 0);
 
     // Calculate attendance deductions
@@ -947,28 +947,66 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     try {
       const payroll = calculatePayroll();
       
+      // Debug: Log calculated values to identify floating-point issues
+      console.log('Payroll Calculation:', {
+        workingDays: payroll.workingDays,
+        daysPresent: payroll.daysPresent,
+        daysAbsent: payroll.daysAbsent,
+        daysLate: payroll.daysLate,
+        daysHalfDay: payroll.daysHalfDay,
+        daysOnLeave: payroll.daysOnLeave,
+        daysSick: payroll.daysSick,
+        totalLateMinutes: payroll.totalLateMinutes,
+        totalEarlyMinutes: payroll.totalEarlyMinutes,
+        chargeableEarlyMinutes: payroll.chargeableEarlyMinutes
+      });
+      
+      // Clean up payrollForm - remove empty strings for optional fields
+      const cleanedForm = { ...payrollForm };
+      
+      // Remove empty string date fields (keep only if they have values)
+      if (!cleanedForm.payment_date) delete cleanedForm.payment_date;
+      
       const payrollData: PayrollRecord = {
-        ...payrollForm,
         outlet_id: outletId,
+        employee_id: cleanedForm.employee_id,
+        pay_period_start: cleanedForm.pay_period_start,
+        pay_period_end: cleanedForm.pay_period_end,
+        base_salary: cleanedForm.base_salary,
+        housing_allowance: cleanedForm.housing_allowance || 0,
+        transport_allowance: cleanedForm.transport_allowance || 0,
+        meal_allowance: cleanedForm.meal_allowance || 0,
+        overtime_hours: cleanedForm.overtime_hours || 0,
+        overtime_pay: cleanedForm.overtime_pay || 0,
+        other_allowances: cleanedForm.other_allowances || 0,
+        tax_deduction: cleanedForm.tax_deduction || 0,
+        social_security: cleanedForm.social_security || 0,
+        health_insurance: cleanedForm.health_insurance || 0,
+        advance_payment: cleanedForm.advance_payment || 0,
+        other_deductions: cleanedForm.other_deductions || 0,
+        status: cleanedForm.status,
+        notes: cleanedForm.notes || undefined,
         gross_salary: payroll.gross,
         total_deductions: payroll.deductions,
         net_salary: payroll.net,
-        working_days: payroll.workingDays,
-        days_present: payroll.daysPresent,
-        days_absent: payroll.daysAbsent,
-        days_late: payroll.daysLate,
-        days_half_day: payroll.daysHalfDay,
-        days_on_leave: payroll.daysOnLeave,
-        days_sick: payroll.daysSick,
-        total_late_minutes: payroll.totalLateMinutes,
-        total_early_minutes: payroll.totalEarlyMinutes,
-        chargeable_early_minutes: payroll.chargeableEarlyMinutes,
+        working_days: Math.round(payroll.workingDays),
+        days_present: Math.round(payroll.daysPresent),
+        days_absent: Math.round(payroll.daysAbsent),
+        days_late: Math.round(payroll.daysLate),
+        days_half_day: Math.round(payroll.daysHalfDay),
+        days_on_leave: Math.round(payroll.daysOnLeave),
+        days_sick: Math.round(payroll.daysSick),
+        total_late_minutes: Math.round(payroll.totalLateMinutes),
+        total_early_minutes: Math.round(payroll.totalEarlyMinutes),
+        chargeable_early_minutes: Math.round(payroll.chargeableEarlyMinutes),
         per_day_salary: payroll.perDaySalary,
         attendance_deduction: payroll.attendanceDeduction,
         late_penalty: payroll.latePenalty,
         early_departure_penalty: payroll.earlyDeparturePenalty,
         perfect_attendance_bonus: payroll.perfectAttendanceBonus,
-        attendance_bonus: payroll.attendanceBonus
+        attendance_bonus: payroll.attendanceBonus,
+        // Only include payment_date if it has a value
+        ...(cleanedForm.payment_date && { payment_date: cleanedForm.payment_date })
       };
 
       if (editingPayroll?.id) {
