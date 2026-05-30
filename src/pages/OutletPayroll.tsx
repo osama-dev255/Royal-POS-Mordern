@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import jsPDF from 'jspdf';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, ChevronsUpDown, Download, FileText, Printer, Share2, MoreVertical } from "lucide-react";
+import { Check, ChevronsUpDown, Download, FileText, Printer, Share2, MoreVertical, Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -82,6 +83,7 @@ import {
   updateAttendanceRecord,
   deleteAttendanceRecord,
   bulkCreateAttendance,
+  getOutletById,
   OutletEmployee,
   PayrollRecord,
   AttendanceRecord
@@ -97,6 +99,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   const [employees, setEmployees] = useState<OutletEmployee[]>([]);
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [outletName, setOutletName] = useState<string>("Outlet");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
@@ -106,6 +109,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   const [editingPayroll, setEditingPayroll] = useState<PayrollRecord | null>(null);
   const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false); // For view-only payroll dialog
   const { toast } = useToast();
 
   // Date Range Filters
@@ -473,6 +477,710 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     }
   };
 
+  // Individual Payroll Record Actions
+  const viewPayrollRecord = (record: PayrollRecord) => {
+    // Populate form with record data for viewing
+    setPayrollForm({
+      employee_id: record.employee_id,
+      pay_period_start: record.pay_period_start,
+      pay_period_end: record.pay_period_end,
+      base_salary: record.base_salary,
+      housing_allowance: record.housing_allowance || 0,
+      transport_allowance: record.transport_allowance || 0,
+      meal_allowance: record.meal_allowance || 0,
+      overtime_hours: record.overtime_hours || 0,
+      overtime_pay: record.overtime_pay || 0,
+      other_allowances: record.other_allowances || 0,
+      tax_deduction: record.tax_deduction || 0,
+      social_security: record.social_security || 0,
+      health_insurance: record.health_insurance || 0,
+      advance_payment: record.advance_payment || 0,
+      other_deductions: record.other_deductions || 0,
+      status: record.status || 'pending',
+      payment_date: record.payment_date || '',
+      notes: record.notes || ''
+    });
+    setEditingPayroll(record);
+    setIsViewMode(true);
+    setIsPayrollDialogOpen(true);
+  };
+
+  const printIndividualPayroll = (record: PayrollRecord) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payroll Slip - ${record.employee_name}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 10px;
+            color: #333;
+            line-height: 1.4;
+            font-size: 11px;
+          }
+          .container { max-width: 800px; margin: 0 auto; }
+          
+          /* Header */
+          .header {
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+          .company-info h1 {
+            font-size: 20px;
+            color: #2563eb;
+            margin-bottom: 3px;
+            font-weight: 700;
+          }
+          .company-info p {
+            font-size: 10px;
+            color: #666;
+          }
+          .payslip-title {
+            text-align: right;
+          }
+          .payslip-title h2 {
+            font-size: 24px;
+            color: #1e40af;
+            margin-bottom: 3px;
+            font-weight: 700;
+          }
+          .payslip-title p {
+            font-size: 9px;
+            color: #666;
+          }
+          
+          /* Employee Info */
+          .employee-info {
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            border-left: 3px solid #2563eb;
+          }
+          .employee-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+          }
+          .info-item {
+            display: flex;
+            gap: 8px;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #64748b;
+            min-width: 110px;
+            font-size: 10px;
+          }
+          .info-value {
+            color: #1e293b;
+            font-weight: 500;
+            font-size: 10px;
+          }
+          
+          /* Tables */
+          .section {
+            margin-bottom: 10px;
+          }
+          .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 6px;
+            padding-bottom: 3px;
+            border-bottom: 2px solid #e2e8f0;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+          }
+          th {
+            background: #f1f5f9;
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #475569;
+            border-bottom: 2px solid #cbd5e1;
+            font-size: 10px;
+          }
+          td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 10px;
+          }
+          tr:last-child td {
+            border-bottom: none;
+          }
+          .amount {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+          }
+          .subtotal {
+            background: #f8fafc;
+            font-weight: 700;
+          }
+          .subtotal td {
+            border-top: 2px solid #cbd5e1;
+          }
+          
+          /* Summary Box */
+          .summary-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 11px;
+          }
+          .summary-row.total {
+            border-top: 2px solid rgba(255,255,255,0.3);
+            margin-top: 6px;
+            padding-top: 8px;
+            font-size: 18px;
+            font-weight: 700;
+          }
+          .net-pay-label { text-transform: uppercase; letter-spacing: 0.5px; }
+          .net-pay-amount { font-family: 'Courier New', monospace; }
+          
+          /* Attendance */
+          .attendance-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 10px;
+          }
+          .attendance-item {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+          }
+          .attendance-label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+          }
+          .attendance-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+          }
+          
+          /* Footer */
+          .footer {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 2px solid #e2e8f0;
+          }
+          .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            margin-bottom: 10px;
+          }
+          .signature-item {
+            text-align: center;
+          }
+          .signature-line {
+            border-top: 2px solid #333;
+            margin-top: 40px;
+            padding-top: 8px;
+            font-size: 10px;
+            color: #64748b;
+          }
+          .print-date {
+            text-align: center;
+            font-size: 9px;
+            color: #94a3b8;
+            margin-top: 10px;
+          }
+          
+          @media print {
+            body { margin: 0; }
+            .container { max-width: 100%; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <!-- Header -->
+          <div class="header">
+            <div class="company-info">
+              <h1>${outletName.toUpperCase()}</h1>
+              <p>Employee Payroll System</p>
+              <p style="margin-top: 5px;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            <div class="payslip-title">
+              <h2>PAYSLIP</h2>
+              <p>Official Payment Record</p>
+              <p style="margin-top: 5px; font-weight: 600; color: #2563eb;">${record.status?.toUpperCase()}</p>
+            </div>
+          </div>
+
+          <!-- Employee Information -->
+          <div class="employee-info">
+            <div class="employee-info-grid">
+              <div class="info-item">
+                <span class="info-label">Employee Name:</span>
+                <span class="info-value">${record.employee_name}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Pay Period:</span>
+                <span class="info-value">${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Employee ID:</span>
+                <span class="info-value">${record.employee_id}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Payment Date:</span>
+                <span class="info-value">${record.payment_date ? new Date(record.payment_date).toLocaleDateString() : 'Pending'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Earnings -->
+          <div class="section">
+            <div class="section-title">EARNINGS</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th style="text-align: right;">Amount (TZS)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Base Salary</td>
+                  <td class="amount">${record.base_salary.toLocaleString()}</td>
+                </tr>
+                ${record.housing_allowance ? `<tr><td>Housing Allowance</td><td class="amount">${record.housing_allowance.toLocaleString()}</td></tr>` : ''}
+                ${record.transport_allowance ? `<tr><td>Transport Allowance</td><td class="amount">${record.transport_allowance.toLocaleString()}</td></tr>` : ''}
+                ${record.meal_allowance ? `<tr><td>Meal Allowance</td><td class="amount">${record.meal_allowance.toLocaleString()}</td></tr>` : ''}
+                ${record.overtime_pay ? `<tr><td>Overtime Pay</td><td class="amount">${record.overtime_pay.toLocaleString()}</td></tr>` : ''}
+                ${record.other_allowances ? `<tr><td>Other Allowances</td><td class="amount">${record.other_allowances.toLocaleString()}</td></tr>` : ''}
+                ${record.perfect_attendance_bonus ? `<tr><td>Perfect Attendance Bonus</td><td class="amount">${record.perfect_attendance_bonus.toLocaleString()}</td></tr>` : ''}
+                ${record.attendance_bonus ? `<tr><td>Monthly Attendance Bonus (28+ days)</td><td class="amount">${record.attendance_bonus.toLocaleString()}</td></tr>` : ''}
+                <tr class="subtotal">
+                  <td><strong>GROSS PAY</strong></td>
+                  <td class="amount"><strong>${record.gross_salary.toLocaleString()}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Deductions -->
+          <div class="section">
+            <div class="section-title">DEDUCTIONS</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th style="text-align: right;">Amount (TZS)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${record.tax_deduction ? `<tr><td>Tax Deduction</td><td class="amount">-${record.tax_deduction.toLocaleString()}</td></tr>` : ''}
+                ${record.social_security ? `<tr><td>Social Security</td><td class="amount">-${record.social_security.toLocaleString()}</td></tr>` : ''}
+                ${record.health_insurance ? `<tr><td>Health Insurance</td><td class="amount">-${record.health_insurance.toLocaleString()}</td></tr>` : ''}
+                ${record.advance_payment ? `<tr><td>Advance Payment</td><td class="amount">-${record.advance_payment.toLocaleString()}</td></tr>` : ''}
+                ${record.other_deductions ? `<tr><td>Other Deductions</td><td class="amount">-${record.other_deductions.toLocaleString()}</td></tr>` : ''}
+                ${record.late_penalty ? `<tr><td>Late Penalty</td><td class="amount">-${record.late_penalty.toLocaleString()}</td></tr>` : ''}
+                ${record.early_departure_penalty ? `<tr><td>Early Departure Penalty</td><td class="amount">-${record.early_departure_penalty.toLocaleString()}</td></tr>` : ''}
+                ${record.attendance_deduction ? `<tr><td>Attendance Deduction</td><td class="amount">-${record.attendance_deduction.toLocaleString()}</td></tr>` : ''}
+                <tr class="subtotal">
+                  <td><strong>TOTAL DEDUCTIONS</strong></td>
+                  <td class="amount"><strong>-${record.total_deductions.toLocaleString()}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Summary Box -->
+          <div class="summary-box">
+            <div class="summary-row">
+              <span>Gross Pay</span>
+              <span>TZS ${record.gross_salary.toLocaleString()}</span>
+            </div>
+            <div class="summary-row">
+              <span>Total Deductions</span>
+              <span>- TZS ${record.total_deductions.toLocaleString()}</span>
+            </div>
+            <div class="summary-row total">
+              <span class="net-pay-label">NET PAY</span>
+              <span class="net-pay-amount">TZS ${record.net_salary.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="footer">
+            <div class="signature-grid">
+              <div class="signature-item">
+                <div class="signature-line">Authorized Signature</div>
+              </div>
+              <div class="signature-item">
+                <div class="signature-line">Employee Signature</div>
+              </div>
+            </div>
+            <div class="print-date">
+              Printed on ${new Date().toLocaleString()} | This is a computer-generated document
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const downloadIndividualPayrollPDF = (record: PayrollRecord) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 15;
+    let y = 15;
+
+    // Helper function to add text
+    const addText = (text: string, x: number, yPos: number, size: number, style: 'normal' | 'bold' = 'normal', color: [number, number, number] = [51, 51, 51]) => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', style);
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(text, x, yPos);
+    };
+
+    // Helper function to add filled rectangle
+    const addRect = (x: number, yPos: number, width: number, height: number, color: [number, number, number]) => {
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(x, yPos, width, height, 'F');
+    };
+
+    // Helper function to add line
+    const addLine = (yPos: number, color: [number, number, number] = [226, 232, 240], thickness: number = 0.5) => {
+      doc.setDrawColor(color[0], color[1], color[2]);
+      doc.setLineWidth(thickness);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+    };
+
+    // Header - Company Name
+    addRect(margin, y, pageWidth - 2 * margin, 25, [248, 250, 252]);
+    addText(outletName.toUpperCase(), margin + 5, y + 10, 18, 'bold', [37, 99, 235]);
+    addText('Employee Payroll System', margin + 5, y + 17, 9, 'normal', [100, 116, 139]);
+    
+    // PAYSLIP Title (right side)
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
+    const payslipText = 'PAYSLIP';
+    const payslipWidth = doc.getTextWidth(payslipText);
+    doc.text(payslipText, pageWidth - margin - payslipWidth - 5, y + 10);
+    
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    const statusText = 'Official Payment Record';
+    const statusWidth = doc.getTextWidth(statusText);
+    doc.text(statusText, pageWidth - margin - statusWidth - 5, y + 16);
+    
+    // Status badge
+    const status = record.status?.toUpperCase() || 'PENDING';
+    let statusColor: [number, number, number] = [245, 158, 11]; // Default orange
+    if (status === 'PAID') {
+      statusColor = [16, 185, 129]; // Green
+    } else if (status === 'APPROVED') {
+      statusColor = [59, 130, 246]; // Blue
+    }
+    addRect(pageWidth - margin - 25, y + 18, 20, 5, statusColor);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    const statusTextWidth = doc.getTextWidth(status);
+    doc.text(status, pageWidth - margin - 15 - statusTextWidth / 2, y + 22);
+    
+    y += 28;
+
+    // Date
+    addText(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), margin, y, 9, 'normal', [100, 116, 139]);
+    y += 8;
+
+    // Employee Information Box
+    addRect(margin, y, pageWidth - 2 * margin, 22, [248, 250, 252]);
+    doc.setDrawColor(37, 99, 235);
+    doc.setLineWidth(1);
+    doc.line(margin, y, margin, y + 22);
+    
+    y += 6;
+    addText('Employee Name:', margin + 5, y, 8, 'bold', [100, 116, 139]);
+    addText(record.employee_name, margin + 35, y, 8, 'normal', [30, 41, 59]);
+    
+    addText('Pay Period:', pageWidth / 2, y, 8, 'bold', [100, 116, 139]);
+    addText(`${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}`, pageWidth / 2 + 20, y, 8, 'normal', [30, 41, 59]);
+    
+    y += 5;
+    addText('Employee ID:', margin + 5, y, 8, 'bold', [100, 116, 139]);
+    addText(record.employee_id, margin + 35, y, 8, 'normal', [30, 41, 59]);
+    
+    addText('Payment Date:', pageWidth / 2, y, 8, 'bold', [100, 116, 139]);
+    addText(record.payment_date ? new Date(record.payment_date).toLocaleDateString() : 'Pending', pageWidth / 2 + 20, y, 8, 'normal', [30, 41, 59]);
+    
+    y += 18;
+
+    // Earnings Section
+    addText('EARNINGS', margin, y, 11, 'bold', [30, 64, 175]);
+    addLine(y + 2, [226, 232, 240], 1);
+    y += 7;
+
+    // Earnings Table Header
+    addRect(margin, y, pageWidth - 2 * margin, 6, [241, 245, 249]);
+    addText('Description', margin + 3, y + 4.5, 8, 'bold', [71, 85, 105]);
+    addText('Amount (TZS)', pageWidth - margin - 3, y + 4.5, 8, 'bold', [71, 85, 105]);
+    y += 7;
+
+    // Earnings Items
+    const addEarningsRow = (desc: string, amount: number, isSubtotal: boolean = false) => {
+      if (isSubtotal) {
+        addRect(margin, y, pageWidth - 2 * margin, 6, [248, 250, 252]);
+        addText(desc, margin + 3, y + 4.5, 8, 'bold', [30, 41, 59]);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.8);
+        doc.line(margin, y, pageWidth - margin, y);
+      } else {
+        addText(desc, margin + 3, y + 4.5, 8, 'normal', [51, 51, 51]);
+      }
+      const amountText = amount.toLocaleString();
+      const amountWidth = doc.getTextWidth(amountText);
+      addText(amountText, pageWidth - margin - 3 - amountWidth, y + 4.5, 8, isSubtotal ? 'bold' : 'normal', [51, 51, 51]);
+      y += 6.5;
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageWidth - margin, y);
+    };
+
+    addEarningsRow('Base Salary', record.base_salary);
+    if (record.housing_allowance) addEarningsRow('Housing Allowance', record.housing_allowance);
+    if (record.transport_allowance) addEarningsRow('Transport Allowance', record.transport_allowance);
+    if (record.meal_allowance) addEarningsRow('Meal Allowance', record.meal_allowance);
+    if (record.overtime_pay) addEarningsRow('Overtime Pay', record.overtime_pay);
+    if (record.other_allowances) addEarningsRow('Other Allowances', record.other_allowances);
+    if (record.perfect_attendance_bonus) addEarningsRow('Perfect Attendance Bonus', record.perfect_attendance_bonus);
+    if (record.attendance_bonus) addEarningsRow('Monthly Attendance Bonus (28+ days)', record.attendance_bonus);
+    addEarningsRow('GROSS PAY', record.gross_salary, true);
+    
+    y += 3;
+
+    // Deductions Section
+    addText('DEDUCTIONS', margin, y, 11, 'bold', [30, 64, 175]);
+    addLine(y + 2, [226, 232, 240], 1);
+    y += 7;
+
+    // Deductions Table Header
+    addRect(margin, y, pageWidth - 2 * margin, 6, [241, 245, 249]);
+    addText('Description', margin + 3, y + 4.5, 8, 'bold', [71, 85, 105]);
+    addText('Amount (TZS)', pageWidth - margin - 3, y + 4.5, 8, 'bold', [71, 85, 105]);
+    y += 7;
+
+    const addDeductionsRow = (desc: string, amount: number, isSubtotal: boolean = false) => {
+      if (isSubtotal) {
+        addRect(margin, y, pageWidth - 2 * margin, 6, [248, 250, 252]);
+        addText(desc, margin + 3, y + 4.5, 8, 'bold', [30, 41, 59]);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.8);
+        doc.line(margin, y, pageWidth - margin, y);
+      } else {
+        addText(desc, margin + 3, y + 4.5, 8, 'normal', [51, 51, 51]);
+      }
+      const amountText = `-${amount.toLocaleString()}`;
+      const amountWidth = doc.getTextWidth(amountText);
+      addText(amountText, pageWidth - margin - 3 - amountWidth, y + 4.5, 8, isSubtotal ? 'bold' : 'normal', [51, 51, 51]);
+      y += 6.5;
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageWidth - margin, y);
+    };
+
+    if (record.tax_deduction) addDeductionsRow('Tax Deduction', record.tax_deduction);
+    if (record.social_security) addDeductionsRow('Social Security', record.social_security);
+    if (record.health_insurance) addDeductionsRow('Health Insurance', record.health_insurance);
+    if (record.advance_payment) addDeductionsRow('Advance Payment', record.advance_payment);
+    if (record.other_deductions) addDeductionsRow('Other Deductions', record.other_deductions);
+    if (record.late_penalty) addDeductionsRow('Late Penalty', record.late_penalty);
+    if (record.early_departure_penalty) addDeductionsRow('Early Departure Penalty', record.early_departure_penalty);
+    if (record.attendance_deduction) addDeductionsRow('Attendance Deduction', record.attendance_deduction);
+    addDeductionsRow('TOTAL DEDUCTIONS', record.total_deductions, true);
+    
+    y += 5;
+
+    // Net Pay Summary Box
+    const boxHeight = 22;
+    
+    y += 6;
+    doc.setTextColor(51, 51, 51);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    addText('Gross Pay', margin + 5, y, 9, 'normal', [51, 51, 51]);
+    const grossText = `TZS ${record.gross_salary.toLocaleString()}`;
+    const grossWidth = doc.getTextWidth(grossText);
+    addText(grossText, pageWidth - margin - 5 - grossWidth, y, 9, 'normal', [51, 51, 51]);
+    
+    y += 5;
+    addText('Total Deductions', margin + 5, y, 9, 'normal', [51, 51, 51]);
+    const deductText = `- TZS ${record.total_deductions.toLocaleString()}`;
+    const deductWidth = doc.getTextWidth(deductText);
+    addText(deductText, pageWidth - margin - 5 - deductWidth, y, 9, 'normal', [51, 51, 51]);
+    
+    y += 6;
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.8);
+    doc.line(margin + 5, y, pageWidth - margin - 5, y);
+    
+    y += 5;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    addText('NET PAY', margin + 5, y, 14, 'bold', [30, 64, 175]);
+    const netText = `TZS ${record.net_salary.toLocaleString()}`;
+    const netWidth = doc.getTextWidth(netText);
+    addText(netText, pageWidth - margin - 5 - netWidth, y, 14, 'bold', [30, 64, 175]);
+    
+    y += boxHeight - 16;
+
+    // Footer - Signature Lines
+    y += 10;
+    doc.setDrawColor(51, 51, 51);
+    doc.setLineWidth(0.5);
+    
+    // Authorized Signature
+    doc.line(margin + 10, y, margin + 70, y);
+    addText('Authorized Signature', margin + 20, y + 5, 8, 'normal', [100, 116, 139]);
+    
+    // Employee Signature
+    doc.line(pageWidth - margin - 70, y, pageWidth - margin - 10, y);
+    addText('Employee Signature', pageWidth - margin - 55, y + 5, 8, 'normal', [100, 116, 139]);
+    
+    y += 12;
+    addText(`Printed on ${new Date().toLocaleString()} | This is a computer-generated document`, pageWidth / 2, y, 7, 'normal', [148, 163, 184]);
+
+    // Save PDF
+    doc.save(`payroll_${record.employee_name}_${record.pay_period_start}.pdf`);
+  };
+
+  const exportIndividualPayrollToXLS = (record: PayrollRecord) => {
+    const data = [
+      // Header Section
+      { 'Section': 'COMPANY', 'Detail': 'DETAIL', 'Amount': outletName.toUpperCase() },
+      { 'Section': 'Document Type', 'Detail': '', 'Amount': 'PAYSLIP' },
+      { 'Section': 'Generated Date', 'Detail': '', 'Amount': new Date().toLocaleDateString() },
+      { 'Section': '', 'Detail': '', 'Amount': '' },
+      
+      // Employee Information
+      { 'Section': 'EMPLOYEE', 'Detail': 'INFORMATION', 'Amount': '' },
+      { 'Section': 'Employee Name', 'Detail': '', 'Amount': record.employee_name },
+      { 'Section': 'Employee ID', 'Detail': '', 'Amount': record.employee_id },
+      { 'Section': 'Pay Period Start', 'Detail': '', 'Amount': new Date(record.pay_period_start).toLocaleDateString() },
+      { 'Section': 'Pay Period End', 'Detail': '', 'Amount': new Date(record.pay_period_end).toLocaleDateString() },
+      { 'Section': 'Payment Date', 'Detail': '', 'Amount': record.payment_date ? new Date(record.payment_date).toLocaleDateString() : 'Pending' },
+      { 'Section': 'Status', 'Detail': '', 'Amount': record.status?.toUpperCase() || 'PENDING' },
+      { 'Section': '', 'Detail': '', 'Amount': '' },
+      
+      // Earnings
+      { 'Section': 'EARNINGS', 'Detail': '', 'Amount': '' },
+      { 'Section': 'Base Salary', 'Detail': '', 'Amount': record.base_salary },
+      { 'Section': 'Housing Allowance', 'Detail': '', 'Amount': record.housing_allowance || 0 },
+      { 'Section': 'Transport Allowance', 'Detail': '', 'Amount': record.transport_allowance || 0 },
+      { 'Section': 'Meal Allowance', 'Detail': '', 'Amount': record.meal_allowance || 0 },
+      { 'Section': 'Overtime Pay', 'Detail': '', 'Amount': record.overtime_pay || 0 },
+      { 'Section': 'Other Allowances', 'Detail': '', 'Amount': record.other_allowances || 0 },
+      { 'Section': 'Perfect Attendance Bonus', 'Detail': '', 'Amount': record.perfect_attendance_bonus || 0 },
+      { 'Section': 'Monthly Attendance Bonus (28+ days)', 'Detail': '', 'Amount': record.attendance_bonus || 0 },
+      { 'Section': 'GROSS PAY', 'Detail': '', 'Amount': record.gross_salary },
+      { 'Section': '', 'Detail': '', 'Amount': '' },
+      
+      // Deductions
+      { 'Section': 'DEDUCTIONS', 'Detail': '', 'Amount': '' },
+      { 'Section': 'Tax Deduction', 'Detail': '', 'Amount': record.tax_deduction || 0 },
+      { 'Section': 'Social Security', 'Detail': '', 'Amount': record.social_security || 0 },
+      { 'Section': 'Health Insurance', 'Detail': '', 'Amount': record.health_insurance || 0 },
+      { 'Section': 'Advance Payment', 'Detail': '', 'Amount': record.advance_payment || 0 },
+      { 'Section': 'Other Deductions', 'Detail': '', 'Amount': record.other_deductions || 0 },
+      { 'Section': 'Late Penalty', 'Detail': '', 'Amount': record.late_penalty || 0 },
+      { 'Section': 'Early Departure Penalty', 'Detail': '', 'Amount': record.early_departure_penalty || 0 },
+      { 'Section': 'Attendance Deduction', 'Detail': '', 'Amount': record.attendance_deduction || 0 },
+      { 'Section': 'TOTAL DEDUCTIONS', 'Detail': '', 'Amount': record.total_deductions },
+      { 'Section': '', 'Detail': '', 'Amount': '' },
+      
+      // Summary
+      { 'Section': 'SUMMARY', 'Detail': '', 'Amount': '' },
+      { 'Section': 'Gross Pay', 'Detail': '', 'Amount': record.gross_salary },
+      { 'Section': 'Total Deductions', 'Detail': '', 'Amount': record.total_deductions },
+      { 'Section': 'NET PAY', 'Detail': '', 'Amount': record.net_salary },
+      { 'Section': '', 'Detail': '', 'Amount': '' },
+      
+      // Attendance (if available)
+      { 'Section': 'ATTENDANCE', 'Detail': 'RECORD', 'Amount': '' },
+      { 'Section': 'Working Days', 'Detail': '', 'Amount': record.working_days || 0 },
+      { 'Section': 'Days Present', 'Detail': '', 'Amount': record.days_present || 0 },
+      { 'Section': 'Days Absent', 'Detail': '', 'Amount': record.days_absent || 0 },
+      { 'Section': 'Days Late', 'Detail': '', 'Amount': record.days_late || 0 },
+      { 'Section': 'Days Half Day', 'Detail': '', 'Amount': record.days_half_day || 0 },
+      { 'Section': 'Days on Leave', 'Detail': '', 'Amount': record.days_on_leave || 0 },
+      { 'Section': 'Days Sick', 'Detail': '', 'Amount': record.days_sick || 0 },
+      { 'Section': 'Total Late Minutes', 'Detail': '', 'Amount': record.total_late_minutes || 0 }
+    ];
+    ExportUtils.exportToXLS(data, `payroll_${record.employee_name}_${record.pay_period_start}`);
+  };
+
+  const shareIndividualPayroll = async (record: PayrollRecord) => {
+    const textData = `Payroll Slip - ${record.employee_name}
+Period: ${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}
+
+Earnings:
+- Base Salary: ${formatTZS(record.base_salary)}
+- Gross Salary: ${formatTZS(record.gross_salary)}
+
+Deductions:
+- Total: ${formatTZS(record.total_deductions)}
+
+Net Salary: ${formatTZS(record.net_salary)}
+Status: ${record.status?.toUpperCase()}`;
+
+    const success = await ExportUtils.shareData(
+      `Payroll Slip - ${record.employee_name}`,
+      textData
+    );
+    if (success) {
+      toast({ title: "Success", description: "Payroll slip shared successfully" });
+    }
+  };
+
   // Position and Department handlers
   const handleAddPosition = () => {
     if (newPosition.trim()) {
@@ -611,14 +1319,19 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     
     setLoading(true);
     try {
-      const [empData, payrollData, attendanceData] = await Promise.all([
+      const [empData, payrollData, attendanceData, outletData] = await Promise.all([
         getOutletEmployees(outletId),
         getPayrollRecords(outletId),
-        getAttendanceRecords(outletId)
+        getAttendanceRecords(outletId),
+        // Fetch outlet name
+        getOutletById(outletId)
       ]);
       setEmployees(empData);
       setPayrollRecords(payrollData);
       setAttendanceRecords(attendanceData);
+      if (outletData) {
+        setOutletName(outletData.name || 'Outlet');
+      }
     } catch (error) {
       console.error('Error loading payroll data:', error);
       toast({
@@ -739,6 +1452,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
 
   // Payroll management
   const handleOpenPayrollDialog = (record?: PayrollRecord) => {
+    setIsViewMode(false); // Reset view mode when opening for edit/create
     if (record) {
       setEditingPayroll(record);
       setPayrollForm({
@@ -1795,6 +2509,17 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          {/* View Button */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => viewPayrollRecord(record)}
+                            title="View Payroll"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+
+                          {/* Status Action Buttons */}
                           {record.status === 'pending' && (
                             <Button
                               variant="ghost"
@@ -1813,20 +2538,44 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                               Mark Paid
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenPayrollDialog(record)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeletePayroll(record.id!)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+
+                          {/* More Actions Dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenPayrollDialog(record)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => printIndividualPayroll(record)}>
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print Slip
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => downloadIndividualPayrollPDF(record)}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => exportIndividualPayrollToXLS(record)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Export XLS
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => shareIndividualPayroll(record)}>
+                                <Share2 className="h-4 w-4 mr-2" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeletePayroll(record.id!)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -2109,11 +2858,16 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
       </Dialog>
 
       {/* Payroll Dialog */}
-      <Dialog open={isPayrollDialogOpen} onOpenChange={setIsPayrollDialogOpen}>
+      <Dialog open={isPayrollDialogOpen} onOpenChange={(open) => {
+        setIsPayrollDialogOpen(open);
+        if (!open) {
+          setIsViewMode(false); // Reset view mode when dialog closes
+        }
+      }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingPayroll ? "Edit Payroll Record" : "Create Payroll Record"}
+              {isViewMode ? "View Payroll Record" : editingPayroll ? "Edit Payroll Record" : "Create Payroll Record"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
@@ -2124,6 +2878,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                 <Select
                   value={payrollForm.employee_id}
                   onValueChange={handleEmployeeSelect}
+                  disabled={isViewMode}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select employee" />
@@ -2142,6 +2897,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                 <Select
                   value={payrollForm.status}
                   onValueChange={(v) => setPayrollForm(prev => ({ ...prev, status: v as any }))}
+                  disabled={isViewMode}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -2164,6 +2920,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   type="date"
                   value={payrollForm.pay_period_start}
                   onChange={(e) => setPayrollForm(prev => ({ ...prev, pay_period_start: e.target.value }))}
+                  disabled={isViewMode}
                 />
               </div>
               <div>
@@ -2172,6 +2929,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   type="date"
                   value={payrollForm.pay_period_end}
                   onChange={(e) => setPayrollForm(prev => ({ ...prev, pay_period_end: e.target.value }))}
+                  disabled={isViewMode}
                 />
               </div>
             </div>
@@ -2189,6 +2947,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.base_salary}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, base_salary: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2197,6 +2956,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.housing_allowance}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, housing_allowance: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2205,6 +2965,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.transport_allowance}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, transport_allowance: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2213,6 +2974,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.meal_allowance}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, meal_allowance: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2221,6 +2983,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.overtime_hours}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, overtime_hours: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2229,6 +2992,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.overtime_pay}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, overtime_pay: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2237,6 +3001,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.other_allowances}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, other_allowances: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
               </div>
@@ -2255,6 +3020,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.tax_deduction}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, tax_deduction: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2263,6 +3029,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.social_security}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, social_security: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2271,6 +3038,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.health_insurance}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, health_insurance: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2279,6 +3047,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.advance_payment}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, advance_payment: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
                 <div>
@@ -2287,6 +3056,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                     type="number"
                     value={payrollForm.other_deductions}
                     onChange={(e) => setPayrollForm(prev => ({ ...prev, other_deductions: parseFloat(e.target.value) || 0 }))}
+                    disabled={isViewMode}
                   />
                 </div>
               </div>
@@ -2300,6 +3070,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                   type="date"
                   value={payrollForm.payment_date}
                   onChange={(e) => setPayrollForm(prev => ({ ...prev, payment_date: e.target.value }))}
+                  disabled={isViewMode}
                 />
               </div>
             </div>
@@ -2309,6 +3080,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
                 value={payrollForm.notes}
                 onChange={(e) => setPayrollForm(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Additional notes..."
+                disabled={isViewMode}
               />
             </div>
 
@@ -2430,13 +3202,22 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
             </Card>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPayrollDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSavePayroll} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingPayroll ? "Update" : "Create"} Payroll
-            </Button>
+            {!isViewMode && (
+              <>
+                <Button variant="outline" onClick={() => setIsPayrollDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSavePayroll} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editingPayroll ? "Update" : "Create"} Payroll
+                </Button>
+              </>
+            )}
+            {isViewMode && (
+              <Button onClick={() => setIsPayrollDialogOpen(false)}>
+                Close
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

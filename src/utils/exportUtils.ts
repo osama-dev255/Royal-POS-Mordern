@@ -1,13 +1,5 @@
 // Utility functions for exporting data
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
-// Extend jsPDF interface to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: any;
-  }
-}
 
 export class ExportUtils {
   // Export data to CSV
@@ -62,37 +54,47 @@ export class ExportUtils {
 
     // Create a new jsPDF instance
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
     
     // Add title
-    doc.setFontSize(18);
-    doc.text(title, doc.internal.pageSize.width / 2, 20, { align: 'center' });
+    doc.setFontSize(16);
+    doc.text(title, 14, 15);
 
     // Prepare table data
     const headers = Object.keys(data[0]);
-    const rows = data.map(row => Object.values(row));
+    const rows = data.map(row => Object.values(row).map(v => String(v)));
 
-    // Add table using autoTable
-    (doc as any).autoTable({
-      head: [headers],
-      body: rows,
-      startY: 30,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2
-      },
-      headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: [0, 0, 0],
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 250]
-      },
-      margin: { top: 30, left: 10, right: 10, bottom: 10 }
+    // Manual table creation without autoTable
+    const startY = 25;
+    const rowHeight = 7;
+    const colWidth = (doc.internal.pageSize.width - 28) / headers.length;
+    
+    // Draw header row
+    doc.setFontSize(8);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, startY, colWidth * headers.length, rowHeight, 'F');
+    
+    headers.forEach((header, i) => {
+      doc.text(header, 14 + (i * colWidth) + 2, startY + 5);
+    });
+    
+    // Draw data rows
+    doc.setFillColor(255, 255, 255);
+    rows.forEach((row, rowIdx) => {
+      const y = startY + rowHeight + (rowIdx * rowHeight);
+      
+      // Alternate row colors
+      if (rowIdx % 2 === 1) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(14, y, colWidth * headers.length, rowHeight, 'F');
+      }
+      
+      row.forEach((cell, colIdx) => {
+        doc.text(cell.substring(0, 30), 14 + (colIdx * colWidth) + 2, y + 5);
+      });
     });
 
     // Check if we're on a mobile device
@@ -787,29 +789,170 @@ export class ExportUtils {
   static exportToXLS(data: any[], filename: string, sheetName: string = 'Sheet1') {
     if (!data || data.length === 0) return;
 
-    // Create CSV content (Excel can open CSV files)
-    const headers = Object.keys(data[0]).join('\t');
-    const rows = data.map(row => 
-      Object.values(row).map(value => {
-        if (value === null || value === undefined) return '';
-        const str = String(value);
-        // Escape tabs and newlines
-        return str.replace(/\t/g, ' ').replace(/\n/g, ' ');
-      }).join('\t')
-    );
-    
-    const csvContent = [headers, ...rows].join('\n');
-    
-    // Create download link with XLS extension
-    const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.xls`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Detect if this is payroll data (has Section, Detail, Amount columns)
+    const isPayrollData = data[0] && 'Section' in data[0];
+
+    if (isPayrollData) {
+      // Advanced Excel format with HTML table styling
+      let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<!--[if gte mso 9]>
+<xml>
+<x:ExcelWorkbook>
+<x:ExcelWorksheets>
+<x:ExcelWorksheet>
+<x:Name>${sheetName}</x:Name>
+<x:WorksheetOptions>
+<x:DisplayGridlines/>
+</x:WorksheetOptions>
+</x:ExcelWorksheet>
+</x:ExcelWorksheets>
+</x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<style>
+  td, th {
+    font-family: Calibri, Arial, sans-serif;
+    font-size: 11pt;
+    padding: 4px 8px;
+  }
+  .header-section {
+    background-color: #2563eb;
+    color: white;
+    font-weight: bold;
+    font-size: 14pt;
+  }
+  .section-title {
+    background-color: #dbeafe;
+    color: #1e40af;
+    font-weight: bold;
+    font-size: 12pt;
+  }
+  .section-header {
+    background-color: #f1f5f9;
+    font-weight: bold;
+    color: #475569;
+  }
+  .data-row {
+    background-color: #ffffff;
+  }
+  .data-row-alt {
+    background-color: #f8fafc;
+  }
+  .subtotal-row {
+    background-color: #fef3c7;
+    font-weight: bold;
+    border-top: 2px solid #f59e0b;
+    border-bottom: 2px solid #f59e0b;
+  }
+  .total-row {
+    background-color: #dcfce7;
+    font-weight: bold;
+    font-size: 13pt;
+    border-top: 3px solid #16a34a;
+    border-bottom: 3px solid #16a34a;
+  }
+  .empty-row {
+    height: 15px;
+  }
+  .amount {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+</style>
+</head>
+<body>
+<table>
+`;
+
+      let rowIdx = 0;
+      data.forEach((row) => {
+        const section = row.Section || '';
+        const detail = row.Detail || '';
+        const amount = row.Amount;
+
+        // Empty row - no background color
+        if (!section && !detail && (amount === '' || amount === 0)) {
+          html += `<tr style="height: 15px;"><td></td><td></td><td></td></tr>
+`;
+          return;
+        }
+
+        // Section headers (COMPANY, EMPLOYEE, EARNINGS, etc.) - color only columns A-C
+        if (detail && section.toUpperCase() === detail) {
+          html += `<tr><td class="header-section" colspan="3">${section}</td><td></td><td></td></tr>
+`;
+        }
+        // Section titles (INFORMATION, RECORD) - color only columns A-C
+        else if (detail && !amount && amount !== 0) {
+          html += `<tr><td class="section-title" colspan="3">${section} ${detail}</td><td></td><td></td></tr>
+`;
+        }
+        // Subtotals (GROSS PAY, TOTAL DEDUCTIONS) - color only columns A-C
+        else if (section.toUpperCase().includes('GROSS PAY') || section.toUpperCase().includes('TOTAL DEDUCTIONS')) {
+          const amountValue = typeof amount === 'number' ? amount.toLocaleString() : amount;
+          html += `<tr><td class="subtotal-row">${section}</td><td></td><td class="subtotal-row amount">${amountValue}</td><td></td><td></td></tr>
+`;
+        }
+        // Net Pay (final total) - color only columns A-C
+        else if (section.toUpperCase() === 'NET PAY') {
+          const amountValue = typeof amount === 'number' ? amount.toLocaleString() : amount;
+          html += `<tr><td class="total-row">${section}</td><td></td><td class="total-row amount">${amountValue}</td><td></td><td></td></tr>
+`;
+        }
+        // Section headers without detail (EARNINGS, DEDUCTIONS, SUMMARY, ATTENDANCE) - color only columns A-C
+        else if (!detail && !amount && amount !== 0 && section) {
+          html += `<tr><td class="section-title" colspan="3">${section}</td><td></td><td></td></tr>
+`;
+        }
+        // Regular data rows with alternating colors - color only columns A-C
+        else {
+          const bgColor = rowIdx % 2 === 0 ? 'data-row' : 'data-row-alt';
+          const amountValue = typeof amount === 'number' ? amount.toLocaleString() : (amount || '');
+          html += `<tr><td class="${bgColor}">${section}</td><td class="${bgColor}">${detail}</td><td class="${bgColor} amount">${amountValue}</td><td></td><td></td></tr>
+`;
+          rowIdx++;
+        }
+      });
+
+      html += `</table>
+</body>
+</html>`;
+
+      // Create download link
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${filename}.xls`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // Fallback to simple tab-separated format for non-payroll data
+      const headers = Object.keys(data[0]).join('\t');
+      const rows = data.map(row => 
+        Object.values(row).map(value => {
+          if (value === null || value === undefined) return '';
+          const str = String(value);
+          return str.replace(/\t/g, ' ').replace(/\n/g, ' ');
+        }).join('\t')
+      );
+      
+      const csvContent = [headers, ...rows].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${filename}.xls`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   }
 
   // Share data (uses Web Share API on mobile, copies to clipboard on desktop)
