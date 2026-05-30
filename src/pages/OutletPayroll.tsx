@@ -1159,25 +1159,107 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   const shareIndividualPayroll = async (record: PayrollRecord) => {
-    const textData = `Payroll Slip - ${record.employee_name}
+    // Build comprehensive payroll summary
+    const earningsList = [
+      `Base Salary: ${formatTZS(record.base_salary)}`,
+      record.housing_allowance ? `Housing Allowance: ${formatTZS(record.housing_allowance)}` : null,
+      record.transport_allowance ? `Transport Allowance: ${formatTZS(record.transport_allowance)}` : null,
+      record.meal_allowance ? `Meal Allowance: ${formatTZS(record.meal_allowance)}` : null,
+      record.overtime_pay ? `Overtime Pay: ${formatTZS(record.overtime_pay)}` : null,
+      record.other_allowances ? `Other Allowances: ${formatTZS(record.other_allowances)}` : null,
+      record.perfect_attendance_bonus ? `Perfect Attendance Bonus: ${formatTZS(record.perfect_attendance_bonus)}` : null,
+      record.attendance_bonus ? `Monthly Attendance Bonus: ${formatTZS(record.attendance_bonus)}` : null,
+    ].filter(Boolean).join('\n');
+
+    const deductionsList = [
+      record.tax_deduction ? `Tax Deduction: ${formatTZS(record.tax_deduction)}` : null,
+      record.social_security ? `Social Security: ${formatTZS(record.social_security)}` : null,
+      record.health_insurance ? `Health Insurance: ${formatTZS(record.health_insurance)}` : null,
+      record.advance_payment ? `Advance Payment: ${formatTZS(record.advance_payment)}` : null,
+      record.other_deductions ? `Other Deductions: ${formatTZS(record.other_deductions)}` : null,
+      record.late_penalty ? `Late Penalty: ${formatTZS(record.late_penalty)}` : null,
+      record.early_departure_penalty ? `Early Departure Penalty: ${formatTZS(record.early_departure_penalty)}` : null,
+      record.attendance_deduction ? `Attendance Deduction: ${formatTZS(record.attendance_deduction)}` : null,
+    ].filter(Boolean).join('\n');
+
+    const textData = `📄 PAYSLIP - ${outletName.toUpperCase()}
+━━━━━━━━━━━━━━━━━━━━━
+
+👤 EMPLOYEE INFORMATION
+Name: ${record.employee_name}
+ID: ${record.employee_id}
 Period: ${new Date(record.pay_period_start).toLocaleDateString()} - ${new Date(record.pay_period_end).toLocaleDateString()}
+Payment Date: ${record.payment_date ? new Date(record.payment_date).toLocaleDateString() : 'Pending'}
+Status: ${record.status?.toUpperCase() || 'PENDING'}
 
-Earnings:
-- Base Salary: ${formatTZS(record.base_salary)}
-- Gross Salary: ${formatTZS(record.gross_salary)}
+━━━━━━━━━━━━━━━━━━━━━
+💰 EARNINGS
+${earningsList}
 
-Deductions:
-- Total: ${formatTZS(record.total_deductions)}
+➖➖➖➖➖➖➖➖➖➖➖➖
+GROSS PAY: ${formatTZS(record.gross_salary)}
 
-Net Salary: ${formatTZS(record.net_salary)}
-Status: ${record.status?.toUpperCase()}`;
+━━━━━━━━━━━━━━━━━━━━━
+📉 DEDUCTIONS
+${deductionsList || 'No deductions'}
 
-    const success = await ExportUtils.shareData(
-      `Payroll Slip - ${record.employee_name}`,
-      textData
-    );
-    if (success) {
-      toast({ title: "Success", description: "Payroll slip shared successfully" });
+➖➖➖➖➖➖➖➖➖➖➖➖
+TOTAL DEDUCTIONS: ${formatTZS(record.total_deductions)}
+
+━━━━━━━━━━━━━━━━━━━━━
+✅ NET PAY: ${formatTZS(record.net_salary)}
+━━━━━━━━━━━━━━━━━━━━━
+
+📊 ATTENDANCE SUMMARY
+Working Days: ${record.working_days || 0}
+Days Present: ${record.days_present || 0}
+Days Absent: ${record.days_absent || 0}
+Late Minutes: ${record.total_late_minutes || 0}
+
+━━━━━━━━━━━━━━━━━━━━━
+Generated: ${new Date().toLocaleString()}
+${outletName} - Employee Payroll System`;
+
+    // Check if we're on mobile (supports native sharing)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile && navigator.share) {
+      // Mobile: Use native share
+      try {
+        await navigator.share({
+          title: `Payroll Slip - ${record.employee_name}`,
+          text: textData,
+        });
+        toast({ 
+          title: "Success", 
+          description: "Payroll slip shared successfully" 
+        });
+      } catch (error: any) {
+        // User cancelled - do nothing
+        if (error.name === 'AbortError' || error.name === 'NotAllowedError') {
+          return;
+        }
+        toast({ 
+          title: "Error", 
+          description: "Failed to share payroll slip", 
+          variant: "destructive" 
+        });
+      }
+    } else {
+      // Desktop: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(textData);
+        toast({ 
+          title: "Copied!", 
+          description: "Payroll slip copied to clipboard" 
+        });
+      } catch (error) {
+        toast({ 
+          title: "Error", 
+          description: "Failed to copy to clipboard", 
+          variant: "destructive" 
+        });
+      }
     }
   };
 

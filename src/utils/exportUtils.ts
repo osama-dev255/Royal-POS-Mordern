@@ -965,9 +965,14 @@ export class ExportUtils {
           text: text,
         });
         return true;
-      } catch (error) {
+      } catch (error: any) {
+        // User cancelled the share
+        if (error.name === 'AbortError' || error.name === 'NotAllowedError') {
+          console.log('Share cancelled by user');
+          return false;
+        }
         console.error('Error sharing:', error);
-        return false;
+        throw error; // Re-throw to let caller handle
       }
     } else {
       // Fallback: copy to clipboard
