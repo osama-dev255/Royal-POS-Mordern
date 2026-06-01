@@ -12,7 +12,10 @@ import {
   Shield,
   FileText,
   Bot,
-  Scan
+  Scan,
+  DollarSign,
+  Building,
+  TrendingUp
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -154,6 +157,13 @@ export const Dashboard = ({ username, onNavigate, onLogout }: DashboardProps) =>
       description: "View and manage your Goods Received Notes inventory",
       icon: Package,
       color: "bg-white border border-gray-200"
+    },
+    {
+      id: "outlet-expenses",
+      title: "Outlet Expenses",
+      description: "Manage outlet expenses, budgets, and approvals",
+      icon: DollarSign,
+      color: "bg-white border border-green-200"
     }
   ];
 

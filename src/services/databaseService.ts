@@ -211,7 +211,9 @@ export interface PurchaseOrderItem {
 export interface Expense {
   id?: string;
   user_id?: string;
+  outlet_id?: string; // New: Link to outlet
   category: string;
+  sub_category?: string; // New
   description: string;
   amount: number;
   payment_method: string;
@@ -219,8 +221,60 @@ export interface Expense {
   receipt_url?: string;
   is_business_related?: boolean;
   notes?: string;
+  // Approval workflow
+  approval_status?: string; // pending, approved, rejected
+  approved_by?: string;
+  approval_date?: string;
+  approval_notes?: string;
+  // Advanced tracking
+  is_recurring?: boolean;
+  recurring_frequency?: string; // daily, weekly, monthly, yearly
+  vendor_name?: string;
+  vendor_contact?: string;
+  tax_deductible?: boolean;
+  tags?: string[];
+  department?: string;
+  project?: string;
+  cost_center?: string;
+  expense_type?: string; // operating, capital, personal
+  cost_classification?: string; // direct, indirect
+  // Recurring expense fields
+  is_recurring?: boolean;
+  recurring_frequency?: string; // daily, weekly, bi-weekly, monthly, quarterly, semi-annually, annually
+  next_due_date?: string;
+  last_processed_date?: string;
+  recurring_end_date?: string;
+  occurrence_count?: number;
+  parent_expense_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ExpenseBudget {
+  id?: string;
+  outlet_id: string;
+  category: string;
+  sub_category?: string;
+  budget_amount: number;
+  spent_amount?: number;
+  period: string; // monthly, quarterly, yearly
+  start_date: string;
+  end_date: string;
+  alert_threshold?: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ExpenseAnalytics {
+  total_expenses: number;
+  by_category: Record<string, number>;
+  by_payment_method: Record<string, number>;
+  by_status: Record<string, number>;
+  daily_average: number;
+  month_over_month_change: number;
+  top_vendors: Array<{ vendor_name: string; total: number }>;
+  budget_utilization: number;
 }
 
 export interface Debt {
@@ -2345,6 +2399,667 @@ export const deleteExpense = async (id: string): Promise<boolean> => {
   } catch (error) {
     console.error('Error deleting expense:', error);
     return false;
+  }
+};
+
+// ============================================
+// OUTLET EXPENSE MANAGEMENT FUNCTIONS
+// ============================================
+
+// Get expenses for a specific outlet
+export const getOutletExpenses = async (outletId: string): Promise<Expense[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('expense_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet expenses:', error);
+    return [];
+  }
+};
+
+// Get expenses with advanced filtering
+export const getOutletExpensesFiltered = async (
+  outletId: string,
+  filters?: {
+    startDate?: string;
+    endDate?: string;
+    category?: string;
+    approvalStatus?: string;
+    paymentMethod?: string;
+    minAmount?: number;
+    maxAmount?: number;
+    vendorName?: string;
+    search?: string;
+  }
+): Promise<Expense[]> => {
+  try {
+    let query = supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId);
+    
+    if (filters?.startDate) {
+      query = query.gte('expense_date', filters.startDate);
+    }
+    if (filters?.endDate) {
+      query = query.lte('expense_date', filters.endDate + 'T23:59:59');
+    }
+    if (filters?.category) {
+      query = query.eq('category', filters.category);
+    }
+    if (filters?.approvalStatus) {
+      query = query.eq('approval_status', filters.approvalStatus);
+    }
+    if (filters?.paymentMethod) {
+      query = query.eq('payment_method', filters.paymentMethod);
+    }
+    if (filters?.minAmount !== undefined) {
+      query = query.gte('amount', filters.minAmount);
+    }
+    if (filters?.maxAmount !== undefined) {
+      query = query.lte('amount', filters.maxAmount);
+    }
+    if (filters?.vendorName) {
+      query = query.ilike('vendor_name', `%${filters.vendorName}%`);
+    }
+    if (filters?.search) {
+      query = query.or(`description.ilike.%${filters.search}%,vendor_name.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`);
+    }
+    
+    query = query.order('expense_date', { ascending: false });
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching filtered outlet expenses:', error);
+    return [];
+  }
+};
+
+// Get expense analytics for outlet
+export const getOutletExpenseAnalytics = async (
+  outletId: string,
+  period: 'month' | 'quarter' | 'year' = 'month'
+): Promise<ExpenseAnalytics> => {
+  try {
+    const now = new Date();
+    let startDate: Date;
+    
+    if (period === 'month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (period === 'quarter') {
+      const quarter = Math.floor(now.getMonth() / 3);
+      startDate = new Date(now.getFullYear(), quarter * 3, 1);
+    } else {
+      startDate = new Date(now.getFullYear(), 0, 1);
+    }
+    
+    const { data: expenses, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('approval_status', 'approved')
+      .gte('expense_date', startDate.toISOString());
+    
+    if (error) throw error;
+    
+    // Calculate analytics
+    const total = expenses?.reduce((sum, exp) => sum + exp.amount, 0) || 0;
+    const daysInPeriod = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) || 1;
+    
+    const byCategory: Record<string, number> = {};
+    const byPaymentMethod: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    const vendorTotals: Record<string, number> = {};
+    
+    expenses?.forEach(exp => {
+      byCategory[exp.category] = (byCategory[exp.category] || 0) + exp.amount;
+      byPaymentMethod[exp.payment_method] = (byPaymentMethod[exp.payment_method] || 0) + exp.amount;
+      byStatus[exp.approval_status || 'pending'] = (byStatus[exp.approval_status || 'pending'] || 0) + 1;
+      
+      if (exp.vendor_name) {
+        vendorTotals[exp.vendor_name] = (vendorTotals[exp.vendor_name] || 0) + exp.amount;
+      }
+    });
+    
+    const topVendors = Object.entries(vendorTotals)
+      .map(([vendor_name, total]) => ({ vendor_name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+    
+    // Get previous period for comparison
+    const prevPeriodStart = new Date(startDate);
+    if (period === 'month') {
+      prevPeriodStart.setMonth(prevPeriodStart.getMonth() - 1);
+    } else if (period === 'quarter') {
+      prevPeriodStart.setMonth(prevPeriodStart.getMonth() - 3);
+    } else {
+      prevPeriodStart.setFullYear(prevPeriodStart.getFullYear() - 1);
+    }
+    
+    const { data: prevExpenses } = await supabase
+      .from('expenses')
+      .select('amount')
+      .eq('outlet_id', outletId)
+      .eq('approval_status', 'approved')
+      .gte('expense_date', prevPeriodStart.toISOString())
+      .lt('expense_date', startDate.toISOString());
+    
+    const prevTotal = prevExpenses?.reduce((sum, exp) => sum + exp.amount, 0) || 0;
+    const momChange = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0;
+    
+    // Get budget utilization
+    const { data: budgets } = await supabase
+      .from('expense_budgets')
+      .select('budget_amount, spent_amount')
+      .eq('outlet_id', outletId)
+      .lte('start_date', now.toISOString().split('T')[0])
+      .gte('end_date', now.toISOString().split('T')[0]);
+    
+    const totalBudget = budgets?.reduce((sum, b) => sum + b.budget_amount, 0) || 0;
+    const totalSpent = budgets?.reduce((sum, b) => sum + (b.spent_amount || 0), 0) || 0;
+    const budgetUtilization = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+    
+    return {
+      total_expenses: total,
+      by_category: byCategory,
+      by_payment_method: byPaymentMethod,
+      by_status: byStatus,
+      daily_average: total / daysInPeriod,
+      month_over_month_change: momChange,
+      top_vendors: topVendors,
+      budget_utilization: budgetUtilization
+    };
+  } catch (error) {
+    console.error('Error fetching expense analytics:', error);
+    return {
+      total_expenses: 0,
+      by_category: {},
+      by_payment_method: {},
+      by_status: {},
+      daily_average: 0,
+      month_over_month_change: 0,
+      top_vendors: [],
+      budget_utilization: 0
+    };
+  }
+};
+
+// Create outlet expense
+export const createOutletExpense = async (expense: Omit<Expense, 'id'>): Promise<Expense | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert([{
+        ...expense,
+        expense_date: expense.expense_date || new Date().toISOString(),
+        approval_status: expense.approval_status || 'pending',
+        // Convert empty strings to null for timestamp fields
+        next_due_date: expense.next_due_date || null,
+        last_processed_date: expense.last_processed_date || null,
+        recurring_end_date: expense.recurring_end_date || null,
+        approval_date: expense.approval_date || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating outlet expense:', error);
+    return null;
+  }
+};
+
+// Update outlet expense
+export const updateOutletExpense = async (id: string, expense: Partial<Expense>): Promise<Expense | null> => {
+  try {
+    const updateData: any = {
+      ...expense,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Convert empty strings to null for timestamp fields
+    if ('next_due_date' in updateData) {
+      updateData.next_due_date = updateData.next_due_date || null;
+    }
+    if ('last_processed_date' in updateData) {
+      updateData.last_processed_date = updateData.last_processed_date || null;
+    }
+    if ('recurring_end_date' in updateData) {
+      updateData.recurring_end_date = updateData.recurring_end_date || null;
+    }
+    if ('approval_date' in updateData) {
+      updateData.approval_date = updateData.approval_date || null;
+    }
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet expense:', error);
+    return null;
+  }
+};
+
+// Approve/Reject expense
+export const approveOutletExpense = async (
+  expenseId: string,
+  status: 'approved' | 'rejected',
+  approvedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('expenses')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', expenseId);
+      
+    if (error) throw error;
+    
+    // Log approval history
+    await supabase
+      .from('expense_approval_history')
+      .insert({
+        expense_id: expenseId,
+        action: status,
+        action_by: approvedBy,
+        notes: notes,
+        new_status: status
+      });
+    
+    return true;
+  } catch (error) {
+    console.error('Error approving expense:', error);
+    return false;
+  }
+};
+
+// Delete outlet expense
+export const deleteOutletExpense = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting outlet expense:', error);
+    return false;
+  }
+};
+
+// Get pending approvals for outlet
+export const getPendingExpenseApprovals = async (outletId: string): Promise<Expense[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('approval_status', 'pending')
+      .order('expense_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching pending approvals:', error);
+    return [];
+  }
+};
+
+// ============================================
+// EXPENSE BUDGET MANAGEMENT FUNCTIONS
+// ============================================
+
+// Get budgets for outlet
+export const getOutletBudgets = async (outletId: string): Promise<ExpenseBudget[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('expense_budgets')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet budgets:', error);
+    return [];
+  }
+};
+
+// Create budget
+export const createExpenseBudget = async (budget: Omit<ExpenseBudget, 'id'>): Promise<ExpenseBudget | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('expense_budgets')
+      .insert([{
+        ...budget,
+        spent_amount: 0,
+        alert_threshold: budget.alert_threshold || 80,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating expense budget:', error);
+    return null;
+  }
+};
+
+// Update budget
+export const updateExpenseBudget = async (id: string, budget: Partial<ExpenseBudget>): Promise<ExpenseBudget | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('expense_budgets')
+      .update({
+        ...budget,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating expense budget:', error);
+    return null;
+  }
+};
+
+// Delete budget
+export const deleteExpenseBudget = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('expense_budgets')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting expense budget:', error);
+    return false;
+  }
+};
+
+// Get budget alerts
+export const getBudgetAlerts = async (outletId: string): Promise<Array<{
+  budget_id: string;
+  category: string;
+  budget_amount: number;
+  spent_amount: number;
+  usage_percentage: number;
+  alert_message: string;
+}>> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('check_budget_alerts')
+      .eq('outlet_id', outletId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching budget alerts:', error);
+    return [];
+  }
+};
+
+// Recurring Expense Management Functions
+export const getUpcomingRecurringExpenses = async (
+  outletId: string,
+  daysAhead: number = 30
+): Promise<Expense[]> => {
+  try {
+    const today = new Date().toISOString();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('is_recurring', true)
+      .lte('next_due_date', futureDate.toISOString())
+      .or(`next_due_date.is.null,next_due_date.gte.${today}`)
+      .order('next_due_date', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching upcoming recurring expenses:', error);
+    return [];
+  }
+};
+
+export const getOverdueRecurringExpenses = async (outletId: string): Promise<Expense[]> => {
+  try {
+    const today = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('is_recurring', true)
+      .lt('next_due_date', today)
+      .order('next_due_date', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching overdue recurring expenses:', error);
+    return [];
+  }
+};
+
+export const createNextRecurringExpense = async (parentExpense: Expense): Promise<Expense | null> => {
+  try {
+    // Calculate next due date
+    const currentDate = parentExpense.next_due_date 
+      ? new Date(parentExpense.next_due_date)
+      : new Date(parentExpense.expense_date);
+    
+    const frequency = parentExpense.recurring_frequency || 'monthly';
+    let nextDate = new Date(currentDate);
+    
+    switch (frequency) {
+      case 'daily':
+        nextDate.setDate(nextDate.getDate() + 1);
+        break;
+      case 'weekly':
+        nextDate.setDate(nextDate.getDate() + 7);
+        break;
+      case 'bi-weekly':
+        nextDate.setDate(nextDate.getDate() + 14);
+        break;
+      case 'monthly':
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        break;
+      case 'quarterly':
+        nextDate.setMonth(nextDate.getMonth() + 3);
+        break;
+      case 'semi-annually':
+        nextDate.setMonth(nextDate.getMonth() + 6);
+        break;
+      case 'annually':
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+        break;
+    }
+    
+    // Check if we've exceeded recurring_end_date
+    if (parentExpense.recurring_end_date && nextDate > new Date(parentExpense.recurring_end_date)) {
+      throw new Error('Recurring end date has been reached');
+    }
+    
+    const newExpense = {
+      outlet_id: parentExpense.outlet_id,
+      category: parentExpense.category,
+      sub_category: parentExpense.sub_category,
+      description: `${parentExpense.description} (Occurrence #${(parentExpense.occurrence_count || 0) + 2})`,
+      amount: parentExpense.amount,
+      payment_method: parentExpense.payment_method || 'cash',
+      expense_date: nextDate.toISOString().split('T')[0],
+      vendor_name: parentExpense.vendor_name,
+      vendor_contact: parentExpense.vendor_contact,
+      tax_deductible: parentExpense.tax_deductible,
+      expense_type: parentExpense.expense_type,
+      cost_classification: parentExpense.cost_classification,
+      is_recurring: parentExpense.is_recurring,
+      recurring_frequency: parentExpense.recurring_frequency,
+      next_due_date: nextDate.toISOString(),
+      recurring_end_date: parentExpense.recurring_end_date,
+      occurrence_count: (parentExpense.occurrence_count || 0) + 1,
+      parent_expense_id: parentExpense.id,
+      approval_status: 'pending',
+      notes: parentExpense.notes,
+      department: parentExpense.department,
+    };
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert([newExpense])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    // Update parent expense's last_processed_date
+    await supabase
+      .from('expenses')
+      .update({ 
+        last_processed_date: new Date().toISOString(),
+        occurrence_count: (parentExpense.occurrence_count || 0) + 1
+      })
+      .eq('id', parentExpense.id);
+    
+    return data;
+  } catch (error) {
+    console.error('Error creating next recurring expense:', error);
+    return null;
+  }
+};
+
+export const updateRecurringExpenseTracking = async (
+  expenseId: string,
+  updates: {
+    is_recurring?: boolean;
+    recurring_frequency?: string;
+    next_due_date?: string;
+    recurring_end_date?: string;
+  }
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('expenses')
+      .update(updates)
+      .eq('id', expenseId);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating recurring expense tracking:', error);
+    return false;
+  }
+};
+
+export const getRecurringExpenseSummary = async (outletId: string): Promise<{
+  total_recurring: number;
+  upcoming_7_days: number;
+  upcoming_30_days: number;
+  overdue: number;
+  monthly_total: number;
+}> => {
+  try {
+    const today = new Date();
+    const next7Days = new Date(today);
+    next7Days.setDate(next7Days.getDate() + 7);
+    const next30Days = new Date(today);
+    next30Days.setDate(next30Days.getDate() + 30);
+    
+    // Get all recurring expenses
+    const { data: recurring, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('is_recurring', true);
+      
+    if (error) throw error;
+    
+    const totalRecurring = recurring?.length || 0;
+    const overdue = recurring?.filter(e => e.next_due_date && new Date(e.next_due_date) < today).length || 0;
+    const upcoming7 = recurring?.filter(e => {
+      if (!e.next_due_date) return false;
+      const due = new Date(e.next_due_date);
+      return due >= today && due <= next7Days;
+    }).length || 0;
+    const upcoming30 = recurring?.filter(e => {
+      if (!e.next_due_date) return false;
+      const due = new Date(e.next_due_date);
+      return due >= today && due <= next30Days;
+    }).length || 0;
+    
+    // Calculate monthly total
+    const monthlyTotal = recurring?.reduce((sum, expense) => {
+      const amount = expense.amount || 0;
+      const freq = expense.recurring_frequency || 'monthly';
+      
+      // Normalize to monthly
+      switch (freq) {
+        case 'daily': return sum + (amount * 30);
+        case 'weekly': return sum + (amount * 4);
+        case 'bi-weekly': return sum + (amount * 2);
+        case 'monthly': return sum + amount;
+        case 'quarterly': return sum + (amount / 3);
+        case 'semi-annually': return sum + (amount / 6);
+        case 'annually': return sum + (amount / 12);
+        default: return sum + amount;
+      }
+    }, 0) || 0;
+    
+    return {
+      total_recurring: totalRecurring,
+      upcoming_7_days: upcoming7,
+      upcoming_30_days: upcoming30,
+      overdue: overdue,
+      monthly_total: monthlyTotal
+    };
+  } catch (error) {
+    console.error('Error getting recurring expense summary:', error);
+    return {
+      total_recurring: 0,
+      upcoming_7_days: 0,
+      upcoming_30_days: 0,
+      overdue: 0,
+      monthly_total: 0
+    };
   }
 };
 

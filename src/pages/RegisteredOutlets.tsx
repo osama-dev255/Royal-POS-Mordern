@@ -15,7 +15,10 @@ import {
   Edit,
   Trash2,
   Loader2,
-  X
+  X,
+  Wallet,
+  DollarSign,
+  TrendingUp
 } from "lucide-react";
 import { format } from "date-fns";
 import { getOutlets, createOutlet, updateOutlet, deleteOutlet, Outlet } from "@/services/databaseService";
@@ -141,6 +144,10 @@ export const RegisteredOutlets = () => {
     // Navigate to outlet inventory page
     console.log("Setting window.location.hash to:", `#/outlet-inventory/${outlet.id}`);
     window.location.hash = `#/outlet-inventory/${outlet.id}`;
+  };
+
+  const handleViewExpenses = (outlet: Outlet) => {
+    window.location.hash = `#/outlet-expenses/${outlet.id}`;
   };
 
   // Removed outlet details modal functionality
@@ -333,6 +340,18 @@ export const RegisteredOutlets = () => {
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1 bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewExpenses(outlet);
+                        }}
+                      >
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        Expenses
                       </Button>
                       <Button 
                         variant="outline" 

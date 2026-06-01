@@ -27,6 +27,7 @@ import { InvoiceDetailedView } from "./pages/InvoiceDetailedView";
 import { OrdersDetailedView } from "./pages/OrdersDetailedView";
 import { DeliveriesDetailedView } from "./pages/DeliveriesDetailedView";
 import { SettlementsDetailedView } from "./pages/SettlementsDetailedView";
+import { OutletExpenses } from "./pages/OutletExpenses";
 import { useEffect } from "react";
 // Import authentication context
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -116,6 +117,7 @@ const App = () => {
                 <Route path="/sales/deliveries-detailed" element={<DeliveriesDetailedView username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/sales/settlements-detailed" element={<SettlementsDetailedView username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
                 <Route path="/grn-inventory-dashboard" element={<GRNInventoryDashboard username="admin" onBack={() => window.history.back()} onLogout={() => {}} />} />
+                <Route path="/outlet-expenses/:outletId" element={<OutletExpenses onBack={() => window.history.back()} outletName="Outlet Expenses" />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

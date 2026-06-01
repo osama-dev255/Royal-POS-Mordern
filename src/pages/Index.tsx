@@ -57,6 +57,7 @@ import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 import { OutletDetails } from "@/pages/OutletDetails";
 import { OutletInventory } from "@/pages/OutletInventory";
+import { OutletExpenses } from "@/pages/OutletExpenses";
 import { OutletLayout } from "@/components/OutletLayout";
 import { OutletCustomers } from "@/pages/OutletCustomers";
 import { OutletDeliveries } from "@/pages/OutletDeliveries";
@@ -544,7 +545,7 @@ export const Index = () => {
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
-    "inventory", "grn-inventory-dashboard", "registered-outlets"
+    "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses"
   ];
 
   // Check if view is authorized, but allow outlet-specific patterns
@@ -560,6 +561,7 @@ export const Index = () => {
   const isOutletStockTakeView = currentView.startsWith('outlet-stock-take-');
   const isOutletSettingsView = currentView.startsWith('outlet-settings-');
   const isOutletPayrollView = currentView.startsWith('outlet-payroll-');
+  const isOutletExpensesView = currentView.startsWith('outlet-expenses-');
   const isOutletSalesManagementView = currentView.startsWith('outlet-sales-management-');
   const isOutletSavedSalesView = currentView.startsWith('outlet-saved-sales-');
   const isOutletSavedCashView = currentView.startsWith('outlet-saved-cash-');
@@ -581,6 +583,7 @@ export const Index = () => {
       !isOutletStockTakeView &&
       !isOutletSettingsView &&
       !isOutletPayrollView &&
+      !isOutletExpensesView &&
       !isOutletSalesManagementView &&
       !isOutletSavedSalesView &&
       !isOutletSavedCashView &&
@@ -605,6 +608,7 @@ export const Index = () => {
                        currentView.startsWith('outlet-stock-take-') ||
                        currentView.startsWith('outlet-settings-') ||
                        currentView.startsWith('outlet-payroll-') ||
+                       currentView.startsWith('outlet-expenses-') ||
                        currentView.startsWith('outlet-sales-management-') ||
                        currentView.startsWith('outlet-saved-sales-') ||
                        currentView.startsWith('outlet-saved-cash-') ||
@@ -1097,6 +1101,30 @@ export const Index = () => {
               onBack={() => {
                 setCurrentView(`outlet-details-${outletId}`);
                 window.location.hash = `#/outlet/${outletId}`;
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet expenses view
+    if (currentView.startsWith('outlet-expenses-')) {
+      const outletId = currentView.substring('outlet-expenses-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="expenses"
+        >
+          <div className="p-6">
+            <OutletExpenses
+              outletId={outletId}
+              outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
               }}
             />
           </div>
@@ -2451,6 +2479,14 @@ export const Index = () => {
                   onBack={handleBack}
                   onLogout={handleLogout}
                   onNavigate={handleNavigate}
+                />
+              );
+            case "outlet-expenses":
+              console.log("Rendering OutletExpenses");
+              return (
+                <OutletExpenses
+                  onBack={handleBack}
+                  outletName="Outlet Expenses"
                 />
               );
             case "saved-supplier-settlements":

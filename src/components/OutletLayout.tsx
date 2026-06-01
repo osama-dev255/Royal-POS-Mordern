@@ -19,7 +19,8 @@ import {
   FileText,
   TrendingUp,
   Receipt,
-  DollarSign
+  DollarSign,
+  Wallet
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ interface OutletLayoutProps {
   onLogout: () => void;
   outletId: string;
   outletName: string;
-  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'sales-orders' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'payroll' | 'reports' | 'settings' | 'back';
+  currentView: 'dashboard' | 'inventory' | 'sales' | 'sales-management' | 'sales-orders' | 'saved-sales' | 'saved-cash' | 'saved-card' | 'saved-mobile' | 'saved-debts' | 'customers' | 'deliveries' | 'payments' | 'receipts' | 'grn' | 'payroll' | 'expenses' | 'reports' | 'settings' | 'back';
 }
 
 interface MenuItem {
@@ -116,6 +117,12 @@ export const OutletLayout = ({
       title: "Payroll",
       icon: <DollarSign className="h-5 w-5"/>,
       view: `outlet-payroll-${outletId}`
+    },
+    {
+      id: "expenses",
+      title: "Expenses",
+      icon: <Wallet className="h-5 w-5"/>,
+      view: `outlet-expenses-${outletId}`
     },
     {
       id: "reports",
