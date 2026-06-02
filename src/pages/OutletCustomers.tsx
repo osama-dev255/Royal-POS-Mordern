@@ -70,7 +70,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
     email: "",
     address: "",
     district_ward: "",
-    tax_id: ""
+    tax_id: "",
+    credit_limit: 0
   });
 
   // Form state for editing customer
@@ -81,7 +82,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
     email: "",
     address: "",
     district_ward: "",
-    tax_id: ""
+    tax_id: "",
+    credit_limit: 0
   });
 
   // State for searchable dropdowns
@@ -263,6 +265,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         address: newCustomer.address.trim() || undefined,
         district_ward: newCustomer.district_ward.trim() || undefined,
         tax_id: newCustomer.tax_id.trim() || undefined,
+        credit_limit: newCustomer.credit_limit || 0,
         is_active: true,
         loyalty_points: 0
       });
@@ -276,7 +279,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           email: "",
           address: "",
           district_ward: "",
-          tax_id: ""
+          tax_id: "",
+          credit_limit: 0
         });
         setIsAddDialogOpen(false);
         toast({
@@ -331,7 +335,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       email: customer.email || "",
       address: customer.address || "",
       district_ward: customer.district_ward || "",
-      tax_id: customer.tax_id || ""
+      tax_id: customer.tax_id || "",
+      credit_limit: customer.credit_limit || 0
     });
     setIsEditDialogOpen(true);
   };
@@ -356,7 +361,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
         email: editForm.email.trim() || undefined,
         address: editForm.address.trim() || undefined,
         district_ward: editForm.district_ward.trim() || undefined,
-        tax_id: editForm.tax_id.trim() || undefined
+        tax_id: editForm.tax_id.trim() || undefined,
+        credit_limit: editForm.credit_limit || 0
       });
 
       if (updated) {
@@ -390,7 +396,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       email: "",
       address: "",
       district_ward: "",
-      tax_id: ""
+      tax_id: "",
+      credit_limit: 0
     });
     setEditingCustomer(null);
   };
@@ -403,7 +410,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       email: "",
       address: "",
       district_ward: "",
-      tax_id: ""
+      tax_id: "",
+      credit_limit: 0
     });
   };
 
@@ -621,6 +629,12 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                       <span className="font-semibold">{(customer.loyalty_points || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-muted-foreground">Credit Limit:</span>
+                      <span className="font-semibold text-blue-600">
+                        {formatCurrency(customer.credit_limit || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Balance:</span>
                       <span className={`font-semibold ${customerBalances[customer.id!] ? 'text-red-600' : 'text-green-600'}`}>
                         {formatCurrency(customerBalances[customer.id!] || 0)}
@@ -652,6 +666,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                 <TableHead>Address</TableHead>
                 <TableHead>District/Ward</TableHead>
                 <TableHead>Loyalty Points</TableHead>
+                <TableHead>Credit Limit</TableHead>
                 <TableHead>Balance</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
@@ -669,6 +684,9 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                   <TableCell>{customer.address || '-'}</TableCell>
                   <TableCell>{customer.district_ward || '-'}</TableCell>
                   <TableCell>{(customer.loyalty_points || 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-blue-600 font-medium">
+                    {formatCurrency(customer.credit_limit || 0)}
+                  </TableCell>
                   <TableCell className={customerBalances[customer.id!] ? 'text-red-600 font-medium' : 'text-green-600'}>
                     {formatCurrency(customerBalances[customer.id!] || 0)}
                   </TableCell>
@@ -852,6 +870,17 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                 placeholder="Enter tax identification number"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Credit Limit</label>
+              <Input
+                type="number"
+                value={newCustomer.credit_limit}
+                onChange={(e) => setNewCustomer(prev => ({ ...prev, credit_limit: parseFloat(e.target.value) || 0 }))}
+                placeholder="Enter credit limit"
+                min="0"
+                step="0.01"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
@@ -1022,6 +1051,17 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                 value={editForm.tax_id}
                 onChange={(e) => setEditForm(prev => ({ ...prev, tax_id: e.target.value }))}
                 placeholder="Enter tax identification number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Credit Limit</label>
+              <Input
+                type="number"
+                value={editForm.credit_limit}
+                onChange={(e) => setEditForm(prev => ({ ...prev, credit_limit: parseFloat(e.target.value) || 0 }))}
+                placeholder="Enter credit limit"
+                min="0"
+                step="0.01"
               />
             </div>
           </div>
