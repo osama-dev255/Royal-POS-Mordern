@@ -200,9 +200,10 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       const debts = await getOutletDebtsByOutletId(outletId);
       const balances: Record<string, number> = {};
       
-      // Sum up outstanding AND partial debts for each customer (both have remaining balance)
+      // Sum up ALL remaining amounts for each customer (includes debt, overpayment, and partial)
+      // Positive = customer owes money, Negative = customer has credit (overpaid)
       debts.forEach(debt => {
-        if (debt.customer_id && (debt.payment_status === 'unpaid' || debt.payment_status === 'partial')) {
+        if (debt.customer_id && (debt.remaining_amount !== 0)) {
           balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
         }
       });
@@ -420,9 +421,13 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const activeCustomers = customers.filter(c => c.is_active !== false).length;
   const totalLoyaltyPoints = customers.reduce((sum, c) => sum + (c.loyalty_points || 0), 0);
   
-  // Calculate total outstanding customer balances
+  // Calculate total outstanding customer balances (positive = debt, negative = credit)
   const totalOutstandingBalance = Object.values(customerBalances).reduce((sum, balance) => sum + balance, 0);
   const customersWithDebt = Object.values(customerBalances).filter(balance => balance > 0).length;
+  
+  // Calculate total customer credit (overpayments)
+  const totalCustomerCredit = Object.values(customerBalances).reduce((sum, balance) => sum + (balance < 0 ? balance : 0), 0);
+  const customersWithCredit = Object.values(customerBalances).filter(balance => balance < 0).length;
 
   if (loading) {
     return (
@@ -475,7 +480,7 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -505,11 +510,25 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground mb-1">Outstanding Balance</p>
-                <p className="text-lg font-bold text-red-600 truncate">{formatCurrency(totalOutstandingBalance)}</p>
+                <p className="text-lg font-bold text-red-600 truncate">{formatCurrency(totalOutstandingBalance > 0 ? totalOutstandingBalance : 0)}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{customersWithDebt} customer{customersWithDebt !== 1 ? 's' : ''}</p>
               </div>
               <div className="h-7 w-7 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 ml-2">
                 <span className="text-red-600 text-xs font-bold">TSh</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground mb-1">Customer Credit</p>
+                <p className="text-lg font-bold text-green-600 truncate">{formatCurrency(Math.abs(totalCustomerCredit))}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{customersWithCredit} customer{customersWithCredit !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="h-7 w-7 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 ml-2">
+                <span className="text-green-600 text-xs font-bold">TSh</span>
               </div>
             </div>
           </CardContent>
@@ -636,7 +655,11 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Balance:</span>
-                      <span className={`font-semibold ${customerBalances[customer.id!] ? 'text-red-600' : 'text-green-600'}`}>
+                      <span className={`font-semibold ${
+                        (customerBalances[customer.id!] || 0) > 0 ? 'text-red-600' :
+                        (customerBalances[customer.id!] || 0) < 0 ? 'text-green-600' :
+                        'text-blue-600'
+                      }`}>
                         {formatCurrency(customerBalances[customer.id!] || 0)}
                       </span>
                     </div>
@@ -687,7 +710,11 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                   <TableCell className="text-blue-600 font-medium">
                     {formatCurrency(customer.credit_limit || 0)}
                   </TableCell>
-                  <TableCell className={customerBalances[customer.id!] ? 'text-red-600 font-medium' : 'text-green-600'}>
+                  <TableCell className={
+                    (customerBalances[customer.id!] || 0) > 0 ? 'text-red-600 font-medium' :
+                    (customerBalances[customer.id!] || 0) < 0 ? 'text-green-600 font-medium' :
+                    'text-blue-600'
+                  }>
                     {formatCurrency(customerBalances[customer.id!] || 0)}
                   </TableCell>
                   <TableCell>
