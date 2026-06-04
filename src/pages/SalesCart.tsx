@@ -20,7 +20,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, createCustomerLedgerEntry, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, createCustomerLedgerEntry, getOutletCustomerSettlementsByOutletId, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -255,10 +255,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }));
         setCustomers(formattedCustomers);
         
-        // Fetch customer balances from outlet_debts if outletId is present
+        // Fetch customer balances from outlet_debts AND settlements if outletId is present
         if (outletId) {
           const debts = await getOutletDebtsByOutletId(outletId);
           const balances: Record<string, number> = {};
+          
           // Include ALL debts with non-zero remaining_amount
           // Positive = customer owes money (debt)
           // Negative = customer has credit (overpaid)
@@ -267,6 +268,18 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
             }
           });
+          
+          // ALSO fetch settlements to include overpayments
+          const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
+          settlements.forEach(settlement => {
+            if (settlement.customer_id && settlement.new_balance !== undefined) {
+              // Only add negative balances (credits) to avoid double-counting
+              if (settlement.new_balance < 0) {
+                balances[settlement.customer_id] = (balances[settlement.customer_id] || 0) + settlement.new_balance;
+              }
+            }
+          });
+          
           setCustomerBalances(balances);
         }
       } catch (error) {
@@ -383,6 +396,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   
   // Tax is displayed as 18% but doesn't affect calculation (for display purposes only)
   const tax = (subtotal - discountAmount) * 0.18; // 18% tax for display on subtotal after discount
+  
+  // Apply customer credit balance to reduce the total
+  // creditBroughtForward is negative for credit (overpayment), positive for debt
+  // When customer has credit, it reduces what they need to pay
+  const effectiveTotal = total - (creditBroughtForward < 0 ? Math.abs(creditBroughtForward) : 0);
+  
   const totalWithTax = total; // Tax doesn't affect the actual total
   
   const amountReceivedNum = parseFloat(amountReceived) || 0;
@@ -396,6 +415,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   // For current transaction payment:
   // - debt: use amountReceived (what they paid for current items)
   // - non-debt: use amountReceived if entered, otherwise full payment
+  // When customer has credit, effectiveTotal is reduced
   const actualAmountPaid = paymentMethod === "debt" 
     ? amountReceivedNum  // For debt, what they paid for current items
     : (amountReceivedNum > 0 ? amountReceivedNum : safeTotalWithTax);
@@ -406,9 +426,10 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   // Change calculation: what they paid minus what they owe (current transaction only)
   // For debt: if they paid more than current transaction, they get change
   // For non-debt: standard change calculation
+  // When customer has credit, use effectiveTotal for change calculation
   const change = paymentMethod === "debt"
-    ? (amountReceivedNum > total ? amountReceivedNum - total : 0)  // Only give change if overpaid current transaction
-    : amountReceivedNum - total;
+    ? (amountReceivedNum > effectiveTotal ? amountReceivedNum - effectiveTotal : 0)  // Only give change if overpaid current transaction
+    : amountReceivedNum - effectiveTotal;
     
   console.log('Payment Debug:', {
     paymentMethod,
@@ -688,6 +709,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       }
 
       // Create ledger entry for cash/card/mobile sales (DEBIT)
+      // When customer has credit, debit only the effective total (after credit applied)
       if (selectedCustomer && outletId && (paymentMethod === 'cash' || paymentMethod === 'card' || paymentMethod === 'mobile')) {
         const saleType = `${paymentMethod}_sale` as 'cash_sale' | 'card_sale' | 'mobile_sale';
         
@@ -697,14 +719,14 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           transaction_type: saleType,
           reference_id: createdSale.id || '',
           reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
-          debit_amount: totalWithTax,
+          debit_amount: effectiveTotal,
           credit_amount: 0,
           transaction_date: new Date().toISOString(),
           description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Sale - ${createdSale.invoice_number}`,
           payment_method: paymentMethod,
-          notes: `Sale total: ${totalWithTax}`
+          notes: `Sale total: ${totalWithTax}${creditBroughtForward < 0 ? `, Credit applied: ${formatCurrency(Math.abs(creditBroughtForward))}` : ''}`
         });
-        console.log(`📊 Created ledger entry for ${paymentMethod} sale: ${totalWithTax}`);
+        console.log(`📊 Created ledger entry for ${paymentMethod} sale: ${effectiveTotal}${creditBroughtForward < 0 ? ` (after credit)` : ''}`);
       }
 
       // Create sale items for each product in the cart - run in parallel for speed
@@ -807,7 +829,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         
         // Create new debt record for current transaction
         // Always create a debt record for debt transactions, even if fully paid or overpaid
-        const remainingNewDebt = totalWithTax - actualAmountPaid;
+        // Use effectiveTotal to account for customer's credit balance
+        const remainingNewDebt = effectiveTotal - actualAmountPaid;
         if (paymentMethod === "debt") {
           // Determine payment status based on amount paid
           const paymentStatus = remainingNewDebt <= 0 ? 'paid' : (actualAmountPaid > 0 ? 'partial' : 'unpaid');
@@ -1743,9 +1766,21 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                           let totalDebt = 0;
                           
                           if (outletId) {
-                            // Get outlet-specific debts from database only
+                            // Get outlet-specific debts from database
                             const outletDebts = await getOutletDebtsByCustomerId(outletId, customer.id);
                             totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
+                            
+                            // ALSO get customer settlements to include overpayments
+                            const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
+                            const customerSettlements = settlements.filter(s => s.customer_id === customer.id);
+                            
+                            // Add negative settlement balances (credits/overpayments)
+                            // Only add negative balances to avoid double-counting payments
+                            customerSettlements.forEach(settlement => {
+                              if (settlement.new_balance !== undefined && settlement.new_balance < 0) {
+                                totalDebt += settlement.new_balance; // This adds negative value (credit)
+                              }
+                            });
                           } else {
                             // Get general debts from database
                             const dbDebts = await getDebtsByCustomerId(customer.id);
@@ -2007,6 +2042,21 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               </div>
             </div>
             
+            {/* Show Amount Due when customer has credit applied */}
+            {creditBroughtForward < 0 && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-green-700">Amount After Credit</span>
+                  <span className="text-2xl font-bold text-green-700">
+                    {formatCurrency(total - Math.abs(creditBroughtForward))}
+                  </span>
+                </div>
+                <p className="text-xs text-green-600 mt-1">
+                  Original total {formatCurrency(total)} - Credit {formatCurrency(Math.abs(creditBroughtForward))}
+                </p>
+              </div>
+            )}
+            
             {/* Salesman and Driver fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -2060,25 +2110,42 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               </div>
             )}
             
-            {/* Show debt payment field if customer has previous debt */}
-            {creditBroughtForward > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            {/* Show customer balance field if customer has previous debt OR credit */}
+            {creditBroughtForward !== 0 && (
+              <div className={`p-3 border rounded-lg ${
+                creditBroughtForward > 0 
+                  ? 'bg-blue-50 border-blue-200' 
+                  : 'bg-green-50 border-green-200'
+              }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-blue-700 font-medium">Previous Debt Balance</span>
-                  <span className="text-blue-700 font-bold">{formatCurrency(creditBroughtForward)}</span>
+                  <span className={`text-sm font-medium ${
+                    creditBroughtForward > 0 ? 'text-blue-700' : 'text-green-700'
+                  }`}>
+                    {creditBroughtForward > 0 ? 'Previous Debt Balance' : 'Customer Credit Balance'}
+                  </span>
+                  <span className={`font-bold ${
+                    creditBroughtForward > 0 ? 'text-blue-700' : 'text-green-700'
+                  }`}>
+                    {formatCurrency(creditBroughtForward)}
+                  </span>
                 </div>
-                <div>
-                  <Label htmlFor="debtPayment" className="text-blue-700">Debt Payment Amount</Label>
-                  <Input
-                    id="debtPayment"
-                    type="number"
-                    placeholder="0.00"
-                    value={debtPaymentAmount}
-                    onChange={(e) => setDebtPaymentAmount(e.target.value)}
-                    className="text-lg bg-white"
-                  />
-                  <p className="text-xs text-blue-600 mt-1">Additional payment toward previous debt</p>
-                </div>
+                {creditBroughtForward > 0 && (
+                  <div>
+                    <Label htmlFor="debtPayment" className="text-blue-700">Debt Payment Amount</Label>
+                    <Input
+                      id="debtPayment"
+                      type="number"
+                      placeholder="0.00"
+                      value={debtPaymentAmount}
+                      onChange={(e) => setDebtPaymentAmount(e.target.value)}
+                      className="text-lg bg-white"
+                    />
+                    <p className="text-xs text-blue-600 mt-1">Additional payment toward previous debt</p>
+                  </div>
+                )}
+                {creditBroughtForward < 0 && (
+                  <p className="text-xs text-green-600 mt-1">This credit will be applied to reduce the current total</p>
+                )}
               </div>
             )}
             
