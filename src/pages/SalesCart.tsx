@@ -259,8 +259,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         if (outletId) {
           const debts = await getOutletDebtsByOutletId(outletId);
           const balances: Record<string, number> = {};
+          // Include ALL debts with non-zero remaining_amount
+          // Positive = customer owes money (debt)
+          // Negative = customer has credit (overpaid)
           debts.forEach(debt => {
-            if (debt.customer_id && (debt.payment_status === 'unpaid' || debt.payment_status === 'partial')) {
+            if (debt.customer_id && (debt.remaining_amount !== 0)) {
               balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
             }
           });
@@ -1767,9 +1770,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                         )}
                       </div>
                     </div>
-                    {outletId && customerBalances[customer.id] > 0 && (
+                    {outletId && customerBalances[customer.id] !== undefined && customerBalances[customer.id] !== 0 && (
                       <div className="text-right">
-                        <span className="text-sm font-semibold text-red-600">
+                        <span className={`text-sm font-semibold ${
+                          customerBalances[customer.id] > 0 ? 'text-red-600' : 'text-green-600'
+                        }`}>
                           Balance: {formatCurrency(customerBalances[customer.id])}
                         </span>
                       </div>
