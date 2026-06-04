@@ -197,13 +197,19 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       setCustomers(data);
       
       // Fetch all debts for this outlet and calculate balances per customer
+      // NOTE: We ONLY use the debt table because settlements already update the debt records
+      // When a settlement is made, it updates the remaining_amount in outlet_debts
+      // So we don't need to add settlement balances separately (that would be double-counting)
       const debts = await getOutletDebtsByOutletId(outletId);
       const balances: Record<string, number> = {};
       
-      // Sum up ALL remaining amounts for each customer (includes debt, overpayment, and partial)
+      // Sum up ALL remaining amounts for each customer from debts
       // Positive = customer owes money, Negative = customer has credit (overpaid)
+      // Zero = customer has no balance
       debts.forEach(debt => {
-        if (debt.customer_id && (debt.remaining_amount !== 0)) {
+        if (debt.customer_id) {
+          // Include ALL debts (even if remaining_amount is 0 or negative)
+          // This ensures overpayments (negative remaining_amount) are captured
           balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
         }
       });

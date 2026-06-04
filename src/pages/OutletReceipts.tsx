@@ -1608,7 +1608,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         throw new Error('Outlet ID is missing');
       }
       
-      const newBalance = Math.max(0, settlementPreviousBalance - settlementPaymentAmount);
+      // Calculate new balance (can be negative for overpayments)
+      const newBalance = settlementPreviousBalance - settlementPaymentAmount;
       
       console.log('💾 Saving settlement to database:', {
         outlet_id: outletId,
