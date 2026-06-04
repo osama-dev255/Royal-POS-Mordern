@@ -40,7 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer } from "@/services/databaseService";
+import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import { CustomerLedger } from "@/components/CustomerLedger";
 
@@ -196,21 +196,48 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       const data = await getOutletCustomers(outletId);
       setCustomers(data);
       
-      // Fetch all debts for this outlet and calculate balances per customer
-      // NOTE: We ONLY use the debt table because settlements already update the debt records
-      // When a settlement is made, it updates the remaining_amount in outlet_debts
-      // So we don't need to add settlement balances separately (that would be double-counting)
-      const debts = await getOutletDebtsByOutletId(outletId);
+      // Calculate customer balances from TWO sources:
+      // 1. outlet_debts table - tracks debt from sales transactions
+      // 2. outlet customer settlements - tracks payments (can create negative balance/credit)
+      //
+      // IMPORTANT: We need BOTH because:
+      // - When customer has existing debt and pays, the debt record is updated
+      // - When customer has NO debt and overpays, ONLY settlement record exists
+      // - Settlement new_balance represents the actual current balance after payment
+      
       const balances: Record<string, number> = {};
       
-      // Sum up ALL remaining amounts for each customer from debts
-      // Positive = customer owes money, Negative = customer has credit (overpaid)
-      // Zero = customer has no balance
+      // Step 1: Get all debts for this outlet
+      const debts = await getOutletDebtsByOutletId(outletId);
+      
+      // Sum up all remaining amounts from debts
       debts.forEach(debt => {
         if (debt.customer_id) {
-          // Include ALL debts (even if remaining_amount is 0 or negative)
-          // This ensures overpayments (negative remaining_amount) are captured
           balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
+        }
+      });
+      
+      // Step 2: Get all customer settlements for this outlet
+      const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
+      
+      // For each settlement, we need to calculate the OVERPAYMENT amount
+      // and add it to the customer's balance
+      settlements.forEach(settlement => {
+        if (settlement.customer_id && settlement.new_balance !== undefined && settlement.new_balance !== null) {
+          // If new_balance is negative, it means customer overpaid (has credit)
+          // We need to include this credit in their total balance
+          const settlementBalance = settlement.new_balance;
+          
+          // Only add if it's an overpayment (negative balance)
+          // OR if customer has no debt record at all
+          if (settlementBalance < 0) {
+            // Customer has credit from overpayment
+            balances[settlement.customer_id] = (balances[settlement.customer_id] || 0) + settlementBalance;
+          } else if (!balances[settlement.customer_id] && settlementBalance === 0) {
+            // Customer has no debts and balance is zero (fully paid)
+            // Initialize to 0 so they appear in the system
+            balances[settlement.customer_id] = 0;
+          }
         }
       });
       
