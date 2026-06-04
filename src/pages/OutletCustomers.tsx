@@ -480,78 +480,70 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Total Customers</p>
-                <p className="text-xl font-bold">{totalCustomers}</p>
-              </div>
-              <Users className="h-7 w-7 text-primary" />
+          <CardContent className="p-2">
+            <div className="flex flex-col items-center text-center">
+              <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
+              <p className="text-2xl font-bold">{totalCustomers}</p>
+              <Users className="h-5 w-5 text-primary mt-1" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Active</p>
-                <p className="text-xl font-bold">{activeCustomers}</p>
-              </div>
-              <div className="h-7 w-7 rounded-full bg-green-100 flex items-center justify-center">
+          <CardContent className="p-2">
+            <div className="flex flex-col items-center text-center">
+              <p className="text-[10px] text-muted-foreground mb-0.5">Active</p>
+              <p className="text-2xl font-bold">{activeCustomers}</p>
+              <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center mt-1">
                 <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="col-span-2 sm:col-span-2 lg:col-span-2">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0 pr-3">
                 <p className="text-xs text-muted-foreground mb-1">Outstanding Balance</p>
-                <p className="text-lg font-bold text-red-600 truncate">{formatCurrency(totalOutstandingBalance > 0 ? totalOutstandingBalance : 0)}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{customersWithDebt} customer{customersWithDebt !== 1 ? 's' : ''}</p>
+                <p className="text-lg font-bold text-red-600 break-words leading-tight">{formatCurrency(totalOutstandingBalance > 0 ? totalOutstandingBalance : 0)}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{customersWithDebt} customer{customersWithDebt !== 1 ? 's' : ''} with debt</p>
               </div>
-              <div className="h-7 w-7 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 ml-2">
-                <span className="text-red-600 text-xs font-bold">TSh</span>
+              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-red-600 text-sm font-bold">TSh</span>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="col-span-2 sm:col-span-2 lg:col-span-2">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0 pr-3">
                 <p className="text-xs text-muted-foreground mb-1">Customer Credit</p>
-                <p className="text-lg font-bold text-green-600 truncate">{formatCurrency(Math.abs(totalCustomerCredit))}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{customersWithCredit} customer{customersWithCredit !== 1 ? 's' : ''}</p>
+                <p className="text-lg font-bold text-green-600 break-words leading-tight">{formatCurrency(Math.abs(totalCustomerCredit))}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{customersWithCredit} customer{customersWithCredit !== 1 ? 's' : ''} with credit</p>
               </div>
-              <div className="h-7 w-7 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 ml-2">
-                <span className="text-green-600 text-xs font-bold">TSh</span>
+              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-600 text-sm font-bold">TSh</span>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Loyalty Points</p>
-                <p className="text-xl font-bold">{totalLoyaltyPoints.toLocaleString()}</p>
-              </div>
-              <Star className="h-7 w-7 text-yellow-500" />
+          <CardContent className="p-2">
+            <div className="flex flex-col items-center text-center">
+              <p className="text-[10px] text-muted-foreground mb-0.5">Loyalty</p>
+              <p className="text-xl font-bold">{totalLoyaltyPoints.toLocaleString()}</p>
+              <Star className="h-5 w-5 text-yellow-500 mt-1" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Status</p>
-                <p className="text-xl font-bold text-green-600">Active</p>
-              </div>
-              <ShoppingBag className="h-7 w-7 text-blue-500" />
+          <CardContent className="p-2">
+            <div className="flex flex-col items-center text-center">
+              <p className="text-[10px] text-muted-foreground mb-0.5">Status</p>
+              <p className="text-lg font-bold text-green-600">Active</p>
+              <ShoppingBag className="h-5 w-5 text-blue-500 mt-1" />
             </div>
           </CardContent>
         </Card>
