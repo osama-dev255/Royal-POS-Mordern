@@ -2372,7 +2372,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               </Button>
               <Button 
                 onClick={completeTransaction}
-                disabled={isProcessing || (paymentMethod !== "debt" && (amountReceivedNum < total || change < 0))}
+                disabled={isProcessing || (paymentMethod !== "debt" && (amountReceivedNum < effectiveTotal || change < 0))}
               >
                 {isProcessing ? (
                   <>
