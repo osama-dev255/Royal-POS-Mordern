@@ -4848,6 +4848,7 @@ export interface OutletCashSale {
   amount_paid: number;
   change_amount: number;
   payment_method: string;
+  balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
   notes?: string;
   reference_number?: string;
   created_at?: string;
@@ -4885,6 +4886,7 @@ export interface OutletCardSale {
   card_last_four?: string;
   transaction_id?: string;
   payment_method: string;
+  balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
   notes?: string;
   reference_number?: string;
   created_at?: string;
@@ -4922,6 +4924,7 @@ export interface OutletMobileSale {
   mobile_number?: string;
   transaction_id?: string;
   payment_method: string;
+  balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
   notes?: string;
   reference_number?: string;
   created_at?: string;
@@ -5197,13 +5200,14 @@ export const getOutletDebtsByOutletId = async (outletId: string): Promise<Outlet
 
 export const getOutletDebtsByCustomerId = async (outletId: string, customerId: string): Promise<OutletDebt[]> => {
   try {
-    // Fetch both unpaid and partial debts (both have remaining balance)
+    // Fetch ALL debts with non-zero remaining_amount (includes unpaid, partial, AND credits/overpayments)
+    // Credits have payment_status='paid' but negative remaining_amount
     const { data, error } = await supabase
       .from('outlet_debts')
       .select('*')
       .eq('outlet_id', outletId)
       .eq('customer_id', customerId)
-      .in('payment_status', ['unpaid', 'partial'])
+      .neq('remaining_amount', 0) // Include all non-zero balances (positive=debt, negative=credit)
       .order('created_at', { ascending: false });
       
     if (error) throw error;

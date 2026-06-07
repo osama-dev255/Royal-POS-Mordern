@@ -109,7 +109,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
     address: "",
     district_ward: "",
     tax_id: ""
-  }); // State for new customer data
+  });
+  const [storeOverpaymentAsCredit, setStoreOverpaymentAsCredit] = useState(false); // Toggle to store overpayment as customer credit // State for new customer data
 
   // MUHEZA wards list (state to allow adding new wards)
   const [muhezaWards, setMuhezaWards] = useState([
@@ -400,7 +401,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   // Apply customer credit balance to reduce the total
   // creditBroughtForward is negative for credit (overpayment), positive for debt
   // When customer has credit, it reduces what they need to pay
-  const effectiveTotal = total - (creditBroughtForward < 0 ? Math.abs(creditBroughtForward) : 0);
+  // effectiveTotal cannot be negative - if credit exceeds total, customer pays 0
+  const effectiveTotal = Math.max(0, total - (creditBroughtForward < 0 ? Math.abs(creditBroughtForward) : 0));
   
   const totalWithTax = total; // Tax doesn't affect the actual total
   
@@ -414,11 +416,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   
   // For current transaction payment:
   // - debt: use amountReceived (what they paid for current items)
-  // - non-debt: use amountReceived if entered, otherwise full payment
+  // - non-debt: use amountReceived if entered, otherwise effectiveTotal (what they owe after credit)
   // When customer has credit, effectiveTotal is reduced
   const actualAmountPaid = paymentMethod === "debt" 
     ? amountReceivedNum  // For debt, what they paid for current items
-    : (amountReceivedNum > 0 ? amountReceivedNum : safeTotalWithTax);
+    : (amountReceivedNum > 0 ? amountReceivedNum : effectiveTotal); // Default to effectiveTotal, not totalWithTax
   
   // Total cash received includes debt payment
   const totalAmountReceived = actualAmountPaid + debtPaymentNum;
@@ -427,9 +429,13 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   // For debt: if they paid more than current transaction, they get change
   // For non-debt: standard change calculation
   // When customer has credit, use effectiveTotal for change calculation
-  const change = paymentMethod === "debt"
+  const rawChange = paymentMethod === "debt"
     ? (amountReceivedNum > effectiveTotal ? amountReceivedNum - effectiveTotal : 0)  // Only give change if overpaid current transaction
     : amountReceivedNum - effectiveTotal;
+  
+  // If customer chooses to store overpayment as credit, change = 0 (no cash back)
+  // Otherwise, change = rawChange (given to customer as cash back)
+  const change = (storeOverpaymentAsCredit && rawChange > 0 && paymentMethod !== 'debt') ? 0 : rawChange;
     
   console.log('Payment Debug:', {
     paymentMethod,
@@ -501,8 +507,51 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       amountReceivedNum,
       totalWithTax,
       actualAmountPaid,
-      change
+      change,
+      selectedCustomerId: selectedCustomer?.id,
+      currentCreditBroughtForward: creditBroughtForward
     });
+    
+    // Use a local variable to track the balance (avoid async state issues)
+    let balanceToUse = creditBroughtForward;
+    let finalEffectiveTotal = effectiveTotal; // Start with calculated value, may update
+    
+    // If customer is selected but creditBroughtForward is 0, fetch their balance now
+    if (selectedCustomer?.id && creditBroughtForward === 0 && outletId) {
+      console.log('⚠️ Customer selected but no balance fetched, fetching now...');
+      try {
+        let totalDebt = 0;
+        
+        // Get outlet-specific debts from database
+        const outletDebts = await getOutletDebtsByCustomerId(outletId, selectedCustomer.id);
+        console.log('📊 Outlet debts:', outletDebts.length, 'records');
+        totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
+        console.log('💰 Debt total:', totalDebt);
+        
+        // ALSO get customer settlements to include overpayments
+        const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
+        const customerSettlements = settlements.filter(s => s.customer_id === selectedCustomer.id);
+        console.log('📋 Customer settlements:', customerSettlements.length, 'records');
+        
+        // Add negative settlement balances (credits/overpayments)
+        customerSettlements.forEach(settlement => {
+          if (settlement.new_balance !== undefined && settlement.new_balance < 0) {
+            totalDebt += settlement.new_balance;
+            console.log('💚 Added credit:', settlement.new_balance);
+          }
+        });
+        
+        console.log('✅ Final balanceToUse:', totalDebt);
+        balanceToUse = totalDebt; // Use local variable instead of state
+        setCreditBroughtForward(totalDebt); // Also update state for UI
+        
+        // Recalculate effectiveTotal with the fetched balance
+        finalEffectiveTotal = Math.max(0, total - (balanceToUse < 0 ? Math.abs(balanceToUse) : 0));
+        console.log('🔄 Recalculated finalEffectiveTotal:', finalEffectiveTotal);
+      } catch (error) {
+        console.error('Error fetching customer debts:', error);
+      }
+    }
     
     // Prevent double-clicking
     if (isProcessing) {
@@ -636,6 +685,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           total_amount: Number(totalWithTax) || 0,
           amount_paid: Number(actualAmountPaid),
           change_amount: Number(paymentMethod === "debt" ? 0 : change),
+          balance_carried_forward: Number(balanceToUse) || 0, // Customer's balance BEFORE this transaction
           notes: paymentMethod === "debt" ? "Debt transaction - payment pending" : ""
         };
         
@@ -664,7 +714,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             ...saleData,
             amount_received: Number(totalAmountReceived),
             shipping_amount: Number(parseFloat(shippingCost) || 0),
-            credit_brought_forward: Number(creditBroughtForward) || 0,
+            credit_brought_forward: Number(balanceToUse) || 0, // Use local variable to ensure correct value
             adjustments: Number(adjustmentsAmount) || 0,
             adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
             payment_method: 'debt',
@@ -709,24 +759,72 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       }
 
       // Create ledger entry for cash/card/mobile sales (DEBIT)
-      // When customer has credit, debit only the effective total (after credit applied)
+      // When customer has credit, create THREE entries:
+      // 1. DEBIT for full sale amount (what customer owes)
+      // 2. CREDIT for credit amount applied (if customer had previous credit)
+      // 3. CREDIT for payment received (what customer paid)
       if (selectedCustomer && outletId && (paymentMethod === 'cash' || paymentMethod === 'card' || paymentMethod === 'mobile')) {
         const saleType = `${paymentMethod}_sale` as 'cash_sale' | 'card_sale' | 'mobile_sale';
         
+        // Entry 1: Debit the full sale amount
         await createCustomerLedgerEntry({
           outlet_id: outletId,
           customer_id: selectedCustomer.id,
           transaction_type: saleType,
           reference_id: createdSale.id || '',
           reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
-          debit_amount: effectiveTotal,
+          debit_amount: totalWithTax, // Full sale amount
           credit_amount: 0,
           transaction_date: new Date().toISOString(),
           description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Sale - ${createdSale.invoice_number}`,
           payment_method: paymentMethod,
-          notes: `Sale total: ${totalWithTax}${creditBroughtForward < 0 ? `, Credit applied: ${formatCurrency(Math.abs(creditBroughtForward))}` : ''}`
+          notes: `Sale total: ${totalWithTax}`
         });
-        console.log(`📊 Created ledger entry for ${paymentMethod} sale: ${effectiveTotal}${creditBroughtForward < 0 ? ` (after credit)` : ''}`);
+        console.log(`📊 Created ledger entry for ${paymentMethod} sale: ${totalWithTax}`);
+        
+        // Entry 2: If customer has credit, create credit entry for amount applied
+        if (creditBroughtForward < 0) {
+          const creditApplied = Math.abs(creditBroughtForward);
+          await createCustomerLedgerEntry({
+            outlet_id: outletId,
+            customer_id: selectedCustomer.id,
+            transaction_type: 'adjustment',
+            reference_id: createdSale.id || '',
+            reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
+            debit_amount: 0,
+            credit_amount: creditApplied, // Credit amount applied
+            transaction_date: new Date().toISOString(),
+            description: `Credit applied from previous overpayment - ${createdSale.invoice_number}`,
+            payment_method: paymentMethod,
+            notes: `Customer credit balance applied: ${formatCurrency(creditApplied)}`
+          });
+          console.log(`📊 Created credit application entry: ${creditApplied}`);
+        }
+        
+        // Entry 3: Record the payment received
+        // If storing overpayment as credit, only record payment for effectiveTotal, not the overpayment
+        if (actualAmountPaid > 0) {
+          const paymentForSale = storeOverpaymentAsCredit && rawChange > 0 
+            ? actualAmountPaid - rawChange  // Exclude overpayment from payment entry
+            : actualAmountPaid;  // Full payment
+          
+          if (paymentForSale > 0) {
+            await createCustomerLedgerEntry({
+              outlet_id: outletId,
+              customer_id: selectedCustomer.id,
+              transaction_type: 'debt_payment', // Use debt_payment for cash/card/mobile payments
+              reference_id: createdSale.id || '',
+              reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
+              debit_amount: 0,
+              credit_amount: paymentForSale, // Payment for sale (excludes overpayment if storing as credit)
+              transaction_date: new Date().toISOString(),
+              description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Payment - ${createdSale.invoice_number}`,
+              payment_method: paymentMethod,
+              notes: `Payment received: ${formatCurrency(paymentForSale)}${storeOverpaymentAsCredit && rawChange > 0 ? ` (overpayment ${formatCurrency(rawChange)} stored as credit)` : ''}`
+            });
+            console.log(`📊 Created payment entry: ${paymentForSale}`);
+          }
+        }
       }
 
       // Create sale items for each product in the cart - run in parallel for speed
@@ -942,6 +1040,60 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           }
         }
       }
+      
+      // Handle overpayment based on checkbox state
+      if (rawChange > 0 && selectedCustomer && outletId && paymentMethod !== 'debt') {
+        if (storeOverpaymentAsCredit) {
+          // CHECKBOX TICKED: Create credit record for next transaction
+          console.log(`✅ Storing overpayment ${rawChange} as customer credit`);
+          
+          const outletDebtData = {
+            outlet_id: outletId,
+            customer_id: selectedCustomer.id,
+            customer_name: selectedCustomer.name || `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() || 'Unknown Customer',
+            invoice_number: `CREDIT-${Date.now()}`,
+            debt_date: new Date().toISOString(),
+            due_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // Valid for 1 year
+            subtotal: 0,
+            discount_amount: 0,
+            tax_amount: 0,
+            total_amount: 0,
+            amount_paid: rawChange,
+            remaining_amount: -rawChange, // Negative = customer credit
+            payment_status: 'paid',
+            credit_brought_forward: 0,
+            debt_payment_amount: 0,
+            shipping_amount: 0,
+            adjustments: 0,
+            notes: `Overpayment credit from ${paymentMethod} sale ${createdSale.id || 'unknown'}`,
+            salesman: salesman || null,
+            driver: driver || null,
+            truck: truck || null
+          };
+
+          const createdCreditDebt = await createOutletDebt(outletDebtData);
+          if (createdCreditDebt) {
+            console.log(`✅ Created customer credit record: ${rawChange}`);
+            // Create ledger entry for the credit
+            await createCustomerLedgerEntry({
+              outlet_id: outletId,
+              customer_id: selectedCustomer.id,
+              transaction_type: 'adjustment',
+              reference_id: createdCreditDebt.id || '',
+              reference_number: createdCreditDebt.invoice_number || `CREDIT-${Date.now()}`,
+              debit_amount: 0,
+              credit_amount: rawChange,
+              transaction_date: new Date().toISOString(),
+              description: `Overpayment credit from sale ${createdSale.id || 'unknown'}`,
+              payment_method: paymentMethod,
+              notes: `Customer chose to store ${formatCurrency(rawChange)} as credit`
+            });
+          }
+        } else {
+          // CHECKBOX UNTICKED: Give cash back (change_amount already set)
+          console.log(`💵 Giving change to customer: ${rawChange}`);
+        }
+      }
 
       // Update stock quantities for each item in the cart - run in parallel for speed
       const stockUpdatePromises = itemsWithQuantity.map(async (item) => {
@@ -1019,6 +1171,8 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         debtPaymentAmount: debtPaymentNum, // Payment toward previous debt
         previousDebtBalance: creditBroughtForward, // Previous debt before payment
         change: change,
+        overpaymentStoredAsCredit: storeOverpaymentAsCredit && rawChange > 0, // Flag for printing
+        overpaymentCreditAmount: (storeOverpaymentAsCredit && rawChange > 0) ? rawChange : 0, // Amount stored as credit
         customer: selectedCustomer, // Include customer information
         salesman: salesman || 'Not Assigned',
         driver: driver || 'Not Assigned',
@@ -1158,6 +1312,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       setSalesman("");
       setDriver("");
       setTruck("");
+      setStoreOverpaymentAsCredit(false); // Reset overpayment credit toggle
       
       toast({
         title: "Success",
@@ -1765,28 +1920,40 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                         try {
                           let totalDebt = 0;
                           
+                          console.log('🔍 Fetching customer balance:', {
+                            customerId: customer.id,
+                            customerName: customer.name,
+                            outletId
+                          });
+                          
                           if (outletId) {
                             // Get outlet-specific debts from database
                             const outletDebts = await getOutletDebtsByCustomerId(outletId, customer.id);
+                            console.log('📊 Outlet debts:', outletDebts.length, 'records');
                             totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
+                            console.log('💰 Debt total:', totalDebt);
                             
                             // ALSO get customer settlements to include overpayments
                             const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
                             const customerSettlements = settlements.filter(s => s.customer_id === customer.id);
+                            console.log('📋 Customer settlements:', customerSettlements.length, 'records');
                             
                             // Add negative settlement balances (credits/overpayments)
                             // Only add negative balances to avoid double-counting payments
                             customerSettlements.forEach(settlement => {
                               if (settlement.new_balance !== undefined && settlement.new_balance < 0) {
                                 totalDebt += settlement.new_balance; // This adds negative value (credit)
+                                console.log('💚 Added credit:', settlement.new_balance);
                               }
                             });
                           } else {
+                            console.log('⚠️ No outletId, fetching general debts');
                             // Get general debts from database
                             const dbDebts = await getDebtsByCustomerId(customer.id);
                             totalDebt = dbDebts.reduce((sum, debt) => sum + (debt.amount || 0), 0);
                           }
                           
+                          console.log('✅ Final creditBroughtForward:', totalDebt);
                           setCreditBroughtForward(totalDebt);
                         } catch (error) {
                           console.error('Error fetching customer debts:', error);
@@ -2048,11 +2215,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-green-700">Amount After Credit</span>
                   <span className="text-2xl font-bold text-green-700">
-                    {formatCurrency(total - Math.abs(creditBroughtForward))}
+                    {formatCurrency(effectiveTotal)}
                   </span>
                 </div>
                 <p className="text-xs text-green-600 mt-1">
-                  Original total {formatCurrency(total)} - Credit {formatCurrency(Math.abs(creditBroughtForward))}
+                  Original total {formatCurrency(total)} - Credit {formatCurrency(Math.abs(creditBroughtForward))} = {effectiveTotal === 0 ? 'Fully covered by credit' : formatCurrency(effectiveTotal)}
                 </p>
               </div>
             )}
@@ -2150,13 +2317,52 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             )}
             
             {amountReceivedNum > 0 && (
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="flex justify-between">
-                  <span>Change</span>
-                  <span className={`font-bold ${change >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(change)}
-                  </span>
-                </div>
+              <div className="p-3 bg-muted rounded-lg space-y-2">
+                {storeOverpaymentAsCredit && rawChange > 0 ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Change (to customer)</span>
+                      <span className="font-bold text-muted-foreground">
+                        {formatCurrency(0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Stored as Credit</span>
+                      <span className="font-bold text-amber-600">
+                        {formatCurrency(rawChange)}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between">
+                    <span>Change</span>
+                    <span className={`font-bold ${change >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {formatCurrency(change)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Option to store overpayment as customer credit (for cash/card/mobile payments) */}
+            {rawChange > 0 && selectedCustomer && outletId && paymentMethod !== 'debt' && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={storeOverpaymentAsCredit}
+                    onChange={(e) => setStoreOverpaymentAsCredit(e.target.checked)}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-amber-800">
+                      Store Overpayment as Customer Credit
+                    </div>
+                    <div className="text-xs text-amber-700 mt-1">
+                      This amount will be saved as Balance Carried Forward for the next transaction
+                    </div>
+                  </div>
+                </label>
               </div>
             )}
             
