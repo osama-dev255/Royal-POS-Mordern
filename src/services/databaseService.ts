@@ -5591,16 +5591,19 @@ export const getCustomerLedgerBalance = async (
       .eq('outlet_id', outletId)
       .eq('customer_id', customerId)
       .order('transaction_date', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
       
     if (error) {
-      // If no ledger entries exist, balance is 0
-      if (error.code === 'PGRST116') return 0;
-      throw error;
+      console.error('Error fetching customer ledger balance:', error);
+      return 0;
     }
     
-    return data?.running_balance || 0;
+    // If no ledger entries exist, balance is 0
+    if (!data || data.length === 0) {
+      return 0;
+    }
+    
+    return data[0]?.running_balance || 0;
   } catch (error) {
     console.error('Error fetching customer ledger balance:', error);
     return 0;
