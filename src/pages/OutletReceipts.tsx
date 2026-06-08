@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement, getCustomerLedgerBalance } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
@@ -175,11 +175,33 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     try {
       const customers = await getOutletCustomers(outletId);
       
-      // Fetch actual balance for each customer from outlet_debts
+      // Fetch actual balance for each customer from customer_ledger (PRIMARY)
       const customersWithBalances = await Promise.all(
         (customers || []).map(async (customer) => {
           try {
-            // getOutletDebtsByCustomerId now only returns outstanding + partial debts
+            // PRIMARY: Get balance from customer_ledger
+            try {
+              const ledgerBalance = await getCustomerLedgerBalance(outletId, customer.id || '');
+              return { ...customer, total_debt: ledgerBalance };
+            } catch (error) {
+              console.warn(`Could not fetch ledger balance for customer ${customer.id}, falling back`);
+            }
+            
+            // FALLBACK 1: Get the most recent customer_settlement's new_balance
+            const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
+            const customerSettlements = settlements.filter(s => s.customer_id === customer.id);
+            
+            if (customerSettlements.length > 0) {
+              const latestSettlement = customerSettlements.sort((a, b) => 
+                new Date(b.settlement_date || b.created_at).getTime() - new Date(a.settlement_date || a.created_at).getTime()
+              )[0];
+              
+              if (latestSettlement.new_balance !== undefined && latestSettlement.new_balance !== null) {
+                return { ...customer, total_debt: latestSettlement.new_balance };
+              }
+            }
+            
+            // FALLBACK 2: If no settlements, calculate from outlet_debts
             const debts = await getOutletDebtsByCustomerId(outletId, customer.id || '');
             const totalBalance = debts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
             console.log(`  Customer ${customer.first_name} ${customer.last_name}:`, {
@@ -200,16 +222,46 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     }
   };
   
-  // Fetch customer balance from outlet_debts
+  // Fetch customer balance from customer_ledger (PRIMARY), then fallback to settlements/debts
   const fetchCustomerBalance = async (customerId: string) => {
     if (!outletId || !customerId) return;
     try {
       console.log('🔍 Fetching balance for customer:', customerId);
-      // getOutletDebtsByCustomerId now only returns outstanding + partial debts
+      
+      // PRIMARY: Get balance from customer_ledger (most accurate, includes credit applications)
+      try {
+        const ledgerBalance = await getCustomerLedgerBalance(outletId, customerId);
+        console.log('  Ledger balance:', ledgerBalance);
+        setSettlementCustomerBalance(ledgerBalance);
+        setSettlementPreviousBalance(ledgerBalance);
+        return;
+      } catch (error) {
+        console.warn('  Could not fetch ledger balance, falling back:', error);
+      }
+      
+      // FALLBACK 1: Get the most recent customer_settlement's new_balance
+      const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
+      const customerSettlements = settlements.filter(s => s.customer_id === customerId);
+      
+      if (customerSettlements.length > 0) {
+        // Sort by date to get the most recent
+        const latestSettlement = customerSettlements.sort((a, b) => 
+          new Date(b.settlement_date || b.created_at).getTime() - new Date(a.settlement_date || a.created_at).getTime()
+        )[0];
+        
+        if (latestSettlement.new_balance !== undefined && latestSettlement.new_balance !== null) {
+          console.log('  Using latest settlement new_balance:', latestSettlement.new_balance);
+          setSettlementCustomerBalance(latestSettlement.new_balance);
+          setSettlementPreviousBalance(latestSettlement.new_balance);
+          return;
+        }
+      }
+      
+      // FALLBACK 2: If no settlements, calculate from outlet_debts
       const debts = await getOutletDebtsByCustomerId(outletId, customerId);
-      console.log('  Active debts found:', debts.length);
+      console.log('  No settlements found, using debts. Active debts found:', debts.length);
       const totalBalance = debts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
-      console.log('  Total balance:', totalBalance);
+      console.log('  Total balance from debts:', totalBalance);
       setSettlementCustomerBalance(totalBalance);
       setSettlementPreviousBalance(totalBalance);
     } catch (error) {

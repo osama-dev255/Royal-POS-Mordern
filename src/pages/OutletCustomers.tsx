@@ -29,7 +29,8 @@ import {
   Loader2,
   LayoutGrid,
   List,
-  Pencil
+  Pencil,
+  RefreshCw
 } from "lucide-react";
 import {
   Table,
@@ -40,7 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
+import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer, getOutletCustomerSettlementsByOutletId, getOutletCashSalesByOutletId, getOutletCardSalesByOutletId, getOutletMobileSalesByOutletId, getCustomerLedgerBalance } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import { CustomerLedger } from "@/components/CustomerLedger";
 
@@ -196,51 +197,33 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
       const data = await getOutletCustomers(outletId);
       setCustomers(data);
       
-      // Calculate customer balances from TWO sources:
-      // 1. outlet_debts table - tracks debt from sales transactions
-      // 2. outlet customer settlements - tracks payments (can create negative balance/credit)
-      //
-      // IMPORTANT: We need BOTH because:
-      // - When customer has existing debt and pays, the debt record is updated
-      // - When customer has NO debt and overpays, ONLY settlement record exists
-      // - Settlement new_balance represents the actual current balance after payment
+      // Calculate customer balances from the customer_ledger table (PRIMARY SOURCE)
+      // The ledger is updated whenever credit is used in sales, making it the most accurate source
       
       const balances: Record<string, number> = {};
       
-      // Step 1: Get all debts for this outlet
-      const debts = await getOutletDebtsByOutletId(outletId);
-      
-      // Sum up all remaining amounts from debts
-      debts.forEach(debt => {
-        if (debt.customer_id) {
-          balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
+      // Get balance from customer_ledger for each customer (MOST ACCURATE)
+      const balancePromises = data.map(async (customer) => {
+        if (!customer.id) return { customerId: '', balance: 0 };
+        
+        try {
+          const ledgerBalance = await getCustomerLedgerBalance(outletId, customer.id);
+          console.log(`Customer ${customer.first_name} ${customer.last_name} ledger balance:`, ledgerBalance);
+          return { customerId: customer.id, balance: ledgerBalance };
+        } catch (error) {
+          console.warn(`Could not fetch ledger balance for customer ${customer.id}:`, error);
+          return { customerId: customer.id, balance: 0 };
         }
       });
       
-      // Step 2: Get all customer settlements for this outlet
-      const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
-      
-      // For each settlement, we need to calculate the OVERPAYMENT amount
-      // and add it to the customer's balance
-      settlements.forEach(settlement => {
-        if (settlement.customer_id && settlement.new_balance !== undefined && settlement.new_balance !== null) {
-          // If new_balance is negative, it means customer overpaid (has credit)
-          // We need to include this credit in their total balance
-          const settlementBalance = settlement.new_balance;
-          
-          // Only add if it's an overpayment (negative balance)
-          // OR if customer has no debt record at all
-          if (settlementBalance < 0) {
-            // Customer has credit from overpayment
-            balances[settlement.customer_id] = (balances[settlement.customer_id] || 0) + settlementBalance;
-          } else if (!balances[settlement.customer_id] && settlementBalance === 0) {
-            // Customer has no debts and balance is zero (fully paid)
-            // Initialize to 0 so they appear in the system
-            balances[settlement.customer_id] = 0;
-          }
+      const balanceResults = await Promise.all(balancePromises);
+      balanceResults.forEach(({ customerId, balance }) => {
+        if (customerId) {
+          balances[customerId] = balance;
         }
       });
       
+      console.log('✅ Customer balances from ledger:', balances);
       setCustomerBalances(balances);
     } catch (error) {
       console.error("Error loading outlet customers:", error);
@@ -260,6 +243,8 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
 
   const handleBackFromLedger = () => {
     setSelectedCustomerForLedger(null);
+    // Refresh customer data and balances when returning from ledger
+    loadCustomers();
   };
 
   const filteredCustomers = customers.filter(customer =>
@@ -496,6 +481,11 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Refresh Button */}
+          <Button variant="outline" size="sm" onClick={loadCustomers} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           {/* View Toggle */}
           <ToggleGroup type="single" value={viewMode} onValueChange={(value) => value && setViewMode(value as "card" | "table")}>
             <ToggleGroupItem value="card" aria-label="Card view">

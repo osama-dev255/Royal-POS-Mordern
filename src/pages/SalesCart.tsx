@@ -714,7 +714,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             ...saleData,
             amount_received: Number(totalAmountReceived),
             shipping_amount: Number(parseFloat(shippingCost) || 0),
-            credit_brought_forward: Number(balanceToUse) || 0, // Use local variable to ensure correct value
+            balance_carried_forward: Number(balanceToUse) || 0, // Customer's balance BEFORE this transaction
             adjustments: Number(adjustmentsAmount) || 0,
             adjustment_reason: adjustmentsAmount !== 0 ? adjustmentReason : undefined,
             payment_method: 'debt',

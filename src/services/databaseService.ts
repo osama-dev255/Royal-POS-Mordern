@@ -4748,7 +4748,8 @@ export interface OutletSale {
   discount_amount: number;
   tax_amount: number;
   shipping_amount: number;
-  credit_brought_forward: number;
+  balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
+  credit_brought_forward?: number; // Legacy field - use balance_carried_forward
   adjustments?: number;
   adjustment_reason?: string;
   amount_received?: number;
@@ -4996,7 +4997,7 @@ export const updateOutletSale = async (id: string, updates: Partial<OutletSale>)
       ...updates,
       subtotal: updates.subtotal || 0,
       tax_amount: updates.tax_amount || 0,
-      credit_brought_forward: updates.credit_brought_forward || 0,
+      balance_carried_forward: updates.balance_carried_forward || 0,
       adjustments: updates.adjustments || 0,
       total_amount: updates.total_amount || 0,
       amount_paid: updates.amount_paid || 0,
