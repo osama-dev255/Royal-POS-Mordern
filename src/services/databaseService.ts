@@ -5307,6 +5307,9 @@ export interface OutletCustomerSettlement {
   cashier?: string;
   prepared_by?: string;
   approved_by?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approval_date?: string;
+  approval_notes?: string;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
@@ -5553,6 +5556,51 @@ export const deleteOutletCustomerSettlement = async (id: string): Promise<boolea
   } catch (error) {
     console.error('Error deleting outlet customer settlement:', error);
     return false;
+  }
+};
+
+// Approve or reject customer settlement
+export const approveOutletCustomerSettlement = async (
+  settlementId: string,
+  status: 'approved' | 'rejected',
+  approvedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('customer_settlements')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', settlementId);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error approving customer settlement:', error);
+    return false;
+  }
+};
+
+// Get pending settlement approvals for outlet
+export const getPendingSettlementApprovals = async (outletId: string): Promise<OutletCustomerSettlement[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_settlements')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('approval_status', 'pending')
+      .order('settlement_date', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching pending settlement approvals:', error);
+    return [];
   }
 };
 

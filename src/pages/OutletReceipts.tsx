@@ -40,11 +40,14 @@ import {
   Copy,
   FileSpreadsheet,
   FileDown,
-  MoreVertical
+  MoreVertical,
+  CheckCircle,
+  XCircle,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement, getCustomerLedgerBalance } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement, getCustomerLedgerBalance, getPendingSettlementApprovals, approveOutletCustomerSettlement, OutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
@@ -79,7 +82,7 @@ interface ReceiptSale {
 
 export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'all' | 'sales' | 'commission' | 'other'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'sales' | 'commission' | 'other' | 'approvals'>('all');
   const [showNewForm, setShowNewForm] = useState(false);
   const [receipts, setReceipts] = useState<ReceiptSale[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptSale | null>(null);
@@ -87,6 +90,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Pending approvals state
+  const [pendingApprovals, setPendingApprovals] = useState<OutletCustomerSettlement[]>([]);
   
   // Commission receipt form
   const [commissionFrom, setCommissionFrom] = useState('');
@@ -360,6 +366,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       allReceipts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       setReceipts(allReceipts);
+      
+      // Load pending approvals
+      await loadPendingApprovals();
     } catch (error) {
       console.error('Error fetching receipts:', error);
       toast({
@@ -369,6 +378,52 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPendingApprovals = async () => {
+    if (!outletId) return;
+    
+    try {
+      const pending = await getPendingSettlementApprovals(outletId);
+      setPendingApprovals(pending);
+    } catch (error) {
+      console.error('Error loading pending approvals:', error);
+    }
+  };
+
+  const handleApproveSettlement = async (settlementId: string, status: 'approved' | 'rejected') => {
+    try {
+      // Get current authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({ 
+          title: "Authentication Error", 
+          description: "You must be logged in to approve settlements", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      const result = await approveOutletCustomerSettlement(settlementId, status, user.id);
+      if (result) {
+        toast({ 
+          title: "Success", 
+          description: `Settlement ${status} successfully` 
+        });
+        // Reload data
+        await fetchReceipts();
+      } else {
+        toast({ title: "Error", description: `Failed to ${status} settlement`, variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error('Error in handleApproveSettlement:', error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to approve settlement", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -1958,6 +2013,9 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
             <option value="sales">Customer Settlements</option>
             <option value="commission">Commission</option>
             <option value="other">Other</option>
+            <option value="approvals">
+              Approvals{pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ''}
+            </option>
           </select>
           
           {!showNewForm && activeTab !== 'all' && (
@@ -1974,11 +2032,17 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-6">
-        <TabsList className="grid grid-cols-4 w-full">
+        <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="sales">Customer Settlements</TabsTrigger>
           <TabsTrigger value="commission">Commission</TabsTrigger>
           <TabsTrigger value="other">Other</TabsTrigger>
+          <TabsTrigger value="approvals">
+            Approvals
+            {pendingApprovals.length > 0 && (
+              <Badge variant="destructive" className="ml-2">{pendingApprovals.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       
@@ -2611,6 +2675,87 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           ))
         )}
       </div>
+
+      {/* Approvals Tab Content */}
+      {activeTab === 'approvals' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Pending Settlement Approvals
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {pendingApprovals.length} settlement(s) awaiting your approval
+              </p>
+            </CardHeader>
+            <CardContent>
+              {pendingApprovals.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-600" />
+                  <p className="text-lg font-medium">All settlements have been reviewed</p>
+                  <p className="text-sm">No pending approvals at this time</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingApprovals.map((settlement) => (
+                    <div key={settlement.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-semibold">{settlement.invoice_number}</div>
+                          <Badge variant="outline">{settlement.payment_method}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Customer: {settlement.customer_name}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Date: {new Date(settlement.settlement_date).toLocaleDateString()}
+                          {settlement.notes && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span className="italic">{settlement.notes}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                          <div>Previous Balance: <span className="font-medium text-red-600">{formatCurrency(settlement.previous_balance)}</span></div>
+                          <div>Payment: <span className="font-medium text-green-600">{formatCurrency(settlement.payment_amount)}</span></div>
+                          <div>New Balance: <span className="font-medium">{formatCurrency(settlement.new_balance)}</span></div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4">
+                        <div className="text-right">
+                          <div className="text-lg font-bold">{formatCurrency(settlement.payment_amount)}</div>
+                          <div className="text-xs text-muted-foreground">Amount Paid</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleApproveSettlement(settlement.id!, 'approved')}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600"
+                            onClick={() => handleApproveSettlement(settlement.id!, 'rejected')}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* View Receivable Dialog */}
       {selectedReceipt && (
