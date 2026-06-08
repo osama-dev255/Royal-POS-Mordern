@@ -2046,17 +2046,6 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         </TabsList>
       </Tabs>
       
-      {/* New Receivable Button - Only show in specific tabs, not in 'All' */}
-      {!showNewForm && activeTab !== 'all' && (
-        <Button 
-          onClick={() => setShowNewForm(true)} 
-          className="mb-6"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New {activeTab === 'sales' ? 'Settlement' : activeTab === 'commission' ? 'Commission' : 'Receivable'}
-        </Button>
-      )}
-
       {/* Customer Settlements Summary Cards - Only show in 'sales' tab */}
       {activeTab === 'sales' && !showNewForm && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
