@@ -284,7 +284,7 @@ export class PrintUtils {
       .approval-value {
         font-size: 10px;
         min-height: 20px;
-        border-bottom: 1px solid #000;
+        border-bottom: none;
         padding-bottom: 3px;
         margin: 0 auto;
         max-width: 200px;
@@ -2095,12 +2095,12 @@ export class PrintUtils {
               <div style="font-size: 11px; font-weight: bold; margin-bottom: 10px;">Approval Section</div>
               <div style="margin-bottom: 8px;">
                 <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px;">Approved By</div>
-                <div style="font-size: 11px; min-height: 20px; border-bottom: 1px solid #000; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">${transaction.approvedBy || '_______________________'}</div>
+                <div style="font-size: 11px; min-height: 20px; border-bottom: none; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">${transaction.approvedBy || '_______________________'}</div>
                 <div style="font-size: 9px; color: #666; font-style: italic;">Name & Signature</div>
               </div>
               <div style="margin-bottom: 8px;">
                 <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px;">Date</div>
-                <div style="font-size: 11px; min-height: 20px; border-bottom: 1px solid #000; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">_______________________</div>
+                <div style="font-size: 11px; min-height: 20px; border-bottom: none; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">_______________________</div>
                 <div style="font-size: 9px; color: #666; font-style: italic;">Approval Date</div>
               </div>
             </div>
@@ -4522,7 +4522,7 @@ export class PrintUtils {
             .approval-value {
               font-size: 11px;
               min-height: 30px;
-              border-bottom: 1px solid #333;
+              border-bottom: none;
               padding-bottom: 5px;
               margin-bottom: 3px;
             }
