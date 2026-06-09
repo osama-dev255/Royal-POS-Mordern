@@ -264,8 +264,8 @@ export class PrintUtils {
       /* Approval Section Styles */
       .approval-section {
         margin-top: 15px;
-        padding-top: 10px;
-        border-top: 1px dashed #000;
+        padding-top: 0;
+        border-top: none;
         text-align: center;
       }
       .approval-title {
@@ -2091,7 +2091,7 @@ export class PrintUtils {
                 `<div style="font-size: 10px; color: #666;">QR Code not available</div>`}
             </div>
             
-            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #000; text-align: center;">
+            <div style="margin-top: 15px; padding-top: 0; text-align: center;">
               <div style="font-size: 11px; font-weight: bold; margin-bottom: 10px;">Approval Section</div>
               <div style="margin-bottom: 8px;">
                 <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px;">Approved By</div>
@@ -4493,8 +4493,8 @@ export class PrintUtils {
             }
             .approval-section {
               margin-top: 30px;
-              padding-top: 15px;
-              border-top: 2px solid #333;
+              padding-top: 0;
+              border-top: none;
             }
             .approval-title {
               font-weight: bold;
