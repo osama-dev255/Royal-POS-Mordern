@@ -96,10 +96,16 @@ const [pendingApprovals, setPendingApprovals] = useState<OutletCustomerSettlemen
 ## How It Works
 
 1. **Creating Settlements:**
-   - New customer settlements are created with `approval_status = 'pending'` by default
-   - They appear in the Approvals tab immediately
+   - New customer settlements are automatically created with `approval_status = 'pending'`
+   - They appear in the Approvals tab immediately after creation
+   - System requires approval before the settlement is considered final
 
-2. **Viewing Pending Approvals:**
+2. **Editing Settlements:**
+   - When a settlement is edited, it automatically resets to `approval_status = 'pending'`
+   - Previous approval date and notes are cleared
+   - Requires re-approval to ensure changes are reviewed
+
+3. **Viewing Pending Approvals:**
    - Navigate to Receivables page
    - Click "Approvals" tab
    - See all pending settlements with full details
@@ -111,7 +117,12 @@ const [pendingApprovals, setPendingApprovals] = useState<OutletCustomerSettlemen
    - Settlement removed from pending list
    - Toast notification confirms the action
 
-4. **Badge Indicator:**
+4. **Editing Settlements:**
+   - Edit button available on settlement cards
+   - Changes reset approval status to 'pending'
+   - Requires re-approval after modifications
+
+5. **Badge Indicator:**
    - Red badge on Approvals tab shows count of pending items
    - Updates automatically when approvals are processed
 
@@ -147,10 +158,12 @@ To complete the implementation, you need to:
 
 ## Benefits
 
-- ✅ Approval workflow for customer settlements
+- ✅ Automatic approval workflow for all new customer settlements
 - ✅ Clear visibility of pending approvals with badge
 - ✅ Quick approve/reject actions
 - ✅ Audit trail (who approved, when, notes)
 - ✅ Consistent with expense approval pattern
 - ✅ Auto-refresh after actions
 - ✅ Responsive design with proper icons and colors
+- ✅ Edit resets approval status for re-approval
+- ✅ Ensures all settlements are reviewed before finalization

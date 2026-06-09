@@ -78,6 +78,7 @@ interface ReceiptSale {
   cashier?: string;
   preparedBy?: string;
   approvedBy?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
@@ -341,7 +342,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         notes: s.notes,
         cashier: s.cashier,
         preparedBy: s.prepared_by,
-        approvedBy: s.approved_by
+        approvedBy: s.approved_by,
+        approvalStatus: s.approval_status || 'pending'
       }));
       
       // Calculate total paid amount from settlements
@@ -1410,7 +1412,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         notes: editNotes || undefined,
         cashier: editCashier || undefined,
         prepared_by: editPreparedBy || undefined,
-        approved_by: editApprovedBy || undefined
+        approved_by: editApprovedBy || undefined,
+        approval_status: 'pending', // Reset to pending for re-approval after edit
+        approval_date: null, // Clear approval date
+        approval_notes: null // Clear approval notes
       });
       
       if (!result) {
@@ -1748,7 +1753,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         notes: settlementNotes,
         cashier: settlementCashier || undefined,
         prepared_by: settlementPreparedBy || undefined,
-        approved_by: settlementApprovedBy || undefined
+        approved_by: settlementApprovedBy || undefined,
+        approval_status: 'pending' // Mark as pending approval
       });
       
       if (!result) {
@@ -2598,6 +2604,18 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                       <span className="font-semibold">{receipt.invoiceNumber}</span>
                       <Badge className="bg-green-100 text-green-800">{receipt.status}</Badge>
                       <Badge variant="outline" className="capitalize">{receipt.type}</Badge>
+                      {receipt.type === 'sales' && receipt.approvalStatus && (
+                        <Badge 
+                          variant={
+                            receipt.approvalStatus === 'approved' ? 'default' : 
+                            receipt.approvalStatus === 'rejected' ? 'destructive' : 
+                            'secondary'
+                          }
+                          className="capitalize"
+                        >
+                          {receipt.approvalStatus}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <span>{new Date(receipt.date).toLocaleDateString()}</span>
@@ -2773,6 +2791,18 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                     <Badge variant="outline" className="capitalize">
                       {selectedReceipt.type === 'sales' && selectedReceipt.previousBalance !== undefined ? 'Customer Settlement' : selectedReceipt.type}
                     </Badge>
+                    {selectedReceipt.type === 'sales' && selectedReceipt.approvalStatus && (
+                      <Badge 
+                        variant={
+                          selectedReceipt.approvalStatus === 'approved' ? 'default' : 
+                          selectedReceipt.approvalStatus === 'rejected' ? 'destructive' : 
+                          'secondary'
+                        }
+                        className="capitalize"
+                      >
+                        {selectedReceipt.approvalStatus}
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
