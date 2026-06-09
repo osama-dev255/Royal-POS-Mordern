@@ -261,6 +261,39 @@ export class PrintUtils {
         color: #666;
         margin: 5px 0;
       }
+      /* Approval Section Styles */
+      .approval-section {
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 1px dashed #000;
+        text-align: center;
+      }
+      .approval-title {
+        font-size: 10px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      .approval-field {
+        margin-bottom: 8px;
+      }
+      .approval-label {
+        font-size: 9px;
+        font-weight: bold;
+        margin-bottom: 3px;
+      }
+      .approval-value {
+        font-size: 10px;
+        min-height: 20px;
+        border-bottom: 1px solid #000;
+        padding-bottom: 3px;
+        margin: 0 auto;
+        max-width: 200px;
+      }
+      .approval-note {
+        font-size: 8px;
+        color: #666;
+        font-style: italic;
+      }
     </style>
   </head>
   <body>
@@ -380,6 +413,20 @@ export class PrintUtils {
            </div>
          </div>`}
       <div style="font-size: 8px; margin-top: 5px;">Receipt #: ${transaction.receiptNumber || Date.now()}</div>
+    </div>
+    
+    <div class="approval-section">
+      <div class="approval-title">Approval Section</div>
+      <div class="approval-field">
+        <div class="approval-label">Approved By</div>
+        <div class="approval-value">${transaction.approvedBy || '_______________________'}</div>
+        <div class="approval-note">Name & Signature</div>
+      </div>
+      <div class="approval-field">
+        <div class="approval-label">Date</div>
+        <div class="approval-value">_______________________</div>
+        <div class="approval-note">Approval Date</div>
+      </div>
     </div>
   </body>
 </html>`;
@@ -2042,6 +2089,20 @@ export class PrintUtils {
               ${qrCodeUrl ? 
                 `<img src="${qrCodeUrl}" style="width: 120px; height: 120px; margin: 0 auto; display: block;" alt="Receipt QR Code" />` : 
                 `<div style="font-size: 10px; color: #666;">QR Code not available</div>`}
+            </div>
+            
+            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #000; text-align: center;">
+              <div style="font-size: 11px; font-weight: bold; margin-bottom: 10px;">Approval Section</div>
+              <div style="margin-bottom: 8px;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px;">Approved By</div>
+                <div style="font-size: 11px; min-height: 20px; border-bottom: 1px solid #000; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">${transaction.approvedBy || '_______________________'}</div>
+                <div style="font-size: 9px; color: #666; font-style: italic;">Name & Signature</div>
+              </div>
+              <div style="margin-bottom: 8px;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px;">Date</div>
+                <div style="font-size: 11px; min-height: 20px; border-bottom: 1px solid #000; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">_______________________</div>
+                <div style="font-size: 9px; color: #666; font-style: italic;">Approval Date</div>
+              </div>
             </div>
           </div>
           
@@ -4430,6 +4491,46 @@ export class PrintUtils {
               font-size: 9px;
               color: #666;
             }
+            .approval-section {
+              margin-top: 30px;
+              padding-top: 15px;
+              border-top: 2px solid #333;
+            }
+            .approval-title {
+              font-weight: bold;
+              font-size: 12px;
+              margin-bottom: 15px;
+              text-transform: uppercase;
+              text-align: center;
+            }
+            .approval-fields {
+              display: flex;
+              justify-content: space-between;
+              gap: 20px;
+            }
+            .approval-field {
+              flex: 1;
+              text-align: center;
+            }
+            .approval-label {
+              font-size: 10px;
+              font-weight: bold;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+              color: #666;
+            }
+            .approval-value {
+              font-size: 11px;
+              min-height: 30px;
+              border-bottom: 1px solid #333;
+              padding-bottom: 5px;
+              margin-bottom: 3px;
+            }
+            .approval-note {
+              font-size: 9px;
+              color: #999;
+              font-style: italic;
+            }
           </style>
         </head>
         <body>
@@ -4591,6 +4692,22 @@ export class PrintUtils {
           
           <div class="footer">
             <p>This is a computer-generated invoice.</p>
+          </div>
+          
+          <div class="approval-section">
+            <div class="approval-title">Approval Section</div>
+            <div class="approval-fields">
+              <div class="approval-field">
+                <div class="approval-label">Approved By</div>
+                <div class="approval-value">${transaction.approvedBy || '_______________________'}</div>
+                <div class="approval-note">Name & Signature</div>
+              </div>
+              <div class="approval-field">
+                <div class="approval-label">Date</div>
+                <div class="approval-value">_______________________</div>
+                <div class="approval-note">Approval Date</div>
+              </div>
+            </div>
           </div>
           
           <script>

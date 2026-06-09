@@ -1181,7 +1181,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           ? (dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()) 
           : undefined,
         paymentStatus: paymentMethod === "debt" && actualAmountPaid < totalWithTax ? "partial" : 
-                      paymentMethod === "debt" && actualAmountPaid >= totalWithTax ? "paid" : "completed"
+                      paymentMethod === "debt" && actualAmountPaid >= totalWithTax ? "paid" : "completed",
+        approvedBy: '', // Leave blank for manual entry
+        approvedSignature: '' // Leave blank for manual signature
       };
 
       // Store transaction for potential printing
