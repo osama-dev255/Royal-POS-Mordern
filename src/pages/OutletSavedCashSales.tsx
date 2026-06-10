@@ -941,11 +941,13 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Approved By</label>
+                <label className="text-sm font-medium">
+                  {approvalStatus === 'approved' ? 'Approved By' : 'Rejected By'}
+                </label>
                 <Input
                   value={approvedByName}
                   onChange={(e) => setApprovedByName(e.target.value)}
-                  placeholder="Enter approver name..."
+                  placeholder={`Enter ${approvalStatus === 'approved' ? 'approver' : 'rejector'} name...`}
                   className="w-full"
                 />
               </div>
