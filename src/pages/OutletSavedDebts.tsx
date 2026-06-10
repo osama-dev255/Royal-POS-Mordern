@@ -99,6 +99,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Approval status filter
+  const [approvalFilter, setApprovalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  
   // Approval dialog
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
@@ -1435,6 +1438,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
   // Calculate filtered sales for header statistics
   const filteredSales = sales.filter(sale => {
+    // Approval status filter
+    const saleStatus = sale.approvalStatus || 'pending'; // Default to pending if undefined
+    if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+    
     // Date range filter
     if (startDate || endDate) {
       const saleDate = new Date(sale.date);
@@ -1539,6 +1546,20 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             />
           </div>
           
+          {/* Approval Status Filter */}
+          <div className="flex items-center gap-2">
+            <select
+              value={approvalFilter}
+              onChange={(e) => setApprovalFilter(e.target.value as 'all' | 'pending' | 'approved' | 'rejected')}
+              className="h-8 px-3 border rounded-md text-sm"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          
           {/* Action Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1588,6 +1609,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
           // Filter sales by date range and search term
           (() => {
             const filteredSales = sales.filter(sale => {
+              // Approval status filter
+              const saleStatus = sale.approvalStatus || 'pending'; // Default to pending if undefined
+              if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+              
               // Date range filter
               if (startDate || endDate) {
                 const saleDate = new Date(sale.date);

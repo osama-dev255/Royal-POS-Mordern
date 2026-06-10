@@ -89,6 +89,9 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Approval status filter
+  const [approvalFilter, setApprovalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  
   // Approval dialog
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
@@ -304,6 +307,10 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
 
   const getFilteredSales = () => {
     return sales.filter(sale => {
+      // Approval status filter
+      const saleStatus = sale.approvalStatus || 'pending'; // Default to pending if undefined
+      if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
         if (startDate && saleDate < new Date(startDate)) return false;
@@ -654,6 +661,20 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 h-8"
             />
+          </div>
+          
+          {/* Approval Status Filter */}
+          <div className="flex items-center gap-2">
+            <select
+              value={approvalFilter}
+              onChange={(e) => setApprovalFilter(e.target.value as 'all' | 'pending' | 'approved' | 'rejected')}
+              className="h-8 px-3 border rounded-md text-sm"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
           </div>
           
           {/* Action Button */}
