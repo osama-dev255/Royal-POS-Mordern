@@ -31,18 +31,22 @@ import {
   Download,
   Share2,
   ChevronDown,
-  FileText
+  FileText,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getOutletCashSalesByOutletId, 
   deleteOutletCashSale,
+  approveOutletCashSale,
   getOutletCashSaleItemsBySaleId,
   getOutletCustomerById,
   getOutletDebtsByCustomerId,
   OutletCashSale,
   OutletCashSaleItem
 } from "@/services/databaseService";
+import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -66,6 +70,10 @@ interface SavedSale {
   paymentMethod: string;
   status: string;
   creditBroughtForward?: number;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvalDate?: string;
+  approvalNotes?: string;
 }
 
 export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesProps) => {
@@ -81,6 +89,12 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
   
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Approval dialog
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
     fetchSavedCashSales();
@@ -361,7 +375,11 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
             changeAmount: sale.change_amount,
             paymentMethod: 'cash',
             status: 'completed',
-            creditBroughtForward: creditBroughtForward
+            creditBroughtForward: creditBroughtForward,
+            approvalStatus: sale.approval_status || 'pending',
+            approvedBy: sale.approved_by,
+            approvalDate: sale.approval_date,
+            approvalNotes: sale.approval_notes
           };
         })
       );
@@ -500,6 +518,76 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
         title: "Error",
         description: "Failed to delete sale record",
         variant: "destructive"
+      });
+    }
+  };
+
+  // Approval handlers
+  const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
+    setApprovingSale(sale);
+    setApprovalStatus(status);
+    setApprovalNotes('');
+    setIsApprovalDialogOpen(true);
+  };
+
+  const handleApproveSale = async () => {
+    if (!approvingSale) return;
+
+    try {
+      // Get current authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({ 
+          title: "Authentication Error", 
+          description: "You must be logged in to approve sales", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      const success = await approveOutletCashSale(
+        approvingSale.id,
+        approvalStatus,
+        user.id,
+        approvalNotes || undefined
+      );
+
+      if (success) {
+        // Update local state
+        const updatedSales = sales.map(s => 
+          s.id === approvingSale.id 
+            ? { 
+                ...s, 
+                approvalStatus: approvalStatus,
+                approvedBy: user.id,
+                approvalDate: new Date().toISOString(),
+                approvalNotes: approvalNotes || undefined
+              }
+            : s
+        );
+        setSales(updatedSales);
+        
+        toast({ 
+          title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
+          description: `Cash sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
+        });
+        
+        setIsApprovalDialogOpen(false);
+        setApprovingSale(null);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: `Failed to ${approvalStatus} sale`, 
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Error approving sale:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to process approval", 
+        variant: "destructive" 
       });
     }
   };
@@ -644,6 +732,19 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold">{sale.invoiceNumber}</span>
                       <Badge className="bg-green-100 text-green-800">{sale.status}</Badge>
+                      {sale.approvalStatus && (
+                        <Badge 
+                          variant={
+                            sale.approvalStatus === 'approved' ? 'default' : 
+                            sale.approvalStatus === 'rejected' ? 'destructive' : 
+                            'secondary'
+                          }
+                        >
+                          {sale.approvalStatus === 'approved' ? '✓ Approved' : 
+                           sale.approvalStatus === 'rejected' ? '✗ Rejected' : 
+                           '⏳ Pending'}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <span>{sale.date}</span>
@@ -672,6 +773,27 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
                         <Printer className="h-4 w-4 mr-1" />
                         Print
                       </Button>
+                      {sale.approvalStatus === 'pending' && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleOpenApprovalDialog(sale, 'approved')}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-red-600"
+                            onClick={() => handleOpenApprovalDialog(sale, 'rejected')}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
                       <Button 
                         size="sm" 
                         variant="destructive"
@@ -782,6 +904,73 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
                   <Banknote className="h-3 w-3 mr-1" />
                   Cash
                 </Badge>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalStatus === 'approved' ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Approve Sale
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  Reject Sale
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {approvingSale && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Invoice Number</p>
+                <p className="font-semibold">{approvingSale.invoiceNumber}</p>
+                <p className="text-sm text-muted-foreground mt-1">Customer: {approvingSale.customer}</p>
+                <p className="text-sm text-muted-foreground">Amount: {formatCurrency(approvingSale.total)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (Optional)</label>
+                <textarea
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  className="w-full min-h-[100px] p-3 border rounded-md resize-none"
+                  placeholder={`Add notes for ${approvalStatus === 'approved' ? 'approval' : 'rejection'}...`}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsApprovalDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleApproveSale}
+                  className={approvalStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                >
+                  {approvalStatus === 'approved' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}

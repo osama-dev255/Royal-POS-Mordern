@@ -122,6 +122,10 @@ export interface SavedSale {
   status: string;
   sale_date?: string;
   notes?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approval_date?: string;
+  approval_notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -4488,6 +4492,7 @@ export const createSavedSale = async (savedSale: Omit<SavedSale, 'id'>): Promise
       .from('saved_sales')
       .insert([{
         ...savedSale,
+        approval_status: savedSale.approval_status || 'pending', // Default to pending
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
@@ -4608,6 +4613,35 @@ export const getSavedSalesByCustomerId = async (customerId: string): Promise<Sav
   } catch (error) {
     console.error('Error fetching saved sales by customer:', error);
     return [];
+  }
+};
+
+// Approve or reject a saved sale
+export const approveSavedSale = async (
+  id: string, 
+  status: 'approved' | 'rejected', 
+  approvedBy: string,
+  notes?: string
+): Promise<SavedSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_sales')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error approving saved sale:', error);
+    return null;
   }
 };
 
@@ -4852,6 +4886,10 @@ export interface OutletCashSale {
   balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
   notes?: string;
   reference_number?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approval_date?: string;
+  approval_notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -4890,6 +4928,10 @@ export interface OutletCardSale {
   balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
   notes?: string;
   reference_number?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approval_date?: string;
+  approval_notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -4928,6 +4970,10 @@ export interface OutletMobileSale {
   balance_carried_forward?: number; // Customer balance before this transaction (negative=credit, positive=debt)
   notes?: string;
   reference_number?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approval_date?: string;
+  approval_notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -5250,6 +5296,33 @@ export const deleteOutletDebt = async (id: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error deleting outlet debt:', error);
+    return false;
+  }
+};
+
+// Approve or reject an outlet debt
+export const approveOutletDebt = async (
+  id: string, 
+  status: 'approved' | 'rejected', 
+  approvedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_debts')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error approving outlet debt:', error);
     return false;
   }
 };
@@ -5880,6 +5953,33 @@ export const deleteOutletCashSale = async (id: string): Promise<boolean> => {
   }
 };
 
+// Approve or reject an outlet cash sale
+export const approveOutletCashSale = async (
+  id: string, 
+  status: 'approved' | 'rejected', 
+  approvedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_cash_sales')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error approving outlet cash sale:', error);
+    return false;
+  }
+};
+
 export const createOutletCashSaleItem = async (item: Omit<OutletCashSaleItem, 'id'>): Promise<OutletCashSaleItem | null> => {
   try {
     const { data, error } = await supabase
@@ -6002,6 +6102,33 @@ export const deleteOutletCardSale = async (id: string): Promise<boolean> => {
   }
 };
 
+// Approve or reject an outlet card sale
+export const approveOutletCardSale = async (
+  id: string, 
+  status: 'approved' | 'rejected', 
+  approvedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_card_sales')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error approving outlet card sale:', error);
+    return false;
+  }
+};
+
 export const createOutletCardSaleItem = async (item: Omit<OutletCardSaleItem, 'id'>): Promise<OutletCardSaleItem | null> => {
   try {
     const { data, error } = await supabase
@@ -6120,6 +6247,33 @@ export const deleteOutletMobileSale = async (id: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error deleting outlet mobile sale:', error);
+    return false;
+  }
+};
+
+// Approve or reject an outlet mobile sale
+export const approveOutletMobileSale = async (
+  id: string, 
+  status: 'approved' | 'rejected', 
+  approvedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_mobile_sales')
+      .update({
+        approval_status: status,
+        approved_by: approvedBy,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error approving outlet mobile sale:', error);
     return false;
   }
 };

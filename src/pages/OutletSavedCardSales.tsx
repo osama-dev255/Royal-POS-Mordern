@@ -31,18 +31,22 @@ import {
   Download,
   Share2,
   ChevronDown,
-  FileText
+  FileText,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getOutletCardSalesByOutletId, 
   deleteOutletCardSale,
+  approveOutletCardSale,
   getOutletCardSaleItemsBySaleId,
   getOutletCustomerById,
   getOutletDebtsByCustomerId,
   OutletCardSale,
   OutletCardSaleItem
 } from "@/services/databaseService";
+import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -65,6 +69,10 @@ interface SavedSale {
   paymentMethod: string;
   status: string;
   creditBroughtForward?: number;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvalDate?: string;
+  approvalNotes?: string;
 }
 
 export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesProps) => {
@@ -80,6 +88,12 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
   
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Approval dialog
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
     fetchSavedCardSales();
@@ -362,7 +376,11 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
             transactionId: sale.transaction_id,
             paymentMethod: 'card',
             status: 'completed',
-            creditBroughtForward: creditBroughtForward
+            creditBroughtForward: creditBroughtForward,
+            approvalStatus: sale.approval_status || 'pending',
+            approvedBy: sale.approved_by,
+            approvalDate: sale.approval_date,
+            approvalNotes: sale.approval_notes
           };
         })
       );
