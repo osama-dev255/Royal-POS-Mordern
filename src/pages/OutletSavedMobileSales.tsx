@@ -31,18 +31,22 @@ import {
   Download,
   Share2,
   ChevronDown,
-  FileText
+  FileText,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getOutletMobileSalesByOutletId, 
   deleteOutletMobileSale,
+  approveOutletMobileSale,
   getOutletMobileSaleItemsBySaleId,
   getOutletCustomerById,
   getOutletDebtsByCustomerId,
   OutletMobileSale,
   OutletMobileSaleItem
 } from "@/services/databaseService";
+import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -65,6 +69,10 @@ interface SavedSale {
   paymentMethod: string;
   status: string;
   creditBroughtForward?: number;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvalDate?: string;
+  approvalNotes?: string;
 }
 
 export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSalesProps) => {
@@ -80,6 +88,12 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
   
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Approval dialog
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
     fetchSavedMobileSales();
@@ -498,6 +512,73 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
     }
   };
 
+  // Approval handlers
+  const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
+  setApprovingSale(sale);
+  setApprovalStatus(status);
+  setApprovalNotes('');
+  setIsApprovalDialogOpen(true);
+};
+
+const handleApproveSale = async () => {
+  if (!approvingSale) return;
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+      
+    if (!user) {
+      toast({ 
+        title: "Authentication Error", 
+        description: "You must be logged in to approve sales", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const success = await approveOutletMobileSale(
+      approvingSale.id,
+      approvalStatus,
+      user.id,
+      approvalNotes || undefined
+    );
+
+    if (success) {
+      const updatedSales = sales.map(s => 
+        s.id === approvingSale.id 
+          ? { 
+              ...s, 
+              approvalStatus: approvalStatus,
+              approvedBy: user.id,
+              approvalDate: new Date().toISOString(),
+              approvalNotes: approvalNotes || undefined
+            }
+          : s
+      );
+      setSales(updatedSales);
+        
+      toast({ 
+        title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
+        description: `Mobile sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
+      });
+        
+      setIsApprovalDialogOpen(false);
+      setApprovingSale(null);
+    } else {
+      toast({ 
+        title: "Error", 
+        description: `Failed to ${approvalStatus} sale`, 
+        variant: "destructive" 
+      });
+    }
+  } catch (error) {
+    console.error('Error approving sale:', error);
+    toast({ 
+      title: "Error", 
+      description: "Failed to process approval", 
+      variant: "destructive" 
+    });
+  }
+};
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-4 mb-6">
@@ -636,6 +717,19 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold">{sale.invoiceNumber}</span>
                       <Badge className="bg-purple-100 text-purple-800">{sale.status}</Badge>
+                      {sale.approvalStatus && (
+                        <Badge 
+                          variant={
+                            sale.approvalStatus === 'approved' ? 'default' : 
+                            sale.approvalStatus === 'rejected' ? 'destructive' : 
+                            'secondary'
+                          }
+                        >
+                          {sale.approvalStatus === 'approved' ? '✓ Approved' : 
+                           sale.approvalStatus === 'rejected' ? '✗ Rejected' : 
+                           '⏳ Pending'}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <span>{sale.date}</span>
@@ -664,6 +758,27 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
                         <Printer className="h-4 w-4 mr-1" />
                         Print
                       </Button>
+                      {sale.approvalStatus === 'pending' && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleOpenApprovalDialog(sale, 'approved')}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-red-600"
+                            onClick={() => handleOpenApprovalDialog(sale, 'rejected')}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
                       <Button 
                         size="sm" 
                         variant="destructive"
