@@ -93,6 +93,7 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvedByName, setApprovedByName] = useState('');
   const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
@@ -515,75 +516,75 @@ export const OutletSavedCardSales = ({ onBack, outletId }: OutletSavedCardSalesP
       });
     }
   }
-};
 
-// Approval handlers
-const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
-  setApprovingSale(sale);
-  setApprovalStatus(status);
-  setApprovalNotes('');
-  setIsApprovalDialogOpen(true);
-};
+  // Approval handlers
+  const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
+    setApprovingSale(sale);
+    setApprovalStatus(status);
+    setApprovalNotes('');
+    setApprovedByName('');
+    setIsApprovalDialogOpen(true);
+  };
 
-const handleApproveSale = async () => {
-  if (!approvingSale) return;
+  const handleApproveSale = async () => {
+    if (!approvingSale) return;
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
       
-    if (!user) {
-      toast({ 
-        title: "Authentication Error", 
-        description: "You must be logged in to approve sales", 
-        variant: "destructive" 
-      });
-      return;
-    }
+      if (!user) {
+        toast({ 
+          title: "Authentication Error", 
+          description: "You must be logged in to approve sales", 
+          variant: "destructive" 
+        });
+        return;
+      }
 
-    const success = await approveOutletCardSale(
-      approvingSale.id,
-      approvalStatus,
-      user.id,
-      approvalNotes || undefined
-    );
-
-    if (success) {
-      const updatedSales = sales.map(s => 
-        s.id === approvingSale.id 
-          ? { 
-              ...s, 
-              approvalStatus: approvalStatus,
-              approvedBy: user.id,
-              approvalDate: new Date().toISOString(),
-              approvalNotes: approvalNotes || undefined
-            }
-          : s
+      const success = await approveOutletCardSale(
+        approvingSale.id,
+        approvalStatus,
+        user.id,
+        approvalNotes || undefined
       );
-      setSales(updatedSales);
+
+      if (success) {
+        const updatedSales = sales.map(s => 
+          s.id === approvingSale.id 
+            ? { 
+                ...s, 
+                approvalStatus: approvalStatus,
+                approvedBy: user.id,
+                approvalDate: new Date().toISOString(),
+                approvalNotes: approvalNotes || undefined
+              }
+            : s
+        );
+        setSales(updatedSales);
         
-      toast({ 
-        title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
-        description: `Card sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
-      });
+        toast({ 
+          title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
+          description: `Card sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
+        });
         
-      setIsApprovalDialogOpen(false);
-      setApprovingSale(null);
-    } else {
+        setIsApprovalDialogOpen(false);
+        setApprovingSale(null);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: `Failed to ${approvalStatus} sale`, 
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Error approving sale:', error);
       toast({ 
         title: "Error", 
-        description: `Failed to ${approvalStatus} sale`, 
+        description: "Failed to process approval", 
         variant: "destructive" 
       });
     }
-  } catch (error) {
-    console.error('Error approving sale:', error);
-    toast({ 
-      title: "Error", 
-      description: "Failed to process approval", 
-      variant: "destructive" 
-    });
-  }
-};
+  };
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-4 mb-6">
@@ -921,6 +922,16 @@ const handleApproveSale = async () => {
                 <p className="font-semibold">{approvingSale.invoiceNumber}</p>
                 <p className="text-sm text-muted-foreground mt-1">Customer: {approvingSale.customer}</p>
                 <p className="text-sm text-muted-foreground">Amount: {formatCurrency(approvingSale.total)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Approved By</label>
+                <Input
+                  value={approvedByName}
+                  onChange={(e) => setApprovedByName(e.target.value)}
+                  placeholder="Enter approver name..."
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-2">

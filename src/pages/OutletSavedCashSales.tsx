@@ -94,6 +94,7 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvedByName, setApprovedByName] = useState('');
   const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
@@ -527,6 +528,7 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
     setApprovingSale(sale);
     setApprovalStatus(status);
     setApprovalNotes('');
+    setApprovedByName('');
     setIsApprovalDialogOpen(true);
   };
 
@@ -936,6 +938,16 @@ export const OutletSavedCashSales = ({ onBack, outletId }: OutletSavedCashSalesP
                 <p className="font-semibold">{approvingSale.invoiceNumber}</p>
                 <p className="text-sm text-muted-foreground mt-1">Customer: {approvingSale.customer}</p>
                 <p className="text-sm text-muted-foreground">Amount: {formatCurrency(approvingSale.total)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Approved By</label>
+                <Input
+                  value={approvedByName}
+                  onChange={(e) => setApprovedByName(e.target.value)}
+                  placeholder="Enter approver name..."
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-2">

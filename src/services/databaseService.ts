@@ -4838,6 +4838,10 @@ export interface OutletDebt {
   salesman?: string;
   driver?: string;
   truck?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approval_date?: string;
+  approval_notes?: string;
   created_at?: string;
   updated_at?: string;
 }

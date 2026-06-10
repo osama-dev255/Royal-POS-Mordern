@@ -33,11 +33,14 @@ import {
   Search,
   Download,
   Share2,
-  ChevronDown
+  ChevronDown,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
+import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -70,6 +73,10 @@ interface SavedSale {
   salesman?: string;
   driver?: string;
   truck?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvalDate?: string;
+  approvalNotes?: string;
 }
 
 export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) => {
@@ -91,6 +98,13 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Approval dialog
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvedByName, setApprovedByName] = useState('');
+  const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
     fetchSavedDebts();
@@ -851,7 +865,11 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             adjustmentReason: debt.adjustment_reason,
             salesman: debt.salesman,
             driver: debt.driver,
-            truck: debt.truck
+            truck: debt.truck,
+            approvalStatus: debt.approval_status || 'pending',
+            approvedBy: debt.approved_by,
+            approvalDate: debt.approval_date,
+            approvalNotes: debt.approval_notes
           };
         })
       );
@@ -1346,6 +1364,75 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     }
   };
 
+  // Approval handlers
+  const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
+    setApprovingSale(sale);
+    setApprovalStatus(status);
+    setApprovalNotes('');
+    setApprovedByName('');
+    setIsApprovalDialogOpen(true);
+  };
+
+  const handleApproveSale = async () => {
+    if (!approvingSale) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({ 
+          title: "Authentication Error", 
+          description: "You must be logged in to approve sales", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      const success = await approveOutletDebt(
+        approvingSale.id,
+        approvalStatus,
+        user.id,
+        approvalNotes || undefined
+      );
+
+      if (success) {
+        const updatedSales = sales.map(s => 
+          s.id === approvingSale.id 
+            ? { 
+                ...s, 
+                approvalStatus: approvalStatus,
+                approvedBy: user.id,
+                approvalDate: new Date().toISOString(),
+                approvalNotes: approvalNotes || undefined
+              }
+            : s
+        );
+        setSales(updatedSales);
+        
+        toast({ 
+          title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
+          description: `Debt sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
+        });
+        
+        setIsApprovalDialogOpen(false);
+        setApprovingSale(null);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: `Failed to ${approvalStatus} sale`, 
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Error approving sale:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to process approval", 
+        variant: "destructive" 
+      });
+    }
+  };
+
   // Calculate filtered sales for header statistics
   const filteredSales = sales.filter(sale => {
     // Date range filter
@@ -1570,6 +1657,19 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold">{sale.invoiceNumber}</span>
                       {statusBadge}
+                      {sale.approvalStatus && (
+                        <Badge 
+                          variant={
+                            sale.approvalStatus === 'approved' ? 'default' : 
+                            sale.approvalStatus === 'rejected' ? 'destructive' : 
+                            'secondary'
+                          }
+                        >
+                          {sale.approvalStatus === 'approved' ? '✓ Approved' : 
+                           sale.approvalStatus === 'rejected' ? '✗ Rejected' : 
+                           '⏳ Pending'}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <span>{sale.date}</span>
@@ -1613,6 +1713,27 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         <Printer className="h-4 w-4 mr-1" />
                         Print
                       </Button>
+                      {sale.approvalStatus === 'pending' && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleOpenApprovalDialog(sale, 'approved')}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-red-600"
+                            onClick={() => handleOpenApprovalDialog(sale, 'rejected')}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
                       <Button 
                         size="sm" 
                         variant="outline"
@@ -2233,6 +2354,83 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     <>
                       <Save className="h-4 w-4 mr-1" />
                       Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalStatus === 'approved' ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Approve Sale
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  Reject Sale
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {approvingSale && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Invoice Number</p>
+                <p className="font-semibold">{approvingSale.invoiceNumber}</p>
+                <p className="text-sm text-muted-foreground mt-1">Customer: {approvingSale.customer}</p>
+                <p className="text-sm text-muted-foreground">Amount: {formatCurrency(approvingSale.total)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Approved By</label>
+                <Input
+                  value={approvedByName}
+                  onChange={(e) => setApprovedByName(e.target.value)}
+                  placeholder="Enter approver name..."
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (Optional)</label>
+                <textarea
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  className="w-full min-h-[100px] p-3 border rounded-md resize-none"
+                  placeholder={`Add notes for ${approvalStatus === 'approved' ? 'approval' : 'rejection'}...`}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsApprovalDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleApproveSale}
+                  className={approvalStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                >
+                  {approvalStatus === 'approved' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject
                     </>
                   )}
                 </Button>

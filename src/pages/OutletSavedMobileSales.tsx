@@ -93,6 +93,7 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvedByName, setApprovedByName] = useState('');
   const [approvingSale, setApprovingSale] = useState<SavedSale | null>(null);
 
   useEffect(() => {
@@ -376,7 +377,11 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
             transactionId: sale.transaction_id,
             paymentMethod: 'mobile',
             status: 'completed',
-            creditBroughtForward: creditBroughtForward
+            creditBroughtForward: creditBroughtForward,
+            approvalStatus: sale.approval_status || 'pending',
+            approvedBy: sale.approved_by,
+            approvalDate: sale.approval_date,
+            approvalNotes: sale.approval_notes
           };
         })
       );
@@ -514,71 +519,72 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
 
   // Approval handlers
   const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
-  setApprovingSale(sale);
-  setApprovalStatus(status);
-  setApprovalNotes('');
-  setIsApprovalDialogOpen(true);
-};
+    setApprovingSale(sale);
+    setApprovalStatus(status);
+    setApprovalNotes('');
+    setApprovedByName('');
+    setIsApprovalDialogOpen(true);
+  };
 
-const handleApproveSale = async () => {
-  if (!approvingSale) return;
+  const handleApproveSale = async () => {
+    if (!approvingSale) return;
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
       
-    if (!user) {
-      toast({ 
-        title: "Authentication Error", 
-        description: "You must be logged in to approve sales", 
-        variant: "destructive" 
-      });
-      return;
-    }
+      if (!user) {
+        toast({ 
+          title: "Authentication Error", 
+          description: "You must be logged in to approve sales", 
+          variant: "destructive" 
+        });
+        return;
+      }
 
-    const success = await approveOutletMobileSale(
-      approvingSale.id,
-      approvalStatus,
-      user.id,
-      approvalNotes || undefined
-    );
-
-    if (success) {
-      const updatedSales = sales.map(s => 
-        s.id === approvingSale.id 
-          ? { 
-              ...s, 
-              approvalStatus: approvalStatus,
-              approvedBy: user.id,
-              approvalDate: new Date().toISOString(),
-              approvalNotes: approvalNotes || undefined
-            }
-          : s
+      const success = await approveOutletMobileSale(
+        approvingSale.id,
+        approvalStatus,
+        user.id,
+        approvalNotes || undefined
       );
-      setSales(updatedSales);
+
+      if (success) {
+        const updatedSales = sales.map(s => 
+          s.id === approvingSale.id 
+            ? { 
+                ...s, 
+                approvalStatus: approvalStatus,
+                approvedBy: user.id,
+                approvalDate: new Date().toISOString(),
+                approvalNotes: approvalNotes || undefined
+              }
+            : s
+        );
+        setSales(updatedSales);
         
-      toast({ 
-        title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
-        description: `Mobile sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
-      });
+        toast({ 
+          title: approvalStatus === 'approved' ? "Sale Approved" : "Sale Rejected",
+          description: `Mobile sale ${approvingSale.invoiceNumber} has been ${approvalStatus}`
+        });
         
-      setIsApprovalDialogOpen(false);
-      setApprovingSale(null);
-    } else {
+        setIsApprovalDialogOpen(false);
+        setApprovingSale(null);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: `Failed to ${approvalStatus} sale`, 
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Error approving sale:', error);
       toast({ 
         title: "Error", 
-        description: `Failed to ${approvalStatus} sale`, 
+        description: "Failed to process approval", 
         variant: "destructive" 
       });
     }
-  } catch (error) {
-    console.error('Error approving sale:', error);
-    toast({ 
-      title: "Error", 
-      description: "Failed to process approval", 
-      variant: "destructive" 
-    });
-  }
-};
+  };
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-4 mb-6">
@@ -884,6 +890,83 @@ const handleApproveSale = async () => {
                   <Smartphone className="h-3 w-3 mr-1" />
                   Mobile Money
                 </Badge>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalStatus === 'approved' ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Approve Sale
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  Reject Sale
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {approvingSale && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Invoice Number</p>
+                <p className="font-semibold">{approvingSale.invoiceNumber}</p>
+                <p className="text-sm text-muted-foreground mt-1">Customer: {approvingSale.customer}</p>
+                <p className="text-sm text-muted-foreground">Amount: {formatCurrency(approvingSale.total)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Approved By</label>
+                <Input
+                  value={approvedByName}
+                  onChange={(e) => setApprovedByName(e.target.value)}
+                  placeholder="Enter approver name..."
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (Optional)</label>
+                <textarea
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  className="w-full min-h-[100px] p-3 border rounded-md resize-none"
+                  placeholder={`Add notes for ${approvalStatus === 'approved' ? 'approval' : 'rejection'}...`}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsApprovalDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleApproveSale}
+                  className={approvalStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                >
+                  {approvalStatus === 'approved' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}
