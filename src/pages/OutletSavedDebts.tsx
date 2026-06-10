@@ -118,6 +118,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handlePrintDebts = () => {
     // Get filtered sales
     const filteredSales = sales.filter(sale => {
+      // Approval status filter
+      const saleStatus = sale.approvalStatus || 'pending';
+      if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
         if (startDate && saleDate < new Date(startDate)) return false;
@@ -376,6 +380,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleDownload = () => {
     // Get filtered sales
     const filteredSales = sales.filter(sale => {
+      // Approval status filter
+      const saleStatus = sale.approvalStatus || 'pending';
+      if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
         if (startDate && saleDate < new Date(startDate)) return false;
@@ -470,6 +478,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleExportXLS = () => {
     // Get filtered sales
     const filteredSales = sales.filter(sale => {
+      // Approval status filter
+      const saleStatus = sale.approvalStatus || 'pending';
+      if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
         if (startDate && saleDate < new Date(startDate)) return false;
@@ -661,6 +673,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const handleSharePDF = async () => {
     // Get filtered sales
     const filteredSales = sales.filter(sale => {
+      // Approval status filter
+      const saleStatus = sale.approvalStatus || 'pending';
+      if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
         if (startDate && saleDate < new Date(startDate)) return false;
