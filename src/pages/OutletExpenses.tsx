@@ -54,7 +54,10 @@ import {
   MoreVertical,
   Upload,
   File,
-  X
+  X,
+  Share2,
+  ChevronDown,
+  Printer
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -64,6 +67,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { ExportUtils } from "@/utils/exportUtils";
+import { PrintUtils } from "@/utils/printUtils";
+import { ExcelUtils } from "@/utils/excelUtils";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   getOutletExpensesFiltered,
   createOutletExpense,
@@ -665,37 +672,6 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     }
   };
 
-  const exportToPDF = () => {
-    const data = expenses.map(exp => ({
-      Date: new Date(exp.expense_date).toLocaleDateString(),
-      Category: exp.category,
-      Description: exp.description,
-      Amount: exp.amount,
-      Payment: exp.payment_method,
-      Vendor: exp.vendor_name || '-',
-      Status: exp.approval_status || 'pending'
-    }));
-    
-    ExportUtils.exportToPDF(data, `expenses_${outletName}_${new Date().toISOString().split('T')[0]}`, 'Expense Report');
-  };
-
-  const exportToXLS = () => {
-    const data = expenses.map(exp => ({
-      Date: new Date(exp.expense_date).toLocaleDateString(),
-      Category: exp.category,
-      'Sub-Category': exp.sub_category || '-',
-      Description: exp.description,
-      Amount: exp.amount,
-      'Payment Method': exp.payment_method,
-      Vendor: exp.vendor_name || '-',
-      'Tax Deductible': exp.tax_deductible ? 'Yes' : 'No',
-      Status: exp.approval_status || 'pending',
-      Notes: exp.notes || '-'
-    }));
-    
-    ExportUtils.exportToXLS(data, `expenses_${outletName}_${new Date().toISOString().split('T')[0]}`);
-  };
-
   const filteredExpenses = expenses.filter(exp => {
     const matchesSearch = !searchTerm || 
       exp.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -712,6 +688,218 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
     return matchesSearch && matchesCategory && matchesStatus && matchesPayment && matchesDateFrom && matchesDateTo;
   });
+
+  const exportToPDF = () => {
+    const data = filteredExpenses.map(exp => ({
+      Date: new Date(exp.expense_date).toLocaleDateString(),
+      Category: exp.category,
+      Description: exp.description,
+      Amount: exp.amount,
+      Payment: exp.payment_method,
+      Vendor: exp.vendor_name || '-',
+      Status: exp.approval_status || 'pending'
+    }));
+    
+    ExportUtils.exportToPDF(data, `expenses_${outletName}_${new Date().toISOString().split('T')[0]}`, 'Expense Report');
+  };
+
+  const exportToXLS = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to export", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const data = filteredExpenses.map(exp => ({
+      Date: new Date(exp.expense_date).toLocaleDateString(),
+      Category: exp.category,
+      'Sub-Category': exp.sub_category || '-',
+      Description: exp.description,
+      Amount: exp.amount,
+      'Payment Method': exp.payment_method,
+      Vendor: exp.vendor_name || '-',
+      'Tax Deductible': exp.tax_deductible ? 'Yes' : 'No',
+      Status: exp.approval_status || 'pending',
+      Notes: exp.notes || '-'
+    }));
+    
+    const filename = `expenses_${outletName || 'outlet'}_${new Date().toISOString().split('T')[0]}`;
+    ExcelUtils.exportToExcel(data, filename);
+    
+    toast({
+      title: "Export Successful",
+      description: `CSV file downloaded: ${filename}.csv`
+    });
+  };
+
+  const handlePrintReport = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to print", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ 
+        title: "Error", 
+        description: "Please allow pop-ups to print", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Expense Report - ${outletName || 'Outlet'}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+            .header { margin-bottom: 20px; }
+            .summary { background: #f3f4f6; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+            .summary-item { display: inline-block; margin-right: 30px; }
+            .summary-label { font-weight: bold; color: #666; }
+            .summary-value { font-size: 1.2em; color: #3b82f6; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #3b82f6; color: white; padding: 10px; text-align: left; }
+            td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
+            tr:nth-child(even) { background: #f9fafb; }
+            .amount { text-align: right; font-weight: bold; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Expense Report - ${outletName || 'Outlet'}</h1>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div class="summary">
+            <div class="summary-item">
+              <span class="summary-label">Total Expenses: </span>
+              <span class="summary-value">${filteredExpenses.length}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Total Amount: </span>
+              <span class="summary-value">${totalAmount.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Payment</th>
+                <th>Vendor</th>
+                <th class="amount">Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredExpenses.map(exp => `
+                <tr>
+                  <td>${new Date(exp.expense_date).toLocaleDateString()}</td>
+                  <td>${exp.category}</td>
+                  <td>${exp.description}</td>
+                  <td>${exp.payment_method}</td>
+                  <td>${exp.vendor_name || '-'}</td>
+                  <td class="amount">${exp.amount.toFixed(2)}</td>
+                  <td>${exp.approval_status || 'pending'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+    
+    toast({ 
+      title: "Print Ready", 
+      description: "Print dialog opened" 
+    });
+  };
+
+  const handleSharePDF = async () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to share", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`Expense Report - ${outletName || 'Outlet'}`, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    doc.text(`Total Expenses: ${filteredExpenses.length}`, 14, 36);
+    doc.text(`Total Amount: ${totalAmount.toFixed(2)}`, 14, 42);
+    
+    const tableData = filteredExpenses.map(exp => [
+      new Date(exp.expense_date).toLocaleDateString(),
+      exp.category,
+      exp.description,
+      exp.amount.toFixed(2),
+      exp.payment_method,
+      exp.vendor_name || '-',
+      exp.approval_status || 'pending'
+    ]);
+    
+    autoTable(doc, {
+      startY: 50,
+      head: [['Date', 'Category', 'Description', 'Amount', 'Payment', 'Vendor', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+    
+    const pdfBlob = doc.output('blob');
+    
+    // Try to use File constructor if available
+    let pdfFile: File | null = null;
+    try {
+      pdfFile = new File([pdfBlob], 'expense-report.pdf', { type: 'application/pdf' });
+    } catch (error) {
+      // File constructor not supported
+      console.log('File constructor not available');
+    }
+    
+    // Only try to share if File constructor worked
+    if (pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({ files: [pdfFile], title: 'Expense Report' });
+        toast({ title: "Shared", description: "PDF shared successfully" });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          doc.save('expense-report.pdf');
+          toast({ title: "Downloaded", description: "Sharing failed, PDF downloaded" });
+        }
+      }
+    } else {
+      doc.save('expense-report.pdf');
+      toast({ title: "Downloaded", description: "Sharing not supported, PDF downloaded" });
+    }
+  };
 
   if (loading) {
     return (
@@ -736,14 +924,33 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportToPDF} variant="outline">
-            <FileText className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
-          <Button onClick={exportToXLS} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export XLS
-          </Button>
+          {/* Action Button Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-2">
+                <span>Actions</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={handlePrintReport}>
+                <Printer className="h-4 w-4 mr-2" />
+                <span>Print .pdf</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>Download .pdf</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToXLS}>
+                <FileText className="h-4 w-4 mr-2" />
+                <span>Export .csv</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSharePDF}>
+                <Share2 className="h-4 w-4 mr-2" />
+                <span>Share</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button onClick={() => {
             setEditingExpense(null);
             setExpenseData(expenseForm);

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Wallet, Calendar, Filter, Tag, Download, Printer, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Wallet, Calendar, Filter, Tag, Download, Printer, FileSpreadsheet, Loader2, Share2, ChevronDown, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { AutomationService } from "@/services/automationService";
@@ -17,6 +17,9 @@ import { ExportUtils } from "@/utils/exportUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExcelUtils } from "@/utils/excelUtils";
 import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/services/databaseService";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Expense {
   id?: string;
@@ -264,6 +267,194 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
     return matchesSearch && matchesCategory;
   });
 
+  // Action button handlers
+  const handlePrintReport = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to print", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ 
+        title: "Error", 
+        description: "Please allow pop-ups to print", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Expense Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+            .header { margin-bottom: 20px; }
+            .summary { background: #f3f4f6; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+            .summary-item { display: inline-block; margin-right: 30px; }
+            .summary-label { font-weight: bold; color: #666; }
+            .summary-value { font-size: 1.2em; color: #3b82f6; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #3b82f6; color: white; padding: 10px; text-align: left; }
+            td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
+            tr:nth-child(even) { background: #f9fafb; }
+            .amount { text-align: right; font-weight: bold; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Expense Report</h1>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div class="summary">
+            <div class="summary-item">
+              <span class="summary-label">Total Expenses: </span>
+              <span class="summary-value">${filteredExpenses.length}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Total Amount: </span>
+              <span class="summary-value">${formatCurrency(totalAmount)}</span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Payment Method</th>
+                <th class="amount">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredExpenses.map(exp => `
+                <tr>
+                  <td>${exp.date}</td>
+                  <td>${exp.category}</td>
+                  <td>${exp.description}</td>
+                  <td>${exp.paymentMethod}</td>
+                  <td class="amount">${formatCurrency(exp.amount)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+    
+    toast({ 
+      title: "Print Ready", 
+      description: "Print dialog opened" 
+    });
+  };
+
+  const handleDownloadPDF = () => {
+    const filename = `expenses_${new Date().toISOString().split('T')[0]}`;
+    ExportUtils.exportToPDF(filteredExpenses, filename, "Expense Report");
+    toast({
+      title: "Downloaded",
+      description: `PDF: ${filename}.pdf`
+    });
+  };
+
+  const handleExportXLS = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to export", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const filename = `expenses_${new Date().toISOString().split('T')[0]}`;
+    ExcelUtils.exportToExcel(filteredExpenses, filename);
+    toast({
+      title: "Exported",
+      description: `CSV: ${filename}.csv`
+    });
+  };
+
+  const handleSharePDF = async () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to share", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Expense Report', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    doc.text(`Total Expenses: ${filteredExpenses.length}`, 14, 36);
+    doc.text(`Total Amount: ${formatCurrency(totalAmount)}`, 14, 42);
+    
+    const tableData = filteredExpenses.map(exp => [
+      exp.date,
+      exp.category,
+      exp.description,
+      formatCurrency(exp.amount),
+      exp.paymentMethod
+    ]);
+    
+    autoTable(doc, {
+      startY: 50,
+      head: [['Date', 'Category', 'Description', 'Amount', 'Payment Method']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+    
+    const pdfBlob = doc.output('blob');
+    
+    // Try to use File constructor if available
+    let pdfFile: File | null = null;
+    try {
+      pdfFile = new File([pdfBlob], 'expense-report.pdf', { type: 'application/pdf' });
+    } catch (error) {
+      // File constructor not supported
+      console.log('File constructor not available');
+    }
+    
+    // Only try to share if File constructor worked
+    if (pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      try {
+        await navigator.share({ files: [pdfFile], title: 'Expense Report' });
+        toast({ title: "Shared", description: "PDF shared successfully" });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          doc.save('expense-report.pdf');
+          toast({ title: "Downloaded", description: "Sharing failed, PDF downloaded" });
+        }
+      }
+    } else {
+      doc.save('expense-report.pdf');
+      toast({ title: "Downloaded", description: "Sharing not supported, PDF downloaded" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation 
@@ -304,20 +495,33 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
               </SelectContent>
             </Select>
             
-            <Button onClick={() => PrintUtils.printSalesReport(expenses)}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print Report
-            </Button>
-            
-            <Button onClick={() => ExportUtils.exportToCSV(expenses, `expenses_${new Date().toISOString().split('T')[0]}`)}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-            
-            <Button variant="outline" onClick={() => ExcelUtils.exportToExcel(expenses, `expenses_${new Date().toISOString().split('T')[0]}`)}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Export Excel
-            </Button>
+            {/* Action Button Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-2">
+                  <span>Actions</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handlePrintReport}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  <span>Print .pdf</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  <span>Download .pdf</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLS}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span>Export .csv</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSharePDF}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  <span>Share</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>

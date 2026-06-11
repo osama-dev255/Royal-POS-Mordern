@@ -22,12 +22,12 @@ export class ExcelUtils {
     const BOM = '\uFEFF';
     const excelContent = BOM + csvContent;
     
-    // Create download link with .xlsx extension for Excel recognition
-    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    // Create download link with .csv extension (actual format)
+    const blob = new Blob([excelContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.xlsx`);
+    link.setAttribute('download', `${filename}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
