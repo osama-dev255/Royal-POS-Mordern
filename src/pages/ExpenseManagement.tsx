@@ -365,8 +365,44 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
   };
 
   const handleDownloadPDF = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to export", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    
+    // Map expenses to data rows
+    const data = filteredExpenses.map(exp => ({
+      Date: exp.date,
+      Category: exp.category,
+      Description: exp.description,
+      Amount: exp.amount,
+      'Payment Method': exp.paymentMethod
+    }));
+    
+    // Add summary rows
+    data.push({
+      Date: '',
+      Category: '',
+      Description: '',
+      Amount: 0,
+      'Payment Method': ''
+    });
+    data.push({
+      Date: '',
+      Category: 'SUMMARY',
+      Description: `Total Expenses: ${filteredExpenses.length}`,
+      Amount: totalAmount,
+      'Payment Method': `Generated: ${new Date().toLocaleString()}`
+    });
+    
     const filename = `expenses_${new Date().toISOString().split('T')[0]}`;
-    ExportUtils.exportToPDF(filteredExpenses, filename, "Expense Report");
+    ExportUtils.exportToPDF(data, filename, "Expense Report");
     toast({
       title: "Downloaded",
       description: `PDF: ${filename}.pdf`
@@ -383,8 +419,35 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
       return;
     }
 
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    
+    // Map expenses to data rows
+    const data = filteredExpenses.map(exp => ({
+      Date: exp.date,
+      Category: exp.category,
+      Description: exp.description,
+      Amount: exp.amount,
+      'Payment Method': exp.paymentMethod
+    }));
+    
+    // Add summary rows
+    data.push({
+      Date: '',
+      Category: '',
+      Description: '',
+      Amount: 0,
+      'Payment Method': ''
+    });
+    data.push({
+      Date: '',
+      Category: 'SUMMARY',
+      Description: `Total Expenses: ${filteredExpenses.length}`,
+      Amount: totalAmount,
+      'Payment Method': `Generated: ${new Date().toLocaleString()}`
+    });
+    
     const filename = `expenses_${new Date().toISOString().split('T')[0]}`;
-    ExcelUtils.exportToExcel(filteredExpenses, filename);
+    ExcelUtils.exportToExcel(data, filename);
     toast({
       title: "Exported",
       description: `CSV: ${filename}.csv`

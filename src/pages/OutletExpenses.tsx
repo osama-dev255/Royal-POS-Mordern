@@ -690,6 +690,18 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   });
 
   const exportToPDF = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ 
+        title: "No Data", 
+        description: "No expenses to export", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    
+    // Map expenses to data rows
     const data = filteredExpenses.map(exp => ({
       Date: new Date(exp.expense_date).toLocaleDateString(),
       Category: exp.category,
@@ -700,7 +712,27 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       Status: exp.approval_status || 'pending'
     }));
     
-    ExportUtils.exportToPDF(data, `expenses_${outletName}_${new Date().toISOString().split('T')[0]}`, 'Expense Report');
+    // Add summary rows
+    data.push({
+      Date: '',
+      Category: '',
+      Description: '',
+      Amount: 0,
+      Payment: '',
+      Vendor: '',
+      Status: ''
+    });
+    data.push({
+      Date: '',
+      Category: 'SUMMARY',
+      Description: `Total Expenses: ${filteredExpenses.length}`,
+      Amount: totalAmount,
+      Payment: '',
+      Vendor: `Generated: ${new Date().toLocaleString()}`,
+      Status: ''
+    });
+    
+    ExportUtils.exportToPDF(data, `expenses_${outletName || 'outlet'}_${new Date().toISOString().split('T')[0]}`, 'Expense Report');
   };
 
   const exportToXLS = () => {
@@ -713,6 +745,9 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       return;
     }
 
+    const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    
+    // Map expenses to data rows
     const data = filteredExpenses.map(exp => ({
       Date: new Date(exp.expense_date).toLocaleDateString(),
       Category: exp.category,
@@ -725,6 +760,32 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       Status: exp.approval_status || 'pending',
       Notes: exp.notes || '-'
     }));
+    
+    // Add summary rows
+    data.push({
+      Date: '',
+      Category: '',
+      'Sub-Category': '',
+      Description: '',
+      Amount: 0,
+      'Payment Method': '',
+      Vendor: '',
+      'Tax Deductible': '',
+      Status: '',
+      Notes: ''
+    });
+    data.push({
+      Date: '',
+      Category: 'SUMMARY',
+      'Sub-Category': '',
+      Description: `Total Expenses: ${filteredExpenses.length}`,
+      Amount: totalAmount,
+      'Payment Method': '',
+      Vendor: `Generated: ${new Date().toLocaleString()}`,
+      'Tax Deductible': '',
+      Status: '',
+      Notes: ''
+    });
     
     const filename = `expenses_${outletName || 'outlet'}_${new Date().toISOString().split('T')[0]}`;
     ExcelUtils.exportToExcel(data, filename);
