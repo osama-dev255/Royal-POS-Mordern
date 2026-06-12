@@ -115,10 +115,13 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   // Date Range Filters
   const [employeeDateFrom, setEmployeeDateFrom] = useState<string>("");
   const [employeeDateTo, setEmployeeDateTo] = useState<string>("");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<string>("all");
   const [attendanceDateFrom, setAttendanceDateFrom] = useState<string>("");
   const [attendanceDateTo, setAttendanceDateTo] = useState<string>("");
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<string>("all");
   const [payrollDateFrom, setPayrollDateFrom] = useState<string>("");
   const [payrollDateTo, setPayrollDateTo] = useState<string>("");
+  const [payrollStatusFilter, setPayrollStatusFilter] = useState<string>("all");
 
   // Helper function to format currency in TZS with thousand separators
   const formatTZS = (amount: number): string => {
@@ -231,7 +234,12 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   const exportAttendanceToPDF = () => {
-    const data = attendanceRecords.slice(0, 50).map(record => {
+    if (filteredAttendance.length === 0) {
+      toast({ title: "No Data", description: "No attendance records to export", variant: "destructive" });
+      return;
+    }
+    
+    const data = filteredAttendance.map(record => {
       // Calculate late minutes from check_in_time
       let lateMinutes = 0;
       if (record.check_in_time) {
@@ -257,7 +265,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const records = attendanceRecords.slice(0, 50);
+    const records = filteredAttendance;
     const html = `
       <!DOCTYPE html>
       <html>
@@ -326,7 +334,12 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   const exportAttendanceToXLS = () => {
-    const data = attendanceRecords.slice(0, 50).map(record => {
+    if (filteredAttendance.length === 0) {
+      toast({ title: "No Data", description: "No attendance records to export", variant: "destructive" });
+      return;
+    }
+    
+    const data = filteredAttendance.map(record => {
       // Calculate late minutes from check_in_time
       let lateMinutes = 0;
       if (record.check_in_time) {
@@ -349,7 +362,7 @@ export const OutletPayroll = ({ onBack, outletId }: OutletPayrollProps) => {
   };
 
   const shareAttendance = async () => {
-    const records = attendanceRecords.slice(0, 50);
+    const records = filteredAttendance;
     const textData = records.map(record => {
       // Calculate late minutes from check_in_time
       let lateMinutes = 0;
@@ -2035,7 +2048,11 @@ ${outletName} - Employee Payroll System`;
     const matchesDateFrom = !employeeDateFrom || (empDate && empDate >= new Date(employeeDateFrom));
     const matchesDateTo = !employeeDateTo || (empDate && empDate <= new Date(employeeDateTo + 'T23:59:59'));
     
-    return matchesSearch && matchesDateFrom && matchesDateTo;
+    const matchesStatus = employeeStatusFilter === 'all' || 
+      (employeeStatusFilter === 'active' && emp.is_active !== false) ||
+      (employeeStatusFilter === 'inactive' && emp.is_active === false);
+    
+    return matchesSearch && matchesDateFrom && matchesDateTo && matchesStatus;
   });
 
   const filteredPayroll = payrollRecords.filter(record => {
@@ -2047,15 +2064,22 @@ ${outletName} - Employee Payroll System`;
     const matchesDateFrom = !payrollDateFrom || (periodStart && periodStart >= new Date(payrollDateFrom));
     const matchesDateTo = !payrollDateTo || (periodEnd && periodEnd <= new Date(payrollDateTo + 'T23:59:59'));
     
-    return matchesSearch && matchesDateFrom && matchesDateTo;
+    const matchesStatus = payrollStatusFilter === 'all' || record.status === payrollStatusFilter;
+    
+    return matchesSearch && matchesDateFrom && matchesDateTo && matchesStatus;
   });
 
   const filteredAttendance = attendanceRecords.filter(record => {
+    const matchesSearch = record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.status?.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const attDate = record.attendance_date ? new Date(record.attendance_date) : null;
     const matchesDateFrom = !attendanceDateFrom || (attDate && attDate >= new Date(attendanceDateFrom));
     const matchesDateTo = !attendanceDateTo || (attDate && attDate <= new Date(attendanceDateTo + 'T23:59:59'));
     
-    return matchesDateFrom && matchesDateTo;
+    const matchesStatus = attendanceStatusFilter === 'all' || record.status === attendanceStatusFilter;
+    
+    return matchesSearch && matchesDateFrom && matchesDateTo && matchesStatus;
   });
 
   // Statistics
@@ -2207,13 +2231,24 @@ ${outletName} - Employee Payroll System`;
                     className="w-40"
                     placeholder="To Date"
                   />
-                  {(employeeDateFrom || employeeDateTo) && (
+                  <Select value={employeeStatusFilter} onValueChange={setEmployeeStatusFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(employeeDateFrom || employeeDateTo || employeeStatusFilter !== 'all') && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
                         setEmployeeDateFrom("");
                         setEmployeeDateTo("");
+                        setEmployeeStatusFilter('all');
                       }}
                       className="h-9"
                     >
@@ -2344,13 +2379,27 @@ ${outletName} - Employee Payroll System`;
                     className="w-40"
                     placeholder="To Date"
                   />
-                  {(attendanceDateFrom || attendanceDateTo) && (
+                  <Select value={attendanceStatusFilter} onValueChange={setAttendanceStatusFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="present">Present</SelectItem>
+                      <SelectItem value="absent">Absent</SelectItem>
+                      <SelectItem value="late">Late</SelectItem>
+                      <SelectItem value="half_day">Half Day</SelectItem>
+                      <SelectItem value="sick">Sick</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(attendanceDateFrom || attendanceDateTo || attendanceStatusFilter !== 'all') && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
                         setAttendanceDateFrom("");
                         setAttendanceDateTo("");
+                        setAttendanceStatusFilter('all');
                       }}
                       className="h-9"
                     >
@@ -2493,13 +2542,26 @@ ${outletName} - Employee Payroll System`;
                     className="w-40"
                     placeholder="To Date"
                   />
-                  {(payrollDateFrom || payrollDateTo) && (
+                  <Select value={payrollStatusFilter} onValueChange={setPayrollStatusFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(payrollDateFrom || payrollDateTo || payrollStatusFilter !== 'all') && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
                         setPayrollDateFrom("");
                         setPayrollDateTo("");
+                        setPayrollStatusFilter('all');
                       }}
                       className="h-9"
                     >
