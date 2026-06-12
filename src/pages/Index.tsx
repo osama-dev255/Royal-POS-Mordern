@@ -39,6 +39,7 @@ import { AdvancedLayout } from "@/components/AdvancedLayout";
 
 // Import FinanceDashboard, IncomeStatement, AssetsManagement, and CapitalManagement
 import { FinanceDashboard } from "@/pages/FinanceDashboard";
+import { OutletFinance } from "@/pages/OutletFinance";
 import { IncomeStatement } from "@/pages/IncomeStatement";
 import { AssetsManagement } from "@/pages/AssetsManagement";
 import { CapitalManagement } from "@/pages/CapitalManagement";
@@ -257,6 +258,36 @@ export const Index = () => {
         const outletId = hash.split('/')[2];
         if (outletId) {
           setCurrentView(`outlet-customers-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-finance/')) {
+        const outletId = hash.split('/')[2];
+        console.log("Extracted outlet ID for finance:", outletId);
+        if (outletId) {
+          console.log("Setting currentView to:", `outlet-finance-${outletId}`);
+          setCurrentView(`outlet-finance-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-expenses/')) {
+        const outletId = hash.split('/')[2];
+        console.log("Extracted outlet ID for expenses:", outletId);
+        if (outletId) {
+          console.log("Setting currentView to:", `outlet-expenses-${outletId}`);
+          setCurrentView(`outlet-expenses-${outletId}`);
+        }
+        return;
+      }
+      
+      if (hash.startsWith('/outlet-payroll/')) {
+        const outletId = hash.split('/')[2];
+        console.log("Extracted outlet ID for payroll:", outletId);
+        if (outletId) {
+          console.log("Setting currentView to:", `outlet-payroll-${outletId}`);
+          setCurrentView(`outlet-payroll-${outletId}`);
         }
         return;
       }
@@ -562,6 +593,7 @@ export const Index = () => {
   const isOutletSettingsView = currentView.startsWith('outlet-settings-');
   const isOutletPayrollView = currentView.startsWith('outlet-payroll-');
   const isOutletExpensesView = currentView.startsWith('outlet-expenses-');
+  const isOutletFinanceView = currentView.startsWith('outlet-finance-');
   const isOutletSalesManagementView = currentView.startsWith('outlet-sales-management-');
   const isOutletSavedSalesView = currentView.startsWith('outlet-saved-sales-');
   const isOutletSavedCashView = currentView.startsWith('outlet-saved-cash-');
@@ -584,6 +616,7 @@ export const Index = () => {
       !isOutletSettingsView &&
       !isOutletPayrollView &&
       !isOutletExpensesView &&
+      !isOutletFinanceView &&
       !isOutletSalesManagementView &&
       !isOutletSavedSalesView &&
       !isOutletSavedCashView &&
@@ -609,6 +642,7 @@ export const Index = () => {
                        currentView.startsWith('outlet-settings-') ||
                        currentView.startsWith('outlet-payroll-') ||
                        currentView.startsWith('outlet-expenses-') ||
+                       currentView.startsWith('outlet-finance-') ||
                        currentView.startsWith('outlet-sales-management-') ||
                        currentView.startsWith('outlet-saved-sales-') ||
                        currentView.startsWith('outlet-saved-cash-') ||
@@ -1121,6 +1155,30 @@ export const Index = () => {
         >
           <div className="p-6">
             <OutletExpenses
+              outletId={outletId}
+              outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+              onBack={() => {
+                setCurrentView(`outlet-details-${outletId}`);
+              }}
+            />
+          </div>
+        </OutletLayout>
+      );
+    }
+    
+    // Check if this is an outlet finance view
+    if (currentView.startsWith('outlet-finance-')) {
+      const outletId = currentView.substring('outlet-finance-'.length);
+      return (
+        <OutletLayout
+          username={user?.email || "admin"}
+          onLogout={handleLogout}
+          outletId={outletId}
+          outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
+          currentView="finance"
+        >
+          <div className="p-6">
+            <OutletFinance
               outletId={outletId}
               outletName={outletId ? `Outlet ${outletId.slice(0, 8)}` : 'Outlet'}
               onBack={() => {

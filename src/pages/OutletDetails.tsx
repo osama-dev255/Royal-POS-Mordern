@@ -468,6 +468,14 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
                   <Settings className="h-6 w-6" />
                   <span className="text-sm">Settings</span>
                 </Button>
+                <Button 
+                  className="h-auto py-4 flex flex-col items-center gap-2" 
+                  variant="outline"
+                  onClick={() => window.location.hash = `#/outlet-finance/${outlet?.id}`}
+                >
+                  <DollarSign className="h-6 w-6" />
+                  <span className="text-sm">Finance</span>
+                </Button>
               </div>
             </CardContent>
           </Card>
