@@ -79,6 +79,7 @@ interface ReceiptSale {
   preparedBy?: string;
   approvedBy?: string;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  createdAt?: string;
 }
 
 export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
@@ -299,7 +300,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         amountPaid: r.amount,
         paymentMethod: r.payment_method || 'cash',
         status: 'paid',
-        type: 'commission' as const
+        type: 'commission' as const,
+        createdAt: r.created_at
       }));
       
       // Load other receipts from database
@@ -316,7 +318,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         amountPaid: r.amount,
         paymentMethod: r.payment_method || 'cash',
         status: 'paid',
-        type: 'other' as const
+        type: 'other' as const,
+        createdAt: r.created_at
       }));
       
       // Load customer settlement receipts from database
@@ -343,7 +346,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         cashier: s.cashier,
         preparedBy: s.prepared_by,
         approvedBy: s.approved_by,
-        approvalStatus: s.approval_status || 'pending'
+        approvalStatus: s.approval_status || 'pending',
+        createdAt: s.created_at
       }));
       
       // Calculate total paid amount from settlements
@@ -450,6 +454,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       const transaction = {
         receiptNumber: receipt.invoiceNumber,
         date: receipt.date,
+        createdAt: receipt.createdAt,
         customer: {
           name: receipt.customer
         },
@@ -958,7 +963,10 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               return `
               <tr>
                 <td>${r.invoiceNumber}</td>
-                <td>${new Date(r.date).toLocaleDateString()}</td>
+                <td>
+                  ${new Date(r.date).toLocaleDateString()}
+                  ${r.createdAt ? `<br><small style="color:#666">${new Date(r.createdAt).toLocaleTimeString()}</small>` : ''}
+                </td>
                 <td>${r.customer}</td>
                 <td>${r.type}</td>
                 <td class="currency">${formatCurrency(r.previousBalance || 0)}</td>
@@ -1066,36 +1074,36 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
       <body>
         <table>
           <tr>
-            <td colspan="8" class="header">${businessName}</td>
+            <td colspan="9" class="header">${businessName}</td>
           </tr>
           <tr>
-            <td colspan="8" class="header">RECEIVABLES SUMMARY REPORT</td>
+            <td colspan="9" class="header">RECEIVABLES SUMMARY REPORT</td>
           </tr>
           <tr>
-            <td colspan="8" class="subheader">Report Date: ${new Date().toLocaleDateString()}</td>
+            <td colspan="9" class="subheader">Report Date: ${new Date().toLocaleDateString()}</td>
           </tr>
           <tr>
-            <td colspan="8" class="subheader">Total Records: ${filteredReceipts.length}</td>
+            <td colspan="9" class="subheader">Total Records: ${filteredReceipts.length}</td>
           </tr>
           <tr>
-            <td colspan="8" class="subheader">Period: ${startDate || 'All time'} to ${endDate || 'Present'}</td>
+            <td colspan="9" class="subheader">Period: ${startDate || 'All time'} to ${endDate || 'Present'}</td>
           </tr>
-          <tr><td colspan="8"></td></tr>
+          <tr><td colspan="9"></td></tr>
           <tr>
-            <td colspan="8" class="subheader">SUMMARY</td>
+            <td colspan="9" class="subheader">SUMMARY</td>
           </tr>
           <tr class="total-row">
-            <td colspan="5">Total Previous Balance:</td>
+            <td colspan="6">Total Previous Balance:</td>
             <td class="currency">${totalPrevious.toFixed(2)}</td>
             <td colspan="2"></td>
           </tr>
           <tr class="total-row">
-            <td colspan="5">Total Amount Paid:</td>
+            <td colspan="6">Total Amount Paid:</td>
             <td class="currency">${totalAmount.toFixed(2)}</td>
             <td colspan="2"></td>
           </tr>
           <tr class="total-row">
-            <td colspan="5">Total New Balance:</td>
+            <td colspan="6">Total New Balance:</td>
             <td class="currency">${totalNewBalance.toFixed(2)}</td>
             <td colspan="2"></td>
           </tr>
@@ -1103,6 +1111,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           <tr>
             <th>Receipt #</th>
             <th>Date</th>
+            <th>Time</th>
             <th>Customer</th>
             <th>Type</th>
             <th>Payment Method</th>
@@ -1116,6 +1125,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
             <tr>
               <td>${r.invoiceNumber}</td>
               <td class="date">${new Date(r.date).toLocaleDateString()}</td>
+              <td>${r.createdAt ? new Date(r.createdAt).toLocaleTimeString() : '-'}</td>
               <td>${r.customer}</td>
               <td>${r.type}</td>
               <td>${r.paymentMethod}</td>

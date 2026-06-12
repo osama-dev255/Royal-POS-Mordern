@@ -1037,7 +1037,11 @@ export class PrintUtils {
       const receiptNumber = settlement.receiptNumber || `SETTLE-${Date.now()}`;
       const receiptDate = new Date(settlement.date || new Date());
       const dateStr = receiptDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const timeStr = receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      
+      // Use createdAt for time if available, otherwise parse from date
+      const timeStr = settlement.createdAt
+        ? new Date(settlement.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        : receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       
       const customerName = settlement.customer?.name || 'Walk-in Customer';
       const paymentMethod = settlement.paymentMethod || 'Cash';
@@ -3857,7 +3861,11 @@ export class PrintUtils {
     const receiptNumber = transaction.receiptNumber || `SETTLE-${Date.now()}`;
     const receiptDate = new Date(transaction.date || new Date());
     const dateStr = receiptDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    
+    // Use createdAt for time if available, otherwise parse from date
+    const timeStr = transaction.createdAt 
+      ? new Date(transaction.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      : receiptDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     
     const customerName = transaction.customer?.name || 'Walk-in Customer';
     const paymentMethod = transaction.paymentMethod || 'Cash';

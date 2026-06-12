@@ -36,6 +36,7 @@ interface PayableReceivable {
   type: "receivable" | "payable";
   amount: number;
   dueDate?: string;
+  time?: string;
   status: "pending" | "paid" | "overdue";
   paymentMethod?: string;
   referenceNumber?: string;
@@ -94,11 +95,12 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
       const receivables = customerSettlements.map(settlement => ({
         id: settlement.id,
         partyId: settlement.customer_id || "",
-        partyName: "Customer", // We'll update this with actual customer names
+        partyName: settlement.customer_name || "Customer",
         type: "receivable" as const,
         amount: settlement.settlement_amount || 0,
         dueDate: settlement.date,
-        status: "pending" as const, // Simplified for this example
+        time: settlement.time,
+        status: (settlement.status || "pending") as "pending" | "paid" | "overdue",
         paymentMethod: settlement.payment_method,
         referenceNumber: settlement.reference_number,
         notes: settlement.notes,
@@ -495,7 +497,90 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
     
     return matchesSearch && matchesType && matchesStatus && matchesDateRange();
   });
-
+  
+  // Custom print function for receivables/payables with time display
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: "Error", description: "Please allow pop-ups to print", variant: "destructive" });
+      return;
+    }
+  
+    const totalAmount = payablesReceivables.reduce((sum, item) => sum + item.amount, 0);
+      
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payables & Receivables Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            .header { margin-bottom: 10px; color: #666; font-size: 14px; }
+            .summary { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+            .receivable { color: #16a34a; }
+            .payable { color: #dc2626; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Payables & Receivables Report</h1>
+          <div class="header">Generated: ${new Date().toLocaleString()} | Total Records: ${payablesReceivables.length}</div>
+            
+          <div class="summary">
+            <h2>Summary</h2>
+            <p><strong>Total Amount:</strong> TZS ${totalAmount.toLocaleString()}</p>
+            <p><strong>Total Records:</strong> ${payablesReceivables.length}</p>
+            <p><strong>Receivables:</strong> <span class="receivable">${payablesReceivables.filter(r => r.type === 'receivable').length} records</span></p>
+            <p><strong>Payables:</strong> <span class="payable">${payablesReceivables.filter(r => r.type === 'payable').length} records</span></p>
+          </div>
+            
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Party</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Payment Method</th>
+                <th>Reference</th>
+                <th>Status</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payablesReceivables.map(item => `
+                <tr>
+                  <td>${item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '-'}</td>
+                  <td>${item.time || '-'}</td>
+                  <td>${item.partyName}</td>
+                  <td class="${item.type}">${item.type === 'receivable' ? 'Receivable' : 'Payable'}</td>
+                  <td>TZS ${item.amount.toLocaleString()}</td>
+                  <td>${item.paymentMethod || '-'}</td>
+                  <td>${item.referenceNumber || '-'}</td>
+                  <td>${item.status}</td>
+                  <td>${item.notes || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+  
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+  
   return (
     <div className="min-h-screen bg-background">
       <Navigation 
@@ -564,7 +649,7 @@ export const PayablesReceivables = ({ username, onBack, onLogout }: { username: 
               New Settlement
             </Button>
             
-            <Button onClick={() => PrintUtils.printSalesReport(payablesReceivables)}>
+            <Button onClick={handlePrintReport}>
               <Printer className="h-4 w-4 mr-2" />
               Print Report
             </Button>
