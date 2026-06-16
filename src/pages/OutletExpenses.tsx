@@ -188,6 +188,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [expenseData, setExpenseData] = useState(expenseForm);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
+  const [viewingExpense, setViewingExpense] = useState<Expense | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const budgetForm = {
@@ -284,6 +286,184 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     } else {
       toast({ title: "Error", description: "Failed to update expense", variant: "destructive" });
     }
+  };
+
+  const handleViewExpense = (expense: Expense) => {
+    setViewingExpense(expense);
+    setIsViewDialogOpen(true);
+  };
+
+  const handlePrintExpense = (expense: Expense) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ 
+        title: "Error", 
+        description: "Please allow pop-ups to print", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Expense - ${expense.category}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+            .header { margin-bottom: 20px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+            .info-item { background: #f3f4f6; padding: 10px; border-radius: 5px; }
+            .label { font-weight: bold; color: #666; font-size: 0.9em; }
+            .value { font-size: 1.1em; margin-top: 5px; }
+            .amount { font-size: 1.5em; color: #3b82f6; font-weight: bold; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-weight: bold; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Expense Details</h1>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="label">Date</div>
+              <div class="value">${new Date(expense.expense_date).toLocaleDateString()}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Amount</div>
+              <div class="amount">${formatTZS(expense.amount)}</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Category & Description</div>
+            <p><strong>Category:</strong> ${expense.category}${expense.sub_category ? ` - ${expense.sub_category}` : ''}</p>
+            <p><strong>Description:</strong> ${expense.description || 'N/A'}</p>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Payment & Status</div>
+            <p><strong>Payment Method:</strong> ${expense.payment_method?.replace('_', ' ') || 'N/A'}</p>
+            <p><strong>Status:</strong> ${(expense.approval_status || 'pending').toUpperCase()}</p>
+          </div>
+
+          ${expense.vendor_name ? `
+          <div class="section">
+            <div class="section-title">Vendor Information</div>
+            <p><strong>Vendor Name:</strong> ${expense.vendor_name}</p>
+            ${expense.vendor_contact ? `<p><strong>Vendor Contact:</strong> ${expense.vendor_contact}</p>` : ''}
+          </div>
+          ` : ''}
+
+          ${expense.notes ? `
+          <div class="section">
+            <div class="section-title">Notes</div>
+            <p>${expense.notes}</p>
+          </div>
+          ` : ''}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+    
+    toast({ 
+      title: "Print Ready", 
+      description: "Print dialog opened" 
+    });
+  };
+
+  const handleDownloadExpensePDF = (expense: Expense) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Expense Details', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    
+    const expenseData = [
+      ['Date', new Date(expense.expense_date).toLocaleDateString()],
+      ['Category', expense.category + (expense.sub_category ? ` - ${expense.sub_category}` : '')],
+      ['Description', expense.description || 'N/A'],
+      ['Amount', formatTZS(expense.amount)],
+      ['Payment Method', expense.payment_method?.replace('_', ' ') || 'N/A'],
+      ['Status', (expense.approval_status || 'pending').toUpperCase()]
+    ];
+
+    if (expense.vendor_name) {
+      expenseData.push(['Vendor Name', expense.vendor_name]);
+    }
+    if (expense.vendor_contact) {
+      expenseData.push(['Vendor Contact', expense.vendor_contact]);
+    }
+    if (expense.department) {
+      expenseData.push(['Department', expense.department]);
+    }
+    if (expense.notes) {
+      expenseData.push(['Notes', expense.notes]);
+    }
+    
+    autoTable(doc, {
+      startY: 35,
+      body: expenseData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 50 },
+        1: { cellWidth: 120 }
+      }
+    });
+    
+    const filename = `expense_${expense.category}_${new Date(expense.expense_date).toISOString().split('T')[0]}`;
+    doc.save(`${filename}.pdf`);
+    
+    toast({
+      title: "Downloaded",
+      description: `PDF: ${filename}.pdf`
+    });
+  };
+
+  const handleExportExpenseCSV = (expense: Expense) => {
+    const headers = ['Date', 'Category', 'Sub-Category', 'Description', 'Amount', 'Payment Method', 'Status', 'Vendor Name', 'Vendor Contact', 'Department', 'Notes'];
+    
+    const rows = [
+      new Date(expense.expense_date).toLocaleDateString(),
+      expense.category,
+      expense.sub_category || '',
+      expense.description || '',
+      expense.amount.toString(),
+      expense.payment_method?.replace('_', ' ') || '',
+      expense.approval_status || 'pending',
+      expense.vendor_name || '',
+      expense.vendor_contact || '',
+      expense.department || '',
+      expense.notes || ''
+    ];
+    
+    const csvContent = [headers.join(','), rows.map(r => `"${r}"`).join(',')].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    
+    const filename = `expense_${expense.category}_${new Date(expense.expense_date).toISOString().split('T')[0]}`;
+    link.setAttribute('download', `${filename}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Exported",
+      description: `CSV: ${filename}.csv`
+    });
   };
 
   const handleDeleteExpense = async (id: string) => {
@@ -1291,12 +1471,21 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleViewExpense(expense)}
+                            title="View Expense Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => {
                               setEditingExpense(expense);
@@ -1334,24 +1523,21 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            {expense.approval_status === 'pending' && (
-                              <>
-                                <DropdownMenuItem onClick={() => handleApproveExpense(expense.id!, 'approved')}>
-                                  <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                                  Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleApproveExpense(expense.id!, 'rejected')}>
-                                  <XCircle className="h-4 w-4 mr-2 text-red-600" />
-                                  Reject
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            <DropdownMenuItem onClick={() => handleDeleteExpense(expense.id!)} className="text-red-600">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
+                            <DropdownMenuItem onClick={() => handlePrintExpense(expense)}>
+                              <Printer className="h-4 w-4 mr-2" />
+                              Print
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExportExpenseCSV(expense)}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Export CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadExpensePDF(expense)}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download PDF
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -2333,6 +2519,183 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               setNewSubCategoryName("");
             }}>Cancel</Button>
             <Button onClick={handleAddSubCategory}>Add Sub-Category</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Expense Details Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Expense Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewingExpense && (
+            <div className="space-y-6 py-4">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Date</label>
+                    <p className="font-medium">{new Date(viewingExpense.expense_date).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Amount</label>
+                    <p className="font-medium text-lg">{formatTZS(viewingExpense.amount)}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Category</label>
+                  <div className="mt-1">
+                    <Badge variant="secondary">{viewingExpense.category}</Badge>
+                    {viewingExpense.sub_category && (
+                      <Badge variant="outline" className="ml-2">{viewingExpense.sub_category}</Badge>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Description</label>
+                  <p className="mt-1 text-sm">{viewingExpense.description || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Payment & Status */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Payment & Status</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Payment Method</label>
+                    <p className="font-medium">{viewingExpense.payment_method?.replace('_', ' ') || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Status</label>
+                    <div className="mt-1">
+                      <Badge className={getStatusColor(viewingExpense.approval_status || 'pending')}>
+                        {viewingExpense.approval_status?.toUpperCase()}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vendor Information */}
+              {(viewingExpense.vendor_name || viewingExpense.vendor_contact) && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Vendor Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {viewingExpense.vendor_name && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Vendor Name</label>
+                        <p className="font-medium">{viewingExpense.vendor_name}</p>
+                      </div>
+                    )}
+                    {viewingExpense.vendor_contact && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Vendor Contact</label>
+                        <p className="font-medium">{viewingExpense.vendor_contact}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Classification */}
+              {(viewingExpense.expense_type || viewingExpense.cost_classification || viewingExpense.department) && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Classification</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {viewingExpense.expense_type && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Expense Type</label>
+                        <p className="font-medium capitalize">{viewingExpense.expense_type}</p>
+                      </div>
+                    )}
+                    {viewingExpense.cost_classification && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Cost Classification</label>
+                        <p className="font-medium capitalize">{viewingExpense.cost_classification}</p>
+                      </div>
+                    )}
+                    {viewingExpense.department && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Department</label>
+                        <p className="font-medium">{viewingExpense.department}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Recurring Information */}
+              {viewingExpense.is_recurring && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Recurring Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Frequency</label>
+                      <p className="font-medium capitalize">{viewingExpense.recurring_frequency}</p>
+                    </div>
+                    {viewingExpense.next_due_date && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Next Due Date</label>
+                        <p className="font-medium">{new Date(viewingExpense.next_due_date).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Information */}
+              {viewingExpense.notes && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Notes</h3>
+                  <p className="text-sm bg-muted p-3 rounded-md">{viewingExpense.notes}</p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {viewingExpense.tags && viewingExpense.tags.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tags</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingExpense.tags.map((tag, index) => (
+                      <Badge key={index} variant="outline">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tax Information */}
+              {viewingExpense.tax_deductible && (
+                <div className="space-y-2">
+                  <Badge variant="default" className="bg-green-600">
+                    Tax Deductible
+                  </Badge>
+                </div>
+              )}
+
+              {/* Receipt */}
+              {viewingExpense.receipt_url && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Receipt</h3>
+                  <a 
+                    href={viewingExpense.receipt_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View Receipt
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
