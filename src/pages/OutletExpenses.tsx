@@ -293,6 +293,36 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     setIsViewDialogOpen(true);
   };
 
+  const handleViewReceipt = async (receiptUrl: string) => {
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      
+      // Check if it's a file path (private bucket) or full URL (public bucket)
+      if (receiptUrl.startsWith('http')) {
+        // Already a full URL (public bucket)
+        window.open(receiptUrl, '_blank');
+      } else {
+        // It's a file path, generate signed URL
+        const { data, error } = await supabase.storage
+          .from('expense-receipts')
+          .createSignedUrl(receiptUrl, 3600); // 1 hour expiry
+        
+        if (error) throw error;
+        
+        if (data?.signedUrl) {
+          window.open(data.signedUrl, '_blank');
+        }
+      }
+    } catch (error: any) {
+      console.error('Error viewing receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load receipt. The file may have been deleted or moved.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handlePrintExpense = (expense: Expense) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -2681,15 +2711,13 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               {viewingExpense.receipt_url && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Receipt</h3>
-                  <a 
-                    href={viewingExpense.receipt_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline flex items-center gap-2"
+                  <button 
+                    onClick={() => handleViewReceipt(viewingExpense.receipt_url!)}
+                    className="text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer"
                   >
                     <FileText className="h-4 w-4" />
                     View Receipt
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
