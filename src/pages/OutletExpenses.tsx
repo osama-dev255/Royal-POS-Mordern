@@ -142,7 +142,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     "Operating Expenses": ["Office Rent", "Warehouse Rent", "Equipment Lease", "Cleaning Services", "Security Services", "General Operations"],
     "Utilities": ["Electricity", "Water Bill", "Internet", "Phone", "Gas", "Sewer"],
     "Rent & Lease": ["Office Space", "Warehouse", "Equipment Lease", "Vehicle Lease", "Storage Unit"],
-    "Salaries & Wages": ["Base Salary", "Overtime Pay", "Bonuses", "Commissions", "Benefits", "Payroll Taxes", "Employee Advance"],
+    "Salaries & Wages": ["Base Salary", "Overtime Pay", "Bonuses", "Commissions", "Benefits", "Payroll Taxes", "Employee Advance", "Casual Labor"],
     "Marketing & Advertising": ["Social Media Ads", "Print Materials", "Billboard", "Radio/TV Ads", "Promotional Events", "Digital Marketing", "Branding"],
     "Transportation": ["Fuel", "Vehicle Maintenance", "Delivery Fees", "Parking", "Tolls", "Public Transport", "Vehicle Insurance"],
     "Maintenance & Repairs": ["Building Repair", "Equipment Repair", "Plumbing", "Electrical", "HVAC", "Painting", "General Maintenance"],
