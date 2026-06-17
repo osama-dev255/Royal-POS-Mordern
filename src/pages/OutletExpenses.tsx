@@ -139,7 +139,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
   // Predefined sub-categories for each main category
   const predefinedSubCategories: Record<string, string[]> = {
-    "Operating Expenses": ["Office Rent", "Warehouse Rent", "Equipment Lease", "Cleaning Services", "Security Services", "General Operations"],
+    "Operating Expenses": ["Office Rent", "Warehouse Rent", "Equipment Lease", "Cleaning Services", "Security Services", "General Operations", "Packaging Materials"],
     "Utilities": ["Electricity", "Water Bill", "Internet", "Phone", "Gas", "Sewer"],
     "Rent & Lease": ["Office Space", "Warehouse", "Equipment Lease", "Vehicle Lease", "Storage Unit"],
     "Salaries & Wages": ["Base Salary", "Overtime Pay", "Bonuses", "Commissions", "Benefits", "Payroll Taxes", "Employee Advance", "Casual Labor"],
