@@ -212,6 +212,23 @@ export interface PurchaseOrderItem {
 
 }
 
+export interface Vendor {
+  id?: string;
+  outlet_id: string;
+  vendor_name: string;
+  vendor_contact?: string;
+  vendor_email?: string;
+  vendor_address?: string;
+  vendor_type?: string; // supplier, service_provider, contractor, utility, other
+  is_active?: boolean;
+  total_transactions?: number;
+  total_amount_spent?: number;
+  last_transaction_date?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Expense {
   id?: string;
   user_id?: string;
@@ -2411,6 +2428,66 @@ export const deleteExpense = async (id: string): Promise<boolean> => {
 // ============================================
 // OUTLET EXPENSE MANAGEMENT FUNCTIONS
 // ============================================
+
+// Get vendors for a specific outlet
+export const getOutletVendors = async (outletId: string): Promise<Vendor[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('is_active', true)
+      .order('vendor_name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching outlet vendors:', error);
+    return [];
+  }
+};
+
+// Create a new vendor
+export const createVendor = async (vendor: Omit<Vendor, 'id'>): Promise<Vendor | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('vendors')
+      .insert([{
+        ...vendor,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating vendor:', error);
+    return null;
+  }
+};
+
+// Update vendor
+export const updateVendor = async (id: string, vendor: Partial<Vendor>): Promise<Vendor | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('vendors')
+      .update({
+        ...vendor,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating vendor:', error);
+    return null;
+  }
+};
 
 // Get expenses for a specific outlet
 export const getOutletExpenses = async (outletId: string): Promise<Expense[]> => {

@@ -88,9 +88,12 @@ import {
   getOverdueRecurringExpenses,
   createNextRecurringExpense,
   getRecurringExpenseSummary,
+  getOutletVendors,
+  createVendor,
   Expense,
   ExpenseBudget,
-  ExpenseAnalytics
+  ExpenseAnalytics,
+  Vendor
 } from "@/services/databaseService";
 
 interface OutletExpensesProps {
@@ -194,6 +197,18 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [viewingExpense, setViewingExpense] = useState<Expense | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Vendor states
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [isVendorDropdownOpen, setIsVendorDropdownOpen] = useState(false);
+  const [showAddVendorDialog, setShowAddVendorDialog] = useState(false);
+  const [newVendorData, setNewVendorData] = useState({
+    vendor_name: "",
+    vendor_contact: "",
+    vendor_email: "",
+    vendor_type: "supplier"
+  });
 
   const budgetForm = {
     category: "",
@@ -213,12 +228,25 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     }
   }, [outletId]);
 
+  // Close vendor dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.vendor-dropdown')) {
+        setIsVendorDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const loadData = async () => {
     if (!outletId) return;
     
     setLoading(true);
     try {
-      const [expensesData, analyticsData, budgetsData, alertsData, pendingData, upcomingData, overdueData, summaryData] = await Promise.all([
+      const [expensesData, analyticsData, budgetsData, alertsData, pendingData, upcomingData, overdueData, summaryData, vendorsData] = await Promise.all([
         getOutletExpensesFiltered(outletId),
         getOutletExpenseAnalytics(outletId, 'month'),
         getOutletBudgets(outletId),
@@ -226,7 +254,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
         getPendingExpenseApprovals(outletId),
         getUpcomingRecurringExpenses(outletId, 30),
         getOverdueRecurringExpenses(outletId),
-        getRecurringExpenseSummary(outletId)
+        getRecurringExpenseSummary(outletId),
+        getOutletVendors(outletId)
       ]);
       
       setExpenses(expensesData);
@@ -237,6 +266,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       setUpcomingRecurring(upcomingData);
       setOverdueRecurring(overdueData);
       setRecurringSummary(summaryData);
+      setVendors(vendorsData);
     } catch (error) {
       console.error('Error loading expenses data:', error);
       toast({
@@ -248,6 +278,58 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       setLoading(false);
     }
   };
+
+  // Vendor Management Functions
+  const handleSelectVendor = (vendorName: string) => {
+    setExpenseData(prev => ({ ...prev, vendor_name: vendorName }));
+    setIsVendorDropdownOpen(false);
+    setVendorSearch("");
+  };
+
+  const handleAddNewVendor = async () => {
+    if (!outletId || !newVendorData.vendor_name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Vendor name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newVendor = await createVendor({
+      outlet_id: outletId,
+      vendor_name: newVendorData.vendor_name.trim(),
+      vendor_contact: newVendorData.vendor_contact.trim() || undefined,
+      vendor_email: newVendorData.vendor_email.trim() || undefined,
+      vendor_type: newVendorData.vendor_type
+    });
+
+    if (newVendor) {
+      setVendors(prev => [...prev, newVendor]);
+      setExpenseData(prev => ({ ...prev, vendor_name: newVendor.vendor_name }));
+      setShowAddVendorDialog(false);
+      setNewVendorData({
+        vendor_name: "",
+        vendor_contact: "",
+        vendor_email: "",
+        vendor_type: "supplier"
+      });
+      toast({
+        title: "Success",
+        description: `Vendor "${newVendor.vendor_name}" added successfully`
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to add vendor",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const filteredVendors = vendors.filter(v =>
+    v.vendor_name.toLowerCase().includes(vendorSearch.toLowerCase())
+  );
 
   const handleCreateExpense = async () => {
     if (!outletId || !expenseData.category || !expenseData.amount) {
@@ -2193,11 +2275,68 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             </div>
             <div>
               <label className="text-sm font-medium">Vendor Name</label>
-              <Input
-                value={expenseData.vendor_name}
-                onChange={(e) => setExpenseData(prev => ({ ...prev, vendor_name: e.target.value }))}
-                placeholder="Vendor/Payee"
-              />
+              <div className="relative vendor-dropdown">
+                <Input
+                  value={vendorSearch || expenseData.vendor_name}
+                  onChange={(e) => {
+                    setVendorSearch(e.target.value);
+                    setExpenseData(prev => ({ ...prev, vendor_name: e.target.value }));
+                    setIsVendorDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsVendorDropdownOpen(true)}
+                  placeholder="Search or type vendor name"
+                />
+                {isVendorDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="p-2 border-b">
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setShowAddVendorDialog(true);
+                          setIsVendorDropdownOpen(false);
+                          setNewVendorData(prev => ({
+                            ...prev,
+                            vendor_name: expenseData.vendor_name
+                          }));
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add New Vendor
+                      </Button>
+                    </div>
+                    {filteredVendors.length > 0 ? (
+                      filteredVendors.map((vendor) => (
+                        <div
+                          key={vendor.id}
+                          className="px-3 py-2 hover:bg-muted cursor-pointer flex items-center justify-between"
+                          onClick={() => handleSelectVendor(vendor.vendor_name)}
+                        >
+                          <div>
+                            <div className="font-medium">{vendor.vendor_name}</div>
+                            {vendor.vendor_contact && (
+                              <div className="text-xs text-muted-foreground">{vendor.vendor_contact}</div>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {vendor.vendor_type || 'supplier'}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      vendorSearch && (
+                        <div className="px-3 py-4 text-center text-muted-foreground">
+                          <p className="text-sm">No vendors found</p>
+                          <p className="text-xs mt-1">Type to add a new vendor</p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select existing vendor or type to add new
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium">Vendor Contact</label>
@@ -2474,6 +2613,64 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             <Button onClick={editingExpense ? handleUpdateExpense : handleCreateExpense}>
               {editingExpense ? 'Update' : 'Create'} Expense
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Vendor Dialog */}
+      <Dialog open={showAddVendorDialog} onOpenChange={setShowAddVendorDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Vendor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Vendor Name *</label>
+              <Input
+                value={newVendorData.vendor_name}
+                onChange={(e) => setNewVendorData(prev => ({ ...prev, vendor_name: e.target.value }))}
+                placeholder="Enter vendor name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Contact Number</label>
+              <Input
+                value={newVendorData.vendor_contact}
+                onChange={(e) => setNewVendorData(prev => ({ ...prev, vendor_contact: e.target.value }))}
+                placeholder="Phone number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Email Address</label>
+              <Input
+                type="email"
+                value={newVendorData.vendor_email}
+                onChange={(e) => setNewVendorData(prev => ({ ...prev, vendor_email: e.target.value }))}
+                placeholder="vendor@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Vendor Type</label>
+              <Select 
+                value={newVendorData.vendor_type} 
+                onValueChange={(v) => setNewVendorData(prev => ({ ...prev, vendor_type: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="supplier">Supplier</SelectItem>
+                  <SelectItem value="service_provider">Service Provider</SelectItem>
+                  <SelectItem value="contractor">Contractor</SelectItem>
+                  <SelectItem value="utility">Utility</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddVendorDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddNewVendor}>Add Vendor</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
