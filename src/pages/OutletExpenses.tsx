@@ -183,7 +183,9 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     department: "",
     notes: "",
     receipt_url: "",
-    tags: [] as string[]
+    tags: [] as string[],
+    prepared_by_name: "",
+    approved_by_name: ""
   };
 
   const [expenseData, setExpenseData] = useState(expenseForm);
@@ -2385,6 +2387,48 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 )}
               </div>
             </div>
+
+            {/* Prepared By & Approved By Section */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <label className="text-sm font-semibold">Transaction Tracking</label>
+                <div className="group relative">
+                  <div className="h-4 w-4 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center cursor-help">
+                    ?
+                  </div>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-72 p-3 bg-popover text-popover-foreground rounded-lg shadow-lg border z-50">
+                    <p className="text-xs font-semibold mb-1">Prepared By</p>
+                    <p className="text-xs text-muted-foreground mb-2">Person who created this expense record</p>
+                    <p className="text-xs font-semibold mb-1">Approved By</p>
+                    <p className="text-xs text-muted-foreground">Person who authorized/approved this expense</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Prepared By *</label>
+                  <Input
+                    value={expenseData.prepared_by_name || ''}
+                    onChange={(e) => setExpenseData(prev => ({ ...prev, prepared_by_name: e.target.value }))}
+                    placeholder="Name of person creating expense"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Who is recording this expense?
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Approved By</label>
+                  <Input
+                    value={expenseData.approved_by_name || ''}
+                    onChange={(e) => setExpenseData(prev => ({ ...prev, approved_by_name: e.target.value }))}
+                    placeholder="Name of approving authority"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Who authorized this expense?
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
           </div>
           <DialogFooter className="flex-shrink-0">
@@ -2690,6 +2734,27 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       <div>
                         <label className="text-xs text-muted-foreground">Next Due Date</label>
                         <p className="font-medium">{new Date(viewingExpense.next_due_date).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction Tracking */}
+              {(viewingExpense.prepared_by_name || viewingExpense.approved_by_name) && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Transaction Tracking</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {viewingExpense.prepared_by_name && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Prepared By</label>
+                        <p className="font-medium">{viewingExpense.prepared_by_name}</p>
+                      </div>
+                    )}
+                    {viewingExpense.approved_by_name && (
+                      <div>
+                        <label className="text-xs text-muted-foreground">Approved By</label>
+                        <p className="font-medium">{viewingExpense.approved_by_name}</p>
                       </div>
                     )}
                   </div>

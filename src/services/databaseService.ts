@@ -227,7 +227,9 @@ export interface Expense {
   notes?: string;
   // Approval workflow
   approval_status?: string; // pending, approved, rejected
-  approved_by?: string;
+  prepared_by_name?: string; // Person who created the expense (text name)
+  approved_by?: string; // UUID foreign key to users table
+  approved_by_name?: string; // Person who approved (text name)
   approval_date?: string;
   approval_notes?: string;
   // Advanced tracking
