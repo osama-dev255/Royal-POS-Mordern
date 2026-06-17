@@ -364,12 +364,20 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           
           <div class="info-grid">
             <div class="info-item">
+              <div class="label">Expense ID</div>
+              <div class="value font-mono">${expense.id?.slice(0, 8) || 'N/A'}</div>
+            </div>
+            <div class="info-item">
               <div class="label">Date</div>
               <div class="value">${new Date(expense.expense_date).toLocaleDateString()}</div>
             </div>
             <div class="info-item">
               <div class="label">Amount</div>
               <div class="amount">${formatTZS(expense.amount)}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Status</div>
+              <div class="value">${(expense.approval_status || 'pending').toUpperCase()}</div>
             </div>
           </div>
 
@@ -429,6 +437,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
     
     const expenseData = [
+      ['Expense ID', expense.id?.slice(0, 8) || 'N/A'],
       ['Date', new Date(expense.expense_date).toLocaleDateString()],
       ['Category', expense.category + (expense.sub_category ? ` - ${expense.sub_category}` : '')],
       ['Description', expense.description || 'N/A'],
@@ -477,9 +486,10 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   };
 
   const handleExportExpenseCSV = (expense: Expense) => {
-    const headers = ['Date', 'Category', 'Sub-Category', 'Description', 'Amount', 'Payment Method', 'Status', 'Vendor Name', 'Vendor Contact', 'Department', 'Prepared By', 'Approved By', 'Notes'];
+    const headers = ['ID', 'Date', 'Category', 'Sub-Category', 'Description', 'Amount', 'Payment Method', 'Status', 'Vendor Name', 'Vendor Contact', 'Department', 'Prepared By', 'Approved By', 'Notes'];
     
     const rows = [
+      expense.id?.slice(0, 8) || '',
       new Date(expense.expense_date).toLocaleDateString(),
       expense.category,
       expense.sub_category || '',
@@ -1501,6 +1511,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-20">ID</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Description</TableHead>
@@ -1516,6 +1527,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <TableBody>
                   {filteredExpenses.map((expense) => (
                     <TableRow key={expense.id}>
+                      <TableCell className="font-mono text-xs">{expense.id?.slice(0, 8) || '-'}</TableCell>
                       <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <div>
@@ -1735,6 +1747,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-20">ID</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Description</TableHead>
@@ -1747,6 +1760,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <TableBody>
                   {pendingApprovals.map((expense) => (
                     <TableRow key={expense.id}>
+                      <TableCell className="font-mono text-xs">{expense.id?.slice(0, 8) || '-'}</TableCell>
                       <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
                       <TableCell>{expense.category}</TableCell>
                       <TableCell className="max-w-xs truncate">{expense.description}</TableCell>
