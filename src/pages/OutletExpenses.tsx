@@ -393,6 +393,14 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           </div>
           ` : ''}
 
+          ${expense.prepared_by_name || expense.approved_by_name ? `
+          <div class="section">
+            <div class="section-title">Transaction Tracking</div>
+            ${expense.prepared_by_name ? `<p><strong>Prepared By:</strong> ${expense.prepared_by_name}</p>` : ''}
+            ${expense.approved_by_name ? `<p><strong>Approved By:</strong> ${expense.approved_by_name}</p>` : ''}
+          </div>
+          ` : ''}
+
           ${expense.notes ? `
           <div class="section">
             <div class="section-title">Notes</div>
@@ -438,6 +446,12 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     if (expense.department) {
       expenseData.push(['Department', expense.department]);
     }
+    if (expense.prepared_by_name) {
+      expenseData.push(['Prepared By', expense.prepared_by_name]);
+    }
+    if (expense.approved_by_name) {
+      expenseData.push(['Approved By', expense.approved_by_name]);
+    }
     if (expense.notes) {
       expenseData.push(['Notes', expense.notes]);
     }
@@ -463,7 +477,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   };
 
   const handleExportExpenseCSV = (expense: Expense) => {
-    const headers = ['Date', 'Category', 'Sub-Category', 'Description', 'Amount', 'Payment Method', 'Status', 'Vendor Name', 'Vendor Contact', 'Department', 'Notes'];
+    const headers = ['Date', 'Category', 'Sub-Category', 'Description', 'Amount', 'Payment Method', 'Status', 'Vendor Name', 'Vendor Contact', 'Department', 'Prepared By', 'Approved By', 'Notes'];
     
     const rows = [
       new Date(expense.expense_date).toLocaleDateString(),
@@ -476,6 +490,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       expense.vendor_name || '',
       expense.vendor_contact || '',
       expense.department || '',
+      expense.prepared_by_name || '',
+      expense.approved_by_name || '',
       expense.notes || ''
     ];
     
