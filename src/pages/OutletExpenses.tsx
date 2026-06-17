@@ -810,18 +810,25 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   // Auto-determine expense type based on category and sub-category
   const getAutoExpenseType = (category: string, subCategory: string = ''): 'operating' | 'capital' | 'personal' => {
     // Capital expense indicators (long-term assets)
-    const capitalKeywords = ['purchase', 'equipment', 'hardware', 'vehicle', 'building', 'property', 'machinery'];
+    const capitalKeywords = ['equipment', 'hardware', 'vehicle', 'building', 'property', 'machinery'];
     
     // Check sub-category first (more specific)
     if (subCategory) {
       const subLower = subCategory.toLowerCase();
+      
+      // Special case: "Stock Purchase" and "Inventory Adjustment" are operating (COGS), not capital
+      if (category === 'Inventory' && (subCategory === 'Stock Purchase' || subCategory === 'Inventory Adjustment')) {
+        return 'operating';
+      }
+      
+      // Check for capital keywords (excluding "purchase" which is too generic)
       if (capitalKeywords.some(keyword => subLower.includes(keyword))) {
         return 'capital';
       }
       
       // Specific sub-category mappings
       if (category === 'Technology & Software' && subCategory === 'Hardware') return 'capital';
-      if (category === 'Transportation' && (subCategory.includes('Vehicle') || subCategory.includes('Purchase'))) return 'capital';
+      if (category === 'Transportation' && (subCategory.includes('Vehicle') || subCategory === 'Vehicle Purchase')) return 'capital';
       if (category === 'Raw Materials' && subCategory.includes('Equipment')) return 'capital';
     }
     
