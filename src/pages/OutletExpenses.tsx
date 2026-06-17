@@ -1492,6 +1492,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Prepared By</TableHead>
+                    <TableHead>Approved By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1520,6 +1522,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                           {expense.approval_status?.toUpperCase()}
                         </Badge>
                       </TableCell>
+                      <TableCell>{expense.prepared_by_name || '-'}</TableCell>
+                      <TableCell>{expense.approved_by_name || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button 
@@ -1558,7 +1562,9 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                                 department: expense.department || "",
                                 notes: expense.notes || "",
                                 receipt_url: expense.receipt_url || "",
-                                tags: expense.tags || []
+                                tags: expense.tags || [],
+                                prepared_by_name: expense.prepared_by_name || "",
+                                approved_by_name: expense.approved_by_name || ""
                               });
                               // Set uploaded file name if receipt exists
                               if (expense.receipt_url) {
@@ -1718,6 +1724,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <TableHead>Description</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Prepared By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1729,6 +1736,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       <TableCell className="max-w-xs truncate">{expense.description}</TableCell>
                       <TableCell>{expense.vendor_name || '-'}</TableCell>
                       <TableCell className="text-right font-medium">{formatTZS(expense.amount)}</TableCell>
+                      <TableCell>{expense.prepared_by_name || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
