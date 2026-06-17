@@ -153,6 +153,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     "Technology & Software": ["Software Licenses", "Hardware", "Cloud Services", "IT Support", "Website Hosting", "Security Software"],
     "Raw Materials": ["Direct Materials", "Packaging Materials", "Components", "Supplies", "Wholesale Goods"],
     "Inventory": ["Stock Purchase", "Inventory Adjustment", "Shrinkage", "Returns", "Warehouse Costs"],
+    "Withdrawal": ["Owner Withdrawal", "Partner Withdrawal", "Dividend Payment", "Capital Draw", "Personal Use"],
     "Miscellaneous": ["Bank Fees", "Miscellaneous Expenses", "Donations", "Subscriptions", "Memberships"]
   };
 
@@ -831,6 +832,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       return 'operating';
     }
     
+    // Withdrawal category is always personal (not tax-deductible)
+    if (category === 'Withdrawal') {
+      return 'personal';
+    }
+    
     // Most categories are operating expenses by default
     return 'operating';
   };
@@ -858,6 +864,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     // Category-based defaults
     if (directCategories.includes(category)) {
       return 'direct';
+    }
+    
+    // Withdrawal is indirect (not tied to production)
+    if (category === 'Withdrawal') {
+      return 'indirect';
     }
     
     // Most categories are indirect (overhead) by default
