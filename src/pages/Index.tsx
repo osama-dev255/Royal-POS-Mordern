@@ -97,13 +97,16 @@ export const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [assets, setAssets] = useState<any[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, isLoading: authLoading } = useAuth();
 
   // Show splash screen for 2 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSplash(false);
-      setCurrentView("login");
+      // Don't force login - let the auth check and hash restoration handle routing
+      // The hash change handler already called handleHashChange() on mount
+      // So currentView should already be set correctly from the URL hash
+      // Only default to login if somehow we're still on splash after 2 seconds
     }, 2000);
 
     return () => clearTimeout(timer);
@@ -544,7 +547,21 @@ export const Index = () => {
     return <SplashScreen />;
   }
 
-  console.log("Rendering Index, currentView:", currentView, "user:", user);
+  console.log("Rendering Index, currentView:", currentView, "user:", user, "authLoading:", authLoading);
+  
+  // CRITICAL: Check auth loading FIRST before any user checks
+  if (authLoading) {
+    console.log("Auth still loading, showing loading state...");
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
   // Enhanced authentication check - ensure user is authenticated for all views except login and register
   if (currentView === "login" || !user) {
     console.log("Rendering LoginForm");
@@ -554,13 +571,6 @@ export const Index = () => {
   if (currentView === "register") {
     console.log("Rendering RegisterPage");
     return <RegisterPage onBack={handleBack} />;
-  }
-
-  // Additional authentication check to ensure user hasn't been logged out
-  if (!user) {
-    console.log("User not authenticated, redirecting to login");
-    setCurrentView("login");
-    return <LoginForm onLogin={handleLogin} onNavigate={handleNavigate} />;
   }
 
   // Ensure that we don't render unauthorized views
@@ -1526,6 +1536,17 @@ export const Index = () => {
               );
             case "purchase-assets":
               console.log("Rendering Purchase Assets page");
+              // Don't redirect while auth is still loading
+              if (authLoading) {
+                return (
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading...</p>
+                    </div>
+                  </div>
+                );
+              }
               // Ensure user is authenticated before rendering
               if (!user) {
                 console.log("User not authenticated for purchase-assets, redirecting to login");
@@ -1782,6 +1803,17 @@ export const Index = () => {
               );
             case "sell-assets":
               console.log("Rendering Sell Assets page");
+              // Don't redirect while auth is still loading
+              if (authLoading) {
+                return (
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading...</p>
+                    </div>
+                  </div>
+                );
+              }
               // Ensure user is authenticated before rendering
               if (!user) {
                 console.log("User not authenticated for sell-assets, redirecting to login");
@@ -2011,6 +2043,17 @@ export const Index = () => {
               );
             case "dispose-assets":
               console.log("Rendering Dispose Assets page");
+              // Don't redirect while auth is still loading
+              if (authLoading) {
+                return (
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading...</p>
+                    </div>
+                  </div>
+                );
+              }
               // Ensure user is authenticated before rendering
               if (!user) {
                 console.log("User not authenticated for dispose-assets, redirecting to login");
@@ -2204,6 +2247,17 @@ export const Index = () => {
               );
             case "adjust-assets":
               console.log("Rendering Adjust Assets page");
+              // Don't redirect while auth is still loading
+              if (authLoading) {
+                return (
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading...</p>
+                    </div>
+                  </div>
+                );
+              }
               // Ensure user is authenticated before rendering
               if (!user) {
                 console.log("User not authenticated for adjust-assets, redirecting to login");
