@@ -2908,15 +2908,15 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
       {/* View Expense Details Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               Expense Details
             </DialogTitle>
           </DialogHeader>
           {viewingExpense && (
-            <div className="space-y-6 py-4">
+            <div className="space-y-6 py-4 overflow-y-auto flex-1 pr-2">
               {/* Basic Information */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Information</h3>
