@@ -229,6 +229,21 @@ export interface Vendor {
   updated_at?: string;
 }
 
+export interface ExpenseCategory {
+  id?: string;
+  outlet_id: string;
+  category_name: string;
+  sub_category_name?: string;
+  category_type?: string; // 'predefined' or 'custom'
+  is_active?: boolean;
+  usage_count?: number;
+  last_used_date?: string;
+  created_by?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Expense {
   id?: string;
   user_id?: string;
@@ -2486,6 +2501,82 @@ export const updateVendor = async (id: string, vendor: Partial<Vendor>): Promise
   } catch (error) {
     console.error('Error updating vendor:', error);
     return null;
+  }
+};
+
+// Get expense categories for a specific outlet
+export const getOutletExpenseCategories = async (outletId: string): Promise<ExpenseCategory[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('expense_categories')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('is_active', true)
+      .order('category_name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching expense categories:', error);
+    return [];
+  }
+};
+
+// Create a new expense category
+export const createExpenseCategory = async (category: Omit<ExpenseCategory, 'id'>): Promise<ExpenseCategory | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('expense_categories')
+      .insert([{
+        ...category,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating expense category:', error);
+    return null;
+  }
+};
+
+// Update expense category
+export const updateExpenseCategory = async (id: string, category: Partial<ExpenseCategory>): Promise<ExpenseCategory | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('expense_categories')
+      .update({
+        ...category,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating expense category:', error);
+    return null;
+  }
+};
+
+// Delete expense category
+export const deleteExpenseCategory = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('expense_categories')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting expense category:', error);
+    return false;
   }
 };
 

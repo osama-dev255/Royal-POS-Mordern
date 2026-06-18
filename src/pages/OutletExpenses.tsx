@@ -90,10 +90,13 @@ import {
   getRecurringExpenseSummary,
   getOutletVendors,
   createVendor,
+  getOutletExpenseCategories,
+  createExpenseCategory,
   Expense,
   ExpenseBudget,
   ExpenseAnalytics,
-  Vendor
+  Vendor,
+  ExpenseCategory
 } from "@/services/databaseService";
 
 interface OutletExpensesProps {
@@ -122,6 +125,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [customSubCategories, setCustomSubCategories] = useState<Record<string, string[]>>({});
+  const [dbCategories, setDbCategories] = useState<ExpenseCategory[]>([]);
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
   const [isAddSubCategoryDialogOpen, setIsAddSubCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -246,7 +250,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     
     setLoading(true);
     try {
-      const [expensesData, analyticsData, budgetsData, alertsData, pendingData, upcomingData, overdueData, summaryData, vendorsData] = await Promise.all([
+      const [expensesData, analyticsData, budgetsData, alertsData, pendingData, upcomingData, overdueData, summaryData, vendorsData, categoriesData] = await Promise.all([
         getOutletExpensesFiltered(outletId),
         getOutletExpenseAnalytics(outletId, 'month'),
         getOutletBudgets(outletId),
@@ -255,7 +259,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
         getUpcomingRecurringExpenses(outletId, 30),
         getOverdueRecurringExpenses(outletId),
         getRecurringExpenseSummary(outletId),
-        getOutletVendors(outletId)
+        getOutletVendors(outletId),
+        getOutletExpenseCategories(outletId)
       ]);
       
       setExpenses(expensesData);
@@ -267,6 +272,24 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       setOverdueRecurring(overdueData);
       setRecurringSummary(summaryData);
       setVendors(vendorsData);
+      setDbCategories(categoriesData);
+      
+      // Load custom categories and sub-categories from database
+      const customCats = categoriesData
+        .filter(c => c.category_type === 'custom' && !c.sub_category_name)
+        .map(c => c.category_name);
+      setCustomCategories([...customCats]);
+      
+      const customSubCats: Record<string, string[]> = {};
+      categoriesData
+        .filter(c => c.category_type === 'custom' && c.sub_category_name)
+        .forEach(c => {
+          if (!customSubCats[c.category_name]) {
+            customSubCats[c.category_name] = [];
+          }
+          customSubCats[c.category_name].push(c.sub_category_name!);
+        });
+      setCustomSubCategories(customSubCats);
     } catch (error) {
       console.error('Error loading expenses data:', error);
       toast({
@@ -850,7 +873,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   };
 
   // Handle adding new category
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
       toast({ title: "Validation Error", description: "Please enter a category name", variant: "destructive" });
       return;
@@ -862,6 +885,22 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       return;
     }
     
+    // Save to database
+    if (outletId) {
+      const newCategory = await createExpenseCategory({
+        outlet_id: outletId,
+        category_name: trimmedName,
+        category_type: 'custom',
+        is_active: true,
+        usage_count: 0
+      });
+      
+      if (newCategory) {
+        setDbCategories(prev => [...prev, newCategory]);
+      }
+    }
+    
+    // Update local state
     setCustomCategories([...customCategories, trimmedName]);
     setCustomSubCategories({ ...customSubCategories, [trimmedName]: [] });
     setNewCategoryName("");
@@ -870,11 +909,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     // Auto-select the new category
     setExpenseData(prev => ({ ...prev, category: trimmedName }));
     
-    toast({ title: "Success", description: `Category "${trimmedName}" added` });
+    toast({ title: "Success", description: `Category "${trimmedName}" added and saved` });
   };
 
   // Handle adding new sub-category
-  const handleAddSubCategory = () => {
+  const handleAddSubCategory = async () => {
     if (!newSubCategoryName.trim()) {
       toast({ title: "Validation Error", description: "Please enter a sub-category name", variant: "destructive" });
       return;
@@ -896,6 +935,23 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       return;
     }
     
+    // Save to database
+    if (outletId) {
+      const newSubCategory = await createExpenseCategory({
+        outlet_id: outletId,
+        category_name: expenseData.category,
+        sub_category_name: trimmedName,
+        category_type: 'custom',
+        is_active: true,
+        usage_count: 0
+      });
+      
+      if (newSubCategory) {
+        setDbCategories(prev => [...prev, newSubCategory]);
+      }
+    }
+    
+    // Update local state
     const currentCustom = customSubCategories[expenseData.category] || [];
     setCustomSubCategories({
       ...customSubCategories,
@@ -907,7 +963,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     // Auto-select the new sub-category
     setExpenseData(prev => ({ ...prev, sub_category: trimmedName }));
     
-    toast({ title: "Success", description: `Sub-category "${trimmedName}" added` });
+    toast({ title: "Success", description: `Sub-category "${trimmedName}" added and saved` });
   };
 
   // Get sub-categories for selected category
