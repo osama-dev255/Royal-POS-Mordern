@@ -133,6 +133,17 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [isAddSubCategoryDialogOpen, setIsAddSubCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSubCategoryName, setNewSubCategoryName] = useState("");
+
+  // Dashboard date range
+  const [dashDateFrom, setDashDateFrom] = useState<string>("");
+  const [dashDateTo, setDashDateTo] = useState<string>("");
+  const dashboardExpenses = expenses.filter(e => {
+    if (!dashDateFrom && !dashDateTo) return true;
+    const expDate = new Date(e.expense_date || e.created_at || '');
+    const matchesFrom = !dashDateFrom || expDate >= new Date(dashDateFrom);
+    const matchesTo = !dashDateTo || expDate <= new Date(dashDateTo + 'T23:59:59');
+    return matchesFrom && matchesTo;
+  });
   
   // Recurring expense states
   const [upcomingRecurring, setUpcomingRecurring] = useState<Expense[]>([]);
@@ -1444,6 +1455,45 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="space-y-6">
+          {/* Date Range Picker */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <label className="text-sm font-medium">From:</label>
+              <Input
+                type="date"
+                value={dashDateFrom}
+                onChange={(e) => setDashDateFrom(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">To:</label>
+              <Input
+                type="date"
+                value={dashDateTo}
+                onChange={(e) => setDashDateTo(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            {(dashDateFrom || dashDateTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setDashDateFrom(""); setDashDateTo(""); }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
+            {(dashDateFrom || dashDateTo) && (
+              <span className="text-xs text-muted-foreground">
+                Showing {dashboardExpenses.length} of {expenses.length} expenses
+              </span>
+            )}
+          </div>
+
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
@@ -1521,7 +1571,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-red-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1539,7 +1589,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-orange-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.expense_type === 'operating' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1557,7 +1607,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.expense_type === 'capital' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1575,7 +1625,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-purple-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.expense_type === 'personal' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1599,7 +1649,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-green-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.payment_method === 'cash' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1617,7 +1667,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-teal-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.payment_method === 'card' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1635,7 +1685,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-indigo-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.payment_method === 'mobile' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1653,7 +1703,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-cyan-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.payment_method === 'bank_transfer' && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
@@ -1736,13 +1786,13 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-emerald-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => e.tax_deductible && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {expenses.filter(e => e.tax_deductible && e.approval_status === 'approved').length} expense(s)
+                    {dashboardExpenses.filter(e => e.tax_deductible && e.approval_status === 'approved').length} expense(s)
                   </p>
                 </CardContent>
               </Card>
@@ -1756,13 +1806,13 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardContent>
                   <div className="text-2xl font-bold text-gray-700">
                     {formatTZS(
-                      expenses
+                      dashboardExpenses
                         .filter(e => !e.tax_deductible && e.approval_status === 'approved')
                         .reduce((sum, e) => sum + e.amount, 0)
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {expenses.filter(e => !e.tax_deductible && e.approval_status === 'approved').length} expense(s)
+                    {dashboardExpenses.filter(e => !e.tax_deductible && e.approval_status === 'approved').length} expense(s)
                   </p>
                 </CardContent>
               </Card>
