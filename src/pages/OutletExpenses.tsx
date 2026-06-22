@@ -57,7 +57,10 @@ import {
   X,
   Share2,
   ChevronDown,
-  Printer
+  Printer,
+  CreditCard,
+  Smartphone,
+  Landmark
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1501,6 +1504,287 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               <CardContent>
                 <div className="text-2xl font-bold">{pendingApprovals.length}</div>
                 <p className="text-xs text-muted-foreground">Requires attention</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Expense Flow Summary Cards */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Expense Flow Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Cash Out */}
+              <Card className="border-red-200 bg-gradient-to-br from-red-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-red-700">Total Cash Out</CardTitle>
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Total approved expenses</p>
+                </CardContent>
+              </Card>
+
+              {/* Cash Operating Expenses */}
+              <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-orange-700">Operating Expenses</CardTitle>
+                  <DollarSign className="h-4 w-4 text-orange-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.expense_type === 'operating' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Day-to-day operations</p>
+                </CardContent>
+              </Card>
+
+              {/* Cash Capital Expenses */}
+              <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-700">Capital Expenses</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.expense_type === 'capital' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Long-term investments</p>
+                </CardContent>
+              </Card>
+
+              {/* Cash Personal/Withdrawal Expenses */}
+              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-purple-700">Withdrawals</CardTitle>
+                  <ArrowLeft className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.expense_type === 'personal' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Owner withdrawals</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Payment Method Summary Cards */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Payment Methods Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Cash Payments */}
+              <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-green-700">Cash Payments</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.payment_method === 'cash' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Paid in cash</p>
+                </CardContent>
+              </Card>
+
+              {/* Card Payments */}
+              <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-teal-700">Card Payments</CardTitle>
+                  <CreditCard className="h-4 w-4 text-teal-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-teal-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.payment_method === 'card' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Paid by card</p>
+                </CardContent>
+              </Card>
+
+              {/* Mobile Payments */}
+              <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-indigo-700">Mobile Payments</CardTitle>
+                  <Smartphone className="h-4 w-4 text-indigo-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-indigo-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.payment_method === 'mobile' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Mobile money</p>
+                </CardContent>
+              </Card>
+
+              {/* Bank Transfers */}
+              <Card className="border-cyan-200 bg-gradient-to-br from-cyan-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-cyan-700">Bank Transfers</CardTitle>
+                  <Landmark className="h-4 w-4 text-cyan-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-cyan-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.payment_method === 'bank_transfer' && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Bank transfers</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Recurring Expenses Summary */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Recurring Expenses Overview</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Monthly Recurring */}
+              <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-amber-700">Monthly Recurring</CardTitle>
+                  <Calendar className="h-4 w-4 text-amber-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-amber-700">
+                    {formatTZS(recurringSummary?.monthly_total || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Per month commitment</p>
+                </CardContent>
+              </Card>
+
+              {/* Upcoming (7 Days) */}
+              <Card className="border-yellow-200 bg-gradient-to-br from-yellow-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-yellow-700">Due This Week</CardTitle>
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-700">
+                    {formatTZS(
+                      upcomingRecurring
+                        .filter(e => {
+                          const dueDate = new Date(e.next_due_date || '');
+                          const now = new Date();
+                          const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                          return diffDays >= 0 && diffDays <= 7;
+                        })
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Next 7 days</p>
+                </CardContent>
+              </Card>
+
+              {/* Overdue */}
+              <Card className="border-red-200 bg-gradient-to-br from-red-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-red-700">Overdue Recurring</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-700">
+                    {formatTZS(
+                      overdueRecurring.reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{overdueRecurring.length} overdue expense(s)</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Tax Deductible Summary */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Tax Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Tax Deductible Expenses */}
+              <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-emerald-700">Tax Deductible</CardTitle>
+                  <FileText className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-emerald-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => e.tax_deductible && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {expenses.filter(e => e.tax_deductible && e.approval_status === 'approved').length} expense(s)
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Non-Tax Deductible */}
+              <Card className="border-gray-200 bg-gradient-to-br from-gray-50 to-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-700">Non-Deductible</CardTitle>
+                  <XCircle className="h-4 w-4 text-gray-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-700">
+                    {formatTZS(
+                      expenses
+                        .filter(e => !e.tax_deductible && e.approval_status === 'approved')
+                        .reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {expenses.filter(e => !e.tax_deductible && e.approval_status === 'approved').length} expense(s)
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Pending Approvals Value */}
+          <div className="mt-6">
+            <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-blue-700">Pending Approval Value</CardTitle>
+                <Clock className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-700">
+                  {formatTZS(
+                    pendingApprovals.reduce((sum, e) => sum + e.amount, 0)
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {pendingApprovals.length} expense(s) awaiting approval
+                </p>
               </CardContent>
             </Card>
           </div>
