@@ -355,10 +355,10 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   );
 
   const handleCreateExpense = async () => {
-    if (!outletId || !expenseData.category || !expenseData.amount) {
+    if (!outletId || !expenseData.category || !expenseData.amount || !expenseData.vendor_name?.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (Category, Amount, and Vendor Name)",
         variant: "destructive"
       });
       return;
@@ -2330,7 +2330,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Vendor Name</label>
+              <label className="text-sm font-medium">Vendor Name *</label>
               <div className="relative vendor-dropdown">
                 <Input
                   value={vendorSearch || expenseData.vendor_name}
@@ -2341,6 +2341,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   }}
                   onFocus={() => setIsVendorDropdownOpen(true)}
                   placeholder="Search or type vendor name"
+                  required
                 />
                 {isVendorDropdownOpen && (
                   <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
