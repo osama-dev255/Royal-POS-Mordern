@@ -416,7 +416,6 @@ export class PrintUtils {
     </div>
     
     <div class="approval-section">
-      <div class="approval-title">Approval Section</div>
       <div class="approval-field">
         <div class="approval-label">Approved By</div>
         <div class="approval-value">${transaction.approvedBy || '_______________________'}</div>
@@ -2096,7 +2095,6 @@ export class PrintUtils {
             </div>
             
             <div style="margin-top: 15px; padding-top: 0; text-align: center;">
-              <div style="font-size: 11px; font-weight: bold; margin-bottom: 10px;">Approval Section</div>
               <div style="margin-bottom: 8px;">
                 <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px;">Approved By</div>
                 <div style="font-size: 11px; min-height: 20px; border-bottom: none; padding-bottom: 3px; margin: 0 auto; max-width: 200px;">${transaction.approvedBy || '_______________________'}</div>
@@ -4698,12 +4696,7 @@ export class PrintUtils {
             ` : ''}
           </div>
           
-          <div class="footer">
-            <p>This is a computer-generated invoice.</p>
-          </div>
-          
           <div class="approval-section">
-            <div class="approval-title">Approval Section</div>
             <div class="approval-fields">
               <div class="approval-field">
                 <div class="approval-label">Approved By</div>
@@ -4716,6 +4709,10 @@ export class PrintUtils {
                 <div class="approval-note">Approval Date</div>
               </div>
             </div>
+          </div>
+          
+          <div class="footer">
+            <p>This is a computer-generated invoice.</p>
           </div>
           
           <script>
