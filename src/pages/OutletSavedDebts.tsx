@@ -38,7 +38,7 @@ import {
   XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
@@ -77,6 +77,7 @@ interface SavedSale {
   approvedBy?: string;
   approvalDate?: string;
   approvalNotes?: string;
+  customerBalance?: number;
 }
 
 export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) => {
@@ -808,6 +809,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       });
       
       // Enrich data with customer names and item counts
+      // Cache customer ledger balances to avoid redundant DB calls
+      const customerBalanceCache = new Map<string, number>();
+      
       const enrichedSales = await Promise.all(
         data.map(async (debt: OutletDebt) => {
           console.log('📄 Processing debt record:', {
@@ -888,7 +892,16 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             approvalStatus: debt.approval_status || 'pending',
             approvedBy: debt.approved_by,
             approvalDate: debt.approval_date,
-            approvalNotes: debt.approval_notes
+            approvalNotes: debt.approval_notes,
+            customerBalance: debt.customer_id ? (
+              customerBalanceCache.has(debt.customer_id) 
+                ? customerBalanceCache.get(debt.customer_id)!
+                : await (async () => {
+                    const bal = await getCustomerLedgerBalance(outletId, debt.customer_id!);
+                    customerBalanceCache.set(debt.customer_id!, bal);
+                    return bal;
+                  })()
+            ) : undefined
           };
         })
       );
@@ -1483,6 +1496,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   const totalDebt = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
   const totalPaid = filteredSales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
   const totalRemaining = totalDebt - totalPaid;
+  // Calculate total customer balance from unique customers' ledger balances
+  const uniqueCustomerBalances = new Map<string, number>();
+  filteredSales.forEach(sale => {
+    if (sale.customerId && sale.customerBalance !== undefined) {
+      uniqueCustomerBalances.set(sale.customerId, sale.customerBalance);
+    }
+  });
+  const totalCustomerBalance = Array.from(uniqueCustomerBalances.values()).reduce((sum, bal) => sum + bal, 0);
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -1505,6 +1526,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             <p className="text-sm text-muted-foreground">Total: {formatCurrency(totalDebt)}</p>
             <p className="text-xs text-green-600">Paid: {formatCurrency(totalPaid)}</p>
             <p className="text-xs text-red-600">Remaining: {formatCurrency(totalRemaining)}</p>
+              <p className="text-xs font-semibold text-blue-600">Customer Bal: {formatCurrency(totalCustomerBalance)}</p>
           </div>
         </div>
       </div>
@@ -1725,6 +1747,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       <span className={remaining > 0 ? 'text-red-600' : 'text-green-600'}>
                         {remaining > 0 ? `Due: ${formatCurrency(remaining)}` : 'Fully Paid'}
                       </span>
+                      {sale.customerBalance !== undefined && (
+                        <>
+                          <span className="mx-2">•</span>
+                          <span className={`font-semibold ${sale.customerBalance > 0 ? 'text-red-700' : sale.customerBalance < 0 ? 'text-green-700' : 'text-gray-600'}`}>
+                            Cust Bal: {formatCurrency(sale.customerBalance)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -2042,6 +2072,21 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                     </span>
                   </div>
                 </div>
+                {selectedSale.customerBalance !== undefined && (
+                  <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-blue-700">Customer Ledger Balance</span>
+                      <span className={`font-bold ${
+                        selectedSale.customerBalance > 0 ? 'text-red-600' : 
+                        selectedSale.customerBalance < 0 ? 'text-green-600' : 
+                        'text-gray-600'
+                      }`}>
+                        {formatCurrency(selectedSale.customerBalance)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-500 mt-1">Includes all settlements, adjustments & payments from customer ledger</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
