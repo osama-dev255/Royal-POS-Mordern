@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Truck, Plus, Search, Filter, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ProductManagementCard } from "@/components/ProductManagementCard";
+import { ProductStockMonitor } from "@/components/ProductStockMonitor";
 import { GRNManagementCard } from "@/components/GRNManagementCard";
 
 export const InventoryManagement = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
@@ -32,8 +32,8 @@ export const InventoryManagement = ({ username, onBack, onLogout }: { username: 
       
       <main className="container mx-auto p-6">
         <div className="mb-6">
-          <h2 className="text-3xl font-bold">Inventory Management</h2>
-          <p className="text-muted-foreground">Manage your products and goods received notes</p>
+          <h2 className="text-3xl font-bold">Inventory Operations</h2>
+          <p className="text-muted-foreground">Monitor stock levels and manage goods receiving (GRN)</p>
         </div>
         
         {/* Tab Navigation */}
@@ -44,7 +44,7 @@ export const InventoryManagement = ({ username, onBack, onLogout }: { username: 
             onClick={() => setActiveTab("products")}
           >
             <Package className="h-4 w-4" />
-            Products Management
+            Stock Monitor
           </Button>
           <Button
             variant={activeTab === "grn" ? "default" : "outline"}
@@ -77,16 +77,7 @@ export const InventoryManagement = ({ username, onBack, onLogout }: { username: 
                   Refresh
                 </Button>
                 
-                {activeTab === "products" ? (
-                  <Button onClick={() => {
-                    // This would open the add product dialog
-                    const event = new CustomEvent('openAddProductDialog');
-                    window.dispatchEvent(event);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
-                ) : (
+                {activeTab === "grn" && (
                   <Button onClick={() => {
                     // This would open the add GRN dialog
                     const event = new CustomEvent('openAddGRNDialog');
@@ -104,7 +95,7 @@ export const InventoryManagement = ({ username, onBack, onLogout }: { username: 
         {/* Content Cards */}
         <div className="grid grid-cols-1 gap-6">
           {activeTab === "products" ? (
-            <ProductManagementCard 
+            <ProductStockMonitor 
               searchTerm={searchTerm}
               refreshTrigger={refreshTrigger}
             />
