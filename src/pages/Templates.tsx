@@ -1162,7 +1162,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   });
 
   // Product inventory search states for delivery note
-  const [deliveryNoteProductItemsMap, setDeliveryNoteProductItemsMap] = useState<Map<string, { rate: number, unit: string }>>(new Map());
+  const [deliveryNoteProductItemsMap, setDeliveryNoteProductItemsMap] = useState<Map<string, { rate: number, unit: string, stockQuantity: number }>>(new Map());
   const [deliveryNoteProductDescriptions, setDeliveryNoteProductDescriptions] = useState<string[]>([]);
   
   // Product inventory states for GRN
@@ -5918,14 +5918,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const getAllProductItems = async () => {
     try {
       const products = await getProducts();
-      const itemsMap = new Map<string, { rate: number, unit: string }>(); // description -> { rate, unit }
+      const itemsMap = new Map<string, { rate: number, unit: string, stockQuantity: number }>(); // description -> { rate, unit, stockQuantity }
       
       products.forEach(product => {
         if (product.name) {
           // Use the cost price as the rate and unit of measure as the unit
           itemsMap.set(product.name, { 
             rate: product.cost_price || 0, 
-            unit: product.unit_of_measure || 'piece'
+            unit: product.unit_of_measure || 'piece',
+            stockQuantity: product.stock_quantity || 0
           });
         }
       });
@@ -5933,7 +5934,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       return itemsMap;
     } catch (error) {
       console.error('Error fetching product items:', error);
-      return new Map<string, { rate: number, unit: string }>();
+      return new Map<string, { rate: number, unit: string, stockQuantity: number }>();
     }
   };
 
@@ -11938,10 +11939,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                               .filter(desc => 
                                                 item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
                                               )
-                                              .map((desc, idx) => (
+                                              .map((desc, idx) => {
+                                                const productData = deliveryNoteProductItemsMap.get(desc);
+                                                const stockQty = productData?.stockQuantity ?? 0;
+                                                const stockColor = stockQty === 0 ? 'text-red-600' : stockQty <= 10 ? 'text-yellow-600' : 'text-green-600';
+                                                
+                                                return (
                                                 <div
                                                   key={idx}
-                                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex justify-between items-center"
                                                   onMouseDown={() => {
                                                     handleItemChange(item.id, 'description', desc);
                                                     // Set the rate and unit from the product inventory if available
@@ -11954,9 +11960,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                                     setShowDeliveryNoteDropdown(false);
                                                   }}
                                                 >
-                                                  {desc}
+                                                  <span className="flex-1">{desc}</span>
+                                                  <span className={`ml-2 font-semibold ${stockColor}`}>
+                                                    Stock: {stockQty}
+                                                  </span>
                                                 </div>
-                                              ))
+                                                );
+                                              })
                                             }
                                           </div>
                                         )}
