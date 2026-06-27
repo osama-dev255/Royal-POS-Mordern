@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/hooks/use-toast";
 import { 
   FileText, 
   Receipt, 
@@ -583,6 +584,7 @@ export const Templates = ({ onBack }: TemplatesProps) => {
   const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
+  const { toast } = useToast();
   const [templates, setTemplates] = useState<Template[]>([
     {
       id: "1",
@@ -4610,6 +4612,35 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
   // Handle item changes
   const handleItemChange = async (itemId: string, field: keyof DeliveryNoteItem, value: string | number) => {
+    // Validate quantity against available stock when quantity field is changed
+    if (field === 'quantity') {
+      const item = deliveryNoteData.items.find(item => item.id === itemId);
+      if (item && item.description) {
+        const productData = deliveryNoteProductItemsMap.get(item.description);
+        if (productData) {
+          const availableStock = productData.stockQuantity;
+          const requestedQuantity = Number(value);
+          
+          // Show warning if requested quantity exceeds available stock
+          if (requestedQuantity > availableStock) {
+            const toastMessage = availableStock === 0 
+              ? `⚠️ "${item.description}" is OUT OF STOCK. Available: 0`
+              : `⚠️ Insufficient stock for "${item.description}". Requested: ${requestedQuantity}, Available: ${availableStock}`;
+            
+            // Show toast notification
+            toast({
+              title: "Stock Warning",
+              description: toastMessage,
+              variant: "destructive",
+            });
+            
+            // Don't prevent the user from entering the quantity, just warn them
+            // They can still proceed if they want to create a backorder
+          }
+        }
+      }
+    }
+    
     // Only validate against available stock when delivered field is changed, not when quantity is changed
     // Quantity field in delivery note is for planning purposes, validation should happen when delivered is set
     if (field === 'delivered') {
@@ -11977,8 +12008,19 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                         type="number"
                                         value={item.quantity}
                                         onChange={async (e) => await handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                        className="p-1 h-8 text-sm w-full"
+                                        className={`p-1 h-8 text-sm w-full ${
+                                          item.description && deliveryNoteProductItemsMap.has(item.description) && 
+                                          item.quantity > (deliveryNoteProductItemsMap.get(item.description)?.stockQuantity ?? 0)
+                                            ? 'border-red-500 bg-red-50'
+                                            : ''
+                                        }`}
                                       />
+                                      {item.description && deliveryNoteProductItemsMap.has(item.description) && 
+                                       item.quantity > (deliveryNoteProductItemsMap.get(item.description)?.stockQuantity ?? 0) && (
+                                        <div className="text-xs text-red-600 mt-1 font-semibold">
+                                          ⚠️ Exceeds stock ({deliveryNoteProductItemsMap.get(item.description)?.stockQuantity ?? 0} available)
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
