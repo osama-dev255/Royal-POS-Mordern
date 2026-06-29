@@ -17,7 +17,8 @@ import {
   Printer,
   Building,
   PiggyBank,
-  LayoutTemplate
+  LayoutTemplate,
+  Warehouse
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -67,6 +68,13 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
       title: "Inventory Management",
       description: "Manage products, stock levels, and inventory tracking",
       icon: Package,
+      color: "bg-white border border-gray-200"
+    },
+    {
+      id: "godowns",
+      title: "Godown Management",
+      description: "Manage warehouses, zones, and stock transfers",
+      icon: Warehouse,
       color: "bg-white border border-gray-200"
     },
     {
@@ -240,6 +248,10 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
       case "inventory":
         console.log("Navigating to products");
         onNavigate("products");
+        break;
+      case "godowns":
+        console.log("Navigating to godowns");
+        onNavigate("godowns");
         break;
       case "sales":
         console.log("Navigating to sales");

@@ -15,7 +15,8 @@ import {
   LogOut,
   Wallet,
   Truck,
-  FileText
+  FileText,
+  Warehouse
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,13 @@ export const AdvancedLayout = ({
       icon: <Package className="h-5 w-5" />,
       view: "inventory",
       roles: ["admin", "manager", "staff"]
+    },
+    {
+      id: "godowns",
+      title: "Godowns",
+      icon: <Warehouse className="h-5 w-5" />,
+      view: "godowns",
+      roles: ["admin", "manager"]
     },
     {
       id: "sales",

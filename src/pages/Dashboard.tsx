@@ -15,7 +15,8 @@ import {
   Scan,
   DollarSign,
   Building,
-  TrendingUp
+  TrendingUp,
+  Warehouse
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -51,6 +52,13 @@ export const Dashboard = ({ username, onNavigate, onLogout }: DashboardProps) =>
       title: "Inventory Management",
       description: "Manage your products, stock levels, and inventory tracking",
       icon: Package,
+      color: "bg-white border border-gray-200"
+    },
+    {
+      id: "godowns",
+      title: "Godown Management",
+      description: "Manage warehouses, zones, and stock transfers",
+      icon: Warehouse,
       color: "bg-white border border-gray-200"
     },
     {

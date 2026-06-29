@@ -11,6 +11,7 @@ import { ProductManagement } from "@/pages/ProductManagement";
 import { CustomerManagement } from "@/pages/CustomerManagement";
 import { TransactionHistory } from "@/pages/TransactionHistory";
 import { InventoryManagement } from "@/pages/InventoryManagement";
+import { GodownManagement } from "@/pages/GodownManagement";
 import { SalesAnalytics } from "@/pages/SalesAnalytics";
 import { SpendingAnalytics } from "@/pages/SpendingAnalytics";
 import { EmployeeManagement } from "@/pages/EmployeeManagement";
@@ -420,6 +421,9 @@ export const Index = () => {
       case "inventory":
         setCurrentView("comprehensive");
         break;
+      case "godowns":
+        setCurrentView("comprehensive");
+        break;
       case "customers":
         setCurrentView("comprehensive");
         break;
@@ -586,7 +590,8 @@ export const Index = () => {
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
-    "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses"
+    "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses",
+    "godowns"
   ];
 
   // Check if view is authorized, but allow outlet-specific patterns
@@ -1281,6 +1286,14 @@ export const Index = () => {
               console.log("Rendering InventoryManagement");
               return (
                 <InventoryManagement
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "godowns":
+              return (
+                <GodownManagement
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
