@@ -274,7 +274,7 @@ export const updateGodownStock = async (
       .select('*')
       .eq('product_id', productId)
       .eq('godown_id', godownId)
-      .is('zone_id', zoneId)
+      .eq('zone_id', zoneId)  // Use eq() instead of is() for UUID comparison
       .single();
     
     if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows found

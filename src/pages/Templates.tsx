@@ -1640,6 +1640,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         }
         return {
           id: itemWithCost.id,
+          productId: itemWithCost.productId, // Include product ID for godown stock updates
           description: itemWithCost.description,
           quantity: itemWithCost.orderedQuantity,
           delivered: itemWithCost.receivedQuantity,
@@ -1664,7 +1665,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       approvedDate: grnData.approvedDate,
       receivedDate: grnData.receivedDate,
       status: grnData.status === 'received' || grnData.status === 'checked' || grnData.status === 'approved' ? 'completed' : (grnData.status || 'completed'),
-      receivingCosts: grnData.receivingCosts
+      receivingCosts: grnData.receivingCosts,
+      // Godown integration fields
+      destinationGodownId: grnData.destinationGodownId,
+      destinationZoneId: grnData.destinationZoneId,
+      destinationGodownName: grnData.destinationGodownName,
+      destinationZoneName: grnData.destinationZoneName
     };
     
     const newGRN: UtilsSavedGRN = {
@@ -2088,6 +2094,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         ...prev.items,
         {
           id: Date.now().toString(),
+          productId: "", // Initialize with empty productId
           description: "",
           orderedQuantity: 0,
           receivedQuantity: 0,

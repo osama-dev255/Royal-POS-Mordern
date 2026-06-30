@@ -17,7 +17,9 @@ import {
   createGodown, 
   updateGodown, 
   deleteGodown, 
-  Godown 
+  getGodownStock,
+  Godown,
+  GodownStock 
 } from "@/services/godownService";
 import { ZoneManagement } from "@/components/ZoneManagement";
 
@@ -44,6 +46,10 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showZones, setShowZones] = useState(false);
   const [selectedGodownForZones, setSelectedGodownForZones] = useState<Godown | null>(null);
+  const [showProducts, setShowProducts] = useState(false);
+  const [selectedGodownForProducts, setSelectedGodownForProducts] = useState<Godown | null>(null);
+  const [godownProducts, setGodownProducts] = useState<GodownStock[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const { toast } = useToast();
 
   const [newGodown, setNewGodown] = useState<Omit<Godown, "id" | "created_at" | "updated_at">>({
@@ -195,6 +201,32 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
     setSelectedGodownForZones(null);
   };
 
+  const openProductView = async (godown: Godown) => {
+    setSelectedGodownForProducts(godown);
+    setShowProducts(true);
+    setLoadingProducts(true);
+    
+    try {
+      const products = await getGodownStock(undefined, godown.id);
+      setGodownProducts(products);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load products for this godown",
+        variant: "destructive"
+      });
+      setGodownProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const closeProductView = () => {
+    setShowProducts(false);
+    setSelectedGodownForProducts(null);
+  };
+
   const filteredGodowns = godowns.filter(godown => {
     const matchesSearch = 
       godown.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -240,6 +272,89 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
             godownId={selectedGodownForZones.id!}
             godownName={selectedGodownForZones.name}
           />
+        </main>
+      </div>
+    );
+  }
+
+  // Show Products if viewing products for a godown
+  if (showProducts && selectedGodownForProducts) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation 
+          title={`Products in ${selectedGodownForProducts.name}`} 
+          onBack={closeProductView}
+          onLogout={onLogout} 
+          username={username}
+        />
+        <main className="container mx-auto p-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold">{selectedGodownForProducts.name}</h2>
+            <p className="text-muted-foreground">Code: {selectedGodownForProducts.code}</p>
+          </div>
+
+          <Card>
+            <CardContent className="p-6">
+              {loadingProducts ? (
+                <div className="flex justify-center items-center h-32">
+                  <p>Loading products...</p>
+                </div>
+              ) : godownProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No products found in this godown</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Zone</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Reserved</TableHead>
+                      <TableHead className="text-right">Available</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {godownProducts.map((stock) => (
+                      <TableRow key={stock.id}>
+                        <TableCell className="font-semibold">
+                          {(stock.products as any)?.name || 'Unknown Product'}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {(stock.products as any)?.sku || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {stock.zone_id ? (
+                            <Badge variant="outline">
+                              {(stock.godown_zones as any)?.zone_name || 'Zone'}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">No Zone</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {stock.quantity}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {stock.reserved_quantity || 0}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">
+                          {stock.quantity - (stock.reserved_quantity || 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="mt-6">
+            <Button onClick={closeProductView} variant="outline">
+              Back to Godowns
+            </Button>
+          </div>
         </main>
       </div>
     );
@@ -420,6 +535,14 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => openProductView(godown)}
+                              title="View Products"
+                            >
+                              📦
+                            </Button>
                             <Button 
                               variant="outline" 
                               size="sm"

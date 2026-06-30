@@ -24,6 +24,10 @@ export interface GRNItem {
   receivingCostPerUnit?: number;
   totalWithReceivingCost?: number;
   rate?: number;
+  // Templates.tsx specific fields
+  productId?: string;  // Product ID from product selection
+  receivedQuantity?: number;  // Received quantity (alternative to delivered)
+  orderedQuantity?: number;  // Ordered quantity
 }
 
 export interface GRNData {
@@ -184,8 +188,16 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
     console.log('Inserted record ID:', data?.[0]?.id);
     
     // Update godown stock if destination godown is specified
+    console.log('🔍 Checking if godown stock should be updated...');
+    console.log('📍 destinationGodownId:', grn.data.destinationGodownId);
+    console.log('📍 destinationZoneId:', grn.data.destinationZoneId);
+    console.log('📍 Number of items:', grn.data.items?.length);
+    
     if (grn.data.destinationGodownId) {
+      console.log('✅ Destination godown is set, calling updateGRNGodownStock...');
       await updateGRNGodownStock(grn);
+    } else {
+      console.log('⚠️ No destination godown set, skipping godown stock update');
     }
     
   } catch (error: any) {
@@ -223,12 +235,15 @@ const updateGRNGodownStock = async (grn: SavedGRN): Promise<void> => {
     const { updateGodownStock } = await import('@/services/godownService');
 
     for (const item of grn.data.items) {
-      const productId = item.id; // GRN items use 'id' as product_id
-      const quantity = item.delivered || 0;
+      const productId = item.productId || item.id; // GRN items may use either productId or id
+      const quantity = item.delivered || item.receivedQuantity || 0;
 
       if (!productId || quantity <= 0) {
+        console.log(`⚠️ Skipping item: productId=${productId}, quantity=${quantity}`);
         continue;
       }
+
+      console.log(`📦 Processing product ${productId}: ${quantity} units`);
 
       // Increase stock in destination godown
       await updateGodownStock(
