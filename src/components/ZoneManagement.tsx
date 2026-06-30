@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, MapPin, Search, Layers } from "lucide-react";
+import { Plus, Edit, Trash2, MapPin, Search, Layers, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getZones, 
@@ -16,8 +16,10 @@ import {
   updateZone, 
   deleteZone,
   getGodowns,
+  getGodownStock,
   GodownZone,
-  Godown
+  Godown,
+  GodownStock
 } from "@/services/godownService";
 
 const zoneTypes = [
@@ -44,6 +46,10 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<GodownZone | null>(null);
+  const [showProducts, setShowProducts] = useState(false);
+  const [selectedZoneForProducts, setSelectedZoneForProducts] = useState<GodownZone | null>(null);
+  const [zoneProducts, setZoneProducts] = useState<GodownStock[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const { toast } = useToast();
 
   const [newZone, setNewZone] = useState<Omit<GodownZone, "id" | "created_at" | "updated_at">>({
@@ -213,6 +219,36 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
     setIsDialogOpen(true);
   };
 
+  const openProductView = async (zone: GodownZone) => {
+    setSelectedZoneForProducts(zone);
+    setShowProducts(true);
+    setLoadingProducts(true);
+    
+    try {
+      // Get products in this specific zone
+      const products = await getGodownStock(undefined, zone.godown_id);
+      // Filter to only show products in this zone
+      const zoneProductsFiltered = products.filter(p => p.zone_id === zone.id);
+      setZoneProducts(zoneProductsFiltered);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load products for this zone",
+        variant: "destructive"
+      });
+      setZoneProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const closeProductView = () => {
+    setShowProducts(false);
+    setSelectedZoneForProducts(null);
+    setZoneProducts([]);
+  };
+
   const filteredZones = zones.filter(zone => 
     zone.zone_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (zone.zone_code && zone.zone_code.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -226,6 +262,78 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
       default: return "secondary";
     }
   };
+
+  // Show products view if viewing zone products
+  if (showProducts && selectedZoneForProducts) {
+    const selectedGodown = godowns.find(g => g.id === selectedZoneForProducts.godown_id);
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Package className="h-6 w-6 text-primary" />
+            <div>
+              <h2 className="text-2xl font-bold">Products in {selectedZoneForProducts.zone_name}</h2>
+              <p className="text-sm text-muted-foreground">
+                Zone Code: {selectedZoneForProducts.zone_code} | Godown: {selectedGodown?.name || 'Unknown'}
+              </p>
+            </div>
+          </div>
+          <Button onClick={closeProductView} variant="outline">
+            Back to Zones
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="p-6">
+            {loadingProducts ? (
+              <div className="flex justify-center items-center h-32">
+                <p>Loading products...</p>
+              </div>
+            ) : zoneProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No products found in this zone</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Reserved</TableHead>
+                    <TableHead className="text-right">Available</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {zoneProducts.map((stock) => (
+                    <TableRow key={stock.id}>
+                      <TableCell className="font-semibold">
+                        {(stock.products as any)?.name || 'Unknown Product'}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {(stock.products as any)?.sku || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stock.quantity}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {stock.reserved_quantity || 0}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-green-600">
+                        {stock.quantity - (stock.reserved_quantity || 0)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -365,6 +473,14 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => openProductView(zone)}
+                            title="View Products"
+                          >
+                            📦
+                          </Button>
                           <Button 
                             variant="outline" 
                             size="sm"
