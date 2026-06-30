@@ -12,6 +12,7 @@ import { CustomerManagement } from "@/pages/CustomerManagement";
 import { TransactionHistory } from "@/pages/TransactionHistory";
 import { InventoryManagement } from "@/pages/InventoryManagement";
 import { GodownManagement } from "@/pages/GodownManagement";
+import { StockTransferPage } from "@/pages/StockTransferPage";
 import { SalesAnalytics } from "@/pages/SalesAnalytics";
 import { SpendingAnalytics } from "@/pages/SpendingAnalytics";
 import { EmployeeManagement } from "@/pages/EmployeeManagement";
@@ -591,7 +592,7 @@ export const Index = () => {
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
     "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses",
-    "godowns"
+    "godowns", "stock-transfers"
   ];
 
   // Check if view is authorized, but allow outlet-specific patterns
@@ -1294,6 +1295,14 @@ export const Index = () => {
             case "godowns":
               return (
                 <GodownManagement
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "stock-transfers":
+              return (
+                <StockTransferPage
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}

@@ -26,6 +26,13 @@ export interface DeliveryData {
   sourceOutletId?: string; // ID of the source outlet (if sourceType is 'outlet')
   sourceOutletName?: string; // Name of the source outlet (for display purposes)
   creditBroughtForward?: number; // Credit brought forward from previous deliveries
+  // Godown integration fields
+  sourceGodownId?: string; // ID of source godown (for outgoing deliveries from warehouse)
+  sourceZoneId?: string; // ID of source zone within godown
+  destinationGodownId?: string; // ID of destination godown (if delivering to another godown)
+  destinationZoneId?: string; // ID of destination zone
+  sourceGodownName?: string; // Name of source godown (for display)
+  sourceZoneName?: string; // Name of source zone (for display)
 }
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
@@ -62,6 +69,11 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
           source_type: delivery.sourceType || 'investment',
           source_outlet_id: delivery.sourceOutletId || null,
           credit_brought_forward: delivery.creditBroughtForward || 0,
+          // Godown integration fields
+          source_godown_id: delivery.sourceGodownId || null,
+          source_zone_id: delivery.sourceZoneId || null,
+          destination_godown_id: delivery.destinationGodownId || null,
+          destination_zone_id: delivery.destinationZoneId || null,
           // Additional fields from DeliveryDetails view (matching exact View Display)
           business_name: (delivery as any).businessName || null,
           business_address: (delivery as any).businessAddress || null,
@@ -186,47 +198,53 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
               console.log(`📝 ${productName}: ${currentQty} + ${deliveredQty} = ${newQty}`);
               console.log(`💰 ${productName}: unit_cost=${unitCost}, selling_price=${sellingPrice}`);
               
+              // Update the product in inventory
               const { error: updateError } = await supabase
                 .from('inventory_products')
-                .update({ 
+                .update({
                   quantity: newQty,
                   unit_cost: unitCost,
-                  selling_price: sellingPrice
+                  selling_price: sellingPrice,
+                  updated_at: new Date().toISOString()
                 })
                 .eq('id', existingProduct.id);
               
               if (updateError) {
                 console.error(`❌ Error updating ${productName}:`, updateError);
               } else {
-                console.log(`✅ Updated ${productName} to ${newQty}`);
+                console.log(`✅ Updated ${productName} inventory`);
               }
             } else {
-              // Create new product
-              console.log(`🆕 Creating ${productName} with qty ${deliveredQty}`);
-              
+              // Create new inventory product
               const { error: insertError } = await supabase
                 .from('inventory_products')
                 .insert({
                   outlet_id: delivery.outletId,
                   name: productName,
                   quantity: deliveredQty,
-                  unit_cost: item.rate ?? 0,
-                  selling_price: item.rate || item.price || 0
+                  unit_cost: item.rate ?? item.price ?? 0,
+                  selling_price: item.sellingPrice ?? item.rate ?? item.price ?? 0,
+                  unit: item.unit ?? 'pcs',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
                 });
               
               if (insertError) {
-                console.error(`❌ Error creating ${productName}:`, insertError);
+                console.error(`❌ Error creating inventory for ${productName}:`, insertError);
               } else {
-                console.log(`✅ Created ${productName}`);
+                console.log(`✅ Created inventory for ${productName}`);
               }
             }
           }
-          
-          console.log('✅ Inventory update completed');
         }
       } catch (error) {
-        console.error('❌ Inventory update error:', error);
+        console.error('❌ Error updating outlet inventory:', error);
       }
+    }
+
+    // Update godown stock if source godown is specified (warehouse deliveries)
+    if (dbSaveSuccessful && delivery.sourceGodownId && delivery.sourceType === 'investment') {
+      await updateDeliveryGodownStock(delivery);
     }
     
     console.log('✅ Delivery saved successfully:', delivery.deliveryNoteNumber);
@@ -234,6 +252,47 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
   } catch (error) {
     console.error('Error saving delivery:', error);
     throw new Error('Failed to save delivery');
+  }
+};
+
+// Update godown stock when delivery is saved (for warehouse deliveries)
+const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> => {
+  // Only update if source godown is specified and there are items
+  if (!delivery.sourceGodownId || !delivery.itemsList || delivery.itemsList.length === 0) {
+    return;
+  }
+
+  try {
+    console.log('📦 Updating godown stock for delivery:', delivery.deliveryNoteNumber);
+    console.log('📍 Source Godown:', delivery.sourceGodownId);
+    console.log('📍 Source Zone:', delivery.sourceZoneId || 'All Zones');
+
+    // Import updateGodownStock dynamically to avoid circular dependencies
+    const { updateGodownStock } = await import('@/services/godownService');
+
+    for (const item of delivery.itemsList) {
+      const productId = item.product_id || item.id;
+      const quantity = item.quantity || item.delivered || 0;
+
+      if (!productId || quantity <= 0) {
+        continue;
+      }
+
+      // Decrease stock from source godown
+      await updateGodownStock(
+        productId,
+        delivery.sourceGodownId,
+        delivery.sourceZoneId || null,
+        -quantity // Negative to decrease
+      );
+
+      console.log(`✅ Decreased ${quantity} units of product ${productId} from godown`);
+    }
+
+    console.log('✅ Godown stock update completed for delivery');
+  } catch (error) {
+    console.error('❌ Error updating godown stock for delivery:', error);
+    // Don't throw error - delivery was already saved successfully
   }
 };
 

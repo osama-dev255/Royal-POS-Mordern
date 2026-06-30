@@ -16,7 +16,8 @@ import {
   Wallet,
   Truck,
   FileText,
-  Warehouse
+  Warehouse,
+  ArrowRightLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,13 @@ export const AdvancedLayout = ({
       title: "Godowns",
       icon: <Warehouse className="h-5 w-5" />,
       view: "godowns",
+      roles: ["admin", "manager"]
+    },
+    {
+      id: "stock-transfers",
+      title: "Stock Transfers",
+      icon: <ArrowRightLeft className="h-5 w-5" />,
+      view: "stock-transfers",
       roles: ["admin", "manager"]
     },
     {

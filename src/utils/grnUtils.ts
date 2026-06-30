@@ -60,6 +60,11 @@ export interface GRNData {
   receivedDate: string;
   status?: "draft" | "pending" | "received" | "checked" | "approved" | "completed" | "cancelled";
   receivingCosts: Array<{ description: string; amount: number }>;
+  // Godown integration fields
+  destinationGodownId?: string; // ID of destination godown
+  destinationZoneId?: string; // ID of destination zone
+  destinationGodownName?: string; // Name of destination godown (for display)
+  destinationZoneName?: string; // Name of destination zone (for display)
 }
 
 export interface SavedGRN {
@@ -153,7 +158,10 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       status: grn.data.status || 'pending',
       total_amount: totalAmount,
       created_at: grn.createdAt || new Date().toISOString(),
-      updated_at: grn.updatedAt || new Date().toISOString()
+      updated_at: grn.updatedAt || new Date().toISOString(),
+      // Godown integration fields
+      destination_godown_id: grn.data.destinationGodownId || null,
+      destination_zone_id: grn.data.destinationZoneId || null
     };
     
     console.log('3. Attempting database insert...');
@@ -175,6 +183,11 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
     console.log('✓ Database insert successful');
     console.log('Inserted record ID:', data?.[0]?.id);
     
+    // Update godown stock if destination godown is specified
+    if (grn.data.destinationGodownId) {
+      await updateGRNGodownStock(grn);
+    }
+    
   } catch (error: any) {
     console.error('❌ Error in saveGRN function:', error);
     console.error('Error name:', error.name);
@@ -191,6 +204,47 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
     }
     
     throw new Error(`Failed to save GRN: ${error.message}`);
+  }
+};
+
+// Update godown stock when GRN is saved (for incoming goods)
+const updateGRNGodownStock = async (grn: SavedGRN): Promise<void> => {
+  // Only update if destination godown is specified and there are items
+  if (!grn.data.destinationGodownId || !grn.data.items || grn.data.items.length === 0) {
+    return;
+  }
+
+  try {
+    console.log('📦 Updating godown stock for GRN:', grn.data.grnNumber);
+    console.log('📍 Destination Godown:', grn.data.destinationGodownId);
+    console.log('📍 Destination Zone:', grn.data.destinationZoneId || 'All Zones');
+
+    // Import updateGodownStock dynamically to avoid circular dependencies
+    const { updateGodownStock } = await import('@/services/godownService');
+
+    for (const item of grn.data.items) {
+      const productId = item.id; // GRN items use 'id' as product_id
+      const quantity = item.delivered || 0;
+
+      if (!productId || quantity <= 0) {
+        continue;
+      }
+
+      // Increase stock in destination godown
+      await updateGodownStock(
+        productId,
+        grn.data.destinationGodownId!,
+        grn.data.destinationZoneId || null,
+        quantity // Positive to increase
+      );
+
+      console.log(`✅ Increased ${quantity} units of product ${productId} in godown`);
+    }
+
+    console.log('✅ Godown stock update completed for GRN');
+  } catch (error) {
+    console.error('❌ Error updating godown stock for GRN:', error);
+    // Don't throw error - GRN was already saved successfully
   }
 };
 

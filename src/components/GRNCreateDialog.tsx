@@ -9,6 +9,7 @@ import { Plus, Trash2, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { saveGRN, GRNData, GRNItem } from "@/utils/grnUtils";
 import { formatCurrency } from "@/lib/currency";
+import { getGodowns, getZones, Godown, GodownZone } from "@/services/godownService";
 
 interface GRNCreateDialogProps {
   open: boolean;
@@ -89,6 +90,42 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
   const [grnData, setGrnData] = useState<GRNData>(initialGRNData);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Godown state
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [zones, setZones] = useState<GodownZone[]>([]);
+  const [destinationGodownId, setDestinationGodownId] = useState("");
+  const [destinationZoneId, setDestinationZoneId] = useState("");
+
+  // Load godowns on mount
+  useEffect(() => {
+    const loadGodowns = async () => {
+      try {
+        const data = await getGodowns();
+        setGodowns(data.filter(g => g.status === 'active'));
+      } catch (error) {
+        console.error('Error loading godowns:', error);
+      }
+    };
+    loadGodowns();
+  }, []);
+
+  // Load zones when godown changes
+  useEffect(() => {
+    const loadZones = async () => {
+      if (destinationGodownId) {
+        try {
+          const data = await getZones(destinationGodownId);
+          setZones(data);
+        } catch (error) {
+          console.error('Error loading zones:', error);
+        }
+      } else {
+        setZones([]);
+      }
+    };
+    loadZones();
+  }, [destinationGodownId]);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -495,6 +532,71 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
                     onChange={(e) => setGrnData(prev => ({ ...prev, receivedLocation: e.target.value }))}
                     placeholder="Receiving location"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Godown Selection Section */}
+            <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-blue-900">Destination Godown</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Destination Godown *</Label>
+                  <Select 
+                    value={destinationGodownId} 
+                    onValueChange={(val) => {
+                      setDestinationGodownId(val);
+                      setDestinationZoneId(""); // Reset zone when godown changes
+                      // Update grnData for display
+                      const selectedGodown = godowns.find(g => g.id === val);
+                      setGrnData(prev => ({ 
+                        ...prev, 
+                        destinationGodownId: val,
+                        destinationGodownName: selectedGodown?.name || ''
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select destination godown" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {godowns.map((godown) => (
+                        <SelectItem key={godown.id} value={godown.id!}>
+                          {godown.name} ({godown.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label>Destination Zone (Optional)</Label>
+                  <Select 
+                    value={destinationZoneId || "no-zone"} 
+                    onValueChange={(val) => {
+                      const zoneId = val === "no-zone" ? "" : val;
+                      setDestinationZoneId(zoneId);
+                      // Update grnData for display
+                      const selectedZone = zones.find(z => z.id === zoneId);
+                      setGrnData(prev => ({ 
+                        ...prev, 
+                        destinationZoneId: zoneId,
+                        destinationZoneName: selectedZone?.zone_name || ''
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select zone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no-zone">All Zones</SelectItem>
+                      {zones.map((zone) => (
+                        <SelectItem key={zone.id} value={zone.id!}>
+                          {zone.zone_name} ({zone.zone_code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

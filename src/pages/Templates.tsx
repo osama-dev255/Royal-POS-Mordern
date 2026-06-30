@@ -51,6 +51,7 @@ import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveSalesOrder, SalesOrderData as SavedSalesOrderData } from '@/utils/salesOrderUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
+import { getGodowns, getZones, Godown, GodownZone } from '@/services/godownService';
 import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
@@ -119,6 +120,12 @@ interface DeliveryNoteData {
   creditBroughtForward: number;
   amountDue: number;
   timestamp?: string;
+  // Godown integration fields
+  sourceType?: 'investment' | 'outlet';
+  sourceGodownId?: string;
+  sourceZoneId?: string;
+  sourceGodownName?: string;
+  sourceZoneName?: string;
 }
 
 
@@ -566,6 +573,11 @@ interface GRNData {
   receivedDate: string;
   status?: "received" | "checked" | "approved" | "completed";
   timestamp?: string;
+  // Godown integration fields
+  destinationGodownId?: string;
+  destinationZoneId?: string;
+  destinationGodownName?: string;
+  destinationZoneName?: string;
 }
 
 interface SavedGRN {
@@ -1141,6 +1153,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [filteredOutlets, setFilteredOutlets] = useState<Outlet[]>([]);
   const [showOutletDropdown, setShowOutletDropdown] = useState<boolean>(false);
   const [loadingOutlets, setLoadingOutlets] = useState<boolean>(true);
+  
+  // Godown state for delivery notes
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [deliveryZones, setDeliveryZones] = useState<GodownZone[]>([]);
+  const [sourceGodownId, setSourceGodownId] = useState("");
+  const [sourceZoneId, setSourceZoneId] = useState("");
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
   
   const [savedDeliveryNotes, setSavedDeliveryNotes] = useState<SavedDeliveryNote[]>(() => {
@@ -1205,6 +1223,36 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
     loadOutlets();
   }, []);
+
+  // Load godowns for delivery notes
+  useEffect(() => {
+    const loadGodowns = async () => {
+      try {
+        const data = await getGodowns();
+        setGodowns(data.filter(g => g.status === 'active'));
+      } catch (error) {
+        console.error('Error loading godowns:', error);
+      }
+    };
+    loadGodowns();
+  }, []);
+
+  // Load zones when source godown changes
+  useEffect(() => {
+    const loadZones = async () => {
+      if (sourceGodownId) {
+        try {
+          const data = await getZones(sourceGodownId);
+          setDeliveryZones(data);
+        } catch (error) {
+          console.error('Error loading zones:', error);
+        }
+      } else {
+        setDeliveryZones([]);
+      }
+    };
+    loadZones();
+  }, [sourceGodownId]);
 
   // Load products for GRN dropdown on component mount
   useEffect(() => {
@@ -2139,6 +2187,42 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   
   const [grnData, setGrnData] = useState<GRNData>(initialGRNData);
   
+  // GRN Godown state
+  const [grnGodowns, setGrnGodowns] = useState<Godown[]>([]);
+  const [grnZones, setGrnZones] = useState<GodownZone[]>([]);
+  const [grnDestinationGodownId, setGrnDestinationGodownId] = useState("");
+  const [grnDestinationZoneId, setGrnDestinationZoneId] = useState("");
+  
+  // Load godowns for GRN
+  useEffect(() => {
+    const loadGodowns = async () => {
+      try {
+        const data = await getGodowns();
+        setGrnGodowns(data.filter(g => g.status === 'active'));
+      } catch (error) {
+        console.error('Error loading godowns for GRN:', error);
+      }
+    };
+    loadGodowns();
+  }, []);
+  
+  // Load zones when godown changes
+  useEffect(() => {
+    const loadZones = async () => {
+      if (grnDestinationGodownId) {
+        try {
+          const data = await getZones(grnDestinationGodownId);
+          setGrnZones(data);
+        } catch (error) {
+          console.error('Error loading zones for GRN:', error);
+        }
+      } else {
+        setGrnZones([]);
+      }
+    };
+    loadZones();
+  }, [grnDestinationGodownId]);
+  
   const [savedGRNs, setSavedGRNs] = useState<any[]>(() => {
     const saved = localStorage.getItem('savedGRNs');
     return saved ? JSON.parse(saved) : [];
@@ -2480,6 +2564,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           deliveryNotes: deliveryNoteData.deliveryNotes,
           outletId: outletId,
           creditBroughtForward: deliveryNoteData.creditBroughtForward || 0,
+          // Godown integration fields
+          sourceType: 'investment',
+          sourceGodownId: sourceGodownId || undefined,
+          sourceZoneId: sourceZoneId || undefined,
+          sourceGodownName: godowns.find(g => g.id === sourceGodownId)?.name || '',
+          sourceZoneName: deliveryZones.find(z => z.id === sourceZoneId)?.zone_name || '',
           // Additional fields from DeliveryDetails view (matching exact View Display)
           businessName: deliveryNoteData.businessName,
           businessAddress: deliveryNoteData.businessAddress,
@@ -3982,6 +4072,19 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               <div class="text-sm mb-1">
                 <span class="font-medium">Received Date:</span> ${grnData.receivedDate || 'N/A'}
               </div>
+              ${grnData.destinationGodownId ? `
+              <div class="text-sm mb-1" style="background-color: #dbeafe; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                <span class="font-medium" style="color: #1e40af;">DESTINATION GODOWN:</span>
+                <div class="text-sm mb-1">
+                  <span class="font-medium">Godown:</span> ${grnData.destinationGodownName || grnData.destinationGodownId}
+                </div>
+                ${grnData.destinationZoneName ? `
+                <div class="text-sm">
+                  <span class="font-medium">Zone:</span> ${grnData.destinationZoneName}
+                </div>
+                ` : ''}
+              </div>
+              ` : ''}
             </div>
             
             <div>
@@ -4863,6 +4966,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           deliveryNotes: deliveryNoteData.deliveryNotes,
           outletId: outletId,
           creditBroughtForward: deliveryNoteData.creditBroughtForward || 0,
+          // Godown integration fields
+          sourceType: 'investment',
+          sourceGodownId: sourceGodownId || undefined,
+          sourceZoneId: sourceZoneId || undefined,
+          sourceGodownName: godowns.find(g => g.id === sourceGodownId)?.name || '',
+          sourceZoneName: deliveryZones.find(z => z.id === sourceZoneId)?.zone_name || '',
           // Additional fields from DeliveryDetails view (matching exact View Display)
           businessName: deliveryNoteData.businessName,
           businessAddress: deliveryNoteData.businessAddress,
@@ -10698,6 +10807,70 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               </div>
                             </div>
                             
+                            {/* GRN Godown Selection Section */}
+                            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="font-bold mb-3 text-blue-900">DESTINATION GODOWN</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <div className="text-sm font-medium text-blue-800">Destination Godown *</div>
+                                  <Select 
+                                    value={grnDestinationGodownId} 
+                                    onValueChange={(val) => {
+                                      setGrnDestinationGodownId(val);
+                                      setGrnDestinationZoneId(""); // Reset zone
+                                      // Update grnData
+                                      const selectedGodown = grnGodowns.find(g => g.id === val);
+                                      setGrnData(prev => ({ 
+                                        ...prev, 
+                                        destinationGodownId: val,
+                                        destinationGodownName: selectedGodown?.name || ''
+                                      }));
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-full mt-1">
+                                      <SelectValue placeholder="Select destination godown" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {grnGodowns.map((godown) => (
+                                        <SelectItem key={godown.id} value={godown.id!}>
+                                          {godown.name} ({godown.code})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                <div>
+                                  <div className="text-sm font-medium text-blue-800">Destination Zone (Optional)</div>
+                                  <Select 
+                                    value={grnDestinationZoneId || "no-zone"} 
+                                    onValueChange={(val) => {
+                                      const zoneId = val === "no-zone" ? "" : val;
+                                      setGrnDestinationZoneId(zoneId);
+                                      // Update grnData
+                                      const selectedZone = grnZones.find(z => z.id === zoneId);
+                                      setGrnData(prev => ({ 
+                                        ...prev, 
+                                        destinationZoneId: zoneId,
+                                        destinationZoneName: selectedZone?.zone_name || ''
+                                      }));
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-full mt-1">
+                                      <SelectValue placeholder="Select zone" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="no-zone">All Zones</SelectItem>
+                                      {grnZones.map((zone) => (
+                                        <SelectItem key={zone.id} value={zone.id!}>
+                                          {zone.zone_name} ({zone.zone_code})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            </div>
 
                           </div>
                           
@@ -11454,19 +11627,24 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                             </div>
                           </div>
                           
-                          <div>
-                            <div className="font-bold mb-2">Received Location</div>
-                            <div className="text-sm space-y-2">
-                              <div>
-                                <Input 
-                                  value={grnData.receivedLocation || ""}
-                                  onChange={(e) => setGrnData(prev => ({ ...prev, receivedLocation: e.target.value }))}
-                                  className="w-full h-6 p-1 text-sm mt-1"
-                                  placeholder="Enter location"
-                                />
+                          {/* Godown Information Display */}
+                          {grnData.destinationGodownId && (
+                            <div>
+                              <div className="font-bold mb-2 text-blue-800">Destination Godown</div>
+                              <div className="text-sm space-y-2 bg-blue-50 p-3 rounded border border-blue-200">
+                                <div>
+                                  <span className="font-medium">Godown:</span>{" "}
+                                  <span className="text-blue-900">{grnData.destinationGodownName || grnData.destinationGodownId}</span>
+                                </div>
+                                {grnData.destinationZoneName && (
+                                  <div>
+                                    <span className="font-medium">Zone:</span>{" "}
+                                    <span className="text-blue-900">{grnData.destinationZoneName}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
                     ) : currentTemplate?.type === "supplier-settlement" ? (
@@ -11914,6 +12092,63 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               className="text-sm p-1 h-6"
                             />
                           </div>
+                          
+                          {/* Godown Selectors */}
+                          <div>
+                            <div className="text-sm font-medium">Source Godown:</div>
+                            <Select 
+                              value={sourceGodownId} 
+                              onValueChange={(val) => {
+                                setSourceGodownId(val);
+                                setSourceZoneId(""); // Reset zone
+                                setDeliveryNoteData(prev => ({
+                                  ...prev,
+                                  sourceGodownId: val,
+                                  sourceGodownName: godowns.find(g => g.id === val)?.name || ''
+                                }));
+                              }}
+                            >
+                              <SelectTrigger className="text-sm p-1 h-6">
+                                <SelectValue placeholder="Select godown" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {godowns.map((godown) => (
+                                  <SelectItem key={godown.id} value={godown.id!}>
+                                    {godown.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <div className="text-sm font-medium">Source Zone:</div>
+                            <Select 
+                              value={sourceZoneId || "no-zone"} 
+                              onValueChange={(val) => {
+                                const zoneId = val === "no-zone" ? "" : val;
+                                setSourceZoneId(zoneId);
+                                setDeliveryNoteData(prev => ({
+                                  ...prev,
+                                  sourceZoneId: zoneId,
+                                  sourceZoneName: deliveryZones.find(z => z.id === zoneId)?.zone_name || ''
+                                }));
+                              }}
+                            >
+                              <SelectTrigger className="text-sm p-1 h-6">
+                                <SelectValue placeholder="Select zone" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="no-zone">All Zones</SelectItem>
+                                {deliveryZones.map((zone) => (
+                                  <SelectItem key={zone.id} value={zone.id!}>
+                                    {zone.zone_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
                           <div>
                             <div className="text-sm font-medium">Generated:</div>
                             <div className="text-sm">{new Date().toLocaleString()}</div>
