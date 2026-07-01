@@ -2056,8 +2056,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <TableHead>Category</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Vendor</TableHead>
+                    <TableHead>Expense Type</TableHead>
+                    <TableHead>Cost Classification</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Payment</TableHead>
+                    <TableHead>Tax Deductible</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Prepared By</TableHead>
                     <TableHead>Approved By</TableHead>
@@ -2079,11 +2082,28 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{expense.description}</TableCell>
                       <TableCell>{expense.vendor_name || '-'}</TableCell>
+                      <TableCell>
+                        {expense.expense_type ? (
+                          <Badge variant="outline" className="capitalize">{expense.expense_type}</Badge>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {expense.cost_classification ? (
+                          <Badge variant="outline" className="capitalize">{expense.cost_classification}</Badge>
+                        ) : '-'}
+                      </TableCell>
                       <TableCell className="text-right font-medium">{formatTZS(expense.amount)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {expense.payment_method?.replace('_', ' ')}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {expense.tax_deductible !== undefined ? (
+                          <Badge className={expense.tax_deductible ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>
+                            {expense.tax_deductible ? 'Yes' : 'No'}
+                          </Badge>
+                        ) : '-'}
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(expense.approval_status || 'pending')}>
