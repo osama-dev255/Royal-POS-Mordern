@@ -2630,6 +2630,22 @@ export const createVendorType = async (vendorType: Omit<VendorType, 'id'>): Prom
   }
 };
 
+// Delete a vendor type
+export const deleteVendorType = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('vendor_types')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting vendor type:', error);
+    return false;
+  }
+};
+
 // Get expenses for a specific outlet
 export const getOutletExpenses = async (outletId: string): Promise<Expense[]> => {
   try {

@@ -97,6 +97,7 @@ import {
   createExpenseCategory,
   getVendorTypes,
   createVendorType,
+  deleteVendorType,
   Expense,
   ExpenseBudget,
   ExpenseAnalytics,
@@ -422,6 +423,28 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       toast({
         title: "Error",
         description: "Failed to add vendor type",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteVendorType = async (vendorTypeId: string, typeName: string) => {
+    // If currently selected, reset to default
+    if (newVendorData.vendor_type === dbVendorTypes.find(vt => vt.id === vendorTypeId)?.type_key) {
+      setNewVendorData(prev => ({ ...prev, vendor_type: 'supplier' }));
+    }
+
+    const success = await deleteVendorType(vendorTypeId);
+    if (success) {
+      setDbVendorTypes(prev => prev.filter(vt => vt.id !== vendorTypeId));
+      toast({
+        title: "Success",
+        description: `Vendor type "${typeName}" removed successfully`
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to remove vendor type",
         variant: "destructive"
       });
     }
@@ -3231,6 +3254,26 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   />
                   <Button size="sm" onClick={handleAddVendorType}>Add</Button>
                   <Button size="sm" variant="outline" onClick={() => { setShowNewVendorTypeInput(false); setNewVendorTypeName(""); }}>Cancel</Button>
+                </div>
+              )}
+              {dbVendorTypes.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-muted-foreground">Custom vendor types:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {dbVendorTypes.map(vt => (
+                      <Badge key={vt.id} variant="secondary" className="flex items-center gap-1 pr-1">
+                        <span className="text-xs">{vt.type_name}</span>
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-full hover:bg-destructive hover:text-destructive-foreground p-0.5 transition-colors"
+                          onClick={() => handleDeleteVendorType(vt.id!, vt.type_name)}
+                          title={`Remove "${vt.type_name}"`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
