@@ -189,6 +189,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     "Raw Materials": ["Direct Materials", "Packaging Materials", "Components", "Supplies", "Wholesale Goods"],
     "Inventory": ["Stock Purchase", "Inventory Adjustment", "Shrinkage", "Returns", "Warehouse Costs"],
     "Withdrawal": ["Owner Withdrawal", "Partner Withdrawal", "Dividend Payment", "Capital Draw", "Personal Use"],
+    "Tax & Statutory Obligations": ["VAT Payable", "VAT on Inputs (Claimable)", "Corporate Tax Installment", "PAYE Payable", "SDL (Skills & Development Levy)", "WCF (Workers Compensation Fund)", "Withholding Tax (WHT)", "Penalties & Late Filing Fees"],
     "Miscellaneous": ["Bank Fees", "Miscellaneous Expenses", "Donations", "Subscriptions", "Memberships"]
   };
 
@@ -1201,6 +1202,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       return 'personal';
     }
     
+    // Tax & Statutory Obligations are always operating
+    if (category === 'Tax & Statutory Obligations') {
+      return 'operating';
+    }
+    
     // Most categories are operating expenses by default
     return 'operating';
   };
@@ -1235,8 +1241,38 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       return 'indirect';
     }
     
+    // Tax & Statutory Obligations are always indirect
+    if (category === 'Tax & Statutory Obligations') {
+      return 'indirect';
+    }
+    
     // Most categories are indirect (overhead) by default
     return 'indirect';
+  };
+
+  // Auto-determine tax deductible status based on category and sub-category
+  const getAutoTaxDeductible = (category: string, subCategory: string, expenseType: string): boolean => {
+    // Personal expenses are never tax-deductible
+    if (expenseType === 'personal') return false;
+
+    // Tax & Statutory Obligations - specific rules per Tanzania tax law
+    if (category === 'Tax & Statutory Obligations') {
+      // NOT tax-deductible: pass-through liabilities and prepaid taxes
+      const nonDeductibleSubs = [
+        'VAT Payable',
+        'VAT on Inputs (Claimable)',
+        'Corporate Tax Installment',
+        'PAYE Payable',
+        'Withholding Tax (WHT)',
+        'Penalties & Late Filing Fees'
+      ];
+      if (nonDeductibleSubs.includes(subCategory)) return false;
+      // Tax-deductible: employer contributions (SDL, WCF)
+      return true;
+    }
+
+    // All other operating/capital expenses are tax-deductible
+    return true;
   };
 
   const formatTZS = (amount: number) => {
@@ -2737,7 +2773,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   // Auto-set expense type and cost classification based on category
                   const autoType = getAutoExpenseType(v, '');
                   const autoCostClass = getAutoCostClassification(v, '');
-                  const taxDeductible = autoType === 'personal' ? false : true;
+                  const taxDeductible = getAutoTaxDeductible(v, '', autoType);
                   setExpenseData(prev => ({ 
                     ...prev, 
                     category: v, 
@@ -2790,7 +2826,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   // Re-evaluate expense type and cost classification based on category + sub-category
                   const autoType = getAutoExpenseType(expenseData.category, v);
                   const autoCostClass = getAutoCostClassification(expenseData.category, v);
-                  const taxDeductible = autoType === 'personal' ? false : true;
+                  const taxDeductible = getAutoTaxDeductible(expenseData.category, v, autoType);
                   setExpenseData(prev => ({ 
                     ...prev, 
                     sub_category: v,
