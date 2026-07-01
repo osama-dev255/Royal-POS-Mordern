@@ -122,6 +122,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("all");
+  const [filterCostClassification, setFilterCostClassification] = useState<string>("all");
+  const [filterExpenseType, setFilterExpenseType] = useState<string>("all");
+  const [filterVendor, setFilterVendor] = useState<string>("all");
+  const [filterRecurring, setFilterRecurring] = useState<string>("all");
+  const [filterTaxDeductible, setFilterTaxDeductible] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [pendingApprovals, setPendingApprovals] = useState<Expense[]>([]);
@@ -1089,12 +1094,21 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     const matchesCategory = filterCategory === 'all' || exp.category === filterCategory;
     const matchesStatus = filterStatus === 'all' || exp.approval_status === filterStatus;
     const matchesPayment = filterPaymentMethod === 'all' || exp.payment_method === filterPaymentMethod;
+    const matchesCostClassification = filterCostClassification === 'all' || exp.cost_classification === filterCostClassification;
+    const matchesExpenseType = filterExpenseType === 'all' || exp.expense_type === filterExpenseType;
+    const matchesVendor = filterVendor === 'all' || exp.vendor_name === filterVendor;
+    const matchesRecurring = filterRecurring === 'all' || 
+      (filterRecurring === 'yes' && exp.is_recurring) || 
+      (filterRecurring === 'no' && !exp.is_recurring);
+    const matchesTaxDeductible = filterTaxDeductible === 'all' || 
+      (filterTaxDeductible === 'yes' && exp.tax_deductible) || 
+      (filterTaxDeductible === 'no' && !exp.tax_deductible);
     
     const expDate = new Date(exp.expense_date);
     const matchesDateFrom = !dateFrom || expDate >= new Date(dateFrom);
     const matchesDateTo = !dateTo || expDate <= new Date(dateTo + 'T23:59:59');
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesPayment && matchesDateFrom && matchesDateTo;
+    return matchesSearch && matchesCategory && matchesStatus && matchesPayment && matchesCostClassification && matchesExpenseType && matchesVendor && matchesRecurring && matchesTaxDeductible && matchesDateFrom && matchesDateTo;
   });
 
   const exportToPDF = () => {
@@ -1973,6 +1987,60 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                   <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+                <Select value={filterCostClassification} onValueChange={setFilterCostClassification}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Cost Classification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Classifications</SelectItem>
+                    <SelectItem value="direct">Direct</SelectItem>
+                    <SelectItem value="indirect">Indirect</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterExpenseType} onValueChange={setFilterExpenseType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Expense Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="operating">Operating</SelectItem>
+                    <SelectItem value="capital">Capital</SelectItem>
+                    <SelectItem value="personal">Personal</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterVendor} onValueChange={setFilterVendor}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Vendors</SelectItem>
+                    {vendors.map(v => (
+                      <SelectItem key={v.id} value={v.vendor_name}>{v.vendor_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterRecurring} onValueChange={setFilterRecurring}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Recurring" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="yes">Recurring</SelectItem>
+                    <SelectItem value="no">One-time</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterTaxDeductible} onValueChange={setFilterTaxDeductible}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tax Deductible" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="yes">Tax Deductible</SelectItem>
+                    <SelectItem value="no">Not Deductible</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

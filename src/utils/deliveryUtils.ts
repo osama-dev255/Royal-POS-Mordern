@@ -243,8 +243,16 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
     }
 
     // Update godown stock if source godown is specified (warehouse deliveries)
+    console.log('🔍 Checking if delivery godown stock should be updated...');
+    console.log('📍 sourceGodownId:', delivery.sourceGodownId);
+    console.log('📍 sourceType:', delivery.sourceType);
+    console.log('📍 Number of items:', delivery.itemsList?.length);
+    
     if (dbSaveSuccessful && delivery.sourceGodownId && delivery.sourceType === 'investment') {
+      console.log('✅ Source godown is set, calling updateDeliveryGodownStock...');
       await updateDeliveryGodownStock(delivery);
+    } else {
+      console.log('⚠️ Skipping godown stock update - condition not met');
     }
     
     console.log('✅ Delivery saved successfully:', delivery.deliveryNoteNumber);

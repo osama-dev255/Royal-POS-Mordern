@@ -2553,6 +2553,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           paymentMethod: 'N/A', // Templates don't have payment method
           status: 'completed', // For templates, mark as completed
           itemsList: deliveryNoteData.items.map(item => ({
+            id: item.id, // Include item ID
+            product_id: item.productId, // Include product ID for godown stock updates
             name: item.description,
             quantity: item.quantity,
             unit: item.unit,
@@ -4953,6 +4955,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           paymentMethod: 'N/A', // Templates don't have payment method
           status: 'completed', // For templates, mark as completed
           itemsList: deliveryNoteData.items.map(item => ({
+            id: item.id, // Include item ID
+            product_id: item.productId, // Include product ID for godown stock updates
             name: item.description,
             quantity: item.quantity, // Use quantity field for the saved record
             unit: item.unit,
