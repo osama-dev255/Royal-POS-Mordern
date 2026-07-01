@@ -95,11 +95,14 @@ import {
   createVendor,
   getOutletExpenseCategories,
   createExpenseCategory,
+  getVendorTypes,
+  createVendorType,
   Expense,
   ExpenseBudget,
   ExpenseAnalytics,
   Vendor,
-  ExpenseCategory
+  ExpenseCategory,
+  VendorType
 } from "@/services/databaseService";
 
 interface OutletExpensesProps {
@@ -138,6 +141,9 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [isAddSubCategoryDialogOpen, setIsAddSubCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSubCategoryName, setNewSubCategoryName] = useState("");
+  const [dbVendorTypes, setDbVendorTypes] = useState<VendorType[]>([]);
+  const [newVendorTypeName, setNewVendorTypeName] = useState("");
+  const [showNewVendorTypeInput, setShowNewVendorTypeInput] = useState(false);
 
   // Dashboard date range
   const [dashDateFrom, setDashDateFrom] = useState<string>("");
@@ -269,7 +275,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     
     setLoading(true);
     try {
-      const [expensesData, analyticsData, budgetsData, alertsData, pendingData, upcomingData, overdueData, summaryData, vendorsData, categoriesData] = await Promise.all([
+      const [expensesData, analyticsData, budgetsData, alertsData, pendingData, upcomingData, overdueData, summaryData, vendorsData, categoriesData, vendorTypesData] = await Promise.all([
         getOutletExpensesFiltered(outletId),
         getOutletExpenseAnalytics(outletId, 'month'),
         getOutletBudgets(outletId),
@@ -279,7 +285,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
         getOverdueRecurringExpenses(outletId),
         getRecurringExpenseSummary(outletId),
         getOutletVendors(outletId),
-        getOutletExpenseCategories(outletId)
+        getOutletExpenseCategories(outletId),
+        getVendorTypes(outletId)
       ]);
       
       setExpenses(expensesData);
@@ -292,6 +299,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       setRecurringSummary(summaryData);
       setVendors(vendorsData);
       setDbCategories(categoriesData);
+      setDbVendorTypes(vendorTypesData);
       
       // Load custom categories and sub-categories from database
       const customCats = categoriesData
@@ -364,6 +372,56 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       toast({
         title: "Error",
         description: "Failed to add vendor",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddVendorType = async () => {
+    if (!outletId || !newVendorTypeName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Vendor type name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const typeKey = newVendorTypeName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    
+    // Check for duplicates
+    const defaultTypes = ['supplier', 'service_provider', 'contractor', 'utility', 'other'];
+    const existingKeys = [...defaultTypes, ...dbVendorTypes.map(vt => vt.type_key)];
+    if (existingKeys.includes(typeKey)) {
+      toast({
+        title: "Duplicate",
+        description: "This vendor type already exists",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newType = await createVendorType({
+      outlet_id: outletId,
+      type_name: newVendorTypeName.trim(),
+      type_key: typeKey,
+      is_default: false,
+      is_active: true
+    });
+
+    if (newType) {
+      setDbVendorTypes(prev => [...prev, newType]);
+      setNewVendorData(prev => ({ ...prev, vendor_type: typeKey }));
+      setNewVendorTypeName("");
+      setShowNewVendorTypeInput(false);
+      toast({
+        title: "Success",
+        description: `Vendor type "${newType.type_name}" added successfully`
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to add vendor type",
         variant: "destructive"
       });
     }
@@ -3132,7 +3190,13 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               <label className="text-sm font-medium">Vendor Type</label>
               <Select 
                 value={newVendorData.vendor_type} 
-                onValueChange={(v) => setNewVendorData(prev => ({ ...prev, vendor_type: v }))}
+                onValueChange={(v) => {
+                  if (v === '__add_new_type__') {
+                    setShowNewVendorTypeInput(true);
+                  } else {
+                    setNewVendorData(prev => ({ ...prev, vendor_type: v }));
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -3143,8 +3207,32 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   <SelectItem value="contractor">Contractor</SelectItem>
                   <SelectItem value="utility">Utility</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
+                  {dbVendorTypes.map(vt => (
+                    <SelectItem key={vt.id} value={vt.type_key}>{vt.type_name}</SelectItem>
+                  ))}
+                  <SelectItem value="__add_new_type__" className="text-blue-600 font-medium">
+                    + Add New Type
+                  </SelectItem>
                 </SelectContent>
               </Select>
+              {showNewVendorTypeInput && (
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    value={newVendorTypeName}
+                    onChange={(e) => setNewVendorTypeName(e.target.value)}
+                    placeholder="Enter new vendor type name"
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddVendorType();
+                      }
+                    }}
+                  />
+                  <Button size="sm" onClick={handleAddVendorType}>Add</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setShowNewVendorTypeInput(false); setNewVendorTypeName(""); }}>Cancel</Button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

@@ -244,6 +244,17 @@ export interface ExpenseCategory {
   updated_at?: string;
 }
 
+export interface VendorType {
+  id?: string;
+  outlet_id: string;
+  type_name: string;
+  type_key: string;
+  is_default?: boolean;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Expense {
   id?: string;
   user_id?: string;
@@ -2577,6 +2588,45 @@ export const deleteExpenseCategory = async (id: string): Promise<boolean> => {
   } catch (error) {
     console.error('Error deleting expense category:', error);
     return false;
+  }
+};
+
+// Get vendor types for a specific outlet
+export const getVendorTypes = async (outletId: string): Promise<VendorType[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('vendor_types')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .eq('is_active', true)
+      .order('type_name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching vendor types:', error);
+    return [];
+  }
+};
+
+// Create a new vendor type
+export const createVendorType = async (vendorType: Omit<VendorType, 'id'>): Promise<VendorType | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('vendor_types')
+      .insert([{
+        ...vendorType,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error creating vendor type:', error);
+    return null;
   }
 };
 
