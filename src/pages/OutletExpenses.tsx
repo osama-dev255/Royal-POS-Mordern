@@ -93,6 +93,7 @@ import {
   getRecurringExpenseSummary,
   getOutletVendors,
   createVendor,
+  deleteVendor,
   getOutletExpenseCategories,
   createExpenseCategory,
   getVendorTypes,
@@ -335,6 +336,28 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     setExpenseData(prev => ({ ...prev, vendor_name: vendorName }));
     setIsVendorDropdownOpen(false);
     setVendorSearch("");
+  };
+
+  const handleDeleteVendor = async (vendorId: string, vendorName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const success = await deleteVendor(vendorId);
+    if (success) {
+      setVendors(prev => prev.filter(v => v.id !== vendorId));
+      // Clear vendor name if the deleted vendor was selected
+      if (expenseData.vendor_name === vendorName) {
+        setExpenseData(prev => ({ ...prev, vendor_name: '' }));
+      }
+      toast({
+        title: "Success",
+        description: `Vendor "${vendorName}" removed successfully`
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to remove vendor",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAddNewVendor = async () => {
@@ -2869,7 +2892,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       filteredVendors.map((vendor) => (
                         <div
                           key={vendor.id}
-                          className="px-3 py-2 hover:bg-muted cursor-pointer flex items-center justify-between"
+                          className="px-3 py-2 hover:bg-muted cursor-pointer flex items-center justify-between group"
                           onClick={() => handleSelectVendor(vendor.vendor_name)}
                         >
                           <div>
@@ -2878,9 +2901,19 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                               <div className="text-xs text-muted-foreground">{vendor.vendor_contact}</div>
                             )}
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {vendor.vendor_type || 'supplier'}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-xs">
+                              {vendor.vendor_type || 'supplier'}
+                            </Badge>
+                            <button
+                              type="button"
+                              className="opacity-0 group-hover:opacity-100 rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-all"
+                              onClick={(e) => handleDeleteVendor(vendor.id!, vendor.vendor_name, e)}
+                              title={`Remove "${vendor.vendor_name}"`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))
                     ) : (

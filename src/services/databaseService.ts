@@ -2515,6 +2515,22 @@ export const updateVendor = async (id: string, vendor: Partial<Vendor>): Promise
   }
 };
 
+// Delete vendor
+export const deleteVendor = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('vendors')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting vendor:', error);
+    return false;
+  }
+};
+
 // Get expense categories for a specific outlet
 export const getOutletExpenseCategories = async (outletId: string): Promise<ExpenseCategory[]> => {
   try {
