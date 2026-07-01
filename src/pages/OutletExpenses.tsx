@@ -96,6 +96,7 @@ import {
   deleteVendor,
   getOutletExpenseCategories,
   createExpenseCategory,
+  deleteExpenseCategory,
   getVendorTypes,
   createVendorType,
   deleteVendorType,
@@ -1087,6 +1088,73 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     setExpenseData(prev => ({ ...prev, sub_category: trimmedName }));
     
     toast({ title: "Success", description: `Sub-category "${trimmedName}" added and saved` });
+  };
+
+  // Handle deleting a custom category
+  const handleDeleteCategory = async (categoryName: string) => {
+    // Find the DB record for this custom category
+    const dbRecord = dbCategories.find(c => c.category_name === categoryName && !c.sub_category_name && c.category_type === 'custom');
+    
+    if (dbRecord?.id) {
+      const success = await deleteExpenseCategory(dbRecord.id);
+      if (!success) {
+        toast({ title: "Error", description: "Failed to remove category", variant: "destructive" });
+        return;
+      }
+    }
+
+    // Also delete any sub-categories under this category from DB
+    const subRecords = dbCategories.filter(c => c.category_name === categoryName && c.sub_category_name && c.category_type === 'custom');
+    for (const sub of subRecords) {
+      if (sub.id) await deleteExpenseCategory(sub.id);
+    }
+
+    // Update local state
+    setDbCategories(prev => prev.filter(c => c.category_name !== categoryName));
+    setCustomCategories(prev => prev.filter(c => c !== categoryName));
+    setCustomSubCategories(prev => {
+      const updated = { ...prev };
+      delete updated[categoryName];
+      return updated;
+    });
+
+    // Clear selection if deleted category was selected
+    if (expenseData.category === categoryName) {
+      setExpenseData(prev => ({ ...prev, category: '', sub_category: '' }));
+    }
+
+    toast({ title: "Success", description: `Category "${categoryName}" removed` });
+  };
+
+  // Handle deleting a custom sub-category
+  const handleDeleteSubCategory = async (categoryName: string, subCategoryName: string) => {
+    const dbRecord = dbCategories.find(c => 
+      c.category_name === categoryName && 
+      c.sub_category_name === subCategoryName && 
+      c.category_type === 'custom'
+    );
+
+    if (dbRecord?.id) {
+      const success = await deleteExpenseCategory(dbRecord.id);
+      if (!success) {
+        toast({ title: "Error", description: "Failed to remove sub-category", variant: "destructive" });
+        return;
+      }
+    }
+
+    // Update local state
+    setDbCategories(prev => prev.filter(c => !(c.category_name === categoryName && c.sub_category_name === subCategoryName && c.category_type === 'custom')));
+    setCustomSubCategories(prev => ({
+      ...prev,
+      [categoryName]: (prev[categoryName] || []).filter(s => s !== subCategoryName)
+    }));
+
+    // Clear selection if deleted sub-category was selected
+    if (expenseData.sub_category === subCategoryName) {
+      setExpenseData(prev => ({ ...prev, sub_category: '' }));
+    }
+
+    toast({ title: "Success", description: `Sub-category "${subCategoryName}" removed` });
   };
 
   // Get sub-categories for selected category
@@ -2692,6 +2760,26 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   </SelectItem>
                 </SelectContent>
               </Select>
+              {customCategories.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-muted-foreground">Custom categories:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {customCategories.map(cat => (
+                      <Badge key={cat} variant="secondary" className="flex items-center gap-1 pr-1">
+                        <span className="text-xs">{cat}</span>
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-full hover:bg-destructive hover:text-destructive-foreground p-0.5 transition-colors"
+                          onClick={() => handleDeleteCategory(cat)}
+                          title={`Remove "${cat}"`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Sub-Category</label>
@@ -2726,6 +2814,26 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   )}
                 </SelectContent>
               </Select>
+              {expenseData.category && (customSubCategories[expenseData.category] || []).length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-muted-foreground">Custom sub-categories:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(customSubCategories[expenseData.category] || []).map(sub => (
+                      <Badge key={sub} variant="secondary" className="flex items-center gap-1 pr-1">
+                        <span className="text-xs">{sub}</span>
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-full hover:bg-destructive hover:text-destructive-foreground p-0.5 transition-colors"
+                          onClick={() => handleDeleteSubCategory(expenseData.category, sub)}
+                          title={`Remove "${sub}"`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="col-span-2">
               <label className="text-sm font-medium">Description *</label>
