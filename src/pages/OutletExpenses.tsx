@@ -179,7 +179,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     "Rent & Lease": ["Office Space", "Warehouse", "Equipment Lease", "Vehicle Lease", "Storage Unit"],
     "Salaries & Wages": ["Base Salary", "Overtime Pay", "Bonuses", "Commissions", "Benefits", "Payroll Taxes", "Employee Advance", "Casual Labor"],
     "Marketing & Advertising": ["Social Media Ads", "Print Materials", "Billboard", "Radio/TV Ads", "Promotional Events", "Digital Marketing", "Branding"],
-    "Transportation": ["Fuel", "Vehicle Maintenance", "Delivery Fees", "Parking", "Tolls", "Public Transport", "Vehicle Insurance"],
+    "Transportation": ["Fuel", "Vehicle Maintenance", "Delivery Fees", "Freight-In / Carriage-In", "Parking", "Tolls", "Public Transport", "Vehicle Insurance"],
     "Maintenance & Repairs": ["Building Repair", "Equipment Repair", "Plumbing", "Electrical", "HVAC", "Painting", "General Maintenance"],
     "Office Supplies": ["Paper & Printing", "Stationery", "Ink & Toner", "Folders & Files", "Desk Accessories", "Breakroom Supplies"],
     "Insurance": ["Property Insurance", "Liability Insurance", "Health Insurance", "Vehicle Insurance", "Workers Compensation", "Business Insurance"],
@@ -1228,7 +1228,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       
       // Specific mappings
       if (category === 'Salaries & Wages' && (subCategory.includes('Production') || subCategory.includes('Direct'))) return 'direct';
-      if (category === 'Transportation' && (subCategory.includes('Delivery') || subCategory.includes('Shipping'))) return 'direct';
+      if (category === 'Transportation' && (subCategory.includes('Delivery') || subCategory.includes('Shipping') || subCategory.includes('Freight'))) return 'direct';
     }
     
     // Category-based defaults
