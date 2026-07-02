@@ -137,6 +137,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [filterTaxDeductible, setFilterTaxDeductible] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [datePreset, setDatePreset] = useState<string>("all");
+  const [expenseCalendarOpen, setExpenseCalendarOpen] = useState(false);
   const [approvalDateFrom, setApprovalDateFrom] = useState<string>("");
   const [approvalDateTo, setApprovalDateTo] = useState<string>("");
   const [approvalDatePreset, setApprovalDatePreset] = useState<string>("all");
@@ -1333,6 +1335,64 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     return matchesFrom && matchesTo;
   });
 
+  const handleDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setDateFrom(todayStr);
+        setDateTo(todayStr);
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split('T')[0];
+        setDateFrom(yStr);
+        setDateTo(yStr);
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setDateFrom(d.toISOString().split('T')[0]);
+        setDateTo(todayStr);
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setDateFrom(d.toISOString().split('T')[0]);
+        setDateTo(todayStr);
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setDateFrom(first);
+        setDateTo(todayStr);
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setDateFrom(first.toISOString().split('T')[0]);
+        setDateTo(last.toISOString().split('T')[0]);
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setDateFrom(first);
+        setDateTo(todayStr);
+        break;
+      }
+      case 'all':
+      default:
+        setDateFrom('');
+        setDateTo('');
+        break;
+    }
+  };
+
   const handleApprovalDatePreset = (preset: string) => {
     setApprovalDatePreset(preset);
     const today = new Date();
@@ -2264,9 +2324,62 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   </SelectContent>
                 </Select>
                 <div className="flex gap-2">
-                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                  <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset('custom'); }} />
+                  <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset('custom'); }} />
+                  <Popover open={expenseCalendarOpen} onOpenChange={setExpenseCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        Calendar
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="range"
+                        selected={{
+                          from: dateFrom ? new Date(dateFrom) : undefined,
+                          to: dateTo ? new Date(dateTo) : undefined,
+                        }}
+                        onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                          if (range?.from) setDateFrom(range.from.toISOString().split('T')[0]);
+                          if (range?.to) setDateTo(range.to.toISOString().split('T')[0]);
+                          setDatePreset('custom');
+                        }}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
+              </div>
+              {/* Quick Range Presets */}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <span className="text-sm font-medium mr-1">Quick Range:</span>
+                {[
+                  { key: 'today', label: 'Today' },
+                  { key: 'yesterday', label: 'Yesterday' },
+                  { key: 'last7', label: 'Last 7 Days' },
+                  { key: 'last30', label: 'Last 30 Days' },
+                  { key: 'thisMonth', label: 'This Month' },
+                  { key: 'lastMonth', label: 'Last Month' },
+                  { key: 'thisYear', label: 'This Year' },
+                  { key: 'all', label: 'All Time' },
+                ].map(preset => (
+                  <Button
+                    key={preset.key}
+                    size="sm"
+                    variant={datePreset === preset.key ? 'default' : 'outline'}
+                    onClick={() => handleDatePreset(preset.key)}
+                    className={datePreset === preset.key ? '' : 'text-xs'}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                {(dateFrom || dateTo) && (
+                  <Button variant="ghost" size="sm" onClick={() => handleDatePreset('all')} className="h-7 text-xs">
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
                 <Select value={filterCostClassification} onValueChange={setFilterCostClassification}>
