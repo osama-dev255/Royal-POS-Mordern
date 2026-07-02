@@ -159,6 +159,65 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   // Dashboard date range
   const [dashDateFrom, setDashDateFrom] = useState<string>("");
   const [dashDateTo, setDashDateTo] = useState<string>("");
+  const [dashDatePreset, setDashDatePreset] = useState<string>("all");
+  const [dashCalendarOpen, setDashCalendarOpen] = useState(false);
+
+  const handleDashDatePreset = (preset: string) => {
+    setDashDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setDashDateFrom(todayStr);
+        setDashDateTo(todayStr);
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        setDashDateFrom(y.toISOString().split('T')[0]);
+        setDashDateTo(y.toISOString().split('T')[0]);
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setDashDateFrom(d.toISOString().split('T')[0]);
+        setDashDateTo(todayStr);
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setDashDateFrom(d.toISOString().split('T')[0]);
+        setDashDateTo(todayStr);
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setDashDateFrom(first);
+        setDashDateTo(todayStr);
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setDashDateFrom(first.toISOString().split('T')[0]);
+        setDashDateTo(last.toISOString().split('T')[0]);
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setDashDateFrom(first);
+        setDashDateTo(todayStr);
+        break;
+      }
+      case 'all':
+      default:
+        setDashDateFrom('');
+        setDashDateTo('');
+        break;
+    }
+  };
   const dashboardExpenses = expenses.filter(e => {
     if (!dashDateFrom && !dashDateTo) return true;
     const expDate = new Date(e.expense_date || e.created_at || '');
@@ -1809,44 +1868,86 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="space-y-6">
-          {/* Date Range Picker */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <label className="text-sm font-medium">From:</label>
-              <Input
-                type="date"
-                value={dashDateFrom}
-                onChange={(e) => setDashDateFrom(e.target.value)}
-                className="w-40"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">To:</label>
-              <Input
-                type="date"
-                value={dashDateTo}
-                onChange={(e) => setDashDateTo(e.target.value)}
-                className="w-40"
-              />
-            </div>
-            {(dashDateFrom || dashDateTo) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setDashDateFrom(""); setDashDateTo(""); }}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
-            )}
-            {(dashDateFrom || dashDateTo) && (
-              <span className="text-xs text-muted-foreground">
-                Showing {dashboardExpenses.length} of {expenses.length} expenses
-              </span>
-            )}
-          </div>
+          {/* Advanced Date Range Picker */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex flex-col md:flex-row md:items-end gap-4">
+                {/* Preset Buttons */}
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Quick Range</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: 'today', label: 'Today' },
+                      { key: 'yesterday', label: 'Yesterday' },
+                      { key: 'last7', label: 'Last 7 Days' },
+                      { key: 'last30', label: 'Last 30 Days' },
+                      { key: 'thisMonth', label: 'This Month' },
+                      { key: 'lastMonth', label: 'Last Month' },
+                      { key: 'thisYear', label: 'This Year' },
+                      { key: 'all', label: 'All Time' },
+                    ].map(preset => (
+                      <Button
+                        key={preset.key}
+                        size="sm"
+                        variant={dashDatePreset === preset.key ? 'default' : 'outline'}
+                        onClick={() => handleDashDatePreset(preset.key)}
+                        className={dashDatePreset === preset.key ? '' : 'text-xs'}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {/* Custom Date Inputs */}
+                <div className="flex gap-2 items-end">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">From</label>
+                    <Input type="date" value={dashDateFrom} onChange={(e) => { setDashDateFrom(e.target.value); setDashDatePreset('custom'); }} className="w-40" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">To</label>
+                    <Input type="date" value={dashDateTo} onChange={(e) => { setDashDateTo(e.target.value); setDashDatePreset('custom'); }} className="w-40" />
+                  </div>
+                  {/* Calendar Popover */}
+                  <Popover open={dashCalendarOpen} onOpenChange={setDashCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        Calendar
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="range"
+                        selected={{
+                          from: dashDateFrom ? new Date(dashDateFrom) : undefined,
+                          to: dashDateTo ? new Date(dashDateTo) : undefined,
+                        }}
+                        onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                          if (range?.from) setDashDateFrom(range.from.toISOString().split('T')[0]);
+                          if (range?.to) setDashDateTo(range.to.toISOString().split('T')[0]);
+                          setDashDatePreset('custom');
+                        }}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="ghost" size="sm" onClick={() => handleDashDatePreset('all')} className="h-9">
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              {(dashDateFrom || dashDateTo) && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {dashDatePreset !== 'custom' ? dashDatePreset.replace(/([A-Z])/g, ' $1').trim() : 'Custom'}: {dashDateFrom || '...'} → {dashDateTo || '...'}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">Showing {dashboardExpenses.length} of {expenses.length} expenses</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
