@@ -161,6 +161,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [dashDateTo, setDashDateTo] = useState<string>("");
   const [dashDatePreset, setDashDatePreset] = useState<string>("all");
   const [dashCalendarOpen, setDashCalendarOpen] = useState(false);
+  const [vendorSearchTerm, setVendorSearchTerm] = useState<string>("");
 
   const handleDashDatePreset = (preset: string) => {
     setDashDatePreset(preset);
@@ -2365,16 +2366,41 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardTitle>Top Vendors</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search vendor name..."
+                    value={vendorSearchTerm}
+                    onChange={(e) => setVendorSearchTerm(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
                 <div className="space-y-3">
-                  {analytics?.top_vendors?.slice(0, 8).map((vendor, idx) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
-                        <span className="text-sm">{vendor.vendor_name}</span>
+                  {(() => {
+                    const vendorMap: Record<string, number> = {};
+                    dashboardExpenses
+                      .filter(e => e.approval_status === 'approved')
+                      .forEach(e => {
+                        const name = e.vendor_name || 'Unknown';
+                        vendorMap[name] = (vendorMap[name] || 0) + (Number(e.amount) || 0);
+                      });
+                    const topVendors = Object.entries(vendorMap)
+                      .map(([vendor_name, total]) => ({ vendor_name, total }))
+                      .sort((a, b) => b.total - a.total)
+                      .filter(v => !vendorSearchTerm || v.vendor_name.toLowerCase().includes(vendorSearchTerm.toLowerCase()));
+                    if (topVendors.length === 0) {
+                      return <p className="text-sm text-muted-foreground text-center py-4">{vendorSearchTerm ? 'No vendors match your search' : 'No vendor data available'}</p>;
+                    }
+                    return topVendors.slice(0, 10).map((vendor, idx) => (
+                      <div key={idx} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
+                          <span className="text-sm">{vendor.vendor_name}</span>
+                        </div>
+                        <span className="text-sm font-medium">{formatTZS(vendor.total)}</span>
                       </div>
-                      <span className="text-sm font-medium">{formatTZS(vendor.total)}</span>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </CardContent>
             </Card>
