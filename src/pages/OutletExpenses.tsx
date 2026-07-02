@@ -1957,20 +1957,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatTZS(analytics?.total_expenses || 0)}</div>
-                <p className="text-xs text-muted-foreground">
-                  {analytics?.month_over_month_change && analytics.month_over_month_change > 0 ? (
-                    <span className="text-red-600 flex items-center">
-                      <TrendingUp className="h-3 w-3 mr-1" />
-                      +{analytics.month_over_month_change.toFixed(1)}%
-                    </span>
-                  ) : (
-                    <span className="text-green-600 flex items-center">
-                      <TrendingDown className="h-3 w-3 mr-1" />
-                      {analytics?.month_over_month_change?.toFixed(1) || 0}%
-                    </span>
-                  )}
-                </p>
+                <div className="text-2xl font-bold">{formatTZS(dashboardExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0))}</div>
+                <p className="text-xs text-muted-foreground">{dashboardExpenses.length} expense{dashboardExpenses.length !== 1 ? 's' : ''} in range</p>
               </CardContent>
             </Card>
 
@@ -1980,24 +1968,41 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatTZS(analytics?.daily_average || 0)}</div>
-                <p className="text-xs text-muted-foreground">Per day this month</p>
+                {(() => {
+                  const total = dashboardExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                  const uniqueDates = new Set(dashboardExpenses.map(e => new Date(e.expense_date || e.created_at || '').toDateString()));
+                  const avg = uniqueDates.size > 0 ? total / uniqueDates.size : 0;
+                  return (
+                    <>
+                      <div className="text-2xl font-bold">{formatTZS(avg)}</div>
+                      <p className="text-xs text-muted-foreground">Across {uniqueDates.size} active day{uniqueDates.size !== 1 ? 's' : ''}</p>
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
+                <CardTitle className="text-sm font-medium">Approved Total</CardTitle>
                 <PieChart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{analytics?.budget_utilization?.toFixed(1) || 0}%</div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div 
-                    className={`h-2 rounded-full ${(analytics?.budget_utilization || 0) > 90 ? 'bg-red-600' : (analytics?.budget_utilization || 0) > 70 ? 'bg-yellow-600' : 'bg-green-600'}`}
-                    style={{ width: `${Math.min(analytics?.budget_utilization || 0, 100)}%` }}
-                  />
-                </div>
+                {(() => {
+                  const approved = dashboardExpenses.filter(e => e.approval_status === 'approved');
+                  const approvedTotal = approved.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                  const allTotal = dashboardExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+                  const pct = allTotal > 0 ? (approvedTotal / allTotal) * 100 : 0;
+                  return (
+                    <>
+                      <div className="text-2xl font-bold">{formatTZS(approvedTotal)}</div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div className="h-2 rounded-full bg-green-600" style={{ width: `${Math.min(pct, 100)}%` }} />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{pct.toFixed(1)}% approved</p>
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
 
