@@ -2259,11 +2259,12 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             const amounts = filteredExpenses.map(e => Number(e.amount) || 0);
             const total = amounts.reduce((sum, a) => sum + a, 0);
             const highest = amounts.length > 0 ? Math.max(...amounts) : 0;
+            const lowest = amounts.length > 0 ? Math.min(...amounts) : 0;
             const average = amounts.length > 0 ? total / amounts.length : 0;
             return (
             <Card>
               <CardContent className="pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-blue-50 rounded-lg p-4 text-center">
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Amount</p>
                     <p className="text-2xl font-bold text-blue-700 mt-1">{formatTZS(total)}</p>
@@ -2273,6 +2274,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">Highest Amount</p>
                     <p className="text-2xl font-bold text-green-700 mt-1">{formatTZS(highest)}</p>
                     <p className="text-xs text-muted-foreground mt-1">Max single expense</p>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-4 text-center">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Lowest Amount</p>
+                    <p className="text-2xl font-bold text-orange-700 mt-1">{formatTZS(lowest)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Min single expense</p>
                   </div>
                   <div className="bg-purple-50 rounded-lg p-4 text-center">
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">Average</p>
