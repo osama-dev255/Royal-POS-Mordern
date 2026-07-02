@@ -26,6 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import {
   DollarSign,
   TrendingUp,
@@ -135,6 +137,10 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [filterTaxDeductible, setFilterTaxDeductible] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [approvalDateFrom, setApprovalDateFrom] = useState<string>("");
+  const [approvalDateTo, setApprovalDateTo] = useState<string>("");
+  const [approvalDatePreset, setApprovalDatePreset] = useState<string>("all");
+  const [approvalCalendarOpen, setApprovalCalendarOpen] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<Expense[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -1318,6 +1324,72 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
     return matchesSearch && matchesCategory && matchesStatus && matchesPayment && matchesCostClassification && matchesExpenseType && matchesVendor && matchesRecurring && matchesTaxDeductible && matchesDateFrom && matchesDateTo;
   });
+
+  // Filtered approvals based on date range
+  const filteredApprovals = pendingApprovals.filter(exp => {
+    const expDate = new Date(exp.expense_date);
+    const matchesFrom = !approvalDateFrom || expDate >= new Date(approvalDateFrom);
+    const matchesTo = !approvalDateTo || expDate <= new Date(approvalDateTo + 'T23:59:59');
+    return matchesFrom && matchesTo;
+  });
+
+  const handleApprovalDatePreset = (preset: string) => {
+    setApprovalDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setApprovalDateFrom(todayStr);
+        setApprovalDateTo(todayStr);
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split('T')[0];
+        setApprovalDateFrom(yStr);
+        setApprovalDateTo(yStr);
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setApprovalDateFrom(d.toISOString().split('T')[0]);
+        setApprovalDateTo(todayStr);
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setApprovalDateFrom(d.toISOString().split('T')[0]);
+        setApprovalDateTo(todayStr);
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setApprovalDateFrom(first);
+        setApprovalDateTo(todayStr);
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setApprovalDateFrom(first.toISOString().split('T')[0]);
+        setApprovalDateTo(last.toISOString().split('T')[0]);
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setApprovalDateFrom(first);
+        setApprovalDateTo(todayStr);
+        break;
+      }
+      case 'all':
+      default:
+        setApprovalDateFrom('');
+        setApprovalDateTo('');
+        break;
+    }
+  };
 
   const exportToPDF = () => {
     if (filteredExpenses.length === 0) {
@@ -2540,11 +2612,96 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
         {/* Approvals Tab */}
         <TabsContent value="approvals" className="space-y-4">
+          {/* Advanced Date Range Picker */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex flex-col md:flex-row md:items-end gap-4">
+                {/* Preset Buttons */}
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Quick Range</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: 'today', label: 'Today' },
+                      { key: 'yesterday', label: 'Yesterday' },
+                      { key: 'last7', label: 'Last 7 Days' },
+                      { key: 'last30', label: 'Last 30 Days' },
+                      { key: 'thisMonth', label: 'This Month' },
+                      { key: 'lastMonth', label: 'Last Month' },
+                      { key: 'thisYear', label: 'This Year' },
+                      { key: 'all', label: 'All Time' },
+                    ].map(preset => (
+                      <Button
+                        key={preset.key}
+                        size="sm"
+                        variant={approvalDatePreset === preset.key ? 'default' : 'outline'}
+                        onClick={() => handleApprovalDatePreset(preset.key)}
+                        className={approvalDatePreset === preset.key ? '' : 'text-xs'}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {/* Custom Date Inputs */}
+                <div className="flex gap-2 items-end">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">From</label>
+                    <Input type="date" value={approvalDateFrom} onChange={(e) => { setApprovalDateFrom(e.target.value); setApprovalDatePreset('custom'); }} className="w-40" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">To</label>
+                    <Input type="date" value={approvalDateTo} onChange={(e) => { setApprovalDateTo(e.target.value); setApprovalDatePreset('custom'); }} className="w-40" />
+                  </div>
+                  {/* Calendar Popover */}
+                  <Popover open={approvalCalendarOpen} onOpenChange={setApprovalCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        Calendar
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="range"
+                        selected={{
+                          from: approvalDateFrom ? new Date(approvalDateFrom) : undefined,
+                          to: approvalDateTo ? new Date(approvalDateTo) : undefined,
+                        }}
+                        onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                          if (range?.from) {
+                            setApprovalDateFrom(range.from.toISOString().split('T')[0]);
+                          }
+                          if (range?.to) {
+                            setApprovalDateTo(range.to.toISOString().split('T')[0]);
+                          }
+                          setApprovalDatePreset('custom');
+                        }}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="ghost" size="sm" onClick={() => handleApprovalDatePreset('all')} className="h-9">
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              {(approvalDateFrom || approvalDateTo) && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {approvalDatePreset !== 'custom' ? approvalDatePreset.replace(/([A-Z])/g, ' $1').trim() : 'Custom'}: {approvalDateFrom || '...'} → {approvalDateTo || '...'}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{filteredApprovals.length} of {pendingApprovals.length} expense(s)</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Pending Approvals</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {pendingApprovals.length} expense(s) awaiting your approval
+                {filteredApprovals.length} expense(s) awaiting your approval{filteredApprovals.length !== pendingApprovals.length ? ` (${pendingApprovals.length} total)` : ''}
               </p>
             </CardHeader>
             <CardContent>
@@ -2562,7 +2719,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pendingApprovals.map((expense) => (
+                  {filteredApprovals.map((expense) => (
                     <TableRow key={expense.id}>
                       <TableCell className="font-mono text-xs">{expense.id?.slice(0, 8) || '-'}</TableCell>
                       <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
@@ -2596,10 +2753,10 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   ))}
                 </TableBody>
               </Table>
-              {pendingApprovals.length === 0 && (
+              {filteredApprovals.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-600" />
-                  <p>All expenses have been reviewed</p>
+                  <p>{pendingApprovals.length === 0 ? 'All expenses have been reviewed' : 'No expenses match the selected date range'}</p>
                 </div>
               )}
             </CardContent>
