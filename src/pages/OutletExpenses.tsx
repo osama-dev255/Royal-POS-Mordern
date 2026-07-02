@@ -162,6 +162,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [dashDatePreset, setDashDatePreset] = useState<string>("all");
   const [dashCalendarOpen, setDashCalendarOpen] = useState(false);
   const [vendorSearchTerm, setVendorSearchTerm] = useState<string>("");
+  const [categorySearchTerm, setCategorySearchTerm] = useState<string>("");
 
   const handleDashDatePreset = (preset: string) => {
     setDashDatePreset(preset);
@@ -2337,18 +2338,39 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <CardTitle>Expenses by Category</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search category..."
+                    value={categorySearchTerm}
+                    onChange={(e) => setCategorySearchTerm(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
                 <div className="space-y-3">
-                  {Object.entries(analytics?.by_category || {})
-                    .sort(([,a], [,b]) => b - a)
-                    .slice(0, 8)
-                    .map(([category, amount]) => (
+                  {(() => {
+                    const catMap: Record<string, number> = {};
+                    dashboardExpenses
+                      .filter(e => e.approval_status === 'approved')
+                      .forEach(e => {
+                        const cat = e.category || 'Uncategorized';
+                        catMap[cat] = (catMap[cat] || 0) + (Number(e.amount) || 0);
+                      });
+                    const total = Object.values(catMap).reduce((s, v) => s + v, 0) || 1;
+                    const categories = Object.entries(catMap)
+                      .sort(([,a], [,b]) => b - a)
+                      .filter(([cat]) => !categorySearchTerm || cat.toLowerCase().includes(categorySearchTerm.toLowerCase()));
+                    if (categories.length === 0) {
+                      return <p className="text-sm text-muted-foreground text-center py-4">{categorySearchTerm ? 'No categories match your search' : 'No category data available'}</p>;
+                    }
+                    return categories.slice(0, 10).map(([category, amount]) => (
                       <div key={category} className="flex items-center justify-between">
                         <span className="text-sm">{category}</span>
                         <div className="flex items-center gap-2">
                           <div className="w-32 bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${(amount / (analytics?.total_expenses || 1)) * 100}%` }}
+                              style={{ width: `${(amount / total) * 100}%` }}
                             />
                           </div>
                           <span className="text-sm font-medium w-24 text-right">
@@ -2356,7 +2378,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                           </span>
                         </div>
                       </div>
-                    ))}
+                    ));
+                  })()}
                 </div>
               </CardContent>
             </Card>
