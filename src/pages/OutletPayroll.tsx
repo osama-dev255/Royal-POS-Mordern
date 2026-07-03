@@ -1627,11 +1627,14 @@ ${outletName} - Employee Payroll System`;
     );
 
     const daysPresent = employeeAttendance.filter(r => r.status === 'present').length;
-    const daysAbsent = employeeAttendance.filter(r => r.status === 'absent').length;
     const daysLate = employeeAttendance.filter(r => r.status === 'late').length;
     const daysHalfDay = employeeAttendance.filter(r => r.status === 'half_day').length;
     const daysOnLeave = employeeAttendance.filter(r => r.status === 'on_leave').length;
     const daysSick = employeeAttendance.filter(r => r.status === 'sick').length;
+
+    // Auto-calculate absent days: any working day not accounted for by other statuses
+    const accountedDays = daysPresent + daysLate + daysHalfDay + daysOnLeave + daysSick;
+    const daysAbsent = Math.max(0, workingDays - accountedDays);
 
     // Calculate late minutes from check_in_time (expected: 07:00, 30 min grace)
     const expectedCheckIn = 7.0; // 7:00 AM in hours
