@@ -1661,8 +1661,9 @@ ${outletName} - Employee Payroll System`;
     }, 0);
 
     // Calculate attendance deductions
-    // Regular absence deduction
-    const regularAbsenceDeduction = daysAbsent * perDaySalary + (daysHalfDay * perDaySalary * 0.5);
+    // Regular absence deduction: First 2 days free, then normal rate from 3rd day
+    const chargeableAbsentDays = Math.max(0, daysAbsent - 2);
+    const regularAbsenceDeduction = chargeableAbsentDays * perDaySalary + (daysHalfDay * perDaySalary * 0.5);
     
     // Sick leave: First 2 days free, then normal rate from 3rd day
     const chargeableSickDays = Math.max(0, daysSick - 2);
@@ -1678,8 +1679,8 @@ ${outletName} - Employee Payroll System`;
     const chargeableEarlyMinutes = Math.max(0, totalEarlyMinutes - 20);
     const earlyDeparturePenalty = chargeableEarlyMinutes * 10;
     
-    // Perfect attendance bonus (no absences, no chargeable late, no half days, no early departures, sick days allowed up to 2)
-    const perfectAttendanceBonus = (daysAbsent === 0 && chargeableLateMinutes === 0 && daysHalfDay === 0 && daysSick <= 2 && chargeableEarlyMinutes === 0 && daysPresent > 0) 
+    // Perfect attendance bonus (no chargeable absences beyond 2, no chargeable late, no half days, no early departures, sick days allowed up to 2)
+    const perfectAttendanceBonus = (chargeableAbsentDays === 0 && chargeableLateMinutes === 0 && daysHalfDay === 0 && daysSick <= 2 && chargeableEarlyMinutes === 0 && daysPresent > 0) 
       ? 50 
       : 0;
 
@@ -1723,6 +1724,7 @@ ${outletName} - Employee Payroll System`;
       chargeableEarlyMinutes,
       perDaySalary,
       attendanceDeduction,
+      chargeableAbsentDays,
       latePenalty,
       earlyDeparturePenalty,
       perfectAttendanceBonus,
@@ -3309,6 +3311,12 @@ ${outletName} - Employee Payroll System`;
                       <div className="flex justify-between text-red-600 text-sm">
                         <span>Absence Deduction:</span>
                         <span>-{formatTZS(payroll.attendanceDeduction)}</span>
+                      </div>
+                    )}
+                    {payroll.daysAbsent > 2 && (
+                      <div className="flex justify-between text-orange-600 text-xs">
+                        <span>Absent Days (Chargeable):</span>
+                        <span>{payroll.chargeableAbsentDays} of {payroll.daysAbsent} days (first 2 free)</span>
                       </div>
                     )}
                     {payroll.daysSick > 2 && (

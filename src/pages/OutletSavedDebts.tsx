@@ -1007,8 +1007,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       const newItems = (prev.items || []).filter((_, i) => i !== index);
       const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
       const newTax = newSubtotal * 0.18; // 18% tax (display only)
+      const shipping = prev.shipping || 0;
       const adjustments = prev.adjustments || 0;
-      const newTotal = newSubtotal + adjustments; // Exclude tax from total
+      const newTotal = newSubtotal + shipping + adjustments; // Include shipping and adjustments
       const amountPaid = prev.amountPaid || 0;
       const remainingBalance = newTotal - amountPaid;
       return { 
@@ -1042,8 +1043,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       };
       const newSubtotal = newItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
       const newTax = newSubtotal * 0.18; // 18% tax (display only)
+      const shipping = prev.shipping || 0;
       const adjustments = prev.adjustments || 0;
-      const newTotal = newSubtotal + adjustments; // Exclude tax from total
+      const newTotal = newSubtotal + shipping + adjustments; // Include shipping and adjustments
       const amountPaid = prev.amountPaid || 0;
       const remainingBalance = newTotal - amountPaid;
       return { 
@@ -1298,6 +1300,14 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   };
 
   const handlePrint = (sale: SavedSale) => {
+    // Calculate the correct remaining balance
+    // remainingAmount = total - amountPaid (current transaction balance)
+    // Total balance = remainingAmount + creditBroughtForward - debtPaymentAmount
+    const remainingAmount = (sale.remainingAmount || 0);
+    const creditBroughtForward = sale.creditBroughtForward || 0;
+    const debtPaymentAmount = sale.debtPaymentAmount || 0;
+    const totalBalance = remainingAmount + creditBroughtForward - debtPaymentAmount;
+    
     // Create transaction object that matches PrintUtils.printDebtInvoice expectations
     const transaction = {
       receiptNumber: sale.invoiceNumber,
@@ -1312,9 +1322,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       total: sale.total,
       paymentMethod: 'debt',
       amountPaid: sale.amountPaid || 0,
-      remainingAmount: sale.remainingAmount || 0,
-      debtPaymentAmount: 0,
-      previousDebtBalance: sale.creditBroughtForward || 0,
+      remainingAmount: remainingAmount,
+      totalBalance: totalBalance,
+      debtPaymentAmount: debtPaymentAmount,
+      previousDebtBalance: creditBroughtForward,
       change: 0,
       customer: {
         name: sale.customer,

@@ -4546,7 +4546,7 @@ export class PrintUtils {
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
             <div class="amount-due-label">AMOUNT DUE</div>
-            <div class="amount-due">${formatCurrency(total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0))}</div>
+            <div class="amount-due">${formatCurrency(transaction.totalBalance !== undefined ? transaction.totalBalance : (total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0)))}</div>
           </div>
           
           <div class="info-section">
@@ -4687,7 +4687,7 @@ export class PrintUtils {
             ` : ''}
             <div class="summary-row amount-due-final">
               <span class="summary-label">AMOUNT DUE:</span>
-              <span>${formatCurrency(total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0))}</span>
+              <span>${formatCurrency(transaction.totalBalance !== undefined ? transaction.totalBalance : (total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0)))}</span>
             </div>
             ${transaction.amountPaid > 0 ? `
             <div class="summary-row" style="color: #666; font-size: 12px;">
