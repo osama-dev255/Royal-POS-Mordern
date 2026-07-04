@@ -855,7 +855,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => {
                     const filename = `products_${new Date().toISOString().split('T')[0]}`;
-                    ExportUtils.exportToCSV(products, filename);
+                    ExportUtils.exportToCSV(filteredProducts, filename);
                     toast({ title: "Success", description: "Products exported as CSV" });
                   }}>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -864,7 +864,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                   <DropdownMenuItem onClick={() => {
                     const filename = `products_${new Date().toISOString().split('T')[0]}`;
                     // Export only meaningful columns for PDF
-                    const pdfData = products.map(p => ({
+                    const pdfData = filteredProducts.map(p => ({
                       Name: p.name,
                       SKU: p.sku || '-',
                       Barcode: p.barcode || '-',
@@ -884,7 +884,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
                     const filename = `products_${new Date().toISOString().split('T')[0]}`;
-                    ExcelUtils.exportToExcel(products, filename);
+                    ExcelUtils.exportToExcel(filteredProducts, filename);
                     toast({ title: "Success", description: "Products exported as Excel" });
                   }}>
                     <Download className="h-4 w-4 mr-2" />
@@ -892,7 +892,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
                     const filename = `products_${new Date().toISOString().split('T')[0]}`;
-                    ExportUtils.exportToJSON(products, filename);
+                    ExportUtils.exportToJSON(filteredProducts, filename);
                     toast({ title: "Success", description: "Products exported as JSON" });
                   }}>
                     <FileJson className="h-4 w-4 mr-2" />
@@ -917,10 +917,10 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                         </head>
                         <body>
                           <h1>Products List</h1>
-                          <p>Total: ${products.length} products | Generated: ${new Date().toLocaleDateString()}</p>
+                          <p>Total: ${filteredProducts.length} products | Generated: ${new Date().toLocaleDateString()}</p>
                           <table>
                             <thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Cost</th><th>Stock</th><th>Status</th></tr></thead>
-                            <tbody>${products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${formatCurrency(p.selling_price)}</td><td>${formatCurrency(p.cost_price)}</td><td>${p.stock_quantity}</td><td>${p.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody>
+                            <tbody>${filteredProducts.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${formatCurrency(p.selling_price)}</td><td>${formatCurrency(p.cost_price)}</td><td>${p.stock_quantity}</td><td>${p.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody>
                           </table>
                         </body></html>
                       `;
@@ -1152,7 +1152,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem onClick={() => {
                         const filename = `products_${new Date().toISOString().split('T')[0]}`;
-                        ExportUtils.exportToCSV(products, filename);
+                        ExportUtils.exportToCSV(filteredProducts, filename);
                         toast({ title: "Success", description: "Products exported as CSV" });
                       }}>
                         <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -1161,7 +1161,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                       <DropdownMenuItem onClick={() => {
                         const filename = `products_${new Date().toISOString().split('T')[0]}`;
                         // Export only meaningful columns for PDF
-                        const pdfData = products.map(p => ({
+                        const pdfData = filteredProducts.map(p => ({
                           Name: p.name,
                           SKU: p.sku || '-',
                           Barcode: p.barcode || '-',
@@ -1181,7 +1181,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
                         const filename = `products_${new Date().toISOString().split('T')[0]}`;
-                        ExcelUtils.exportToExcel(products, filename);
+                        ExcelUtils.exportToExcel(filteredProducts, filename);
                         toast({ title: "Success", description: "Products exported as Excel" });
                       }}>
                         <Download className="h-4 w-4 mr-2" />
@@ -1189,7 +1189,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
                         const filename = `products_${new Date().toISOString().split('T')[0]}`;
-                        ExportUtils.exportToJSON(products, filename);
+                        ExportUtils.exportToJSON(filteredProducts, filename);
                         toast({ title: "Success", description: "Products exported as JSON" });
                       }}>
                         <FileJson className="h-4 w-4 mr-2" />
@@ -1214,10 +1214,10 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                             </head>
                             <body>
                               <h1>Products List</h1>
-                              <p>Total: ${products.length} products | Generated: ${new Date().toLocaleDateString()}</p>
+                              <p>Total: ${filteredProducts.length} products | Generated: ${new Date().toLocaleDateString()}</p>
                               <table>
                                 <thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Cost</th><th>Stock</th><th>Status</th></tr></thead>
-                                <tbody>${products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${formatCurrency(p.selling_price)}</td><td>${formatCurrency(p.cost_price)}</td><td>${p.stock_quantity}</td><td>${p.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody>
+                                <tbody>${filteredProducts.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${formatCurrency(p.selling_price)}</td><td>${formatCurrency(p.cost_price)}</td><td>${p.stock_quantity}</td><td>${p.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody>
                               </table>
                             </body></html>
                           `;
