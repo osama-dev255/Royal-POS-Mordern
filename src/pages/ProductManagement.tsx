@@ -11,9 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
+import { ExportUtils } from "@/utils/exportUtils";
+import { ExcelUtils } from "@/utils/excelUtils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 // Import Supabase database service
 import { getProducts, createProduct, updateProduct, deleteProduct, getCategories, Product, Category } from "@/services/databaseService";
 
@@ -842,6 +845,95 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                   )}
                 </DialogContent>
               </Dialog>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <MoreVertical className="h-4 w-4 mr-2" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => {
+                    const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                    ExportUtils.exportToCSV(products, filename);
+                    toast({ title: "Success", description: "Products exported as CSV" });
+                  }}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                    // Export only meaningful columns for PDF
+                    const pdfData = products.map(p => ({
+                      Name: p.name,
+                      SKU: p.sku || '-',
+                      Barcode: p.barcode || '-',
+                      'Unit': p.unit_of_measure || '-',
+                      'Selling Price': p.selling_price,
+                      'Cost Price': p.cost_price,
+                      'Stock': p.stock_quantity,
+                      'Min Stock': p.min_stock_level || 0,
+                      'Max Stock': p.max_stock_level || 0,
+                      'Status': p.is_active ? 'Active' : 'Inactive'
+                    }));
+                    ExportUtils.exportToPDF(pdfData, filename, 'Products Report');
+                    toast({ title: "Success", description: "Products exported as PDF" });
+                  }}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                    ExcelUtils.exportToExcel(products, filename);
+                    toast({ title: "Success", description: "Products exported as Excel" });
+                  }}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                    ExportUtils.exportToJSON(products, filename);
+                    toast({ title: "Success", description: "Products exported as JSON" });
+                  }}>
+                    <FileJson className="h-4 w-4 mr-2" />
+                    Export JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      const html = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head><title>Products List</title>
+                        <style>
+                          body { font-family: Arial; padding: 20px; }
+                          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                          th { background: #2980b9; color: white; }
+                          tr:nth-child(even) { background: #f8f9fa; }
+                          @media print { body { padding: 0; } @page { margin: 1cm; } }
+                        </style>
+                        </head>
+                        <body>
+                          <h1>Products List</h1>
+                          <p>Total: ${products.length} products | Generated: ${new Date().toLocaleDateString()}</p>
+                          <table>
+                            <thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Cost</th><th>Stock</th><th>Status</th></tr></thead>
+                            <tbody>${products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${formatCurrency(p.selling_price)}</td><td>${formatCurrency(p.cost_price)}</td><td>${p.stock_quantity}</td><td>${p.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody>
+                          </table>
+                        </body></html>
+                      `;
+                      printWindow.document.write(html);
+                      printWindow.document.close();
+                      setTimeout(() => printWindow.print(), 500);
+                    }
+                  }}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print List
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -1050,6 +1142,95 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                   >
                     Add Product
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <MoreVertical className="h-4 w-4 mr-2" />
+                        Actions
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => {
+                        const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                        ExportUtils.exportToCSV(products, filename);
+                        toast({ title: "Success", description: "Products exported as CSV" });
+                      }}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Export CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                        // Export only meaningful columns for PDF
+                        const pdfData = products.map(p => ({
+                          Name: p.name,
+                          SKU: p.sku || '-',
+                          Barcode: p.barcode || '-',
+                          'Unit': p.unit_of_measure || '-',
+                          'Selling Price': p.selling_price,
+                          'Cost Price': p.cost_price,
+                          'Stock': p.stock_quantity,
+                          'Min Stock': p.min_stock_level || 0,
+                          'Max Stock': p.max_stock_level || 0,
+                          'Status': p.is_active ? 'Active' : 'Inactive'
+                        }));
+                        ExportUtils.exportToPDF(pdfData, filename, 'Products Report');
+                        toast({ title: "Success", description: "Products exported as PDF" });
+                      }}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Export PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                        ExcelUtils.exportToExcel(products, filename);
+                        toast({ title: "Success", description: "Products exported as Excel" });
+                      }}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        const filename = `products_${new Date().toISOString().split('T')[0]}`;
+                        ExportUtils.exportToJSON(products, filename);
+                        toast({ title: "Success", description: "Products exported as JSON" });
+                      }}>
+                        <FileJson className="h-4 w-4 mr-2" />
+                        Export JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => {
+                        const printWindow = window.open('', '_blank');
+                        if (printWindow) {
+                          const html = `
+                            <!DOCTYPE html>
+                            <html>
+                            <head><title>Products List</title>
+                            <style>
+                              body { font-family: Arial; padding: 20px; }
+                              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                              th { background: #2980b9; color: white; }
+                              tr:nth-child(even) { background: #f8f9fa; }
+                              @media print { body { padding: 0; } @page { margin: 1cm; } }
+                            </style>
+                            </head>
+                            <body>
+                              <h1>Products List</h1>
+                              <p>Total: ${products.length} products | Generated: ${new Date().toLocaleDateString()}</p>
+                              <table>
+                                <thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Cost</th><th>Stock</th><th>Status</th></tr></thead>
+                                <tbody>${products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${formatCurrency(p.selling_price)}</td><td>${formatCurrency(p.cost_price)}</td><td>${p.stock_quantity}</td><td>${p.is_active ? 'Active' : 'Inactive'}</td></tr>`).join('')}</tbody>
+                              </table>
+                            </body></html>
+                          `;
+                          printWindow.document.write(html);
+                          printWindow.document.close();
+                          setTimeout(() => printWindow.print(), 500);
+                        }
+                      }}>
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print List
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button 
                     variant="secondary" 
                     onClick={addSampleProducts}
