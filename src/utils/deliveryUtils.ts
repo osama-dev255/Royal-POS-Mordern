@@ -467,6 +467,124 @@ export const deleteDelivery = async (deliveryId: string): Promise<void> => {
   }
 };
 
+// Helper function to update outlet inventory when delivery is edited
+const updateOutletInventoryAfterEdit = async (
+  outletId: string,
+  originalItems: any[],
+  updatedItems: any[]
+): Promise<void> => {
+  console.log('📦 Updating outlet inventory after delivery edit...');
+  console.log('   - Outlet ID:', outletId);
+  console.log('   - Original items:', originalItems.length);
+  console.log('   - Updated items:', updatedItems.length);
+  
+  try {
+    // Get current inventory for this outlet
+    const { data: currentInventory, error: inventoryError } = await supabase
+      .from('inventory_products')
+      .select('*')
+      .eq('outlet_id', outletId);
+    
+    if (inventoryError) {
+      console.error('❌ Error loading inventory:', inventoryError);
+      return;
+    }
+    
+    console.log('📊 Current inventory products:', currentInventory?.length || 0);
+    
+    // Build a map of original quantities by product name
+    const originalQtyMap = new Map<string, number>();
+    for (const item of originalItems) {
+      const productName = item.name || item.description || item.productName;
+      const qty = item.quantity || item.delivered || 0;
+      if (productName && qty > 0) {
+        originalQtyMap.set(productName, (originalQtyMap.get(productName) || 0) + qty);
+      }
+    }
+    
+    // Build a map of updated quantities by product name
+    const updatedQtyMap = new Map<string, number>();
+    for (const item of updatedItems) {
+      const productName = item.name || item.description || item.productName;
+      const qty = item.quantity || item.delivered || 0;
+      if (productName && qty > 0) {
+        updatedQtyMap.set(productName, (updatedQtyMap.get(productName) || 0) + qty);
+      }
+    }
+    
+    console.log('📋 Original quantities:', Object.fromEntries(originalQtyMap));
+    console.log('📋 Updated quantities:', Object.fromEntries(updatedQtyMap));
+    
+    // Get all unique product names from both original and updated
+    const allProductNames = new Set([...originalQtyMap.keys(), ...updatedQtyMap.keys()]);
+    
+    for (const productName of allProductNames) {
+      const originalQty = originalQtyMap.get(productName) || 0;
+      const updatedQty = updatedQtyMap.get(productName) || 0;
+      const qtyDiff = updatedQty - originalQty;
+      
+      if (qtyDiff === 0) {
+        console.log(`⏭️ ${productName}: No change (${originalQty} -> ${updatedQty})`);
+        continue;
+      }
+      
+      console.log(`📝 ${productName}: ${originalQty} -> ${updatedQty} (diff: ${qtyDiff})`);
+      
+      // Find existing inventory product
+      const existingProduct = currentInventory?.find(p => p.name === productName);
+      
+      if (existingProduct) {
+        // Update existing product
+        const currentQty = existingProduct.quantity || 0;
+        const newQty = Math.max(0, currentQty + qtyDiff); // Don't allow negative stock
+        
+        console.log(`   - Inventory: ${currentQty} -> ${newQty}`);
+        
+        const { error: updateError } = await supabase
+          .from('inventory_products')
+          .update({
+            quantity: newQty,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingProduct.id);
+        
+        if (updateError) {
+          console.error(`❌ Error updating ${productName}:`, updateError);
+        } else {
+          console.log(`✅ Updated ${productName} inventory`);
+        }
+      } else if (qtyDiff > 0) {
+        // New product - create inventory record
+        const updatedItem = updatedItems.find(i => (i.name || i.description || i.productName) === productName);
+        const unitCost = updatedItem?.rate ?? updatedItem?.price ?? updatedItem?.unitPrice ?? 0;
+        const sellingPrice = updatedItem?.sellingPrice ?? updatedItem?.rate ?? updatedItem?.price ?? updatedItem?.unitPrice ?? 0;
+        
+        console.log(`   - Creating new inventory product: ${productName}, qty: ${qtyDiff}`);
+        
+        const { error: insertError } = await supabase
+          .from('inventory_products')
+          .insert({
+            outlet_id: outletId,
+            name: productName,
+            quantity: qtyDiff,
+            unit_cost: unitCost,
+            selling_price: sellingPrice,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (insertError) {
+          console.error(`❌ Error creating inventory for ${productName}:`, insertError);
+        } else {
+          console.log(`✅ Created inventory for ${productName}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error updating outlet inventory after edit:', error);
+  }
+};
+
 export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<void> => {
   try {
     console.log('🔄 Starting delivery update...', updatedDelivery.id);
@@ -474,6 +592,7 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
     // Update database first (source of truth)
     const { data: { user } } = await supabase.auth.getUser();
     let dbUpdateSuccessful = false;
+    let originalItemsList: any[] = [];
     
     if (user) {
       console.log('👤 User authenticated:', user.id);
@@ -487,12 +606,19 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
       
       console.log('📝 User role:', userData?.role);
       
-      // First, check the original status from database
-      const { data: originalDelivery } = await supabase
+      // First, fetch the original delivery from database to compare items
+      const { data: originalDelivery, error: fetchError } = await supabase
         .from('saved_delivery_notes')
-        .select('status, source_type, outlet_id')
+        .select('status, source_type, outlet_id, items_list')
         .eq('id', updatedDelivery.id)
         .single();
+      
+      if (fetchError) {
+        console.error('❌ Error fetching original delivery:', fetchError);
+      } else {
+        originalItemsList = originalDelivery?.items_list || [];
+        console.log('📋 Original items count:', originalItemsList.length);
+      }
       
       // Validate numeric fields to prevent NaN serialization errors
       const updateData = {
@@ -555,11 +681,20 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
         console.log('✅ Database update successful');
         dbUpdateSuccessful = true;
         
-        // NOTE: Inventory update for NEW deliveries is handled by saveDelivery()
-        // This updateDelivery() function should NOT update inventory to prevent double-counting
-        // When editing a delivery, the user should manually adjust inventory if needed
-        console.log('ℹ️ Skipping inventory update in updateDelivery() - handled by saveDelivery() for new deliveries');
-        console.log('ℹ️ If editing delivery quantities, manually adjust outlet inventory');
+        // Update inventory if this is an outlet delivery
+        // Note: We need to update inventory even if itemsList is empty (user deleted all items)
+        if (updatedDelivery.outletId) {
+          const newItemsList = updatedDelivery.itemsList || [];
+          console.log('📦 Updating outlet inventory after delivery edit...');
+          console.log(`   - Original items: ${originalItemsList.length}, Updated items: ${newItemsList.length}`);
+          await updateOutletInventoryAfterEdit(
+            updatedDelivery.outletId,
+            originalItemsList,
+            newItemsList
+          );
+        } else {
+          console.log('ℹ️ Skipping inventory update - no outlet ID');
+        }
       }
     } else {
       console.warn('⚠️ No authenticated user found');
