@@ -56,6 +56,7 @@ interface OutletInventoryProps {
 
 interface InventoryItem {
   id: string;
+  dbId?: string; // Actual database UUID from inventory_products
   name: string;
   sku: string;
   category: string;
@@ -186,6 +187,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
         
         return {
           id: `${item.outlet_id}-${item.name}`,
+          dbId: item.id, // Store actual database UUID
           name: item.name,
           sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
           category: item.category || 'General',
@@ -388,22 +390,33 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     
     // Save to database - update inventory_products table
     try {
-      const { error } = await supabase
-        .from('inventory_products')
-        .update({ 
-          selling_price: editForm.sellingPrice,
-          updated_at: new Date().toISOString()
-        })
-        .eq('outlet_id', propOutletId)
-        .eq('name', editingItem.name);
+      // Use database UUID (dbId) if available, otherwise fall back to name matching
+      const updateData: any = { 
+        selling_price: editForm.sellingPrice,
+        unit_cost: editForm.unitCost,
+        updated_at: new Date().toISOString()
+      };
+      
+      let query = supabase.from('inventory_products').update(updateData);
+      
+      if (editingItem.dbId) {
+        // Use actual database UUID for precise matching
+        query = query.eq('id', editingItem.dbId);
+      } else {
+        // Fallback: match by outlet_id and name
+        query = query.eq('outlet_id', propOutletId).eq('name', editingItem.name);
+      }
+      
+      const { error } = await query;
       
       if (error) {
         console.error('Error updating inventory product in database:', error);
+        throw error;
       } else {
-        console.log('Selling price updated in database successfully');
+        console.log('Inventory product updated in database successfully');
       }
     } catch (err) {
-      console.error('Failed to sync selling price to database:', err);
+      console.error('Failed to sync to database:', err);
     }
     
     setIsEditDialogOpen(false);

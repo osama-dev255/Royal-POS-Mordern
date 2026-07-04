@@ -216,7 +216,13 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
               }
             } else {
               // Create new inventory product
-              const { error: insertError } = await supabase
+              console.log(`🆕 Creating new inventory product for: ${productName}`);
+              console.log(`   - outlet_id: ${delivery.outletId}`);
+              console.log(`   - quantity: ${deliveredQty}`);
+              console.log(`   - unit_cost: ${item.rate ?? item.price ?? 0}`);
+              console.log(`   - selling_price: ${item.sellingPrice ?? item.rate ?? item.price ?? 0}`);
+              
+              const { data: insertData, error: insertError } = await supabase
                 .from('inventory_products')
                 .insert({
                   outlet_id: delivery.outletId,
@@ -224,15 +230,18 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
                   quantity: deliveredQty,
                   unit_cost: item.rate ?? item.price ?? 0,
                   selling_price: item.sellingPrice ?? item.rate ?? item.price ?? 0,
-                  unit: item.unit ?? 'pcs',
+                  delivery_note_number: delivery.deliveryNoteNumber,
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()
-                });
+                })
+                .select();
               
               if (insertError) {
                 console.error(`❌ Error creating inventory for ${productName}:`, insertError);
+                console.error(`   - Full error:`, JSON.stringify(insertError, null, 2));
               } else {
                 console.log(`✅ Created inventory for ${productName}`);
+                console.log(`   - Inserted data:`, insertData);
               }
             }
           }
