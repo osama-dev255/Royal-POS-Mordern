@@ -304,11 +304,11 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   });
 
   // Calculate inventory statistics
-  const totalProducts = products.length;
-  const lowStockItems = products.filter(p => p.stock_quantity < (p.min_stock_level || 10)).length;
-  const outOfStockItems = products.filter(p => p.stock_quantity === 0).length;
-  const totalInventoryValue = products.reduce((sum, product) => sum + (product.selling_price * product.stock_quantity), 0);
-  const totalCostValue = products.reduce((sum, product) => sum + (product.cost_price * product.stock_quantity), 0);
+  const totalProducts = filteredProducts.length;
+  const lowStockItems = filteredProducts.filter(p => p.stock_quantity < (p.min_stock_level || 10)).length;
+  const outOfStockItems = filteredProducts.filter(p => p.stock_quantity === 0).length;
+  const totalInventoryValue = filteredProducts.reduce((sum, product) => sum + (product.selling_price * product.stock_quantity), 0);
+  const totalCostValue = filteredProducts.reduce((sum, product) => sum + (product.cost_price * product.stock_quantity), 0);
   const potentialProfit = totalInventoryValue - totalCostValue;
 
   // Log products for debugging
