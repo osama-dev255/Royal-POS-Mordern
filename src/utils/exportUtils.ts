@@ -1,5 +1,6 @@
 // Utility functions for exporting data
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export class ExportUtils {
   // Export data to CSV
@@ -48,9 +49,22 @@ export class ExportUtils {
     document.body.removeChild(link);
   }
 
-  // Export data to PDF using jsPDF for better mobile compatibility
+  // Format raw object keys into human-readable headers
+  private static formatHeaderKey(key: string): string {
+    return key
+      .replace(/_/g, ' ')
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim();
+  }
+
+  // Export data to PDF using jsPDF with autoTable for proper pagination
   static exportToPDF(data: any[], filename: string, title: string) {
     if (!data || data.length === 0) return;
+
+    const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+    const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
+    const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
 
     // Create a new jsPDF instance
     const doc = new jsPDF({
@@ -58,55 +72,93 @@ export class ExportUtils {
       unit: 'mm',
       format: 'a4'
     });
-    
-    // Add title
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Business header
     doc.setFontSize(16);
-    doc.text(title, 14, 15);
+    doc.setFont('helvetica', 'bold');
+    doc.text(businessName, pageWidth / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(businessAddress, pageWidth / 2, 21, { align: 'center' });
+    doc.text(`Tel: ${businessPhone}`, pageWidth / 2, 26, { align: 'center' });
 
-    // Prepare table data
-    const headers = Object.keys(data[0]);
-    const rows = data.map(row => Object.values(row).map(v => String(v)));
+    // Report title
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, pageWidth / 2, 35, { align: 'center' });
 
-    // Manual table creation without autoTable
-    const startY = 25;
-    const rowHeight = 7;
-    const colWidth = (doc.internal.pageSize.width - 28) / headers.length;
-    
-    // Draw header row
-    doc.setFontSize(8);
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, startY, colWidth * headers.length, rowHeight, 'F');
-    
-    headers.forEach((header, i) => {
-      doc.text(header, 14 + (i * colWidth) + 2, startY + 5);
-    });
-    
-    // Draw data rows
-    doc.setFillColor(255, 255, 255);
-    rows.forEach((row, rowIdx) => {
-      const y = startY + rowHeight + (rowIdx * rowHeight);
-      
-      // Alternate row colors
-      if (rowIdx % 2 === 1) {
-        doc.setFillColor(250, 250, 250);
-        doc.rect(14, y, colWidth * headers.length, rowHeight, 'F');
+    // Report metadata
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const reportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`Generated: ${reportDate}  |  Total Records: ${data.length}`, pageWidth / 2, 41, { align: 'center' });
+
+    // Prepare table data with formatted headers
+    const rawKeys = Object.keys(data[0]);
+    const headers = rawKeys.map(key => this.formatHeaderKey(key));
+    const rows = data.map(row => 
+      rawKeys.map(key => {
+        const val = row[key];
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'number') return val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        return String(val).substring(0, 50);
+      })
+    );
+
+    // Use autoTable for proper pagination and formatting
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: 46,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      bodyStyles: {
+        fontSize: 7,
+        cellPadding: 2,
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 14, right: 14 },
+      didDrawPage: (data) => {
+        // Footer on each page
+        const pageCount = doc.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(128);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 8,
+          { align: 'center' }
+        );
+        doc.text(
+          `© ${new Date().getFullYear()} ${businessName}`,
+          pageWidth - 14,
+          doc.internal.pageSize.getHeight() - 8,
+          { align: 'right' }
+        );
+        // Reset text color
+        doc.setTextColor(0);
       }
-      
-      row.forEach((cell, colIdx) => {
-        doc.text(cell.substring(0, 30), 14 + (colIdx * colWidth) + 2, y + 5);
-      });
     });
 
-    // Check if we're on a mobile device
+    // Save the PDF
+    doc.save(`${filename}.pdf`);
+
+    // Show notification for mobile users
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
     if (isMobile) {
-      // For mobile devices, save the PDF and show notification
-      doc.save(`${filename}.pdf`);
       this.showPreviewNotification("PDF saved to your device. Check your downloads folder.");
-    } else {
-      // For desktop, save the PDF
-      doc.save(`${filename}.pdf`);
     }
   }
 

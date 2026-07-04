@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
-import { ExportImportManager } from "@/components/ExportImportManager";
 // Import Supabase database service
 import { getProducts, createProduct, updateProduct, deleteProduct, getCategories, Product, Category } from "@/services/databaseService";
 
@@ -149,61 +148,6 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
       toast({
         title: "Error",
         description: "Failed to add product",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Handle product import
-  const handleImportProducts = async (importedProducts: any[]) => {
-    try {
-      const results = [];
-      
-      for (const importedProduct of importedProducts) {
-        // Check if product already exists by barcode
-        const existingProduct = products.find(p => p.barcode === importedProduct.barcode);
-        
-        if (existingProduct && existingProduct.id) {
-          // Update existing product
-          const updatedProduct = await updateProduct(existingProduct.id, {
-            ...existingProduct,
-            ...importedProduct,
-            selling_price: Number(importedProduct.selling_price) || existingProduct.selling_price,
-            cost_price: Number(importedProduct.cost_price) || existingProduct.cost_price,
-            stock_quantity: Number(importedProduct.stock_quantity) || existingProduct.stock_quantity
-          });
-          
-          if (updatedProduct) {
-            results.push(updatedProduct);
-          }
-        } else {
-          // Add new product
-          const newProductData = {
-            ...importedProduct,
-            selling_price: Number(importedProduct.selling_price) || 0,
-            cost_price: Number(importedProduct.cost_price) || 0,
-            stock_quantity: Number(importedProduct.stock_quantity) || 0
-          };
-          
-          const createdProduct = await createProduct(newProductData);
-          if (createdProduct) {
-            results.push(createdProduct);
-          }
-        }
-      }
-      
-      // Refresh products list
-      await loadProducts();
-      
-      toast({
-        title: "Import Successful",
-        description: `Successfully imported/updated ${results.length} products`
-      });
-    } catch (error) {
-      console.error("Error importing products:", error);
-      toast({
-        title: "Import Failed",
-        description: "Failed to import products",
         variant: "destructive"
       });
     }
@@ -1208,74 +1152,6 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                 </Table>
               </div>
             )}
-            
-            {/* Debug Information - Only shown in development */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-4 p-4 bg-muted rounded-md">
-                <h4 className="font-medium mb-2">Debug Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Total Products:</span> {products.length}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Filtered Products:</span> {filteredProducts.length}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Loading:</span> {loading ? 'Yes' : 'No'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Error:</span> {error ? 'Yes' : 'No'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Search Term:</span> "{searchTerm}"
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Category Filter:</span> {filterCategory || 'None'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Status Filter:</span> {filterStatus}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Stock Filter:</span> {filterStock}
-                  </div>
-                </div>
-                
-                {products.length > 0 && filteredProducts.length === 0 && (
-                  <div className="mt-3 p-2 bg-yellow-100 rounded">
-                    <p className="text-sm font-medium text-yellow-800">Warning: All products are being filtered out!</p>
-                    <p className="text-xs text-yellow-700">Check your filters above.</p>
-                    <Button 
-                      size="sm" 
-                      variant="secondary" 
-                      className="mt-2"
-                      onClick={() => {
-                        // Clear all filters
-                        setFilterCategory(null);
-                        setFilterStatus("all");
-                        setFilterStock("all");
-                        setSearchTerm("");
-                      }}
-                    >
-                      Clear All Filters
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Export/Import Manager - Moved below product inventory as requested */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Import/Export Products</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ExportImportManager 
-              data={products}
-              onImport={handleImportProducts}
-              dataType="products"
-            />
           </CardContent>
         </Card>
       </div>
