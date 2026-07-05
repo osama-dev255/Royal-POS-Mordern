@@ -910,6 +910,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             approvedBy: debt.approved_by,
             approvalDate: debt.approval_date,
             approvalNotes: debt.approval_notes,
+            isEdited: debt.is_edited || false,
             customerBalance: debt.customer_id ? (
               customerBalanceCache.has(debt.customer_id) 
                 ? customerBalanceCache.get(debt.customer_id)!
@@ -1184,7 +1185,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         salesman: editFormData.salesman,
         driver: editFormData.driver,
         truck: editFormData.truck,
-        due_date: editFormData.dueDate ? new Date(editFormData.dueDate).toISOString() : undefined
+        due_date: editFormData.dueDate ? new Date(editFormData.dueDate).toISOString() : undefined,
+        is_edited: true
       });
       
       if (updatedDebt) {

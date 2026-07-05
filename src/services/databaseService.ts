@@ -5094,6 +5094,7 @@ export interface OutletDebt {
   approved_by?: string;
   approval_date?: string;
   approval_notes?: string;
+  is_edited?: boolean; // Flag indicating if transaction has been edited
   created_at?: string;
   updated_at?: string;
 }

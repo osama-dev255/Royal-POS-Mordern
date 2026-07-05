@@ -4340,14 +4340,16 @@ export class PrintUtils {
             }
             .edited-badge {
               display: inline-block;
-              background-color: #fef3c7;
-              color: #92400e;
-              padding: 4px 12px;
-              border-radius: 4px;
-              font-size: 11px;
-              font-weight: bold;
+              background-color: transparent;
+              color: #666;
+              padding: 2px 8px;
+              border-radius: 2px;
+              font-size: 9px;
+              font-weight: normal;
               margin-bottom: 8px;
-              border: 1px solid #f59e0b;
+              border: none;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
             }
             .invoice-title {
               font-size: 24px;
@@ -4541,7 +4543,7 @@ export class PrintUtils {
         </head>
         <body>
           <div class="invoice-header">
-            ${isEdited ? '<div class="edited-badge">Edited transaction</div>' : ''}
+            ${isEdited ? '<div class="edited-badge">Invoice Edited</div>' : ''}
             <div class="invoice-title">INVOICE</div>
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
