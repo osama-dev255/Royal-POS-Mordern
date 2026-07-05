@@ -1693,31 +1693,31 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       // Use the proper saveGRN utility function
       await saveGRN(newGRN);
       
-      // Update Product Inventory to reflect received quantities
-      try {
-        // Process each item in the GRN to update product stock
-        for (const item of newGRN.data.items) {
-          if (item.description && item.delivered > 0) {
-            // Find the corresponding product in the database
-            const { getProducts, updateProduct } = await import('@/services/databaseService');
-            const allProducts = await getProducts();
-            const product = allProducts.find(p => 
-              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
-            );
-            
-            if (product) {
-              // Increment the product stock by the delivered quantity
-              const currentStock = product.stock_quantity || 0;
-              const newStock = currentStock + item.delivered;
-              const updatedProduct = { ...product, stock_quantity: newStock };
-              await updateProduct(product.id!, updatedProduct);
-              console.log(`Product ${product.name} stock updated from ${currentStock} to ${newStock}`);
+      // Update general products inventory ONLY when no destination godown is set.
+      // When a godown IS set, saveGRN() handles stock via updateGRNGodownStock (godown_stock table).
+      // When no godown is set, we update products.stock_quantity as the general inventory record.
+      if (!grnData.destinationGodownId) {
+        try {
+          const { getProducts, updateProduct } = await import('@/services/databaseService');
+          const allProducts = await getProducts();
+          
+          for (const item of newGRN.data.items) {
+            if (item.description && item.delivered > 0) {
+              const product = allProducts.find(p => 
+                p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+              );
+              
+              if (product) {
+                const currentStock = product.stock_quantity || 0;
+                const newStock = currentStock + item.delivered;
+                await updateProduct(product.id!, { ...product, stock_quantity: newStock });
+                console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}`);
+              }
             }
           }
+        } catch (inventoryError) {
+          console.error('Error updating product inventory after GRN save:', inventoryError);
         }
-      } catch (inventoryError) {
-        console.error('Error updating product inventory after GRN save:', inventoryError);
-        // Don't prevent GRN save if inventory update fails
       }
       
       // Update local state
@@ -4672,43 +4672,14 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   };
 
   // Handle received quantity changes and update product stock
-  const handleReceivedQuantityChange = async (itemId: string, newQuantity: number) => {
-    // First update the GRN data
+  const handleReceivedQuantityChange = (itemId: string, newQuantity: number) => {
+    // Only update the GRN data - stock will be updated when the GRN is saved
     setGrnData(prev => ({
       ...prev,
       items: prev.items.map(item => 
         item.id === itemId ? { ...item, receivedQuantity: newQuantity } : item
       )
     }));
-    
-    // Find the item and its associated product
-    const item = grnData.items.find(i => i.id === itemId);
-    if (item && item.productId && item.description) {
-      // Find the product in our loaded products
-      const product = grnProductItems.find(p => p.id === item.productId);
-      if (product) {
-        try {
-          // Calculate the difference in received quantity
-          const oldReceived = item.receivedQuantity || 0;
-          const quantityDifference = newQuantity - oldReceived;
-          
-          if (quantityDifference !== 0) {
-            // Update the product stock in the database
-            const updatedProduct = await incrementProductStock(product.id!, quantityDifference);
-            if (updatedProduct) {
-              console.log(`Product stock updated for ${product.name}: ${product.stock_quantity} -> ${updatedProduct.stock_quantity}`);
-              
-              // Update our local product list to reflect the change
-              setGrnProductItems(prev => 
-                prev.map(p => p.id === product.id ? updatedProduct : p)
-              );
-            }
-          }
-        } catch (error) {
-          console.error('Error updating product stock:', error);
-        }
-      }
-    }
   };
 
   // Filter outlets based on customer name input
