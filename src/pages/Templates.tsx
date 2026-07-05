@@ -1160,6 +1160,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [sourceGodownId, setSourceGodownId] = useState("");
   const [sourceZoneId, setSourceZoneId] = useState("");
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
+    const [isSavingGRN, setIsSavingGRN] = useState<boolean>(false);
   
   const [savedDeliveryNotes, setSavedDeliveryNotes] = useState<SavedDeliveryNote[]>(() => {
     const saved = localStorage.getItem('savedDeliveryNotes');
@@ -1584,6 +1585,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   };
   
   const handleSaveGRN = async () => {
+    if (isSavingGRN) {
+      console.warn('⚠️ GRN save already in progress...');
+      return;
+    }
+    setIsSavingGRN(true);
+    try {
     console.log('=== STARTING HANDLE SAVE GRN ===');
     if (!grnData.grnNumber.trim()) {
       alert('Please enter a GRN number');
@@ -1682,8 +1689,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       updatedAt: new Date().toISOString()
     };
     
-    try {
-      console.log('About to call saveGRN with:', newGRN);
+    console.log('About to call saveGRN with:', newGRN);
       // Use the proper saveGRN utility function
       await saveGRN(newGRN);
       
@@ -1730,6 +1736,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     } catch (error) {
       console.error('Error saving GRN:', error);
       alert('Error saving GRN. Please try again.');
+    } finally {
+      setIsSavingGRN(false);
     }
   };
   
@@ -8234,9 +8242,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                       />
                     ) : null}
                     <Button 
-                      disabled={isSavingDeliveryNote}
+                      disabled={isSavingDeliveryNote || isSavingGRN}
                       onClick={async () => {
-                        if (isSavingDeliveryNote) {
+                        if (isSavingDeliveryNote || isSavingGRN) {
                           console.warn('⚠️ Save already in progress...');
                           return;
                         }
@@ -8456,7 +8464,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                         handleSaveDeliveryNote();
                       }
                     }}>
-                      {isSavingDeliveryNote ? (
+                      {(isSavingDeliveryNote || isSavingGRN) ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processing...
