@@ -11339,17 +11339,26 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                                     .filter(desc => 
                                                       item.description === "" || desc.toLowerCase().includes(item.description.toLowerCase())
                                                     )
-                                                    .map((desc, idx) => (
+                                                    .map((desc, idx) => {
+                                                      const productData = grnProductItems.find(p => p.name === desc);
+                                                      const stockQty = productData?.stock_quantity ?? 0;
+                                                      const stockColor = stockQty === 0 ? 'text-red-600' : stockQty <= 10 ? 'text-yellow-600' : 'text-green-600';
+                                                      
+                                                      return (
                                                       <div
                                                         key={idx}
-                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex justify-between items-center"
                                                         onMouseDown={() => {
                                                           handleGrnProductSelect(desc, item.id);
                                                         }}
                                                       >
-                                                        {desc}
+                                                        <span className="flex-1">{desc}</span>
+                                                        <span className={`ml-2 font-semibold ${stockColor}`}>
+                                                          Stock: {stockQty}
+                                                        </span>
                                                       </div>
-                                                    ))
+                                                      );
+                                                    })
                                                   }
                                                 </div>
                                               )}
