@@ -59,6 +59,7 @@ interface SavedSale {
   items: { name: string; quantity: number; price: number }[];
   subtotal: number;
   tax: number;
+  discount?: number;
   total: number;
   amountPaid?: number;
   remainingAmount?: number;
@@ -876,6 +877,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             items: itemsWithNames,
             subtotal: debt.subtotal,
             tax: debt.tax_amount,
+            discount: debt.discount_amount || 0,
             total: debt.total_amount,
             amountPaid: debt.amount_paid || 0,
             remainingAmount: debt.remaining_amount,
@@ -1315,7 +1317,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       items: sale.items,
       subtotal: sale.subtotal,
       tax: sale.tax,
-      discount: 0,
+      discount: sale.discount || 0,
       shipping: sale.shipping || 0,
       adjustments: sale.adjustments || 0,
       adjustmentReason: sale.adjustmentReason,
