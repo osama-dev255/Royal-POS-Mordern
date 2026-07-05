@@ -56,6 +56,9 @@ interface SavedSale {
   dueDate?: string;
   customer: string;
   customerId?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  customerEmail?: string;
   items: { name: string; quantity: number; price: number }[];
   subtotal: number;
   tax: number;
@@ -827,16 +830,25 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             adjustmentReason: debt.adjustment_reason
           });
           
-          // Fetch customer name if customer_id exists or use customer_name from database
+          // Fetch customer name and contact details if customer_id exists or use customer_name from database
           let customerName = 'Walk-in Customer';
+          let customerPhone = '';
+          let customerAddress = '';
+          let customerEmail = '';
+          
           if (debt.customer_name) {
             // Use customer_name directly from database (new approach)
             customerName = debt.customer_name;
-          } else if (debt.customer_id) {
-            // Fallback: Fetch from customer table (old approach)
+          }
+          
+          if (debt.customer_id) {
+            // Fetch customer details from customer table
             const customer = await getOutletCustomerById(debt.customer_id);
             if (customer) {
-              customerName = `${customer.first_name} ${customer.last_name}`.trim();
+              customerName = debt.customer_name || `${customer.first_name} ${customer.last_name}`.trim();
+              customerPhone = customer.phone || '';
+              customerAddress = customer.address || '';
+              customerEmail = customer.email || '';
             }
           }
           
@@ -874,6 +886,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             dueDate: debt.due_date,
             customer: customerName,
             customerId: debt.customer_id,
+            customerPhone: customerPhone,
+            customerAddress: customerAddress,
+            customerEmail: customerEmail,
             items: itemsWithNames,
             subtotal: debt.subtotal,
             tax: debt.tax_amount,
@@ -1331,9 +1346,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       change: 0,
       customer: {
         name: sale.customer,
-        phone: '',
-        address: '',
-        email: ''
+        phone: sale.customerPhone || '',
+        address: sale.customerAddress || '',
+        email: sale.customerEmail || ''
       },
       salesman: sale.salesman || 'Not Assigned',
       driver: sale.driver || 'Not Assigned',
