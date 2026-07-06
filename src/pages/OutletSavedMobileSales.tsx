@@ -63,6 +63,7 @@ interface SavedSale {
   customerId?: string;
   items: { name: string; quantity: number; price: number }[];
   subtotal: number;
+  discount: number;
   tax: number;
   total: number;
   amountPaid?: number;
@@ -376,6 +377,7 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
             customerId: sale.customer_id,
             items: itemsWithNames,
             subtotal: sale.subtotal,
+            discount: sale.discount_amount || 0,
             tax: sale.tax_amount,
             total: sale.total_amount,
             amountPaid: sale.amount_paid,
@@ -475,6 +477,7 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
           </table>
           <div class="totals">
             <p><span>Subtotal:</span><span>${formatCurrency(sale.subtotal)}</span></p>
+            <p><span>Discount:</span><span>- ${formatCurrency(sale.discount || 0)}</span></p>
             <p><span>Tax (18%):</span><span>${formatCurrency(sale.tax)}</span></p>
             <p class="total-row"><span>Total:</span><span>${formatCurrency(sale.total)}</span></p>
             ${sale.creditBroughtForward > 0 ? `
@@ -894,6 +897,10 @@ export const OutletSavedMobileSales = ({ onBack, outletId }: OutletSavedMobileSa
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>{formatCurrency(selectedSale.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span>- {formatCurrency(selectedSale.discount || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Tax (18%)</span>

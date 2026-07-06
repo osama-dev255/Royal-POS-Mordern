@@ -4640,16 +4640,24 @@ export class PrintUtils {
               <span>${formatCurrency(subtotal)}</span>
             </div>
             <div class="summary-row">
+              <span class="summary-label">Discount:</span>
+              <span>- ${formatCurrency(transaction.discount || 0)}</span>
+            </div>
+            <div class="summary-row">
               <span class="summary-label">Total Quantity:</span>
               <span>${totalQuantity}</span>
             </div>
             <div class="summary-row">
-              <span class="summary-label">Discount:</span>
-              <span>${formatCurrency(transaction.discount || 0)}</span>
-            </div>
-            <div class="summary-row">
               <span class="summary-label">Tax:</span>
               <span>${formatCurrency(transaction.tax || 0)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Adjustments ${transaction.adjustmentReason ? `(${transaction.adjustmentReason})` : ''}:</span>
+              <span>${formatCurrency(transaction.adjustments || 0)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Shipping:</span>
+              <span>${formatCurrency(transaction.shipping || 0)}</span>
             </div>
             <div class="summary-row total">
               <span class="summary-label">TOTAL:</span>
@@ -4675,16 +4683,6 @@ export class PrintUtils {
             <div class="summary-row">
               <span class="summary-label">Debt Payment (Previous):</span>
               <span>${formatCurrency(transaction.debtPaymentAmount)}</span>
-            </div>
-            ` : ''}
-            <div class="summary-row">
-              <span class="summary-label">Shipping:</span>
-              <span>${formatCurrency(transaction.shipping || 0)}</span>
-            </div>
-            ${transaction.adjustments !== 0 ? `
-            <div class="summary-row">
-              <span class="summary-label">Adjustments ${transaction.adjustmentReason ? `(${transaction.adjustmentReason})` : ''}:</span>
-              <span>${formatCurrency(transaction.adjustments || 0)}</span>
             </div>
             ` : ''}
             <div class="summary-row amount-due-final">
