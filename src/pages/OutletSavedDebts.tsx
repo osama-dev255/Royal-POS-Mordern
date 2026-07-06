@@ -74,6 +74,7 @@ interface SavedSale {
   adjustments?: number;
   adjustmentReason?: string;
   isEdited?: boolean; // Flag to track if transaction has been edited
+  editedAt?: string; // Date/time when the transaction was last edited
   salesman?: string;
   driver?: string;
   truck?: string;
@@ -911,6 +912,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             approvalDate: debt.approval_date,
             approvalNotes: debt.approval_notes,
             isEdited: debt.is_edited || false,
+            editedAt: debt.updated_at,
             customerBalance: debt.customer_id ? (
               customerBalanceCache.has(debt.customer_id) 
                 ? customerBalanceCache.get(debt.customer_id)!
@@ -1361,7 +1363,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       driver: sale.driver || 'Not Assigned',
       truck: sale.truck || 'Not Assigned',
       dueDate: sale.date, // Use sale date as due date if not specified
-      isEdited: sale.isEdited || false // Pass the edited flag
+      isEdited: sale.isEdited || false, // Pass the edited flag
+      editedAt: sale.editedAt // Pass the edit date/time
     };
     
     PrintUtils.printDebtInvoice(transaction);

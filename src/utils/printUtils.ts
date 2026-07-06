@@ -4346,10 +4346,16 @@ export class PrintUtils {
               border-radius: 2px;
               font-size: 9px;
               font-weight: normal;
+              margin-top: 4px;
               margin-bottom: 8px;
               border: none;
               text-transform: uppercase;
               letter-spacing: 0.5px;
+            }
+            .edited-date {
+              font-size: 9px;
+              color: #999;
+              margin-bottom: 8px;
             }
             .invoice-title {
               font-size: 24px;
@@ -4543,8 +4549,8 @@ export class PrintUtils {
         </head>
         <body>
           <div class="invoice-header">
-            ${isEdited ? '<div class="edited-badge">Invoice Edited</div>' : ''}
             <div class="invoice-title">INVOICE</div>
+            ${isEdited ? `<div class="edited-date">Edited: ${transaction.editedAt ? new Date(transaction.editedAt).toLocaleString() : 'N/A'}</div>` : ''}
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
             <div class="amount-due-label">AMOUNT DUE</div>
