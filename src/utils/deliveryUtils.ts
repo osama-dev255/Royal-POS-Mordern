@@ -585,6 +585,150 @@ const updateOutletInventoryAfterEdit = async (
   }
 };
 
+// Helper function to update godown stock when an investment delivery is edited
+const updateGodownStockAfterEdit = async (
+  godownId: string,
+  zoneId: string | null,
+  originalItems: any[],
+  updatedItems: any[]
+): Promise<void> => {
+  console.log('📦 Updating godown stock after investment delivery edit...');
+  console.log('   - Godown ID:', godownId);
+  console.log('   - Zone ID:', zoneId);
+  console.log('   - Original items:', originalItems.length);
+  console.log('   - Updated items:', updatedItems.length);
+
+  try {
+    // Import updateGodownStock dynamically to avoid circular dependencies
+    const { updateGodownStock } = await import('@/services/godownService');
+
+    // Build quantity maps by product_id
+    const originalQtyMap = new Map<string, number>();
+    for (const item of originalItems) {
+      const productId = item.product_id || item.id;
+      const qty = item.quantity || item.delivered || 0;
+      if (productId && qty > 0) {
+        originalQtyMap.set(productId, (originalQtyMap.get(productId) || 0) + qty);
+      }
+    }
+
+    const updatedQtyMap = new Map<string, number>();
+    for (const item of updatedItems) {
+      const productId = item.product_id || item.id;
+      const qty = item.quantity || item.delivered || 0;
+      if (productId && qty > 0) {
+        updatedQtyMap.set(productId, (updatedQtyMap.get(productId) || 0) + qty);
+      }
+    }
+
+    console.log('📋 Original godown quantities:', Object.fromEntries(originalQtyMap));
+    console.log('📋 Updated godown quantities:', Object.fromEntries(updatedQtyMap));
+
+    // Get all unique product IDs from both maps
+    const allProductIds = new Set([...originalQtyMap.keys(), ...updatedQtyMap.keys()]);
+
+    for (const productId of allProductIds) {
+      const originalQty = originalQtyMap.get(productId) || 0;
+      const updatedQty = updatedQtyMap.get(productId) || 0;
+      const delta = updatedQty - originalQty; // positive = more delivered, negative = less delivered
+
+      if (delta === 0) {
+        console.log(`⏭️ Product ${productId}: No change (${originalQty} -> ${updatedQty})`);
+        continue;
+      }
+
+      console.log(`📝 Product ${productId}: ${originalQty} -> ${updatedQty} (delta: ${delta})`);
+
+      // Delivery decreases godown stock, so apply -delta
+      // If qty increased (delta > 0): decrease godown stock further (-delta)
+      // If qty decreased (delta < 0): restore godown stock (-delta = positive)
+      await updateGodownStock(productId, godownId, zoneId, -delta);
+
+      console.log(`✅ Updated godown stock for product ${productId} by ${-delta}`);
+    }
+
+    console.log('✅ Godown stock update after edit completed');
+  } catch (error) {
+    console.error('❌ Error updating godown stock after edit:', error);
+  }
+};
+
+// Helper function to update general products.stock_quantity when investment delivery is edited
+// On initial save, Templates.tsx decrements stock by delivered qty.
+// On edit, we reverse the old decrement (add back) and apply the new one (subtract new qty).
+const updateGeneralInventoryAfterEdit = async (
+  originalItems: any[],
+  updatedItems: any[]
+): Promise<void> => {
+  console.log('📦 Updating products.stock_quantity after investment delivery edit...');
+
+  try {
+    const { getProducts, updateProduct } = await import('@/services/databaseService');
+    const allProducts = await getProducts();
+
+    // Build quantity maps by product name (matching by name like updateProductStockBasedOnDelivered does)
+    const originalQtyMap = new Map<string, number>();
+    for (const item of originalItems) {
+      const name = (item.name || item.description || item.productName || '').toLowerCase().trim();
+      const qty = item.quantity || item.delivered || 0;
+      if (name && qty > 0) {
+        originalQtyMap.set(name, (originalQtyMap.get(name) || 0) + qty);
+      }
+    }
+
+    const updatedQtyMap = new Map<string, number>();
+    for (const item of updatedItems) {
+      const name = (item.name || item.description || item.productName || '').toLowerCase().trim();
+      const qty = item.quantity || item.delivered || 0;
+      if (name && qty > 0) {
+        updatedQtyMap.set(name, (updatedQtyMap.get(name) || 0) + qty);
+      }
+    }
+
+    console.log('📋 Original stock quantities:', Object.fromEntries(originalQtyMap));
+    console.log('📋 Updated stock quantities:', Object.fromEntries(updatedQtyMap));
+
+    // Get all unique product names
+    const allNames = new Set([...originalQtyMap.keys(), ...updatedQtyMap.keys()]);
+
+    for (const name of allNames) {
+      const originalQty = originalQtyMap.get(name) || 0;
+      const updatedQty = updatedQtyMap.get(name) || 0;
+
+      if (originalQty === updatedQty) {
+        console.log(`⏭️ ${name}: No change`);
+        continue;
+      }
+
+      // Find the product in the products table
+      const product = allProducts.find(p =>
+        p.name.toLowerCase().trim() === name
+      );
+
+      if (!product) {
+        console.warn(`⚠️ No matching product found for: ${name}`);
+        continue;
+      }
+
+      const currentStock = product.stock_quantity || 0;
+      // Reverse old decrement (add back originalQty) and apply new decrement (subtract updatedQty)
+      const adjustment = originalQty - updatedQty;
+      const newStock = Math.max(0, currentStock + adjustment);
+
+      console.log(`📝 ${name}: stock ${currentStock} -> ${newStock} (adjustment: ${adjustment})`);
+
+      const updatedProduct = { ...product, stock_quantity: newStock };
+      await updateProduct(product.id!, updatedProduct);
+
+      console.log(`✅ Updated ${name} stock to ${newStock}`);
+    }
+
+    console.log('✅ General inventory update after edit completed');
+  } catch (error) {
+    console.error('❌ Error updating general inventory after edit:', error);
+  }
+};
+
 export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<void> => {
   try {
     console.log('🔄 Starting delivery update...', updatedDelivery.id);
@@ -609,7 +753,7 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
       // First, fetch the original delivery from database to compare items
       const { data: originalDelivery, error: fetchError } = await supabase
         .from('saved_delivery_notes')
-        .select('status, source_type, outlet_id, items_list')
+        .select('status, source_type, outlet_id, items_list, source_godown_id, source_zone_id')
         .eq('id', updatedDelivery.id)
         .single();
       
@@ -693,7 +837,34 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
             newItemsList
           );
         } else {
-          console.log('ℹ️ Skipping inventory update - no outlet ID');
+          console.log('ℹ️ Skipping outlet inventory update - no outlet ID');
+        }
+
+        // Update godown stock for investment deliveries when quantities change
+        const originalGodownId = originalDelivery?.source_godown_id;
+        const originalZoneId = originalDelivery?.source_zone_id;
+        const effectiveGodownId = updatedDelivery.sourceGodownId || originalGodownId;
+        const effectiveZoneId = updatedDelivery.sourceZoneId || originalZoneId;
+        const isInvestment = (originalDelivery?.source_type || updatedDelivery.sourceType) === 'investment';
+
+        if (isInvestment && effectiveGodownId) {
+          console.log('📦 Updating godown stock after investment delivery edit...');
+          await updateGodownStockAfterEdit(
+            effectiveGodownId,
+            effectiveZoneId || null,
+            originalItemsList,
+            updatedDelivery.itemsList || []
+          );
+        } else {
+          console.log('ℹ️ Skipping godown stock update - not investment or no godown');
+        }
+
+        // Update general products.stock_quantity for investment deliveries
+        // On initial save, Templates.tsx calls updateProductStockBasedOnDelivered to decrement stock.
+        // On edit, we need to reverse the old decrement and apply the new one.
+        if (isInvestment) {
+          console.log('📦 Updating products.stock_quantity after investment delivery edit...');
+          await updateGeneralInventoryAfterEdit(originalItemsList, updatedDelivery.itemsList || []);
         }
       }
     } else {
