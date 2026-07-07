@@ -51,7 +51,7 @@ import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveSalesOrder, SalesOrderData as SavedSalesOrderData } from '@/utils/salesOrderUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
-import { getGodowns, getZones, Godown, GodownZone } from '@/services/godownService';
+import { getGodowns, getZones, getGodownStock, Godown, GodownZone, GodownStock } from '@/services/godownService';
 import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
@@ -1161,6 +1161,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   const [sourceZoneId, setSourceZoneId] = useState("");
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
     const [isSavingGRN, setIsSavingGRN] = useState<boolean>(false);
+
+  // Map of product name -> Map of godownId -> total quantity available
+  const [productGodownMap, setProductGodownMap] = useState<Map<string, Map<string, number>>>(new Map());
+  // Map of product name -> Map of godownId -> Map of zoneId -> quantity (for zone-level quantities)
+  const [productGodownZoneMap, setProductGodownZoneMap] = useState<Map<string, Map<string, Map<string, number>>>>(new Map());
+  // Track which products we've already loaded godown stock for
+  const [loadedGodownProducts, setLoadedGodownProducts] = useState<Set<string>>(new Set());
   
   const [savedDeliveryNotes, setSavedDeliveryNotes] = useState<SavedDeliveryNote[]>(() => {
     const saved = localStorage.getItem('savedDeliveryNotes');
@@ -1254,6 +1261,115 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     };
     loadZones();
   }, [sourceGodownId]);
+
+  // Load godown stock for a product and update the productGodownMap + productGodownZoneMap
+  const loadGodownStockForProduct = async (productName: string) => {
+    if (!productName || loadedGodownProducts.has(productName.toLowerCase().trim())) return;
+    try {
+      const products = await getProducts();
+      const product = products.find(p => p.name.toLowerCase().trim() === productName.toLowerCase().trim());
+      if (!product?.id) return;
+      
+      const stockData = await getGodownStock(product.id);
+      const godownQtyMap = new Map<string, number>();
+      const godownZoneQtyMap = new Map<string, Map<string, number>>();
+      
+      for (const stock of stockData) {
+        if (stock.quantity > 0 && stock.godown_id) {
+          // Accumulate godown-level quantity
+          godownQtyMap.set(stock.godown_id, (godownQtyMap.get(stock.godown_id) || 0) + stock.quantity);
+          
+          // Accumulate zone-level quantity within godown
+          const zoneKey = stock.zone_id || '__no_zone__';
+          if (!godownZoneQtyMap.has(stock.godown_id)) {
+            godownZoneQtyMap.set(stock.godown_id, new Map());
+          }
+          const zoneMap = godownZoneQtyMap.get(stock.godown_id)!;
+          zoneMap.set(zoneKey, (zoneMap.get(zoneKey) || 0) + stock.quantity);
+        }
+      }
+      
+      const key = productName.toLowerCase().trim();
+      setProductGodownMap(prev => {
+        const newMap = new Map(prev);
+        newMap.set(key, godownQtyMap);
+        return newMap;
+      });
+      setProductGodownZoneMap(prev => {
+        const newMap = new Map(prev);
+        newMap.set(key, godownZoneQtyMap);
+        return newMap;
+      });
+      setLoadedGodownProducts(prev => new Set(prev).add(key));
+    } catch (error) {
+      console.error('Error loading godown stock for product:', productName, error);
+    }
+  };
+
+  // Compute filtered godowns with quantities based on current items in the delivery note
+  const getFilteredGodowns = (): Array<Godown & { quantity: number }> => {
+    const itemDescriptions = deliveryNoteData.items
+      .map(item => item.description?.toLowerCase().trim())
+      .filter(Boolean);
+    
+    if (itemDescriptions.length === 0) {
+      return godowns.map(g => ({ ...g, quantity: 0 }));
+    }
+    
+    // Aggregate quantities across all items per godown
+    const godownQtyTotal = new Map<string, number>();
+    for (const desc of itemDescriptions) {
+      const godownQtyMap = productGodownMap.get(desc);
+      if (godownQtyMap) {
+        for (const [godownId, qty] of godownQtyMap) {
+          godownQtyTotal.set(godownId, (godownQtyTotal.get(godownId) || 0) + qty);
+        }
+      }
+    }
+    
+    if (godownQtyTotal.size === 0) {
+      // No godown stock data loaded yet - show all godowns with 0 qty
+      return godowns.map(g => ({ ...g, quantity: 0 }));
+    }
+    
+    // Return only godowns that have stock, with their quantities
+    return godowns
+      .filter(g => godownQtyTotal.has(g.id!))
+      .map(g => ({ ...g, quantity: godownQtyTotal.get(g.id!) || 0 }));
+  };
+
+  // Get zone quantities for the selected godown based on current items
+  const getZoneQuantities = (): Array<{ zoneId: string; zoneName: string; quantity: number }> => {
+    if (!sourceGodownId) return [];
+    
+    const itemDescriptions = deliveryNoteData.items
+      .map(item => item.description?.toLowerCase().trim())
+      .filter(Boolean);
+    
+    // Aggregate zone quantities across all items for the selected godown
+    const zoneQtyTotal = new Map<string, number>();
+    for (const desc of itemDescriptions) {
+      const godownZoneMap = productGodownZoneMap.get(desc)?.get(sourceGodownId);
+      if (godownZoneMap) {
+        for (const [zoneId, qty] of godownZoneMap) {
+          zoneQtyTotal.set(zoneId, (zoneQtyTotal.get(zoneId) || 0) + qty);
+        }
+      }
+    }
+    
+    // Map zone IDs to names using deliveryZones
+    const result: Array<{ zoneId: string; zoneName: string; quantity: number }> = [];
+    for (const [zoneId, qty] of zoneQtyTotal) {
+      if (zoneId === '__no_zone__') {
+        result.push({ zoneId: '', zoneName: 'No Zone', quantity: qty });
+      } else {
+        const zone = deliveryZones.find(z => z.id === zoneId);
+        result.push({ zoneId, zoneName: zone?.zone_name || 'Unknown', quantity: qty });
+      }
+    }
+    
+    return result;
+  };
 
   // Load products for GRN dropdown on component mount
   useEffect(() => {
@@ -12111,13 +12227,23 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                 <SelectValue placeholder="Select godown" />
                               </SelectTrigger>
                               <SelectContent>
-                                {godowns.map((godown) => (
+                                {getFilteredGodowns().map((godown) => (
                                   <SelectItem key={godown.id} value={godown.id!}>
-                                    {godown.name}
+                                    <span className="flex justify-between items-center w-full">
+                                      <span>{godown.name}</span>
+                                      {godown.quantity > 0 && (
+                                        <span className="ml-2 text-xs font-semibold text-green-700">Qty: {godown.quantity}</span>
+                                      )}
+                                    </span>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
+                            {deliveryNoteData.items.some(i => i.description) && getFilteredGodowns().length < godowns.length && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Showing {getFilteredGodowns().length} of {godowns.length} godowns with stock
+                              </div>
+                            )}
                           </div>
                           
                           <div>
@@ -12139,9 +12265,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="no-zone">All Zones</SelectItem>
-                                {deliveryZones.map((zone) => (
-                                  <SelectItem key={zone.id} value={zone.id!}>
-                                    {zone.zone_name}
+                                {getZoneQuantities().map((zoneData) => (
+                                  <SelectItem key={zoneData.zoneId || 'no-zone'} value={zoneData.zoneId || 'no-zone'}>
+                                    <span className="flex justify-between items-center w-full">
+                                      <span>{zoneData.zoneName}</span>
+                                      <span className="ml-2 text-xs font-semibold text-green-700">Qty: {zoneData.quantity}</span>
+                                    </span>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -12220,8 +12349,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                                     if (itemDataFromProduct) {
                                                       handleItemChange(item.id, 'rate', itemDataFromProduct.rate);
                                                       handleItemChange(item.id, 'unit', itemDataFromProduct.unit);
-
                                                     }
+                                                    // Load godown stock for this product to filter Source Godown dropdown
+                                                    loadGodownStockForProduct(desc);
                                                     setShowDeliveryNoteDropdown(false);
                                                   }}
                                                 >
