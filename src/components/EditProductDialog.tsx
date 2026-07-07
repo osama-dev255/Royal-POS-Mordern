@@ -7,9 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { updateProduct, getCategories, Product, Category } from "@/services/databaseService";
-import { Edit3 } from "lucide-react";
+import { getGodowns, getZones, getGodownStock, updateGodownStock, Godown, GodownZone, GodownStock } from "@/services/godownService";
+import { Edit3, Warehouse, Plus, Trash2, Package } from "lucide-react";
+
+// Extended type that includes joined data from getGodownStock query
+interface GodownStockWithDetails extends GodownStock {
+  godowns?: { name: string; code?: string };
+  godown_zones?: { zone_name: string; zone_code?: string } | null;
+}
 
 interface EditProductDialogProps {
   product: Product | null;
@@ -39,6 +47,16 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
   const [activeTab, setActiveTab] = useState("basic");
   const { toast } = useToast();
 
+  // Warehouse tab state
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [zones, setZones] = useState<GodownZone[]>([]);
+  const [godownStockList, setGodownStockList] = useState<GodownStockWithDetails[]>([]);
+  const [selectedGodownId, setSelectedGodownId] = useState<string>("");
+  const [selectedZoneId, setSelectedZoneId] = useState<string>("none");
+  const [godownQuantity, setGodownQuantity] = useState<number>(0);
+  const [loadingGodowns, setLoadingGodowns] = useState(false);
+  const [savingGodownStock, setSavingGodownStock] = useState(false);
+
   const [editProduct, setEditProduct] = useState<Product>({
     id: "",
     name: "",
@@ -60,6 +78,7 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
   useEffect(() => {
     if (open && product) {
       loadCategories();
+      loadGodownData();
       // Ensure all values are properly set to avoid null values
       setEditProduct({
         ...product,
@@ -88,6 +107,121 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
     } catch (error) {
       console.error("Error loading categories:", error);
     }
+  };
+
+  // Load godowns and existing godown stock for this product
+  const loadGodownData = async () => {
+    if (!product?.id) return;
+    setLoadingGodowns(true);
+    try {
+      const [godownsData, stockData] = await Promise.all([
+        getGodowns(),
+        getGodownStock(product.id)
+      ]);
+      setGodowns(godownsData.filter(g => g.status === 'active'));
+      setGodownStockList(stockData as GodownStockWithDetails[]);
+    } catch (error) {
+      console.error("Error loading godown data:", error);
+    } finally {
+      setLoadingGodowns(false);
+    }
+  };
+
+  // Load zones when godown is selected
+  useEffect(() => {
+    if (selectedGodownId) {
+      getZones(selectedGodownId).then(setZones).catch(console.error);
+    } else {
+      setZones([]);
+    }
+    setSelectedZoneId("none");
+  }, [selectedGodownId]);
+
+  // Save godown stock
+  const handleSaveGodownStock = async () => {
+    if (!product?.id || !selectedGodownId || godownQuantity <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select a godown and enter a valid quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingGodownStock(true);
+    try {
+      const zoneId = selectedZoneId === "none" ? null : selectedZoneId;
+      
+      // Find existing stock record for this product+godown+zone combo
+      const existingStock = godownStockList.find(s => 
+        s.godown_id === selectedGodownId && 
+        (s.zone_id || null) === zoneId
+      );
+
+      if (existingStock) {
+        // Update: calculate delta
+        const currentQty = existingStock.quantity || 0;
+        const delta = godownQuantity - currentQty;
+        if (delta !== 0) {
+          await updateGodownStock(product.id, selectedGodownId, zoneId, delta);
+        }
+      } else {
+        // Create new stock record
+        await updateGodownStock(product.id, selectedGodownId, zoneId, godownQuantity);
+      }
+
+      toast({
+        title: "Success",
+        description: "Godown stock updated successfully"
+      });
+
+      // Reset form and reload
+      setSelectedGodownId("");
+      setSelectedZoneId("none");
+      setGodownQuantity(0);
+      await loadGodownData();
+    } catch (error) {
+      console.error("Error updating godown stock:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update godown stock",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingGodownStock(false);
+    }
+  };
+
+  // Remove stock from a specific godown/zone
+  const handleRemoveGodownStock = async (stock: GodownStock) => {
+    if (!product?.id) return;
+    try {
+      // Set quantity to 0 by subtracting current quantity
+      await updateGodownStock(product.id, stock.godown_id, stock.zone_id || null, -(stock.quantity || 0));
+      toast({
+        title: "Success",
+        description: "Stock removed from godown"
+      });
+      await loadGodownData();
+    } catch (error) {
+      console.error("Error removing godown stock:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove godown stock",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Get godown name from joined data, fallback to local state
+  const getGodownName = (stock: GodownStockWithDetails) => {
+    return stock.godowns?.name || godowns.find(g => g.id === stock.godown_id)?.name || "Unknown";
+  };
+
+  // Get zone name from joined data, fallback to local state
+  const getZoneName = (stock: GodownStockWithDetails) => {
+    if (!stock.zone_id) return "All Zones";
+    return stock.godown_zones?.zone_name || zones.find(z => z.id === stock.zone_id)?.zone_name || "Unknown Zone";
   };
 
   const handleUpdateProduct = async () => {
@@ -284,43 +418,182 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
             </div>
           </TabsContent>
 
-          <TabsContent value="inventory" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="stock_quantity">Current Stock *</Label>
-                <Input
-                  id="stock_quantity"
-                  type="number"
-                  min="0"
-                  value={editProduct.stock_quantity || 0}
-                  onChange={(e) => setEditProduct({...editProduct, stock_quantity: parseInt(e.target.value) || 0})}
-                  placeholder="0"
-                />
+          <TabsContent value="inventory" className="space-y-6 mt-4">
+            {/* General Stock Section */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                General Stock
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stock_quantity">Current Stock *</Label>
+                  <Input
+                    id="stock_quantity"
+                    type="number"
+                    min="0"
+                    value={editProduct.stock_quantity || 0}
+                    onChange={(e) => setEditProduct({...editProduct, stock_quantity: parseInt(e.target.value) || 0})}
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="min_stock_level">Min Stock Level</Label>
+                  <Input
+                    id="min_stock_level"
+                    type="number"
+                    min="0"
+                    value={editProduct.min_stock_level || 0}
+                    onChange={(e) => setEditProduct({...editProduct, min_stock_level: parseInt(e.target.value) || 0})}
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="max_stock_level">Max Stock Level</Label>
+                  <Input
+                    id="max_stock_level"
+                    type="number"
+                    min="0"
+                    value={editProduct.max_stock_level || 0}
+                    onChange={(e) => setEditProduct({...editProduct, max_stock_level: parseInt(e.target.value) || 0})}
+                    placeholder="100"
+                  />
+                </div>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="min_stock_level">Min Stock Level</Label>
-                <Input
-                  id="min_stock_level"
-                  type="number"
-                  min="0"
-                  value={editProduct.min_stock_level || 0}
-                  onChange={(e) => setEditProduct({...editProduct, min_stock_level: parseInt(e.target.value) || 0})}
-                  placeholder="0"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="max_stock_level">Max Stock Level</Label>
-                <Input
-                  id="max_stock_level"
-                  type="number"
-                  min="0"
-                  value={editProduct.max_stock_level || 0}
-                  onChange={(e) => setEditProduct({...editProduct, max_stock_level: parseInt(e.target.value) || 0})}
-                  placeholder="100"
-                />
-              </div>
+            </div>
+
+            {/* Warehouse / Godown Assignment Section */}
+            <div className="space-y-4 border-t pt-4">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Warehouse className="h-4 w-4" />
+                Warehouse (Godown) Assignment
+              </Label>
+
+              {loadingGodowns ? (
+                <div className="text-center py-6 text-muted-foreground">Loading warehouse data...</div>
+              ) : (
+                <>
+                  {/* Current godown stock for this product */}
+                  <div className="space-y-2">
+                    {godownStockList.length === 0 ? (
+                      <div className="border rounded-lg p-4 text-center text-muted-foreground text-sm">
+                        This product is not assigned to any warehouse yet.
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg divide-y">
+                        {godownStockList.map((stock, idx) => (
+                          <div key={stock.id || idx} className="flex items-center justify-between p-3">
+                            <div className="space-y-0.5">
+                              <div className="font-medium text-sm flex items-center gap-2">
+                                <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
+                                {getGodownName(stock)}
+                                {stock.zone_id && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {getZoneName(stock)}
+                                  </Badge>
+                                )}
+                              </div>
+                              {!stock.zone_id && (
+                                <div className="text-xs text-muted-foreground">All Zones</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge variant={stock.quantity > 0 ? "default" : "secondary"}>
+                                {stock.quantity} units
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveGodownStock(stock)}
+                                className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add/Update godown stock form */}
+                  <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                    <Label className="text-sm font-semibold">Assign to Warehouse</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="godown-select" className="text-xs text-muted-foreground">Godown (Warehouse) *</Label>
+                        <Select
+                          value={selectedGodownId || "none"}
+                          onValueChange={(v) => setSelectedGodownId(v === "none" ? "" : v)}
+                        >
+                          <SelectTrigger id="godown-select">
+                            <SelectValue placeholder="Select a godown" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Select a godown...</SelectItem>
+                            {godowns.map((g) => (
+                              <SelectItem key={g.id} value={g.id!}>
+                                {g.name} {g.code ? `(${g.code})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="zone-select" className="text-xs text-muted-foreground">Zone (Optional)</Label>
+                        <Select
+                          value={selectedZoneId}
+                          onValueChange={setSelectedZoneId}
+                          disabled={!selectedGodownId || zones.length === 0}
+                        >
+                          <SelectTrigger id="zone-select">
+                            <SelectValue placeholder={zones.length === 0 ? "No zones available" : "Select a zone"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">All Zones</SelectItem>
+                            {zones.map((z) => (
+                              <SelectItem key={z.id} value={z.id!}>
+                                {z.zone_name} {z.zone_code ? `(${z.zone_code})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-end gap-3">
+                      <div className="space-y-2 flex-1">
+                        <Label htmlFor="godown-qty" className="text-xs text-muted-foreground">Quantity *</Label>
+                        <Input
+                          id="godown-qty"
+                          type="number"
+                          min="0"
+                          value={godownQuantity}
+                          onChange={(e) => setGodownQuantity(parseInt(e.target.value) || 0)}
+                          placeholder="Enter quantity"
+                        />
+                      </div>
+                      <Button
+                        onClick={handleSaveGodownStock}
+                        disabled={savingGodownStock || !selectedGodownId || godownQuantity <= 0}
+                        size="sm"
+                      >
+                        {savingGodownStock ? (
+                          "Saving..."
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Assign
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </TabsContent>
         </Tabs>

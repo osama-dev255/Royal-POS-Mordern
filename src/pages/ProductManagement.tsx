@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -19,6 +19,13 @@ import { ExcelUtils } from "@/utils/excelUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 // Import Supabase database service
 import { getProducts, createProduct, updateProduct, deleteProduct, getCategories, Product, Category } from "@/services/databaseService";
+import { getGodowns, getZones, getGodownStock, updateGodownStock, Godown, GodownZone, GodownStock } from "@/services/godownService";
+
+// Extended type for godown stock with joined data
+interface GodownStockWithDetails extends GodownStock {
+  godowns?: { name: string; code?: string };
+  godown_zones?: { zone_name: string; zone_code?: string } | null;
+}
 
 // Define unit of measure options
 const unitOfMeasureOptions = [
@@ -76,6 +83,16 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   const [filterStock, setFilterStock] = useState<"all" | "in-stock" | "low-stock" | "out-of-stock">("all");
   const { toast } = useToast();
 
+  // Warehouse tab state
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [zones, setZones] = useState<GodownZone[]>([]);
+  const [godownStockList, setGodownStockList] = useState<GodownStockWithDetails[]>([]);
+  const [selectedGodownId, setSelectedGodownId] = useState<string>("");
+  const [selectedZoneId, setSelectedZoneId] = useState<string>("none");
+  const [godownQuantity, setGodownQuantity] = useState<number>(0);
+  const [loadingGodowns, setLoadingGodowns] = useState(false);
+  const [savingGodownStock, setSavingGodownStock] = useState(false);
+
   // Load products and categories from Supabase on component mount
   useEffect(() => {
     console.log("ProductManagement: Component mounted, loading data...");
@@ -119,6 +136,106 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
         description: "Failed to load categories",
         variant: "destructive"
       });
+    }
+  };
+
+  // Load godown data for the warehouse section
+  const loadGodownData = async (productId: string) => {
+    setLoadingGodowns(true);
+    try {
+      const [godownsData, stockData] = await Promise.all([
+        getGodowns(),
+        getGodownStock(productId)
+      ]);
+      setGodowns(godownsData.filter(g => g.status === 'active'));
+      setGodownStockList(stockData as GodownStockWithDetails[]);
+    } catch (error) {
+      console.error("Error loading godown data:", error);
+    } finally {
+      setLoadingGodowns(false);
+    }
+  };
+
+  // Load godown data when dialog opens with an editing product
+  useEffect(() => {
+    if (isDialogOpen && editingProduct?.id) {
+      loadGodownData(editingProduct.id);
+    }
+  }, [isDialogOpen, editingProduct]);
+
+  // Load zones when godown is selected
+  useEffect(() => {
+    if (selectedGodownId) {
+      getZones(selectedGodownId).then(setZones).catch(console.error);
+    } else {
+      setZones([]);
+    }
+    setSelectedZoneId("none");
+  }, [selectedGodownId]);
+
+  // Get godown name from joined data, fallback to local state
+  const getGodownName = (stock: GodownStockWithDetails) => {
+    return stock.godowns?.name || godowns.find(g => g.id === stock.godown_id)?.name || "Unknown";
+  };
+
+  // Get zone name from joined data, fallback to local state
+  const getZoneName = (stock: GodownStockWithDetails) => {
+    if (!stock.zone_id) return "All Zones";
+    return stock.godown_zones?.zone_name || zones.find(z => z.id === stock.zone_id)?.zone_name || "Unknown Zone";
+  };
+
+  // Save godown stock
+  const handleSaveGodownStock = async () => {
+    if (!editingProduct?.id || !selectedGodownId || godownQuantity <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select a godown and enter a valid quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingGodownStock(true);
+    try {
+      const zoneId = selectedZoneId === "none" ? null : selectedZoneId;
+      const existingStock = godownStockList.find(s =>
+        s.godown_id === selectedGodownId &&
+        (s.zone_id || null) === zoneId
+      );
+
+      if (existingStock) {
+        const currentQty = existingStock.quantity || 0;
+        const delta = godownQuantity - currentQty;
+        if (delta !== 0) {
+          await updateGodownStock(editingProduct.id, selectedGodownId, zoneId, delta);
+        }
+      } else {
+        await updateGodownStock(editingProduct.id, selectedGodownId, zoneId, godownQuantity);
+      }
+
+      toast({ title: "Success", description: "Godown stock updated successfully" });
+      setSelectedGodownId("");
+      setSelectedZoneId("none");
+      setGodownQuantity(0);
+      if (editingProduct?.id) await loadGodownData(editingProduct.id);
+    } catch (error) {
+      console.error("Error updating godown stock:", error);
+      toast({ title: "Error", description: "Failed to update godown stock", variant: "destructive" });
+    } finally {
+      setSavingGodownStock(false);
+    }
+  };
+
+  // Remove stock from a specific godown/zone
+  const handleRemoveGodownStock = async (stock: GodownStockWithDetails) => {
+    if (!editingProduct?.id) return;
+    try {
+      await updateGodownStock(editingProduct.id, stock.godown_id, stock.zone_id || null, -(stock.quantity || 0));
+      toast({ title: "Success", description: "Stock removed from godown" });
+      if (editingProduct?.id) await loadGodownData(editingProduct.id);
+    } catch (error) {
+      console.error("Error removing godown stock:", error);
+      toast({ title: "Error", description: "Failed to remove godown stock", variant: "destructive" });
     }
   };
 
@@ -798,6 +915,139 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                           />
                         </div>
                       </div>
+
+                      {/* Warehouse / Godown Assignment Section - only shown when editing */}
+                      {editingProduct && !viewOnlyMode && (
+                        <div className="space-y-4 border-t pt-4">
+                          <Label className="text-sm font-semibold flex items-center gap-2">
+                            <Warehouse className="h-4 w-4" />
+                            Warehouse (Godown) Assignment
+                          </Label>
+
+                          {loadingGodowns ? (
+                            <div className="text-center py-6 text-muted-foreground">Loading warehouse data...</div>
+                          ) : (
+                            <>
+                              {/* Current godown stock list */}
+                              <div className="space-y-2">
+                                {godownStockList.length === 0 ? (
+                                  <div className="border rounded-lg p-4 text-center text-muted-foreground text-sm">
+                                    This product is not assigned to any warehouse yet.
+                                  </div>
+                                ) : (
+                                  <div className="border rounded-lg divide-y">
+                                    {godownStockList.map((stock, idx) => (
+                                      <div key={stock.id || idx} className="flex items-center justify-between p-3">
+                                        <div className="space-y-0.5">
+                                          <div className="font-medium text-sm flex items-center gap-2">
+                                            <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
+                                            {getGodownName(stock)}
+                                            {stock.zone_id && (
+                                              <Badge variant="outline" className="text-xs">
+                                                {getZoneName(stock)}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          {!stock.zone_id && (
+                                            <div className="text-xs text-muted-foreground">All Zones</div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <Badge variant={stock.quantity > 0 ? "default" : "secondary"}>
+                                            {stock.quantity} units
+                                          </Badge>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRemoveGodownStock(stock)}
+                                            className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Assign to warehouse form */}
+                              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                                <Label className="text-sm font-semibold">Assign to Warehouse</Label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">Godown (Warehouse) *</Label>
+                                    <Select
+                                      value={selectedGodownId || "none"}
+                                      onValueChange={(v) => setSelectedGodownId(v === "none" ? "" : v)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select a godown" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">Select a godown...</SelectItem>
+                                        {godowns.map((g) => (
+                                          <SelectItem key={g.id} value={g.id!}>
+                                            {g.name} {g.code ? `(${g.code})` : ""}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">Zone (Optional)</Label>
+                                    <Select
+                                      value={selectedZoneId}
+                                      onValueChange={setSelectedZoneId}
+                                      disabled={!selectedGodownId || zones.length === 0}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder={zones.length === 0 ? "No zones available" : "Select a zone"} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">All Zones</SelectItem>
+                                        {zones.map((z) => (
+                                          <SelectItem key={z.id} value={z.id!}>
+                                            {z.zone_name} {z.zone_code ? `(${z.zone_code})` : ""}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-end gap-3">
+                                  <div className="space-y-2 flex-1">
+                                    <Label className="text-xs text-muted-foreground">Quantity *</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={godownQuantity}
+                                      onChange={(e) => setGodownQuantity(parseInt(e.target.value) || 0)}
+                                      placeholder="Enter quantity"
+                                    />
+                                  </div>
+                                  <Button
+                                    onClick={handleSaveGodownStock}
+                                    disabled={savingGodownStock || !selectedGodownId || godownQuantity <= 0}
+                                    size="sm"
+                                  >
+                                    {savingGodownStock ? (
+                                      "Saving..."
+                                    ) : (
+                                      <>
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Assign
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                       
                       {viewOnlyMode && editingProduct && (
                         <div className="pt-4 border-t">
