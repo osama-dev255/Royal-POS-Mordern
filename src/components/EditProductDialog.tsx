@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { updateProduct, getCategories, Product, Category } from "@/services/databaseService";
 import { getGodowns, getZones, getGodownStock, updateGodownStock, Godown, GodownZone, GodownStock } from "@/services/godownService";
-import { Edit3, Warehouse, Plus, Trash2, Package } from "lucide-react";
+import { Edit3, Warehouse, Plus, Trash2, Package, X } from "lucide-react";
 
 // Extended type that includes joined data from getGodownStock query
 interface GodownStockWithDetails extends GodownStock {
@@ -210,6 +210,25 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
         description: "Failed to remove godown stock",
         variant: "destructive"
       });
+    }
+  };
+
+  // Remove zone assignment (move stock from specific zone to "All Zones")
+  const handleRemoveZoneFromGodownStock = async (stock: GodownStockWithDetails) => {
+    if (!product?.id || !stock.zone_id) return;
+    try {
+      const qty = stock.quantity || 0;
+      // Remove from zone-specific entry
+      await updateGodownStock(product.id, stock.godown_id, stock.zone_id, -qty);
+      // Add to "All Zones" (null zone) for same godown
+      if (qty > 0) {
+        await updateGodownStock(product.id, stock.godown_id, null, qty);
+      }
+      toast({ title: "Success", description: "Zone removed, stock moved to All Zones" });
+      await loadGodownData();
+    } catch (error) {
+      console.error("Error removing zone from godown stock:", error);
+      toast({ title: "Error", description: "Failed to remove zone assignment", variant: "destructive" });
     }
   };
 
@@ -490,8 +509,16 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
                                 <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
                                 {getGodownName(stock)}
                                 {stock.zone_id && (
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
                                     {getZoneName(stock)}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveZoneFromGodownStock(stock)}
+                                      className="ml-0.5 text-muted-foreground hover:text-destructive rounded-full"
+                                      title="Remove zone assignment"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
                                   </Badge>
                                 )}
                               </div>

@@ -269,30 +269,54 @@ export const updateGodownStock = async (
 ): Promise<void> => {
   try {
     // Check if stock record exists
-    const { data: existingStock, error: fetchError } = await supabase
+    let query = supabase
       .from('godown_stock')
       .select('*')
       .eq('product_id', productId)
-      .eq('godown_id', godownId)
-      .eq('zone_id', zoneId)  // Use eq() instead of is() for UUID comparison
-      .single();
+      .eq('godown_id', godownId);
     
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows found
+    // Use .is() for NULL zone_id, .eq() for non-NULL UUID comparison
+    if (zoneId) {
+      query = query.eq('zone_id', zoneId);
+    } else {
+      query = query.is('zone_id', null);
+    }
+    
+    const { data: existingStock, error: fetchError } = await query.single();
+    
+    // PGRST116 = no rows returned; 406/PGRST118 = .single() found no rows
+    const isNotFoundError = !fetchError || 
+      fetchError.code === 'PGRST116' || 
+      fetchError.code === 'PGRST118' ||
+      fetchError.details?.includes('0 rows');
+    
+    if (fetchError && !isNotFoundError) {
       throw fetchError;
     }
     
     if (existingStock) {
       // Update existing stock
       const newQuantity = existingStock.quantity + quantityChange;
-      const { error: updateError } = await supabase
-        .from('godown_stock')
-        .update({ 
-          quantity: newQuantity,
-          last_updated: new Date().toISOString()
-        })
-        .eq('id', existingStock.id);
       
-      if (updateError) throw updateError;
+      if (newQuantity <= 0) {
+        // Delete the record when quantity reaches 0 or below (no ghost entries)
+        const { error: deleteError } = await supabase
+          .from('godown_stock')
+          .delete()
+          .eq('id', existingStock.id);
+        
+        if (deleteError) throw deleteError;
+      } else {
+        const { error: updateError } = await supabase
+          .from('godown_stock')
+          .update({ 
+            quantity: newQuantity,
+            last_updated: new Date().toISOString()
+          })
+          .eq('id', existingStock.id);
+        
+        if (updateError) throw updateError;
+      }
     } else {
       // Create new stock record
       const { error: insertError } = await supabase

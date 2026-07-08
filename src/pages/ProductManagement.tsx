@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -236,6 +236,25 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
     } catch (error) {
       console.error("Error removing godown stock:", error);
       toast({ title: "Error", description: "Failed to remove godown stock", variant: "destructive" });
+    }
+  };
+
+  // Remove zone assignment (move stock from specific zone to "All Zones")
+  const handleRemoveZoneFromGodownStock = async (stock: GodownStockWithDetails) => {
+    if (!editingProduct?.id || !stock.zone_id) return;
+    try {
+      const qty = stock.quantity || 0;
+      // Remove from zone-specific entry
+      await updateGodownStock(editingProduct.id, stock.godown_id, stock.zone_id, -qty);
+      // Add to "All Zones" (null zone) for same godown
+      if (qty > 0) {
+        await updateGodownStock(editingProduct.id, stock.godown_id, null, qty);
+      }
+      toast({ title: "Success", description: "Zone removed, stock moved to All Zones" });
+      if (editingProduct?.id) await loadGodownData(editingProduct.id);
+    } catch (error) {
+      console.error("Error removing zone from godown stock:", error);
+      toast({ title: "Error", description: "Failed to remove zone assignment", variant: "destructive" });
     }
   };
 
@@ -943,8 +962,16 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                                             <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
                                             {getGodownName(stock)}
                                             {stock.zone_id && (
-                                              <Badge variant="outline" className="text-xs">
+                                              <Badge variant="outline" className="text-xs flex items-center gap-1">
                                                 {getZoneName(stock)}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleRemoveZoneFromGodownStock(stock)}
+                                                  className="ml-0.5 text-muted-foreground hover:text-destructive rounded-full"
+                                                  title="Remove zone assignment"
+                                                >
+                                                  <X className="h-3 w-3" />
+                                                </button>
                                               </Badge>
                                             )}
                                           </div>
