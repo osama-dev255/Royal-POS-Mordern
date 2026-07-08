@@ -5089,6 +5089,15 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           receivedByDate: deliveryNoteData.receivedByDate
         };
         
+        // CRITICAL DIAGNOSTIC: Log godown integration data before save
+        console.log('🔍 PRE-SAVE GODOWN DIAGNOSTICS:');
+        console.log('   sourceGodownId:', sourceGodownId);
+        console.log('   sourceZoneId:', sourceZoneId);
+        console.log('   deliveryToSave.sourceGodownId:', deliveryToSave.sourceGodownId);
+        console.log('   deliveryToSave.sourceZoneId:', deliveryToSave.sourceZoneId);
+        console.log('   deliveryToSave.sourceType:', deliveryToSave.sourceType);
+        console.log('   deliveryToSave.itemsList:', deliveryToSave.itemsList?.map(i => ({ name: i.name, product_id: i.product_id, quantity: i.quantity })));
+        
         await saveDelivery(deliveryToSave);
         console.log('✅ saveDelivery() completed');
         console.log('📊 Delivery status saved as:', deliveryToSave.status);
