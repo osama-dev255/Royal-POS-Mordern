@@ -284,14 +284,36 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
     console.log('📍 Source Godown:', delivery.sourceGodownId);
     console.log('📍 Source Zone:', delivery.sourceZoneId || 'All Zones');
 
-    // Import updateGodownStock dynamically to avoid circular dependencies
+    // Import services dynamically to avoid circular dependencies
     const { updateGodownStock } = await import('@/services/godownService');
+    const { getProducts } = await import('@/services/databaseService');
+
+    // Build a product name -> ID map so we can resolve IDs from item descriptions
+    const products = await getProducts();
+    const productNameToId = new Map<string, string>();
+    products.forEach(p => {
+      if (p.name && p.id) {
+        productNameToId.set(p.name.toLowerCase().trim(), p.id);
+      }
+    });
+
+    console.log(`📋 Built product map with ${productNameToId.size} entries`);
+    console.log(`📋 Delivery items to process:`, delivery.itemsList.map(i => ({ name: i.name, product_id: i.product_id, quantity: i.quantity })));
 
     for (const item of delivery.itemsList) {
-      const productId = item.product_id || item.id;
+      // Resolve product ID: first try explicit product_id, then look up by name
+      // NOTE: item.id is the delivery item's own ID (NOT a product ID) - do not use it as fallback
+      let productId = item.product_id || null;
+      if (!productId && item.name) {
+        const lookupKey = item.name.toLowerCase().trim();
+        productId = productNameToId.get(lookupKey) || null;
+        console.log(`🔍 Name lookup for "${item.name}" (key: "${lookupKey}") → ${productId || 'NOT FOUND'}`);
+      }
+
       const quantity = item.quantity || item.delivered || 0;
 
       if (!productId || quantity <= 0) {
+        console.log(`⚠️ Skipping item: name="${item.name}", productId=${productId}, quantity=${quantity}`);
         continue;
       }
 
@@ -303,7 +325,7 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
         -quantity // Negative to decrease
       );
 
-      console.log(`✅ Decreased ${quantity} units of product ${productId} from godown`);
+      console.log(`✅ Decreased ${quantity} units of product ${item.name || productId} from godown`);
     }
 
     console.log('✅ Godown stock update completed for delivery');
