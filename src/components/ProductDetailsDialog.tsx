@@ -1,12 +1,19 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { Eye, Package, DollarSign, ShoppingCart, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Eye, Package, DollarSign, ShoppingCart, TrendingUp, TrendingDown, AlertTriangle, Warehouse, MapPin } from "lucide-react";
 import { Product } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
+import { getGodownStock, GodownStock } from "@/services/godownService";
+
+interface GodownStockWithDetails extends GodownStock {
+  godowns?: { name: string; code?: string };
+  godown_zones?: { zone_name: string; zone_code?: string } | null;
+}
 
 interface ProductDetailsDialogProps {
   product: Product | null;
@@ -15,6 +22,29 @@ interface ProductDetailsDialogProps {
 }
 
 export const ProductDetailsDialog = ({ product, open, onOpenChange }: ProductDetailsDialogProps) => {
+  const [godownStockList, setGodownStockList] = useState<GodownStockWithDetails[]>([]);
+  const [loadingGodownStock, setLoadingGodownStock] = useState(false);
+
+  useEffect(() => {
+    if (open && product?.id) {
+      const fetchGodownStock = async () => {
+        setLoadingGodownStock(true);
+        try {
+          const data = await getGodownStock(product.id) as GodownStockWithDetails[];
+          setGodownStockList(data || []);
+        } catch (error) {
+          console.error('Error fetching godown stock:', error);
+          setGodownStockList([]);
+        } finally {
+          setLoadingGodownStock(false);
+        }
+      };
+      fetchGodownStock();
+    } else {
+      setGodownStockList([]);
+    }
+  }, [open, product?.id]);
+
   if (!product) return null;
 
   const stockLevel = product.stock_quantity;
@@ -167,6 +197,71 @@ export const ProductDetailsDialog = ({ product, open, onOpenChange }: ProductDet
                     </TableRow>
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+
+            {/* Warehouse Location Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Warehouse className="h-4 w-4" />
+                  Warehouse Location
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingGodownStock ? (
+                  <div className="flex justify-center items-center h-16 text-muted-foreground">
+                    <p>Loading warehouse data...</p>
+                  </div>
+                ) : godownStockList.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-16 text-muted-foreground">
+                    <MapPin className="h-5 w-5 mb-1" />
+                    <p className="text-sm">No warehouse assignments found</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Godown</TableHead>
+                        <TableHead>Zone</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {godownStockList.map((gs, index) => (
+                        <TableRow key={gs.id || index}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>{gs.godowns?.name || 'Unknown'}</span>
+                              {gs.godowns?.code && (
+                                <Badge variant="secondary" className="text-xs">{gs.godowns.code}</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {gs.godown_zones ? (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>{gs.godown_zones.zone_name}</span>
+                                {gs.godown_zones.zone_code && (
+                                  <Badge variant="outline" className="text-xs">{gs.godown_zones.zone_code}</Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">No zone assigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={gs.quantity === 0 ? "destructive" : "default"}>
+                              {gs.quantity}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
 

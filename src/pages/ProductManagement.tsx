@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse, X } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse, X, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -1076,6 +1076,56 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                         </div>
                       )}
                       
+                      {/* Warehouse Location - View Only Mode */}
+                      {viewOnlyMode && editingProduct && (
+                        <div className="space-y-4 border-t pt-4">
+                          <Label className="text-sm font-semibold flex items-center gap-2">
+                            <Warehouse className="h-4 w-4" />
+                            Warehouse Location
+                          </Label>
+
+                          {loadingGodowns ? (
+                            <div className="text-center py-6 text-muted-foreground">Loading warehouse data...</div>
+                          ) : godownStockList.length === 0 ? (
+                            <div className="border rounded-lg p-4 text-center text-muted-foreground text-sm">
+                              This product is not assigned to any warehouse.
+                            </div>
+                          ) : (
+                            <div className="border rounded-lg divide-y">
+                              {godownStockList.map((stock, idx) => (
+                                <div key={stock.id || idx} className="flex items-center justify-between p-3">
+                                  <div className="space-y-0.5">
+                                    <div className="font-medium text-sm flex items-center gap-2">
+                                      <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
+                                      {getGodownName(stock)}
+                                      {stock.godowns?.code && (
+                                        <Badge variant="secondary" className="text-xs">{stock.godowns.code}</Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      {stock.zone_id ? (
+                                        <>
+                                          <MapPin className="h-3 w-3" />
+                                          {getZoneName(stock)}
+                                          {stock.godown_zones?.zone_code && (
+                                            <Badge variant="outline" className="text-xs ml-1">{stock.godown_zones.zone_code}</Badge>
+                                          )}
+                                        </>
+                                      ) : (
+                                        "All Zones"
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Badge variant={stock.quantity > 0 ? "default" : "secondary"}>
+                                    {stock.quantity} units
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {viewOnlyMode && editingProduct && (
                         <div className="pt-4 border-t">
                           <h4 className="font-medium mb-2">Product Metadata</h4>
