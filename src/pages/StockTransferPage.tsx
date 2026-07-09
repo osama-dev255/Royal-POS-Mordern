@@ -226,35 +226,55 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
       setSearching(true);
       try {
+        // Step 1: Find matching products from the products table
+        const { data: matchingProducts, error: productError } = await supabase
+          .from("products")
+          .select("id, name, sku, barcode, unit")
+          .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
+          .limit(20);
+
+        if (productError) throw productError;
+
+        if (!matchingProducts || matchingProducts.length === 0) {
+          setSearchResults([]);
+          return;
+        }
+
+        const productIds = matchingProducts.map(p => p.id);
+
         if (fromGodownId) {
-          // Query godown_stock to get products with their location in the selected godown
-          const { data: stockData, error } = await supabase
+          // Step 2: Query godown_stock for these products in the selected godown
+          const { data: stockData, error: stockError } = await supabase
             .from("godown_stock")
             .select(`
               product_id,
               quantity,
               zone_id,
-              products!inner (id, name, sku, barcode, unit),
-              godowns!inner (name),
+              godowns (name),
               godown_zones (zone_name)
             `)
             .eq("godown_id", fromGodownId)
-            .gt("quantity", 0)
-            .or(`products.name.ilike.%${productSearch}%,products.sku.ilike.%${productSearch}%,products.barcode.ilike.%${productSearch}%`)
-            .limit(20);
+            .in("product_id", productIds)
+            .gt("quantity", 0);
 
-          if (error) throw error;
+          if (stockError) throw stockError;
 
-          const results: SearchResultItem[] = (stockData || []).map((stock: any) => ({
-            id: stock.products.id,
-            name: stock.products.name,
-            sku: stock.products.sku,
-            barcode: stock.products.barcode,
-            unit: stock.products.unit,
-            godown_name: stock.godowns?.name || "",
-            zone_name: stock.godown_zones?.zone_name || "Godown Level",
-            available_stock: stock.quantity,
-          }));
+          // Build a product info lookup
+          const productMap = new Map(matchingProducts.map(p => [p.id, p]));
+
+          const results: SearchResultItem[] = (stockData || []).map((stock: any) => {
+            const product = productMap.get(stock.product_id);
+            return {
+              id: stock.product_id,
+              name: product?.name || "",
+              sku: product?.sku,
+              barcode: product?.barcode,
+              unit: product?.unit,
+              godown_name: stock.godowns?.name || "",
+              zone_name: stock.godown_zones?.zone_name || "Godown Level",
+              available_stock: stock.quantity,
+            };
+          });
 
           setSearchResults(results);
         } else {
