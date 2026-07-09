@@ -53,7 +53,6 @@ import {
   getStockTransfers,
   createStockTransfer,
   generateTransferNumber,
-  getGodownStock,
   updateGodownStock,
   Godown,
   GodownZone,
@@ -70,6 +69,17 @@ interface Product {
   unit?: string;
 }
 
+interface SearchResultItem {
+  id: string;
+  name: string;
+  sku?: string;
+  barcode?: string;
+  unit?: string;
+  godown_name: string;
+  zone_name: string;
+  available_stock: number;
+}
+
 interface TransferItem {
   product_id: string;
   product_name: string;
@@ -78,6 +88,8 @@ interface TransferItem {
   quantity: number;
   unit?: string;
   remarks?: string;
+  godown_name?: string;
+  zone_name?: string;
 }
 
 interface StockTransferPageProps {
@@ -111,7 +123,7 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
   // State for product search and selection
   const [productSearch, setProductSearch] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [transferItems, setTransferItems] = useState<TransferItem[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -204,7 +216,7 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
     setSearchResults([]);
   };
 
-  // Search products
+  // Search products - query godown_stock to show products with their godown/zone locations
   useEffect(() => {
     const searchProducts = async () => {
       if (!productSearch || productSearch.length < 2) {
@@ -214,14 +226,60 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
       setSearching(true);
       try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id, name, sku, barcode, unit")
-          .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
-          .limit(10);
+        if (fromGodownId) {
+          // Query godown_stock to get products with their location in the selected godown
+          const { data: stockData, error } = await supabase
+            .from("godown_stock")
+            .select(`
+              product_id,
+              quantity,
+              zone_id,
+              products!inner (id, name, sku, barcode, unit),
+              godowns!inner (name),
+              godown_zones (zone_name)
+            `)
+            .eq("godown_id", fromGodownId)
+            .gt("quantity", 0)
+            .or(`products.name.ilike.%${productSearch}%,products.sku.ilike.%${productSearch}%,products.barcode.ilike.%${productSearch}%`)
+            .limit(20);
 
-        if (error) throw error;
-        setSearchResults(data || []);
+          if (error) throw error;
+
+          const results: SearchResultItem[] = (stockData || []).map((stock: any) => ({
+            id: stock.products.id,
+            name: stock.products.name,
+            sku: stock.products.sku,
+            barcode: stock.products.barcode,
+            unit: stock.products.unit,
+            godown_name: stock.godowns?.name || "",
+            zone_name: stock.godown_zones?.zone_name || "Godown Level",
+            available_stock: stock.quantity,
+          }));
+
+          setSearchResults(results);
+        } else {
+          // No source godown selected - search products table with general stock info
+          const { data, error } = await supabase
+            .from("products")
+            .select("id, name, sku, barcode, unit")
+            .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
+            .limit(10);
+
+          if (error) throw error;
+
+          const results: SearchResultItem[] = (data || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            barcode: p.barcode,
+            unit: p.unit,
+            godown_name: "",
+            zone_name: "",
+            available_stock: 0,
+          }));
+
+          setSearchResults(results);
+        }
       } catch (error) {
         console.error("Error searching products:", error);
         setSearchResults([]);
@@ -234,45 +292,26 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
     return () => clearTimeout(debounceTimer);
   }, [productSearch, fromGodownId]);
 
-  // Get available stock for a product in selected godown
-  const getAvailableStock = async (productId: string): Promise<number> => {
-    if (!fromGodownId) return 0;
-    
-    try {
-      const stock = await getGodownStock(productId, fromGodownId);
-      const actualZoneId = fromZoneId === "no-zone" ? null : fromZoneId;
-      
-      if (actualZoneId) {
-        const zoneStock = stock.find(s => s.zone_id === actualZoneId);
-        return zoneStock?.quantity || 0;
-      }
-      return stock.reduce((sum, s) => sum + s.quantity, 0);
-    } catch (error) {
-      console.error("Error getting stock:", error);
-      return 0;
-    }
-  };
-
   // Add product to transfer
-  const addProduct = async (product: Product) => {
+  const addProduct = (result: SearchResultItem) => {
     // Check if already added
-    if (transferItems.find(item => item.product_id === product.id)) {
+    if (transferItems.find(item => item.product_id === result.id)) {
       toast.error("Product already added");
       return;
     }
 
-    const availableStock = await getAvailableStock(product.id);
-    
     setTransferItems([
       ...transferItems,
       {
-        product_id: product.id,
-        product_name: product.name,
-        sku: product.sku,
-        available_stock: availableStock,
+        product_id: result.id,
+        product_name: result.name,
+        sku: result.sku,
+        available_stock: result.available_stock,
         quantity: 1,
-        unit: product.unit,
+        unit: result.unit,
         remarks: "",
+        godown_name: result.godown_name,
+        zone_name: result.zone_name,
       },
     ]);
     
@@ -746,25 +785,52 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
                 {/* Search Results */}
                 {searchResults.length > 0 && (
-                  <div className="mt-2 border rounded-lg max-h-48 overflow-y-auto">
-                    {searchResults.map((product) => (
+                  <div className="mt-2 border rounded-lg max-h-60 overflow-y-auto">
+                    {searchResults.map((product, idx) => (
                       <div
-                        key={product.id}
+                        key={`${product.id}-${idx}`}
                         className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
                         onClick={() => addProduct(product)}
                       >
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {product.sku || product.barcode || "No SKU"}
-                          </p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{product.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-muted-foreground">
+                              {product.sku || product.barcode || "No SKU"}
+                            </span>
+                            {product.godown_name && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                                {product.godown_name}
+                              </span>
+                            )}
+                            {product.zone_name && (
+                              <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                                {product.zone_name}
+                              </span>
+                            )}
+                            {product.available_stock > 0 && (
+                              <span className="text-xs font-semibold text-muted-foreground">
+                                Qty: {product.available_stock}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="ml-2 shrink-0">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
                   </div>
+                )}
+                {fromGodownId && searchResults.length === 0 && productSearch.length >= 2 && !searching && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    No products with stock found in the selected source godown.
+                  </p>
+                )}
+                {!fromGodownId && searchResults.length === 0 && productSearch.length >= 2 && !searching && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Select a Source Godown to see product availability.
+                  </p>
                 )}
               </div>
 
@@ -775,7 +841,8 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                     <TableHeader>
                       <TableRow>
                         <TableHead>Product</TableHead>
-                        <TableHead>SKU</TableHead>
+                        <TableHead>Godown</TableHead>
+                        <TableHead>Zone</TableHead>
                         <TableHead>Available</TableHead>
                         <TableHead>Quantity</TableHead>
                         <TableHead>Unit</TableHead>
@@ -787,7 +854,8 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                       {transferItems.map((item) => (
                         <TableRow key={item.product_id}>
                           <TableCell className="font-medium">{item.product_name}</TableCell>
-                          <TableCell>{item.sku || "-"}</TableCell>
+                          <TableCell>{item.godown_name || "-"}</TableCell>
+                          <TableCell>{item.zone_name || "-"}</TableCell>
                           <TableCell>{item.available_stock}</TableCell>
                           <TableCell>
                             <Input
