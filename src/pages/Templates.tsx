@@ -1249,22 +1249,18 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     loadGodowns();
   }, []);
 
-  // Load zones when source godown changes
+  // Load ALL zones on mount (needed for per-row zone name resolution across multiple godowns)
   useEffect(() => {
     const loadZones = async () => {
-      if (sourceGodownId) {
-        try {
-          const data = await getZones(sourceGodownId);
-          setDeliveryZones(data);
-        } catch (error) {
-          console.error('Error loading zones:', error);
-        }
-      } else {
-        setDeliveryZones([]);
+      try {
+        const data = await getZones();
+        setDeliveryZones(data);
+      } catch (error) {
+        console.error('Error loading zones:', error);
       }
     };
     loadZones();
-  }, [sourceGodownId]);
+  }, []);
 
   // Load godown stock for a product and update the productGodownMap + productGodownZoneMap
   const loadGodownStockForProduct = async (productName: string) => {
