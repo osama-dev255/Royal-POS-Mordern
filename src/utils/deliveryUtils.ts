@@ -257,7 +257,7 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
     console.log('📍 sourceType:', delivery.sourceType);
     console.log('📍 Number of items:', delivery.itemsList?.length);
     
-    if (dbSaveSuccessful && delivery.sourceGodownId && delivery.sourceType === 'investment') {
+    if (dbSaveSuccessful && (delivery.sourceGodownId || delivery.itemsList?.some(i => i.godown_id)) && delivery.sourceType === 'investment') {
       console.log('✅ Source godown is set, calling updateDeliveryGodownStock...');
       await updateDeliveryGodownStock(delivery);
     } else {
@@ -274,16 +274,14 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
 
 // Update godown stock when delivery is saved (for warehouse deliveries)
 const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> => {
-  // Only update if source godown is specified and there are items
-  if (!delivery.sourceGodownId || !delivery.itemsList || delivery.itemsList.length === 0) {
-    console.log('⚠️ updateDeliveryGodownStock: Skipping - sourceGodownId:', delivery.sourceGodownId, 'items:', delivery.itemsList?.length);
+  // Only update if there are items
+  if (!delivery.itemsList || delivery.itemsList.length === 0) {
+    console.log('⚠️ updateDeliveryGodownStock: Skipping - items:', delivery.itemsList?.length);
     return;
   }
 
   try {
     console.log('📦 Updating godown stock for delivery:', delivery.deliveryNoteNumber);
-    console.log('📍 Source Godown:', delivery.sourceGodownId);
-    console.log('📍 Source Zone:', delivery.sourceZoneId || 'All Zones');
 
     // Import services dynamically to avoid circular dependencies
     const { updateGodownStock, getGodownStock } = await import('@/services/godownService');
@@ -299,7 +297,10 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
     });
 
     console.log(`📋 Built product map with ${productNameToId.size} entries`);
-    console.log(`📋 Delivery items to process:`, delivery.itemsList.map(i => ({ name: i.name, product_id: i.product_id, quantity: i.quantity })));
+    console.log(`📋 Delivery items to process:`, delivery.itemsList.map(i => ({
+      name: i.name, product_id: i.product_id, quantity: i.quantity,
+      godown_id: i.godown_id, zone_id: i.zone_id
+    })));
 
     for (const item of delivery.itemsList) {
       // Resolve product ID: first try explicit product_id, then look up by name
@@ -312,36 +313,46 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
 
       const quantity = item.quantity || item.delivered || 0;
 
+      // Use per-item godown_id, fall back to delivery-level sourceGodownId
+      const itemGodownId = item.godown_id || delivery.sourceGodownId || null;
+      // Use per-item zone_id, fall back to delivery-level sourceZoneId
+      const itemZoneId = item.zone_id || delivery.sourceZoneId || null;
+
       if (!productId || quantity <= 0) {
         console.log(`⚠️ Skipping item: name="${item.name}", productId=${productId}, quantity=${quantity}`);
         continue;
       }
 
-      const sourceZoneId = delivery.sourceZoneId || null;
+      if (!itemGodownId) {
+        console.log(`⚠️ Skipping item "${item.name}": no godown_id specified (per-item or delivery-level)`);
+        continue;
+      }
+
+      console.log(`📍 Processing item "${item.name}": godown=${itemGodownId}, zone=${itemZoneId || 'null'}, qty=${quantity}`);
 
       // Check which godown_stock records exist for this product in the source godown
-      const existingStock = await getGodownStock(productId, delivery.sourceGodownId);
+      const existingStock = await getGodownStock(productId, itemGodownId);
       console.log(`📋 Existing godown stock for product ${item.name}:`, existingStock.map(s => ({ zone_id: s.zone_id, quantity: s.quantity })));
 
       if (existingStock.length === 0) {
-        console.log(`⚠️ No godown stock records found for product ${item.name} in godown ${delivery.sourceGodownId}. Skipping godown decrement.`);
+        console.log(`⚠️ No godown stock records found for product ${item.name} in godown ${itemGodownId}. Skipping godown decrement.`);
         continue;
       }
 
       // Determine which record to decrement from
       let targetZoneId: string | null = null;
 
-      if (sourceZoneId) {
+      if (itemZoneId) {
         // Zone is specified - check if a zone-specific record exists
-        const zoneRecord = existingStock.find(s => s.zone_id === sourceZoneId);
+        const zoneRecord = existingStock.find(s => s.zone_id === itemZoneId);
         if (zoneRecord) {
-          targetZoneId = sourceZoneId; // Decrement from zone-specific record
+          targetZoneId = itemZoneId; // Decrement from zone-specific record
         } else {
           // Fall back to godown-level record (zone_id = null)
           const godownLevelRecord = existingStock.find(s => s.zone_id === null);
           if (godownLevelRecord) {
             targetZoneId = null; // Decrement from godown-level record
-            console.log(`ℹ️ Zone-specific record not found for zone ${sourceZoneId}. Falling back to godown-level record.`);
+            console.log(`ℹ️ Zone-specific record not found for zone ${itemZoneId}. Falling back to godown-level record.`);
           } else {
             // No matching record at all - use the first available record
             targetZoneId = existingStock[0].zone_id || null;
@@ -363,12 +374,12 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
       // Decrease stock from the determined record
       await updateGodownStock(
         productId,
-        delivery.sourceGodownId,
+        itemGodownId,
         targetZoneId,
         -quantity // Negative to decrease
       );
 
-      console.log(`✅ Decreased ${quantity} units of product ${item.name || productId} from godown (zone: ${targetZoneId || 'null'})`);
+      console.log(`✅ Decreased ${quantity} units of product ${item.name || productId} from godown ${itemGodownId} (zone: ${targetZoneId || 'null'})`);
     }
 
     console.log('✅ Godown stock update completed for delivery');

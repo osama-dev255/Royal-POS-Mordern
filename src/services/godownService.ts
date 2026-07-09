@@ -282,15 +282,10 @@ export const updateGodownStock = async (
       query = query.is('zone_id', null);
     }
     
-    const { data: existingStock, error: fetchError } = await query.single();
+    const { data: existingStock, error: fetchError } = await query.maybeSingle();
     
-    // PGRST116 = no rows returned; 406/PGRST118 = .single() found no rows
-    const isNotFoundError = !fetchError || 
-      fetchError.code === 'PGRST116' || 
-      fetchError.code === 'PGRST118' ||
-      fetchError.details?.includes('0 rows');
-    
-    if (fetchError && !isNotFoundError) {
+    if (fetchError) {
+      console.error('Error fetching godown stock:', fetchError);
       throw fetchError;
     }
     

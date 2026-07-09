@@ -81,6 +81,10 @@ interface DeliveryNoteItem {
   amount: number;
   delivered: number;
   remarks: string;
+  godownId?: string;
+  godownName?: string;
+  zoneId?: string;
+  zoneName?: string;
 }
 
 interface DeliveryNoteData {
@@ -1369,6 +1373,39 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     }
     
     return result;
+  };
+
+  // Get available godowns for a specific item's product
+  const getItemGodowns = (itemDescription: string): Array<{ godownId: string; godownName: string; quantity: number }> => {
+    if (!itemDescription) return [];
+    const key = itemDescription.toLowerCase().trim();
+    const godownQtyMap = productGodownMap.get(key);
+    if (!godownQtyMap) return [];
+    
+    return Array.from(godownQtyMap.entries())
+      .filter(([, qty]) => qty > 0)
+      .map(([godownId, qty]) => {
+        const godown = godowns.find(g => g.id === godownId);
+        return { godownId, godownName: godown?.name || 'Unknown', quantity: qty };
+      });
+  };
+
+  // Get available zones for a specific item's product and selected godown
+  const getItemZones = (itemDescription: string, godownId: string): Array<{ zoneId: string; zoneName: string; quantity: number }> => {
+    if (!itemDescription || !godownId) return [];
+    const key = itemDescription.toLowerCase().trim();
+    const godownZoneMap = productGodownZoneMap.get(key)?.get(godownId);
+    if (!godownZoneMap) return [];
+    
+    return Array.from(godownZoneMap.entries())
+      .filter(([, qty]) => qty > 0)
+      .map(([zoneKey, qty]) => {
+        if (zoneKey === '__no_zone__') {
+          return { zoneId: '__no_zone__', zoneName: 'No Zone (Godown Level)', quantity: qty };
+        }
+        const zone = deliveryZones.find(z => z.id === zoneKey);
+        return { zoneId: zoneKey, zoneName: zone?.zone_name || 'Unknown', quantity: qty };
+      });
   };
 
   // Load products for GRN dropdown on component mount
@@ -2690,7 +2727,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               delivered: item.delivered,
               remarks: item.remarks,
               price: item.rate, // Use rate as the price for delivery items
-              total: item.amount // Use amount as the total for delivery items
+              total: item.amount, // Use amount as the total for delivery items
+              // Per-item godown/zone for multi-godown deliveries
+              godown_id: item.godownId || undefined,
+              zone_id: item.zoneId || undefined,
+              godown_name: item.godownName || undefined,
+              zone_name: item.zoneName || undefined
             };
           }),
           subtotal: deliveryNoteData.subtotal, // Use the calculated subtotal from deliveryNoteData
@@ -2703,12 +2745,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           deliveryNotes: deliveryNoteData.deliveryNotes,
           outletId: outletId,
           creditBroughtForward: deliveryNoteData.creditBroughtForward || 0,
-          // Godown integration fields
+          // Godown integration fields - use first item's godown as delivery-level reference
           sourceType: 'investment',
-          sourceGodownId: sourceGodownId || undefined,
-          sourceZoneId: sourceZoneId || undefined,
-          sourceGodownName: godowns.find(g => g.id === sourceGodownId)?.name || '',
-          sourceZoneName: deliveryZones.find(z => z.id === sourceZoneId)?.zone_name || '',
+          sourceGodownId: deliveryNoteData.items.find(i => i.godownId)?.godownId || undefined,
+          sourceZoneId: deliveryNoteData.items.find(i => i.godownId)?.zoneId || undefined,
+          sourceGodownName: deliveryNoteData.items.find(i => i.godownId)?.godownName || '',
+          sourceZoneName: deliveryNoteData.items.find(i => i.godownId)?.zoneName || '',
           // Additional fields from DeliveryDetails view (matching exact View Display)
           businessName: deliveryNoteData.businessName,
           businessAddress: deliveryNoteData.businessAddress,
@@ -4964,7 +5006,11 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           rate: 0,
           amount: 0,
           delivered: 0,
-          remarks: ""
+          remarks: "",
+          godownId: "",
+          godownName: "",
+          zoneId: "",
+          zoneName: ""
         }
       ]
     }));
@@ -5071,7 +5117,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               delivered: item.quantity, // Also update delivered to match quantity
               remarks: item.remarks,
               price: item.rate, // Use rate as the price for delivery items
-              total: item.amount // Use amount as the total for delivery items
+              total: item.amount, // Use amount as the total for delivery items
+              // Per-item godown/zone for multi-godown deliveries
+              godown_id: item.godownId || undefined,
+              zone_id: item.zoneId || undefined,
+              godown_name: item.godownName || undefined,
+              zone_name: item.zoneName || undefined
             };
           }),
           subtotal: deliveryNoteData.subtotal || totalAmount, // Use the calculated subtotal from deliveryNoteData
@@ -5084,12 +5135,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           deliveryNotes: deliveryNoteData.deliveryNotes,
           outletId: outletId,
           creditBroughtForward: deliveryNoteData.creditBroughtForward || 0,
-          // Godown integration fields
+          // Godown integration fields - use first item's godown as delivery-level reference
           sourceType: 'investment',
-          sourceGodownId: sourceGodownId || undefined,
-          sourceZoneId: sourceZoneId || undefined,
-          sourceGodownName: godowns.find(g => g.id === sourceGodownId)?.name || '',
-          sourceZoneName: deliveryZones.find(z => z.id === sourceZoneId)?.zone_name || '',
+          sourceGodownId: deliveryNoteData.items.find(i => i.godownId)?.godownId || undefined,
+          sourceZoneId: deliveryNoteData.items.find(i => i.godownId)?.zoneId || undefined,
+          sourceGodownName: deliveryNoteData.items.find(i => i.godownId)?.godownName || '',
+          sourceZoneName: deliveryNoteData.items.find(i => i.godownId)?.zoneName || '',
           // Additional fields from DeliveryDetails view (matching exact View Display)
           businessName: deliveryNoteData.businessName,
           businessAddress: deliveryNoteData.businessAddress,
@@ -5347,6 +5398,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                 <thead>
                   <tr>
                     <th>Item Description</th>
+                    <th>Godown</th>
+                    <th>Zone</th>
                     <th>Quantity</th>
                     <th>Unit</th>
                     <th>Delivered</th>
@@ -5357,6 +5410,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                   ${viewedData.items.map(item => `
                     <tr>
                       <td>${item.description}</td>
+                      <td>${item.godownName || '-'}</td>
+                      <td>${item.zoneName || '-'}</td>
                       <td>${item.quantity}</td>
                       <td>${item.unit}</td>
                       <td>${item.delivered}</td>
@@ -5556,6 +5611,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               <thead>
                 <tr>
                   <th>Item Description</th>
+                  <th>Godown</th>
+                  <th>Zone</th>
                   <th>Quantity</th>
                   <th>Unit</th>
                   <th>Delivered</th>
@@ -5566,6 +5623,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                 ${deliveryNoteData.items.map(item => `
                   <tr>
                     <td>${item.description}</td>
+                    <td>${item.godownName || '-'}</td>
+                    <td>${item.zoneName || '-'}</td>
                     <td>${item.quantity}</td>
                     <td>${item.unit}</td>
                     <td>${item.delivered}</td>
@@ -5760,6 +5819,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
             <thead>
               <tr>
                 <th>Item Description</th>
+                <th>Godown</th>
+                <th>Zone</th>
                 <th>Quantity</th>
                 <th>Unit</th>
                 <th>Rate</th>
@@ -5772,6 +5833,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               ${deliveryNoteData.items.map(item => `
                 <tr>
                   <td>${item.description}</td>
+                  <td>${item.godownName || '-'}</td>
+                  <td>${item.zoneName || '-'}</td>
                   <td>${item.quantity}</td>
                   <td>${item.unit}</td>
                   <td>${item.rate}</td>
@@ -12229,75 +12292,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                             />
                           </div>
                           
-                          {/* Godown Selectors */}
-                          <div>
-                            <div className="text-sm font-medium">Source Godown:</div>
-                            <Select 
-                              value={sourceGodownId} 
-                              onValueChange={(val) => {
-                                setSourceGodownId(val);
-                                setSourceZoneId(""); // Reset zone
-                                setDeliveryNoteData(prev => ({
-                                  ...prev,
-                                  sourceGodownId: val,
-                                  sourceGodownName: godowns.find(g => g.id === val)?.name || ''
-                                }));
-                              }}
-                            >
-                              <SelectTrigger className="text-sm p-1 h-6">
-                                <SelectValue placeholder="Select godown" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {getFilteredGodowns().map((godown) => (
-                                  <SelectItem key={godown.id} value={godown.id!}>
-                                    <span className="flex justify-between items-center w-full">
-                                      <span>{godown.name}</span>
-                                      {godown.quantity > 0 && (
-                                        <span className="ml-2 text-xs font-semibold text-green-700">Qty: {godown.quantity}</span>
-                                      )}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {deliveryNoteData.items.some(i => i.description) && getFilteredGodowns().length < godowns.length && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Showing {getFilteredGodowns().length} of {godowns.length} godowns with stock
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <div className="text-sm font-medium">Source Zone:</div>
-                            <Select 
-                              value={sourceZoneId || "no-zone"} 
-                              onValueChange={(val) => {
-                                const zoneId = val === "no-zone" ? "" : val;
-                                setSourceZoneId(zoneId);
-                                setDeliveryNoteData(prev => ({
-                                  ...prev,
-                                  sourceZoneId: zoneId,
-                                  sourceZoneName: deliveryZones.find(z => z.id === zoneId)?.zone_name || ''
-                                }));
-                              }}
-                            >
-                              <SelectTrigger className="text-sm p-1 h-6">
-                                <SelectValue placeholder="Select zone" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="no-zone">All Zones</SelectItem>
-                                {getZoneQuantities().map((zoneData) => (
-                                  <SelectItem key={zoneData.zoneId || 'no-zone'} value={zoneData.zoneId || 'no-zone'}>
-                                    <span className="flex justify-between items-center w-full">
-                                      <span>{zoneData.zoneName}</span>
-                                      <span className="ml-2 text-xs font-semibold text-green-700">Qty: {zoneData.quantity}</span>
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
                           <div>
                             <div className="text-sm font-medium">Generated:</div>
                             <div className="text-sm">{new Date().toLocaleString()}</div>
@@ -12312,6 +12306,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                               <thead>
                                 <tr className="bg-gray-100">
                                   <th className="border border-gray-300 p-2 text-left">Item Description</th>
+                                  <th className="border border-gray-300 p-2 text-left">Godown</th>
+                                  <th className="border border-gray-300 p-2 text-left">Zone</th>
                                   <th className="border border-gray-300 p-2 text-left">Quantity</th>
                                   <th className="border border-gray-300 p-2 text-left">Unit</th>
                                   <th className="border border-gray-300 p-2 text-left">Rate</th>
@@ -12387,6 +12383,57 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                           </div>
                                         )}
                                       </div>
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Select
+                                        value={item.godownId || ''}
+                                        onValueChange={(val) => {
+                                          const godown = godowns.find(g => g.id === val);
+                                          handleItemChange(item.id, 'godownId', val);
+                                          handleItemChange(item.id, 'godownName', godown?.name || '');
+                                          // Reset zone when godown changes
+                                          handleItemChange(item.id, 'zoneId', '');
+                                          handleItemChange(item.id, 'zoneName', '');
+                                        }}
+                                        disabled={!item.description}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs w-[140px]">
+                                          <SelectValue placeholder="Select godown" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {getItemGodowns(item.description).map(g => (
+                                            <SelectItem key={g.godownId} value={g.godownId}>
+                                              {g.godownName} (Qty: {g.quantity})
+                                            </SelectItem>
+                                          ))}
+                                          {item.description && getItemGodowns(item.description).length === 0 && (
+                                            <SelectItem value="__none__" disabled>No stock available</SelectItem>
+                                          )}
+                                        </SelectContent>
+                                      </Select>
+                                    </td>
+                                    <td className="border border-gray-300 p-2">
+                                      <Select
+                                        value={item.zoneId || ''}
+                                        onValueChange={(val) => {
+                                          const zoneVal = val === '__no_zone__' ? '' : val;
+                                          const zone = deliveryZones.find(z => z.id === val);
+                                          handleItemChange(item.id, 'zoneId', zoneVal);
+                                          handleItemChange(item.id, 'zoneName', val === '__no_zone__' ? 'No Zone' : (zone?.zone_name || ''));
+                                        }}
+                                        disabled={!item.godownId}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs w-[160px]">
+                                          <SelectValue placeholder="Select zone" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {item.godownId && getItemZones(item.description, item.godownId).map(z => (
+                                            <SelectItem key={z.zoneId} value={z.zoneId}>
+                                              {z.zoneName} (Qty: {z.quantity})
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
