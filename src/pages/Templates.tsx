@@ -2676,17 +2676,23 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           total: totalAmount,
           paymentMethod: 'N/A', // Templates don't have payment method
           status: 'completed', // For templates, mark as completed
-          itemsList: deliveryNoteData.items.map(item => ({
-            id: item.id, // Include item ID
-            product_id: item.productId, // Include product ID for godown stock updates
-            name: item.description,
-            quantity: item.quantity,
-            unit: item.unit,
-            delivered: item.delivered,
-            remarks: item.remarks,
-            price: item.rate, // Use rate as the price for delivery items
-            total: item.amount // Use amount as the total for delivery items
-          })),
+          itemsList: deliveryNoteData.items.map(item => {
+            // Resolve product ID from grnProductItems by matching name to description
+            const matchedProduct = grnProductItems.find(p => 
+              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+            );
+            return {
+              id: item.id,
+              product_id: matchedProduct?.id || undefined, // Resolved product ID for godown stock updates
+              name: item.description,
+              quantity: item.quantity,
+              unit: item.unit,
+              delivered: item.delivered,
+              remarks: item.remarks,
+              price: item.rate, // Use rate as the price for delivery items
+              total: item.amount // Use amount as the total for delivery items
+            };
+          }),
           subtotal: deliveryNoteData.subtotal, // Use the calculated subtotal from deliveryNoteData
           tax: deliveryNoteData.tax,
           discount: deliveryNoteData.discount,
@@ -5049,19 +5055,25 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           total: totalAmount,
           paymentMethod: 'N/A', // Templates don't have payment method
           status: 'completed', // For templates, mark as completed
-          itemsList: deliveryNoteData.items.map(item => ({
-            id: item.id, // Include item ID
-            product_id: item.productId, // Include product ID for godown stock updates
-            name: item.description,
-            quantity: item.quantity, // Use quantity field for the saved record
-            unit: item.unit,
-            rate: item.rate,
-            amount: item.amount,
-            delivered: item.quantity, // Also update delivered to match quantity
-            remarks: item.remarks,
-            price: item.rate, // Use rate as the price for delivery items
-            total: item.amount // Use amount as the total for delivery items
-          })),
+          itemsList: deliveryNoteData.items.map(item => {
+            // Resolve product ID from grnProductItems by matching name to description
+            const matchedProduct = grnProductItems.find(p => 
+              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+            );
+            return {
+              id: item.id,
+              product_id: matchedProduct?.id || undefined, // Resolved product ID for godown stock updates
+              name: item.description,
+              quantity: item.quantity, // Use quantity field for the saved record
+              unit: item.unit,
+              rate: item.rate,
+              amount: item.amount,
+              delivered: item.quantity, // Also update delivered to match quantity
+              remarks: item.remarks,
+              price: item.rate, // Use rate as the price for delivery items
+              total: item.amount // Use amount as the total for delivery items
+            };
+          }),
           subtotal: deliveryNoteData.subtotal || totalAmount, // Use the calculated subtotal from deliveryNoteData
           tax: deliveryNoteData.tax,
           discount: deliveryNoteData.discount,

@@ -276,6 +276,7 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
 const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> => {
   // Only update if source godown is specified and there are items
   if (!delivery.sourceGodownId || !delivery.itemsList || delivery.itemsList.length === 0) {
+    console.log('⚠️ updateDeliveryGodownStock: Skipping - sourceGodownId:', delivery.sourceGodownId, 'items:', delivery.itemsList?.length);
     return;
   }
 
@@ -285,7 +286,7 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
     console.log('📍 Source Zone:', delivery.sourceZoneId || 'All Zones');
 
     // Import services dynamically to avoid circular dependencies
-    const { updateGodownStock } = await import('@/services/godownService');
+    const { updateGodownStock, getGodownStock } = await import('@/services/godownService');
     const { getProducts } = await import('@/services/databaseService');
 
     // Build a product name -> ID map so we can resolve IDs from item descriptions
@@ -302,7 +303,6 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
 
     for (const item of delivery.itemsList) {
       // Resolve product ID: first try explicit product_id, then look up by name
-      // NOTE: item.id is the delivery item's own ID (NOT a product ID) - do not use it as fallback
       let productId = item.product_id || null;
       if (!productId && item.name) {
         const lookupKey = item.name.toLowerCase().trim();
@@ -317,15 +317,58 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
         continue;
       }
 
-      // Decrease stock from source godown
+      const sourceZoneId = delivery.sourceZoneId || null;
+
+      // Check which godown_stock records exist for this product in the source godown
+      const existingStock = await getGodownStock(productId, delivery.sourceGodownId);
+      console.log(`📋 Existing godown stock for product ${item.name}:`, existingStock.map(s => ({ zone_id: s.zone_id, quantity: s.quantity })));
+
+      if (existingStock.length === 0) {
+        console.log(`⚠️ No godown stock records found for product ${item.name} in godown ${delivery.sourceGodownId}. Skipping godown decrement.`);
+        continue;
+      }
+
+      // Determine which record to decrement from
+      let targetZoneId: string | null = null;
+
+      if (sourceZoneId) {
+        // Zone is specified - check if a zone-specific record exists
+        const zoneRecord = existingStock.find(s => s.zone_id === sourceZoneId);
+        if (zoneRecord) {
+          targetZoneId = sourceZoneId; // Decrement from zone-specific record
+        } else {
+          // Fall back to godown-level record (zone_id = null)
+          const godownLevelRecord = existingStock.find(s => s.zone_id === null);
+          if (godownLevelRecord) {
+            targetZoneId = null; // Decrement from godown-level record
+            console.log(`ℹ️ Zone-specific record not found for zone ${sourceZoneId}. Falling back to godown-level record.`);
+          } else {
+            // No matching record at all - use the first available record
+            targetZoneId = existingStock[0].zone_id || null;
+            console.log(`ℹ️ No matching record found. Using first available record (zone: ${targetZoneId || 'null'}).`);
+          }
+        }
+      } else {
+        // No zone specified - use godown-level record (zone_id = null)
+        const godownLevelRecord = existingStock.find(s => s.zone_id === null);
+        if (godownLevelRecord) {
+          targetZoneId = null;
+        } else {
+          // No godown-level record, use first available
+          targetZoneId = existingStock[0].zone_id || null;
+          console.log(`ℹ️ No godown-level record found. Using first available record (zone: ${targetZoneId || 'null'}).`);
+        }
+      }
+
+      // Decrease stock from the determined record
       await updateGodownStock(
         productId,
         delivery.sourceGodownId,
-        delivery.sourceZoneId || null,
+        targetZoneId,
         -quantity // Negative to decrease
       );
 
-      console.log(`✅ Decreased ${quantity} units of product ${item.name || productId} from godown`);
+      console.log(`✅ Decreased ${quantity} units of product ${item.name || productId} from godown (zone: ${targetZoneId || 'null'})`);
     }
 
     console.log('✅ Godown stock update completed for delivery');
