@@ -473,6 +473,108 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
     setIsDetailsDialogOpen(true);
   };
 
+  // Print transfer details
+  const handlePrintTransfer = () => {
+    if (!selectedTransfer) return;
+    const t = selectedTransfer;
+    const items = (t.stock_transfer_items as any[]) || [];
+    const totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow pop-ups to print");
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Stock Transfer ${t.transfer_number}</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Arial, sans-serif; padding: 24px; color: #1a1a1a; }
+          h1 { font-size: 20px; margin-bottom: 4px; }
+          .subtitle { color: #666; font-size: 13px; margin-bottom: 20px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin-bottom: 20px; }
+          .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+          .value { font-size: 14px; font-weight: 500; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f5f5f5; text-align: left; padding: 8px 10px; font-size: 12px; color: #555; border-bottom: 2px solid #ddd; }
+          td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+          .total-row td { font-weight: 600; border-top: 2px solid #ddd; background: #f9f9f9; }
+          .notes { background: #f9f9f9; border: 1px solid #eee; border-radius: 4px; padding: 10px 14px; font-size: 13px; margin-bottom: 12px; }
+          .notes .label { margin-bottom: 4px; }
+          .footer { margin-top: 24px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+          @media print { body { padding: 12px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Stock Transfer ${t.transfer_number}</h1>
+        <div class="subtitle">Status: ${(t.status || "pending").toUpperCase()}</div>
+
+        <div class="grid">
+          <div>
+            <div class="label">From</div>
+            <div class="value">${t.from_godown?.name || t.from_godown_id}</div>
+          </div>
+          <div>
+            <div class="label">To</div>
+            <div class="value">${t.to_godown?.name || t.to_godown_id}</div>
+          </div>
+          <div>
+            <div class="label">Transfer Date</div>
+            <div class="value">${formatDate(t.transfer_date)}</div>
+          </div>
+          <div>
+            <div class="label">Completed</div>
+            <div class="value">${t.completion_date ? formatDate(t.completion_date) : "—"}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item: any, i: number) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${item.products?.name || item.product_id}</td>
+                <td>${item.quantity}</td>
+                <td>${item.unit || "pcs"}</td>
+                <td>${item.remarks || "—"}</td>
+              </tr>
+            `).join("")}
+            <tr class="total-row">
+              <td colspan="2">Total</td>
+              <td>${totalQty}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${t.reason ? `<div class="notes"><div class="label">Reason</div><div>${t.reason}</div></div>` : ""}
+        ${t.notes ? `<div class="notes"><div class="label">Notes</div><div>${t.notes}</div></div>` : ""}
+
+        <div class="footer">
+          Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()} &nbsp;|&nbsp; Requested by: ${t.requested_by || "—"}
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   // Filter transfers
   const filteredTransfers = transfers.filter(transfer => {
     const matchesSearch =
@@ -1051,7 +1153,7 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
             <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>
               Close
             </Button>
-            <Button>
+            <Button onClick={handlePrintTransfer}>
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
