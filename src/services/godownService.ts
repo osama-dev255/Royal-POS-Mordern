@@ -67,6 +67,10 @@ export interface StockTransfer {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  // Joined properties from Supabase queries
+  from_godown?: { name: string };
+  to_godown?: { name: string };
+  stock_transfer_items?: StockTransferItem[];
 }
 
 export interface StockTransferItem {

@@ -77,6 +77,7 @@ interface SearchResultItem {
   unit?: string;
   godown_name: string;
   zone_name: string;
+  zone_id: string | null;
   available_stock: number;
 }
 
@@ -90,6 +91,7 @@ interface TransferItem {
   remarks?: string;
   godown_name?: string;
   zone_name?: string;
+  zone_id: string | null;
 }
 
 interface StockTransferPageProps {
@@ -219,6 +221,10 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
   // Search products - query godown_stock to show products with their godown/zone locations
   useEffect(() => {
     const searchProducts = async () => {
+      if (!fromGodownId) {
+        setSearchResults([]);
+        return;
+      }
       if (!productSearch || productSearch.length < 2) {
         setSearchResults([]);
         return;
@@ -229,7 +235,7 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
         // Step 1: Find matching products from the products table
         const { data: matchingProducts, error: productError } = await supabase
           .from("products")
-          .select("id, name, sku, barcode, unit")
+          .select("id, name, sku, barcode, unit:unit_of_measure")
           .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
           .limit(20);
 
@@ -242,64 +248,50 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
         const productIds = matchingProducts.map(p => p.id);
 
-        if (fromGodownId) {
-          // Step 2: Query godown_stock for these products in the selected godown
-          const { data: stockData, error: stockError } = await supabase
-            .from("godown_stock")
-            .select(`
-              product_id,
-              quantity,
-              zone_id,
-              godowns (name),
-              godown_zones (zone_name)
-            `)
-            .eq("godown_id", fromGodownId)
-            .in("product_id", productIds)
-            .gt("quantity", 0);
+        // Step 2: Query godown_stock for these products in the selected godown
+        let stockQuery = supabase
+          .from("godown_stock")
+          .select(`
+            product_id,
+            quantity,
+            zone_id,
+            godowns (name),
+            godown_zones (zone_name)
+          `)
+          .eq("godown_id", fromGodownId)
+          .in("product_id", productIds)
+          .gt("quantity", 0);
 
-          if (stockError) throw stockError;
-
-          // Build a product info lookup
-          const productMap = new Map(matchingProducts.map(p => [p.id, p]));
-
-          const results: SearchResultItem[] = (stockData || []).map((stock: any) => {
-            const product = productMap.get(stock.product_id);
-            return {
-              id: stock.product_id,
-              name: product?.name || "",
-              sku: product?.sku,
-              barcode: product?.barcode,
-              unit: product?.unit,
-              godown_name: stock.godowns?.name || "",
-              zone_name: stock.godown_zones?.zone_name || "Godown Level",
-              available_stock: stock.quantity,
-            };
-          });
-
-          setSearchResults(results);
-        } else {
-          // No source godown selected - search products table with general stock info
-          const { data, error } = await supabase
-            .from("products")
-            .select("id, name, sku, barcode, unit")
-            .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
-            .limit(10);
-
-          if (error) throw error;
-
-          const results: SearchResultItem[] = (data || []).map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            sku: p.sku,
-            barcode: p.barcode,
-            unit: p.unit,
-            godown_name: "",
-            zone_name: "",
-            available_stock: 0,
-          }));
-
-          setSearchResults(results);
+        // Filter by zone if a specific zone is selected
+        if (fromZoneId && fromZoneId !== "no-zone") {
+          stockQuery = stockQuery.eq("zone_id", fromZoneId);
+        } else if (fromZoneId === "no-zone") {
+          stockQuery = stockQuery.is("zone_id", null);
         }
+
+        const { data: stockData, error: stockError } = await stockQuery;
+
+        if (stockError) throw stockError;
+
+        // Build a product info lookup
+        const productMap = new Map(matchingProducts.map(p => [p.id, p]));
+
+        const results: SearchResultItem[] = (stockData || []).map((stock: any) => {
+          const product = productMap.get(stock.product_id);
+          return {
+            id: stock.product_id,
+            name: product?.name || "",
+            sku: product?.sku,
+            barcode: product?.barcode,
+            unit: product?.unit,
+            godown_name: stock.godowns?.name || "",
+            zone_name: stock.godown_zones?.zone_name || "Godown Level",
+            zone_id: stock.zone_id || null,
+            available_stock: stock.quantity,
+          };
+        });
+
+        setSearchResults(results);
       } catch (error) {
         console.error("Error searching products:", error);
         setSearchResults([]);
@@ -310,13 +302,13 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
     const debounceTimer = setTimeout(searchProducts, 300);
     return () => clearTimeout(debounceTimer);
-  }, [productSearch, fromGodownId]);
+  }, [productSearch, fromGodownId, fromZoneId]);
 
   // Add product to transfer
   const addProduct = (result: SearchResultItem) => {
-    // Check if already added
-    if (transferItems.find(item => item.product_id === result.id)) {
-      toast.error("Product already added");
+    // Check if already added (by product_id + zone_id composite key)
+    if (transferItems.find(item => item.product_id === result.id && item.zone_id === result.zone_id)) {
+      toast.error("Product from this zone already added");
       return;
     }
 
@@ -332,6 +324,7 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
         remarks: "",
         godown_name: result.godown_name,
         zone_name: result.zone_name,
+        zone_id: result.zone_id,
       },
     ]);
     
@@ -373,8 +366,17 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
     }
 
     if (fromGodownId === toGodownId) {
-      toast.error("Source and destination godowns must be different");
-      return;
+      // Same godown: require different zones
+      const resolvedFromZone = fromZoneId === "no-zone" ? null : fromZoneId;
+      const resolvedToZone = toZoneId === "no-zone" ? null : toZoneId;
+      if (!fromZoneId || !toZoneId) {
+        toast.error("Please select source and destination zones for within-godown transfer");
+        return;
+      }
+      if (resolvedFromZone === resolvedToZone) {
+        toast.error("Source and destination zones must be different");
+        return;
+      }
     }
 
     if (transferItems.length === 0) {
@@ -398,6 +400,13 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
     }
 
     try {
+      // Get the current user's UUID (requested_by / completed_by are UUID columns)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        toast.error("You must be logged in to create a transfer");
+        return;
+      }
+
       // Create transfer record
       const transferData = {
         transfer_number: transferNumber,
@@ -407,8 +416,8 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
         to_zone_id: toZoneId === "no-zone" ? null : toZoneId,
         transfer_date: transferDate,
         status: "completed" as const,
-        requested_by: username,
-        completed_by: username,
+        requested_by: authUser.id,
+        completed_by: authUser.id,
         reason: reason || undefined,
         notes: notes || undefined,
       };
@@ -429,12 +438,12 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
         return;
       }
 
-      // Update stock: Decrease from source
+      // Update stock: Decrease from source (use per-item zone_id)
       for (const item of transferItems) {
         await updateGodownStock(
           item.product_id,
           fromGodownId,
-          fromZoneId === "no-zone" ? null : fromZoneId,
+          item.zone_id,
           -item.quantity
         );
       }
@@ -468,8 +477,8 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
   const filteredTransfers = transfers.filter(transfer => {
     const matchesSearch =
       transfer.transfer_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (transfer.from_godown as any)?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (transfer.to_godown as any)?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      (transfer.from_godown)?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (transfer.to_godown)?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || transfer.status === statusFilter;
 
@@ -627,15 +636,15 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                   <TableRow key={transfer.id}>
                     <TableCell className="font-medium">{transfer.transfer_number}</TableCell>
                     <TableCell>
-                      {(transfer.from_godown as any)?.name || transfer.from_godown_id}
+                      {transfer.from_godown?.name || transfer.from_godown_id}
                     </TableCell>
                     <TableCell>
-                      {(transfer.to_godown as any)?.name || transfer.to_godown_id}
+                      {transfer.to_godown?.name || transfer.to_godown_id}
                     </TableCell>
                     <TableCell>{formatDate(transfer.transfer_date)}</TableCell>
-                    <TableCell>{(transfer.stock_transfer_items as any)?.length || 0}</TableCell>
+                    <TableCell>{transfer.stock_transfer_items?.length || 0}</TableCell>
                     <TableCell>
-                      {(transfer.stock_transfer_items as any)?.reduce(
+                      {transfer.stock_transfer_items?.reduce(
                         (sum: number, item: any) => sum + item.quantity,
                         0
                       ) || 0}
@@ -670,7 +679,7 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
           <DialogHeader>
             <DialogTitle>Create Stock Transfer</DialogTitle>
             <DialogDescription>
-              Transfer inventory from one godown to another
+              Transfer inventory between godowns or between zones within the same godown
             </DialogDescription>
           </DialogHeader>
 
@@ -796,9 +805,10 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                 <div className="relative mt-1">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by product name, SKU, or barcode..."
+                    placeholder={fromGodownId ? "Search by product name, SKU, or barcode..." : "Select a Source Godown first..."}
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
+                    disabled={!fromGodownId}
                     className="pl-10"
                   />
                 </div>
@@ -842,14 +852,14 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                     ))}
                   </div>
                 )}
+                {!fromGodownId && productSearch.length >= 2 && (
+                  <p className="text-sm text-amber-600 mt-2">
+                    Please select a Source Godown before searching for products.
+                  </p>
+                )}
                 {fromGodownId && searchResults.length === 0 && productSearch.length >= 2 && !searching && (
                   <p className="text-sm text-muted-foreground mt-2">
                     No products with stock found in the selected source godown.
-                  </p>
-                )}
-                {!fromGodownId && searchResults.length === 0 && productSearch.length >= 2 && !searching && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Select a Source Godown to see product availability.
                   </p>
                 )}
               </div>
@@ -957,13 +967,13 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                 <div>
                   <Label className="text-muted-foreground">From</Label>
                   <p className="mt-1 font-medium">
-                    {(selectedTransfer.from_godown as any)?.name || selectedTransfer.from_godown_id}
+                    {selectedTransfer.from_godown?.name || selectedTransfer.from_godown_id}
                   </p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">To</Label>
                   <p className="mt-1 font-medium">
-                    {(selectedTransfer.to_godown as any)?.name || selectedTransfer.to_godown_id}
+                    {selectedTransfer.to_godown?.name || selectedTransfer.to_godown_id}
                   </p>
                 </div>
               </div>
