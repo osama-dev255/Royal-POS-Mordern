@@ -5031,9 +5031,34 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     return { totalItems, totalQuantity, totalPackages };
   };
 
+  // Validate required delivery note fields
+  const validateDeliveryNoteRequiredFields = (): boolean => {
+    const missingFields: string[] = [];
+    
+    if (!deliveryNoteData.customerName || deliveryNoteData.customerName.trim() === '') {
+      missingFields.push('TO: (Customer Name)');
+    }
+    
+    if (!deliveryNoteData.preparedByName || deliveryNoteData.preparedByName.trim() === '') {
+      missingFields.push('Prepared By (Name)');
+    }
+    
+    if (missingFields.length > 0) {
+      alert(`Please fill in the following required fields:\n\n• ${missingFields.join('\n• ')}`);
+      return false;
+    }
+    
+    return true;
+  };
+
   // Save delivery note to localStorage
   // Function to save delivery note to the global saved deliveries system
   const handleSaveDeliveryNote = async () => {
+    // Validate required fields
+    if (!validateDeliveryNoteRequiredFields()) {
+      return;
+    }
+
     // Prevent double submission
     if (isSavingDeliveryNote) {
       console.warn('⚠️ Save already in progress...');
@@ -5282,186 +5307,21 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     if (note) {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
-        // Calculate totals for the viewed note
         const viewedData = note.data;
         const totalItems = viewedData.items.length;
         const totalQuantity = viewedData.items.reduce((sum, item) => sum + Number(item.quantity || item.delivered || 0), 0);
         const totalPackages = viewedData.items.reduce((count, item) => 
           item.unit && (item.quantity || item.delivered) ? count + 1 : count, 0
         );
-        
-        const printContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Delivery Note - ${note.name}</title>
-            <style>
-              body { 
-                font-family: Arial, sans-serif; 
-                margin: 20px;
-                font-size: 14px;
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 20px;
-              }
-              .header h1 {
-                font-size: 24px;
-                margin: 0;
-              }
-              .section {
-                margin-bottom: 20px;
-              }
-              .grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-              }
-              .grid-4 {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr 1fr;
-                gap: 10px;
-              }
-              .signatures {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                gap: 20px;
-                margin-top: 40px;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-              }
-              th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-              }
-              th {
-                background-color: #f2f2f2;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>DELIVERY NOTE</h1>
-            </div>
-            
-            <div class="grid">
-              <div>
-                <h3 class="font-bold text-lg">${viewedData.businessName}</h3>
-                <p>${viewedData.businessAddress}</p>
-                <p>Phone: ${viewedData.businessPhone}</p>
-                <p>Email: ${viewedData.businessEmail}</p>
-              </div>
-              
-              <div>
-                <h3 class="font-bold">TO:</h3>
-                <p>${viewedData.customerName}</p>
-                <p>${viewedData.customerAddress1}</p>
-                <p>${viewedData.customerAddress2}</p>
-                <p>Phone: ${viewedData.customerPhone}</p>
-                <p>Email: ${viewedData.customerEmail}</p>
-              </div>
-            </div>
-            
-            <div class="grid-4">
-              <div>
-                <p class="font-bold">Delivery Note #:</p>
-                <p>${viewedData.deliveryNoteNumber}</p>
-              </div>
-              <div>
-                <p class="font-bold">Date:</p>
-                <p>${viewedData.date}</p>
-              </div>
-              <div>
-                <p class="font-bold">Delivery Date:</p>
-                <p>${viewedData.deliveryDate || '_________'}</p>
-              </div>
-              <div>
-                <p class="font-bold">Vehicle #:</p>
-                <p>${viewedData.vehicle || '_________'}</p>
-              </div>
-              <div>
-                <p class="font-bold">Driver:</p>
-                <p>${viewedData.driver || '_________'}</p>
-              </div>
-            </div>
-            
-            <div class="section">
-              <h3 class="font-bold mb-2">ITEMS DELIVERED:</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item Description</th>
-                    <th>Godown</th>
-                    <th>Zone</th>
-                    <th>Quantity</th>
-                    <th>Unit</th>
-                    <th>Delivered</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${viewedData.items.map(item => `
-                    <tr>
-                      <td>${item.description}</td>
-                      <td>${item.godownName || '-'}</td>
-                      <td>${item.zoneName || '-'}</td>
-                      <td>${item.quantity}</td>
-                      <td>${item.unit}</td>
-                      <td>${item.delivered}</td>
-                      <td>${item.remarks}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-            
-            <div class="section">
-              <h3 class="font-bold mb-2">DELIVERY NOTES:</h3>
-              <p>${viewedData.deliveryNotes}</p>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <span class="font-bold">Total Items:</span> ${totalItems}
-              </div>
-              <div>
-                <span class="font-bold">Total Quantity:</span> ${totalQuantity} units
-              </div>
-              <div>
-                <span class="font-bold">Total Packages:</span> ${totalPackages}
-              </div>
-            </div>
-            
-            <div class="signatures">
-              <div>
-                <h4 class="font-bold mb-2">Prepared By</h4>
-                <p>Name: ${viewedData.preparedByName || '_________'}</p>
-                <p>Date: ${viewedData.preparedByDate || '_________'}</p>
-                <p class="mt-8">Signature: _________________</p>
-              </div>
-              
-              <div>
-                <h4 class="font-bold mb-2">Driver Signature</h4>
-                <p>Name: ${viewedData.driverName || '_________'}</p>
-                <p>Date: ${viewedData.driverDate || '_________'}</p>
-                <p class="mt-8">Signature: _________________</p>
-              </div>
-              
-              <div>
-                <h4 class="font-bold mb-2">Received By</h4>
-                <p>Name: ${viewedData.receivedByName || '_________'}</p>
-                <p>Date: ${viewedData.receivedByDate || '_________'}</p>
-                <p class="mt-8">Signature: _________________</p>
-                <p class="text-xs mt-2">(Signature Required)</p>
-              </div>
-            </div>
-          </body>
-          </html>
-        `;
-        
+        const subtotal = viewedData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const total = subtotal + Number(viewedData.tax || 0) - Number(viewedData.discount || 0);
+        const amountDue = total - Number(viewedData.amountPaid || 0) + Number(viewedData.creditBroughtForward || 0);
+        const printContent = buildDeliveryNotePrintHTML(
+          viewedData,
+          { totalItems, totalQuantity, totalPackages },
+          { subtotal, total, amountDue },
+          { autoPrint: true }
+        );
         printWindow.document.write(printContent);
         printWindow.document.close();
       }
@@ -5478,210 +5338,16 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
   // Print delivery note
   const handlePrintDeliveryNote = () => {
+    // Validate required fields
+    if (!validateDeliveryNoteRequiredFields()) {
+      return;
+    }
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       const totals = calculateTotals();
-      
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Delivery Note</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 20px;
-              font-size: 14px;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 20px;
-            }
-            .header h1 {
-              font-size: 24px;
-              margin: 0;
-            }
-            .section {
-              margin-bottom: 20px;
-            }
-            .grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 20px;
-            }
-            .grid-4 {
-              display: grid;
-              grid-template-columns: 1fr 1fr 1fr 1fr;
-              gap: 10px;
-            }
-            .signatures {
-              display: grid;
-              grid-template-columns: 1fr 1fr 1fr;
-              gap: 20px;
-              margin-top: 40px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 10px 0;
-            }
-            th, td {
-              border: 1px solid #000;
-              padding: 8px;
-              text-align: left;
-            }
-            th {
-              background-color: #f0f0f0;
-            }
-            .text-right {
-              text-align: right;
-            }
-            .font-bold {
-              font-weight: bold;
-            }
-            .mt-4 {
-              margin-top: 20px;
-            }
-            .mb-2 {
-              margin-bottom: 10px;
-            }
-            .signature-line {
-              margin-top: 40px;
-              padding-top: 5px;
-              border-top: 1px solid #000;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>DELIVERY NOTE</h1>
-          </div>
-          
-          <div class="grid">
-            <div>
-              <h2 class="font-bold">${deliveryNoteData.businessName}</h2>
-              <p>${deliveryNoteData.businessAddress}</p>
-              <p>Phone: ${deliveryNoteData.businessPhone}</p>
-              <p>Email: ${deliveryNoteData.businessEmail}</p>
-            </div>
-            
-            <div>
-              <h3 class="font-bold">TO:</h3>
-              <p>${deliveryNoteData.customerName}</p>
-              ${deliveryNoteData.customerAddress1 ? `<p>${deliveryNoteData.customerAddress1}</p>` : ''}
-              ${deliveryNoteData.customerDistrictWard ? `<p>${deliveryNoteData.customerDistrictWard}</p>` : ''}
-              ${deliveryNoteData.customerAddress2 ? `<p>${deliveryNoteData.customerAddress2}</p>` : ''}
-              ${deliveryNoteData.customerPhone ? `<p>Phone: ${deliveryNoteData.customerPhone}</p>` : ''}
-              ${deliveryNoteData.customerEmail ? `<p>Email: ${deliveryNoteData.customerEmail}</p>` : ''}
-              ${deliveryNoteData.customerTaxId ? `<p>TIN: ${deliveryNoteData.customerTaxId}</p>` : ''}
-            </div>
-          </div>
-          
-          <div class="grid-4">
-            <div>
-              <p class="font-bold">Delivery Note #:</p>
-              <p>${deliveryNoteData.deliveryNoteNumber}</p>
-            </div>
-            <div>
-              <p class="font-bold">Date:</p>
-              <p>${deliveryNoteData.date}</p>
-              <p class="text-sm" style="font-size: 12px; color: #666; margin-top: 4px;">Time: ${new Date().toLocaleTimeString()}</p>
-            </div>
-            <div>
-              <p class="font-bold">Delivery Date:</p>
-              <p>${deliveryNoteData.deliveryDate || '_________'}</p>
-            </div>
-            <div>
-              <p class="font-bold">Vehicle #:</p>
-              <p>${deliveryNoteData.vehicle || '_________'}</p>
-            </div>
-            <div>
-              <p class="font-bold">Driver:</p>
-              <p>${deliveryNoteData.driver || '_________'}</p>
-            </div>
-          </div>
-          
-          <div class="section">
-            <h3 class="font-bold mb-2">ITEMS DELIVERED:</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Item Description</th>
-                  <th>Godown</th>
-                  <th>Zone</th>
-                  <th>Quantity</th>
-                  <th>Unit</th>
-                  <th>Delivered</th>
-                  <th>Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${deliveryNoteData.items.map(item => `
-                  <tr>
-                    <td>${item.description}</td>
-                    <td>${item.godownName || '-'}</td>
-                    <td>${item.zoneName || '-'}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.unit}</td>
-                    <td>${item.delivered}</td>
-                    <td>${item.remarks}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-          
-          <div class="section">
-            <h3 class="font-bold mb-2">DELIVERY NOTES:</h3>
-            <p>${deliveryNoteData.deliveryNotes.replace(/\n/g, '<br>')}</p>
-          </div>
-          
-          <div class="grid-4">
-            <div>
-              <p class="font-bold">Total Items:</p>
-              <p>${totals.totalItems}</p>
-            </div>
-            <div>
-              <p class="font-bold">Total Quantity:</p>
-              <p>${totals.totalQuantity} units</p>
-            </div>
-            <div>
-              <p class="font-bold">Total Packages:</p>
-              <p>${totals.totalPackages}</p>
-            </div>
-          </div>
-          
-          <div class="signatures">
-            <div>
-              <h4 class="font-bold">Prepared By</h4>
-              <p>Name: ${deliveryNoteData.preparedByName || '_________________'}</p>
-              <p>Date: ${deliveryNoteData.preparedByDate || '_________'}</p>
-            </div>
-            
-            <div>
-              <h4 class="font-bold">Driver Signature</h4>
-              <p>Name: ${deliveryNoteData.driverName || '_________________'}</p>
-              <p>Date: ${deliveryNoteData.driverDate || '_________'}</p>
-            </div>
-            
-            <div>
-              <h4 class="font-bold">Received By</h4>
-              <p>Name: ${deliveryNoteData.receivedByName || '_________________'}</p>
-              <p>Date: ${deliveryNoteData.receivedByDate || '_________'}</p>
-              <p class="signature-line">(Signature Required)</p>
-            </div>
-          </div>
-          
-          <script>
-            window.onload = function() {
-              window.print();
-              window.close();
-            }
-          </script>
-        </body>
-        </html>
-      `;
-      
+      const noteTotals = calculateDeliveryNoteTotals();
+      const printContent = buildDeliveryNotePrintHTML(deliveryNoteData, totals, noteTotals, { autoPrint: true, autoClose: true });
       printWindow.document.write(printContent);
       printWindow.document.close();
     }
@@ -5689,203 +5355,14 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
   // Download delivery note as PDF
   const handleDownloadDeliveryNote = () => {
+    // Validate required fields
+    if (!validateDeliveryNoteRequiredFields()) {
+      return;
+    }
+
     const totals = calculateTotals();
-    
-    // Create HTML content for the PDF
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Delivery Note</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px;
-            font-size: 14px;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 20px;
-          }
-          .header h1 {
-            font-size: 24px;
-            margin: 0;
-          }
-          .section {
-            margin-bottom: 20px;
-          }
-          .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-          }
-          .grid-4 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 10px;
-          }
-          .signatures {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
-            margin-top: 40px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-          }
-          th, td {
-            border: 1px solid #000;
-            padding: 8px;
-            text-align: left;
-          }
-          th {
-            background-color: #f0f0f0;
-          }
-          .text-right {
-            text-align: right;
-          }
-          .font-bold {
-            font-weight: bold;
-          }
-          .mt-4 {
-            margin-top: 20px;
-          }
-          .mb-2 {
-            margin-bottom: 10px;
-          }
-          .signature-line {
-            margin-top: 40px;
-            padding-top: 5px;
-            border-top: 1px solid #000;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>DELIVERY NOTE</h1>
-        </div>
-        
-        <div class="grid">
-          <div>
-            <h2 class="font-bold">${deliveryNoteData.businessName}</h2>
-            <p>${deliveryNoteData.businessAddress}</p>
-            <p>Phone: ${deliveryNoteData.businessPhone}</p>
-            <p>Email: ${deliveryNoteData.businessEmail}</p>
-          </div>
-          
-          <div>
-            <h3 class="font-bold">TO:</h3>
-            <p>${deliveryNoteData.customerName}</p>
-            <p>${deliveryNoteData.customerAddress1}</p>
-            <p>${deliveryNoteData.customerAddress2}</p>
-            <p>Phone: ${deliveryNoteData.customerPhone}</p>
-            <p>Email: ${deliveryNoteData.customerEmail}</p>
-          </div>
-        </div>
-        
-        <div class="grid-4">
-          <div>
-            <p class="font-bold">Delivery Note #:</p>
-            <p>${deliveryNoteData.deliveryNoteNumber}</p>
-          </div>
-          <div>
-            <p class="font-bold">Date:</p>
-            <p>${deliveryNoteData.date}</p>
-            <p class="text-sm" style="font-size: 12px; color: #666; margin-top: 4px;">Time: ${new Date().toLocaleTimeString()}</p>
-          </div>
-          <div>
-            <p class="font-bold">Delivery Date:</p>
-            <p>${deliveryNoteData.deliveryDate || '_________'}</p>
-          </div>
-          <div>
-            <p class="font-bold">Vehicle #:</p>
-            <p>${deliveryNoteData.vehicle || '_________'}</p>
-          </div>
-          <div>
-            <p class="font-bold">Driver:</p>
-            <p>${deliveryNoteData.driver || '_________'}</p>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3 class="font-bold mb-2">ITEMS DELIVERED:</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Item Description</th>
-                <th>Godown</th>
-                <th>Zone</th>
-                <th>Quantity</th>
-                <th>Unit</th>
-                <th>Rate</th>
-                <th>Amount</th>
-                <th>Delivered</th>
-                <th>Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${deliveryNoteData.items.map(item => `
-                <tr>
-                  <td>${item.description}</td>
-                  <td>${item.godownName || '-'}</td>
-                  <td>${item.zoneName || '-'}</td>
-                  <td>${item.quantity}</td>
-                  <td>${item.unit}</td>
-                  <td>${item.rate}</td>
-                  <td>${item.amount}</td>
-                  <td>${item.delivered}</td>
-                  <td>${item.remarks}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="section">
-          <h3 class="font-bold mb-2">DELIVERY NOTES:</h3>
-          <p>${deliveryNoteData.deliveryNotes.replace(/\n/g, '<br>')}</p>
-        </div>
-        
-        <div class="grid-4">
-          <div>
-            <p class="font-bold">Total Items:</p>
-            <p>${totals.totalItems}</p>
-          </div>
-          <div>
-            <p class="font-bold">Total Quantity:</p>
-            <p>${totals.totalQuantity} units</p>
-          </div>
-          <div>
-            <p class="font-bold">Total Packages:</p>
-            <p>${totals.totalPackages}</p>
-          </div>
-        </div>
-        
-        <div class="signatures">
-          <div>
-            <h4 class="font-bold">Prepared By</h4>
-            <p>Name: ${deliveryNoteData.preparedByName || '_________________'}</p>
-            <p>Date: ${deliveryNoteData.preparedByDate || '_________'}</p>
-          </div>
-          
-          <div>
-            <h4 class="font-bold">Driver Signature</h4>
-            <p>Name: ${deliveryNoteData.driverName || '_________________'}</p>
-            <p>Date: ${deliveryNoteData.driverDate || '_________'}</p>
-          </div>
-          
-          <div>
-            <h4 class="font-bold">Received By</h4>
-            <p>Name: ${deliveryNoteData.receivedByName || '_________________'}</p>
-            <p>Date: ${deliveryNoteData.receivedByDate || '_________'}</p>
-            <p class="signature-line">(Signature Required)</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    const noteTotals = calculateDeliveryNoteTotals();
+    const htmlContent = buildDeliveryNotePrintHTML(deliveryNoteData, totals, noteTotals);
 
     // Create a Blob with the HTML content
     const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -6602,215 +6079,734 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     return cleanHTML;
   };
   
+  // Shared professional delivery note HTML builder
+  const buildDeliveryNotePrintHTML = (
+    data: typeof deliveryNoteData,
+    totals: { totalItems: number; totalQuantity: number; totalPackages: number },
+    noteTotals: { subtotal: number; total: number; amountDue: number },
+    options: { autoPrint?: boolean; autoClose?: boolean } = {}
+  ): string => {
+    const customerLines = [
+      data.customerAddress1,
+      data.customerDistrictWard,
+      data.customerAddress2
+    ].filter(line => line && !line.startsWith('Customer Address'));
+    const customerAddressHTML = customerLines.map(line => `<div style="margin: 2px 0;">${line}</div>`).join('');
+    const timeStr = new Date().toLocaleTimeString();
+    const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Delivery Note - ${data.deliveryNoteNumber}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media print {
+      @page { margin: 0.3in; size: A4; }
+      body { margin: 0; padding: 0; }
+      .no-break { page-break-inside: avoid; }
+      .page-break { page-break-after: always; }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 0;
+      font-size: 11px;
+      color: #1a1a1a;
+      line-height: 1.5;
+      background: #fff;
+    }
+    
+    /* === TOP ACCENT BAR === */
+    .accent-bar {
+      height: 4px;
+      background: linear-gradient(90deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+    }
+    
+    /* === HEADER === */
+    .dn-header {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: #fff;
+      padding: 12px 24px;
+      position: relative;
+    }
+    .dn-header::after {
+      content: '';
+      position: absolute;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 50px;
+      height: 50px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 50%;
+    }
+    .dn-header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .dn-company-info { flex: 1; }
+    .dn-company-name {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .dn-company-details {
+      font-size: 11px;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+    .dn-company-details div { margin: 1px 0; }
+    .dn-document-info { text-align: right; }
+    .dn-document-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .dn-document-number {
+      font-size: 13px;
+      font-weight: 600;
+      color: #60a5fa;
+      letter-spacing: 0.5px;
+    }
+    .dn-copy-indicator {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 8px;
+      background: rgba(96, 165, 250, 0.2);
+      border: 1px solid #60a5fa;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    
+    /* === META BAR === */
+    .meta-bar {
+      background: #f8fafc;
+      padding: 6px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .meta-bar-item {
+      display: flex;
+      align-items: center;
+    }
+    .meta-bar-text { display: flex; flex-direction: column; }
+    .meta-bar-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.3px;
+    }
+    .meta-bar-value {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    
+    /* === PARTY SECTION === */
+    .party-section {
+      padding: 12px 24px;
+      display: flex;
+      gap: 16px;
+    }
+    .party-box {
+      flex: 1;
+      background: #fff;
+      overflow: hidden;
+    }
+    .party-header {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .party-body { padding: 10px 12px; }
+    .party-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .party-detail {
+      font-size: 11px;
+      color: #475569;
+      margin: 2px 0;
+    }
+    
+    /* === INFO GRID === */
+    .info-grid-section {
+      padding: 0 24px 12px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .info-card {
+      background: #f8fafc;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .info-card-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.3px;
+      margin-bottom: 2px;
+    }
+    .info-card-value {
+      font-size: 13px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+    
+    /* === ITEMS TABLE === */
+    .items-section {
+      padding: 0 24px 12px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #1e293b;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #000;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title::before {
+      content: '';
+      width: 3px;
+      height: 14px;
+      background: #1e40af;
+      border-radius: 2px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .items-table thead th {
+      background: #fff;
+      color: #000;
+      padding: 8px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      text-align: left;
+      border: none;
+    }
+    .items-table thead th.r { text-align: right; }
+    .items-table thead th.c { text-align: center; }
+    .items-table tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    .items-table tbody tr:nth-child(even) { background: #f8fafc; }
+    .items-table tbody tr:hover { background: #f1f5f9; }
+    .items-table .r { text-align: right; }
+    .items-table .c { text-align: center; }
+    .items-table .item-num {
+      font-weight: 700;
+      color: #64748b;
+      font-size: 10px;
+    }
+    .items-table .item-desc {
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .items-table .item-amount {
+      font-weight: 700;
+      color: #1e40af;
+    }
+    .items-table .item-delivered {
+      font-weight: 700;
+      color: #16a34a;
+      font-size: 11px;
+    }
+    .items-table tfoot td {
+      padding: 8px 10px;
+      font-weight: 700;
+      border-top: 2px solid #000;
+      background: #f1f5f9;
+      font-size: 11px;
+    }
+    .items-table tfoot .total-label {
+      text-align: right;
+      color: #1e293b;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .items-table tfoot .total-value {
+      color: #1e40af;
+      font-size: 12px;
+    }
+    
+    /* === PAYMENT + NOTES === */
+    .bottom-section {
+      padding: 0 24px 12px;
+      display: flex;
+      gap: 16px;
+    }
+    .payment-box {
+      width: 400px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .payment-header {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .payment-body { padding: 2px 0; }
+    .payment-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .payment-row:last-child { border-bottom: none; }
+    .payment-label { color: #475569; font-size: 11px; }
+    .payment-value {
+      font-weight: 600;
+      color: #1e293b;
+      font-size: 11px;
+    }
+    .payment-row.total-row {
+      background: #f8fafc;
+      border-top: 2px solid #000;
+      margin-top: 2px;
+    }
+    .payment-row.total-row .payment-label,
+    .payment-row.total-row .payment-value {
+      font-size: 12px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+    .payment-row.due-row {
+      background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+      border-top: 2px solid #dc2626;
+    }
+    .payment-row.due-row .payment-label,
+    .payment-row.due-row .payment-value {
+      color: #dc2626;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .payment-row.discount-row .payment-value { color: #16a34a; }
+    .payment-row.paid-row .payment-value { color: #16a34a; }
+    
+    .notes-box {
+      flex: 1;
+      overflow: hidden;
+    }
+    .notes-header {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #92400e;
+      border-bottom: 1px solid #fde68a;
+    }
+    .notes-body {
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #475569;
+      min-height: 50px;
+      line-height: 1.4;
+    }
+    
+    /* === SIGNATURES === */
+    .sig-section {
+      padding: 0 24px 12px;
+    }
+    .sig-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .sig-box {
+      padding: 10px;
+      text-align: center;
+      background: #fff;
+    }
+    .sig-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #1e40af;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .sig-field { margin: 4px 0; }
+    .sig-label {
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 1px;
+    }
+    .sig-value {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+    .sig-line {
+      margin-top: 12px;
+      padding-top: 4px;
+      border-top: 2px dashed #94a3b8;
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .sig-box.received-box {
+      background: #fef2f2;
+    }
+    .sig-box.received-box .sig-title { color: #dc2626; }
+    .sig-box.received-box .sig-line {
+      color: #dc2626;
+      font-weight: 700;
+      border-color: #dc2626;
+    }
+    
+    /* === FOOTER === */
+    .dn-footer {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: #fff;
+      padding: 10px 24px;
+      margin-top: 12px;
+    }
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .footer-thankyou {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .footer-generated {
+      font-size: 9px;
+      opacity: 0.8;
+    }
+    .footer-bottom {
+      text-align: center;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      font-size: 8px;
+      opacity: 0.7;
+      letter-spacing: 0.3px;
+    }
+    
+    /* === WATERMARK === */
+    @media print {
+      .watermark {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        font-size: 80px;
+        font-weight: 900;
+        color: rgba(30, 64, 175, 0.05);
+        z-index: -1;
+        letter-spacing: 10px;
+        text-transform: uppercase;
+      }
+    }
+  </style>
+</head>
+<body>
+  ${options.autoPrint ? '<div class="watermark">ORIGINAL</div>' : ''}
+  
+  <!-- ACCENT BAR -->
+  <div class="accent-bar"></div>
+  
+  <!-- HEADER -->
+  <div class="dn-header">
+    <div class="dn-header-top">
+      <div class="dn-company-info">
+        <div class="dn-company-name">${data.businessName}</div>
+        <div class="dn-company-details">
+          <div>${data.businessAddress}</div>
+          <div>${data.businessPhone} ${data.businessEmail ? '| ' + data.businessEmail : ''}</div>
+        </div>
+      </div>
+      <div class="dn-document-info">
+        <div class="dn-document-title">DELIVERY NOTE</div>
+        <div class="dn-document-number">#${data.deliveryNoteNumber}</div>
+        <div class="dn-copy-indicator">Original Copy</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- META BAR -->
+  <div class="meta-bar">
+    <div class="meta-bar-item">
+      <div class="meta-bar-text">
+        <div class="meta-bar-label">Document Date</div>
+        <div class="meta-bar-value">${data.date}</div>
+      </div>
+    </div>
+    <div class="meta-bar-item">
+      <div class="meta-bar-text">
+        <div class="meta-bar-label">Delivery Date</div>
+        <div class="meta-bar-value">${data.deliveryDate || 'N/A'}</div>
+      </div>
+    </div>
+    <div class="meta-bar-item">
+      <div class="meta-bar-text">
+        <div class="meta-bar-label">Time</div>
+        <div class="meta-bar-value">${timeStr}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FROM / TO -->
+  <div class="party-section">
+    <div class="party-box">
+      <div class="party-header">From (Sender)</div>
+      <div class="party-body">
+        <div class="party-name">${data.businessName}</div>
+        <div class="party-detail">
+          <span>${data.businessAddress}</span>
+        </div>
+        <div class="party-detail">
+          <span>${data.businessPhone}</span>
+        </div>
+        ${data.businessEmail ? `<div class="party-detail">
+          <span>${data.businessEmail}</span>
+        </div>` : ''}
+      </div>
+    </div>
+    <div class="party-box">
+      <div class="party-header">Deliver To (Consignee)</div>
+      <div class="party-body">
+        <div class="party-name">${data.customerName}</div>
+        ${customerAddressHTML}
+        ${data.customerPhone ? `<div class="party-detail">
+          <span>${data.customerPhone}</span>
+        </div>` : ''}
+        ${data.customerEmail ? `<div class="party-detail">
+          <span>${data.customerEmail}</span>
+        </div>` : ''}
+        ${data.customerTaxId ? `<div class="party-detail">
+          <span>TIN: ${data.customerTaxId}</span>
+        </div>` : ''}
+      </div>
+    </div>
+  </div>
+
+  <!-- INFO GRID -->
+  <div class="info-grid-section">
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-card-label">Vehicle</div>
+        <div class="info-card-value">${data.vehicle || 'N/A'}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Driver</div>
+        <div class="info-card-value">${data.driver || 'N/A'}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Total Items</div>
+        <div class="info-card-value">${totals.totalItems}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Total Quantity</div>
+        <div class="info-card-value">${totals.totalQuantity}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ITEMS TABLE -->
+  <div class="items-section">
+    <div class="section-title">Items Delivered</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:40px;" class="c">#</th>
+          <th>Description</th>
+          <th>Godown</th>
+          <th>Zone</th>
+          <th class="r">Qty</th>
+          <th class="c">Unit</th>
+          <th class="r">Rate</th>
+          <th class="r">Amount</th>
+          <th class="r">Delivered</th>
+          <th>Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.items.map((item, index) => `
+          <tr>
+            <td class="c item-num">${String(index + 1).padStart(2, '0')}</td>
+            <td class="item-desc">${item.description}</td>
+            <td>${item.godownName || '-'}</td>
+            <td>${item.zoneName || '-'}</td>
+            <td class="r">${item.quantity}</td>
+            <td class="c">${item.unit || '-'}</td>
+            <td class="r">${formatCurrency(item.rate || 0)}</td>
+            <td class="r item-amount">${formatCurrency(item.amount || 0)}</td>
+            <td class="r item-delivered">${item.delivered || item.quantity || 0}</td>
+            <td style="color:#64748b; font-size:11px;">${item.remarks || '-'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" class="total-label">Totals:</td>
+          <td class="r total-value">${totals.totalQuantity}</td>
+          <td></td>
+          <td></td>
+          <td class="r total-value">${formatCurrency(noteTotals.total)}</td>
+          <td class="r" style="color:#16a34a; font-size:15px;">${data.items.reduce((s, i) => s + Number(i.delivered || i.quantity || 0), 0)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- PAYMENT + NOTES -->
+  <div class="bottom-section">
+    <div class="payment-box">
+      <div class="payment-header">Payment Summary</div>
+      <div class="payment-body">
+        <div class="payment-row">
+          <div class="payment-label">Subtotal</div>
+          <div class="payment-value">${formatCurrency(noteTotals.subtotal)}</div>
+        </div>
+        ${Number(data.tax || 0) !== 0 ? `<div class="payment-row">
+          <div class="payment-label">Tax</div>
+          <div class="payment-value">${formatCurrency(data.tax || 0)}</div>
+        </div>` : ''}
+        ${Number(data.discount || 0) !== 0 ? `<div class="payment-row discount-row">
+          <div class="payment-label">Discount</div>
+          <div class="payment-value">-${formatCurrency(data.discount || 0)}</div>
+        </div>` : ''}
+        <div class="payment-row total-row">
+          <div class="payment-label">Total</div>
+          <div class="payment-value">${formatCurrency(noteTotals.total)}</div>
+        </div>
+        <div class="payment-row paid-row">
+          <div class="payment-label">Amount Paid</div>
+          <div class="payment-value">${formatCurrency(data.amountPaid || 0)}</div>
+        </div>
+        ${Number(data.creditBroughtForward || 0) !== 0 ? `<div class="payment-row">
+          <div class="payment-label">Credit Brought Forward</div>
+          <div class="payment-value" style="color:#ea580c;">${formatCurrency(data.creditBroughtForward)}</div>
+        </div>` : ''}
+        <div class="payment-row due-row">
+          <div class="payment-label">Amount Due</div>
+          <div class="payment-value">${formatCurrency(noteTotals.amountDue)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-box">
+      <div class="notes-header">Delivery Notes / Instructions</div>
+      <div class="notes-body">${data.deliveryNotes ? data.deliveryNotes.replace(/\n/g, '<br>') : '<span style="color:#94a3b8;">No additional notes.</span>'}</div>
+    </div>
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="sig-section no-break">
+    <div class="section-title">Authorization & Signatures</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-title">Prepared By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.preparedByName || '—'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.preparedByDate || '—'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Driver</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.driverName || data.driver || '—'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.driverDate || '—'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+      <div class="sig-box received-box">
+        <div class="sig-title">Received By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.receivedByName || '—'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.receivedByDate || '—'}</div>
+        </div>
+        <div class="sig-line">⚠ Signature Required</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="dn-footer">
+    <div class="footer-content">
+      <div class="footer-thankyou">Thank you for your business!</div>
+      <div class="footer-generated">Generated: ${currentDate} at ${timeStr}</div>
+    </div>
+    <div class="footer-bottom">
+      ${data.businessName} &bull; ${data.businessPhone} ${data.businessEmail ? '&bull; ' + data.businessEmail : ''}
+    </div>
+  </div>
+
+  ${options.autoPrint ? `<script>window.onload = function() { window.print(); ${options.autoClose ? 'window.close();' : ''} };</script>` : ''}
+</body>
+</html>`;
+  };
+
   // Function to generate clean delivery note HTML for printing
   const generateDeliveryNoteHTML = (): string => {
-    // Create a clean version of the delivery note without input fields
-    const cleanHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Delivery Note ${deliveryNoteData.deliveryNoteNumber}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          @media print {
-            @page {
-              margin: 0.5in;
-              size: auto;
-            }
-            body {
-              margin: 0.5in;
-              padding: 0;
-            }
-          }
-          body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            font-size: 14px;
-          }
-          .delivery-note-container {
-            border: 1px solid #ccc;
-            padding: 20px;
-            border-radius: 5px;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 20px;
-          }
-          .header h2 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .header .number {
-            font-size: 18px;
-            font-weight: bold;
-            margin: 10px 0;
-          }
-          .info-section {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-          }
-          .business-info, .customer-info {
-            flex: 1;
-            padding: 0 10px;
-          }
-          .info-section h3 {
-            margin-top: 0;
-            font-size: 16px;
-          }
-          .delivery-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-          }
-          .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-          }
-          .items-table th,
-          .items-table td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            text-align: left;
-          }
-          .items-table th {
-            background-color: #f5f5f5;
-          }
-          .signature-section {
-            margin-top: 30px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-          }
-          .signature-box {
-            text-align: center;
-            padding-top: 40px;
-            border-top: 1px solid #000;
-          }
-          .notes-section {
-            margin-top: 20px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="delivery-note-container">
-          <div class="header">
-            <h2>DELIVERY NOTE</h2>
-            <div class="number">${deliveryNoteData.deliveryNoteNumber}</div>
-            <div>Date: ${deliveryNoteData.date}</div>
-            <div>Time: ${new Date().toLocaleTimeString()}</div>
-          </div>
-          
-          <div class="info-section">
-            <div class="business-info">
-              <h3>FROM:</h3>
-              <div>${deliveryNoteData.businessName}</div>
-              <div>${deliveryNoteData.businessAddress}</div>
-              <div>Phone: ${deliveryNoteData.businessPhone}</div>
-              <div>Email: ${deliveryNoteData.businessEmail}</div>
-            </div>
-            
-            <div class="customer-info">
-              <h3>TO:</h3>
-              <div>${deliveryNoteData.customerName}</div>
-              <div>${deliveryNoteData.customerAddress1}</div>
-              <div>${deliveryNoteData.customerAddress2}</div>
-              <div>Phone: ${deliveryNoteData.customerPhone}</div>
-              <div>Email: ${deliveryNoteData.customerEmail}</div>
-            </div>
-          </div>
-          
-          <div class="delivery-details">
-            <div><strong>Delivery Date:</strong> ${deliveryNoteData.deliveryDate || 'N/A'}</div>
-            <div><strong>Vehicle:</strong> ${deliveryNoteData.vehicle || 'N/A'}</div>
-            <div><strong>Driver:</strong> ${deliveryNoteData.driver || 'N/A'}</div>
-            <div><strong>Total Items:</strong> ${deliveryNoteData.totalItems}</div>
-            <div><strong>Total Quantity:</strong> ${deliveryNoteData.totalQuantity}</div>
-            <div><strong>Total Packages:</strong> ${deliveryNoteData.totalPackages}</div>
-          </div>
-          
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-          <table style="width: 300px; font-size: 14px;">
-            <tr>
-              <td style="padding: 5px;"><strong>Total:</strong></td>
-              <td style="padding: 5px; text-align: right;">${formatCurrency(calculateDeliveryNoteTotals().total)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 5px;"><strong>Amount Paid:</strong></td>
-              <td style="padding: 5px; text-align: right;">${formatCurrency(deliveryNoteData.amountPaid)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 5px;"><strong>Credit Brought Forward from previous:</strong></td>
-              <td style="padding: 5px; text-align: right;">${formatCurrency(deliveryNoteData.creditBroughtForward)}</td>
-            </tr>
-            <tr style="border-top: 2px solid #000; padding-top: 5px;">
-              <td style="padding: 5px;"><strong>AMOUNT DUE:</strong></td>
-              <td style="padding: 5px; text-align: right; color: #dc2626;"><strong>${formatCurrency(calculateDeliveryNoteTotals().amountDue)}</strong></td>
-            </tr>
-          </table>
-        </div>
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Item</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Description</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Quantity</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Unit</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Rate</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Amount</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Delivered</th>
-                  <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${deliveryNoteData.items.map((item, index) => `
-                  <tr>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${index + 1}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.description}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.quantity}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.unit}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.rate}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.amount}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.delivered}</td>
-                    <td style="border: 1px solid #ccc; padding: 8px;">${item.remarks}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-          
-          <div class="notes-section">
-            <h3>Delivery Notes:</h3>
-            <div>${deliveryNoteData.deliveryNotes}</div>
-          </div>
-          
-          <div class="signature-section">
-            <div class="signature-box">
-              Prepared By: ${deliveryNoteData.preparedByName || '________________'}
-              <br>
-              Date: ${deliveryNoteData.preparedByDate || '________________'}
-            </div>
-            <div class="signature-box">
-              Driver: ${deliveryNoteData.driverName || '________________'}
-              <br>
-              Date: ${deliveryNoteData.driverDate || '________________'}
-            </div>
-            <div class="signature-box">
-              Received By: ${deliveryNoteData.receivedByName || '________________'}
-              <br>
-              Date: ${deliveryNoteData.receivedByDate || '________________'}
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    return cleanHTML;
+    const totals = calculateTotals();
+    const noteTotals = calculateDeliveryNoteTotals();
+    return buildDeliveryNotePrintHTML(deliveryNoteData, totals, noteTotals);
   };
   
   // Handle print invoice - generate PDF and trigger print dialog
@@ -12050,7 +12046,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                           </div>
                           
                           <div>
-                            <h4 className="font-bold mb-2">TO:</h4>
+                            <h4 className="font-bold mb-2">TO: <span className="text-red-500">*</span></h4>
                             <div className="relative command-autocomplete">
                               <Command className="rounded-lg border shadow-sm">
                                 <div className="flex items-center border-b px-3">
@@ -12575,7 +12571,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                         {/* Signatures */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                           <div>
-                            <h4 className="font-bold mb-2">Prepared By</h4>
+                            <h4 className="font-bold mb-2">Prepared By <span className="text-red-500">*</span></h4>
                             <div className="text-sm space-y-2">
                               <div>
                                 <span>Name:</span>
