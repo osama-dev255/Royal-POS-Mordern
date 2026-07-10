@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Building2, Search, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, Search, Filter, Package, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getGodowns, 
@@ -50,6 +50,7 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
   const [selectedGodownForProducts, setSelectedGodownForProducts] = useState<Godown | null>(null);
   const [godownProducts, setGodownProducts] = useState<GodownStock[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState("");
   const { toast } = useToast();
 
   const [newGodown, setNewGodown] = useState<Omit<Godown, "id" | "created_at" | "updated_at">>({
@@ -225,6 +226,7 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
   const closeProductView = () => {
     setShowProducts(false);
     setSelectedGodownForProducts(null);
+    setProductSearchTerm("");
   };
 
   const filteredGodowns = godowns.filter(godown => {
@@ -279,6 +281,17 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
 
   // Show Products if viewing products for a godown
   if (showProducts && selectedGodownForProducts) {
+    const filteredGodownProducts = godownProducts.filter(stock => {
+      const name = (stock.products?.name || "").toLowerCase();
+      const sku = (stock.products?.sku || "").toLowerCase();
+      const barcode = (stock.products?.barcode || "").toLowerCase();
+      const zoneName = (stock.godown_zones?.zone_name || "").toLowerCase();
+      const term = productSearchTerm.toLowerCase();
+      return name.includes(term) || sku.includes(term) || barcode.includes(term) || zoneName.includes(term);
+    });
+    const totalQty = filteredGodownProducts.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    const totalAvailable = filteredGodownProducts.reduce((sum, s) => sum + (s.quantity - (s.reserved_quantity || 0)), 0);
+
     return (
       <div className="min-h-screen bg-background">
         <Navigation 
@@ -293,6 +306,66 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
             <p className="text-muted-foreground">Code: {selectedGodownForProducts.code}</p>
           </div>
 
+          {/* Stats row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Package className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Products</p>
+                    <p className="text-2xl font-bold">{filteredGodownProducts.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Layers className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Qty</p>
+                    <p className="text-2xl font-bold">{totalQty}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Package className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Available</p>
+                    <p className="text-2xl font-bold text-green-600">{totalAvailable}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Product Search */}
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search by product name, SKU, barcode, or zone..."
+                  className="pl-10"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="p-6">
               {loadingProducts ? (
@@ -302,6 +375,19 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
               ) : godownProducts.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No products found in this godown</p>
+                </div>
+              ) : filteredGodownProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No products matching "{productSearchTerm}"</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setProductSearchTerm("")}
+                  >
+                    Clear Search
+                  </Button>
                 </div>
               ) : (
                 <Table>
@@ -316,18 +402,18 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {godownProducts.map((stock) => (
+                    {filteredGodownProducts.map((stock) => (
                       <TableRow key={stock.id}>
                         <TableCell className="font-semibold">
-                          {(stock.products as any)?.name || 'Unknown Product'}
+                          {stock.products?.name || 'Unknown Product'}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
-                          {(stock.products as any)?.sku || '-'}
+                          {stock.products?.sku || '-'}
                         </TableCell>
                         <TableCell>
                           {stock.zone_id ? (
                             <Badge variant="outline">
-                              {(stock.godown_zones as any)?.zone_name || 'Zone'}
+                              {stock.godown_zones?.zone_name || 'Zone'}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">No Zone</span>

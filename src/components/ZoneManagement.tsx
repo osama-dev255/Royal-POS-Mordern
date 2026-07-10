@@ -50,6 +50,7 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
   const [selectedZoneForProducts, setSelectedZoneForProducts] = useState<GodownZone | null>(null);
   const [zoneProducts, setZoneProducts] = useState<GodownStock[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState("");
   const { toast } = useToast();
 
   const [newZone, setNewZone] = useState<Omit<GodownZone, "id" | "created_at" | "updated_at">>({
@@ -247,6 +248,7 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
     setShowProducts(false);
     setSelectedZoneForProducts(null);
     setZoneProducts([]);
+    setProductSearchTerm("");
   };
 
   const filteredZones = zones.filter(zone => 
@@ -266,6 +268,15 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
   // Show products view if viewing zone products
   if (showProducts && selectedZoneForProducts) {
     const selectedGodown = godowns.find(g => g.id === selectedZoneForProducts.godown_id);
+    const filteredZoneProducts = zoneProducts.filter(stock => {
+      const name = (stock.products?.name || "").toLowerCase();
+      const sku = (stock.products?.sku || "").toLowerCase();
+      const barcode = (stock.products?.barcode || "").toLowerCase();
+      const term = productSearchTerm.toLowerCase();
+      return name.includes(term) || sku.includes(term) || barcode.includes(term);
+    });
+    const totalQty = filteredZoneProducts.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    const totalAvailable = filteredZoneProducts.reduce((sum, s) => sum + (s.quantity - (s.reserved_quantity || 0)), 0);
     
     return (
       <div className="space-y-6">
@@ -284,6 +295,66 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
           </Button>
         </div>
 
+        {/* Stats row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Products</p>
+                  <p className="text-2xl font-bold">{filteredZoneProducts.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Layers className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Qty</p>
+                  <p className="text-2xl font-bold">{totalQty}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <Package className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Available</p>
+                  <p className="text-2xl font-bold text-green-600">{totalAvailable}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Product Search */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by product name, SKU, or barcode..."
+                className="pl-10"
+                value={productSearchTerm}
+                onChange={(e) => setProductSearchTerm(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="p-6">
             {loadingProducts ? (
@@ -294,6 +365,19 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">No products found in this zone</p>
+              </div>
+            ) : filteredZoneProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No products matching "{productSearchTerm}"</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setProductSearchTerm("")}
+                >
+                  Clear Search
+                </Button>
               </div>
             ) : (
               <Table>
@@ -307,13 +391,13 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {zoneProducts.map((stock) => (
+                  {filteredZoneProducts.map((stock) => (
                     <TableRow key={stock.id}>
                       <TableCell className="font-semibold">
-                        {(stock.products as any)?.name || 'Unknown Product'}
+                        {stock.products?.name || 'Unknown Product'}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {(stock.products as any)?.sku || '-'}
+                        {stock.products?.sku || '-'}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
                         {stock.quantity}

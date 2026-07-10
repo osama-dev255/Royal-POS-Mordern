@@ -47,6 +47,9 @@ export interface GodownStock {
   min_stock_level?: number;
   max_stock_level?: number;
   last_updated?: string;
+  // Joined property from Supabase queries
+  products?: { name: string; sku?: string; barcode?: string };
+  godown_zones?: { zone_name: string };
 }
 
 export interface StockTransfer {
