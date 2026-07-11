@@ -6114,7 +6114,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       margin: 0 auto;
       padding: 0;
       font-size: 11px;
-      color: #1a1a1a;
+      color: #000;
       line-height: 1.5;
       background: #fff;
     }
@@ -6174,7 +6174,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .dn-document-number {
       font-size: 13px;
       font-weight: 600;
-      color: #60a5fa;
+      color: #000;
       letter-spacing: 0.5px;
     }
     .dn-copy-indicator {
@@ -6208,13 +6208,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      color: #64748b;
+      color: #000;
       letter-spacing: 0.3px;
     }
     .meta-bar-value {
       font-size: 12px;
       font-weight: 700;
-      color: #1e293b;
+      color: #000;
     }
     
     /* === PARTY SECTION === */
@@ -6241,14 +6241,14 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .party-name {
       font-size: 13px;
       font-weight: 700;
-      color: #0f172a;
+      color: #000;
       margin-bottom: 4px;
       padding-bottom: 4px;
       border-bottom: 2px solid #e2e8f0;
     }
     .party-detail {
       font-size: 11px;
-      color: #475569;
+      color: #000;
       margin: 2px 0;
     }
     
@@ -6270,14 +6270,14 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      color: #64748b;
+      color: #000;
       letter-spacing: 0.3px;
       margin-bottom: 2px;
     }
     .info-card-value {
       font-size: 13px;
       font-weight: 800;
-      color: #1e293b;
+      color: #000;
     }
     
     /* === ITEMS TABLE === */
@@ -6289,7 +6289,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: #1e293b;
+      color: #000;
       margin-bottom: 6px;
       padding-bottom: 4px;
       display: flex;
@@ -6337,20 +6337,20 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .items-table .c { text-align: center; }
     .items-table .item-num {
       font-weight: 700;
-      color: #6b7280;
+      color: #000;
       font-size: 10px;
     }
     .items-table .item-desc {
       font-weight: 600;
-      color: #0f172a;
+      color: #000;
     }
     .items-table .item-amount {
       font-weight: 700;
-      color: #1e40af;
+      color: #000;
     }
     .items-table .item-delivered {
       font-weight: 700;
-      color: #16a34a;
+      color: #000;
       font-size: 11px;
     }
     .items-table tfoot td {
@@ -6364,12 +6364,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .items-table tfoot td:last-child { border-right: none; }
     .items-table tfoot .total-label {
       text-align: right;
-      color: #1e293b;
+      color: #000;
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
     .items-table tfoot .total-value {
-      color: #1e40af;
+      color: #000;
       font-size: 12px;
     }
     
@@ -6401,10 +6401,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       border-bottom: 1px solid #f1f5f9;
     }
     .payment-row:last-child { border-bottom: none; }
-    .payment-label { color: #475569; font-size: 11px; }
+    .payment-label { color: #000; font-size: 11px; }
     .payment-value {
       font-weight: 600;
-      color: #1e293b;
+      color: #000;
       font-size: 11px;
     }
     .payment-row.total-row {
@@ -6416,7 +6416,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .payment-row.total-row .payment-value {
       font-size: 12px;
       font-weight: 800;
-      color: #1e293b;
+      color: #000;
     }
     .payment-row.due-row {
       background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
@@ -6428,8 +6428,8 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       font-weight: 800;
       font-size: 12px;
     }
-    .payment-row.discount-row .payment-value { color: #16a34a; }
-    .payment-row.paid-row .payment-value { color: #16a34a; }
+    .payment-row.discount-row .payment-value { color: #000; }
+    .payment-row.paid-row .payment-value { color: #000; }
     
     .notes-box {
       flex: 1;
@@ -6442,13 +6442,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: #92400e;
+      color: #000;
       border-bottom: 1px solid #fde68a;
     }
     .notes-body {
       padding: 10px 12px;
       font-size: 11px;
-      color: #475569;
+      color: #000;
       min-height: 50px;
       line-height: 1.4;
     }
@@ -6472,7 +6472,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: #1e40af;
+      color: #000;
       margin-bottom: 6px;
       padding-bottom: 4px;
       border-bottom: 2px solid #e2e8f0;
@@ -6480,7 +6480,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .sig-field { margin: 4px 0; }
     .sig-label {
       font-size: 10px;
-      color: #94a3b8;
+      color: #000;
       text-transform: uppercase;
       letter-spacing: 0.3px;
       margin-bottom: 1px;
@@ -6488,25 +6488,25 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .sig-value {
       font-size: 11px;
       font-weight: 600;
-      color: #1e293b;
+      color: #000;
     }
     .sig-line {
       margin-top: 12px;
       padding-top: 4px;
       border-top: 2px dashed #94a3b8;
       font-size: 10px;
-      color: #94a3b8;
+      color: #000;
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
     .sig-box.received-box {
-      background: #fef2f2;
+      background: #fff;
     }
-    .sig-box.received-box .sig-title { color: #dc2626; }
+    .sig-box.received-box .sig-title { color: #000; }
     .sig-box.received-box .sig-line {
-      color: #dc2626;
+      color: #000;
       font-weight: 700;
-      border-color: #dc2626;
+      border-color: #000;
     }
     
     /* === FOOTER === */
@@ -6690,7 +6690,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
             <td class="r">${formatCurrency(item.rate || 0)}</td>
             <td class="r item-amount">${formatCurrency(item.amount || 0)}</td>
             <td class="r item-delivered">${item.delivered || item.quantity || 0}</td>
-            <td style="color:#64748b; font-size:11px;">${item.remarks || '-'}</td>
+            <td style="color:#000; font-size:11px;">${item.remarks || '-'}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -6701,7 +6701,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           <td></td>
           <td></td>
           <td class="r total-value">${formatCurrency(noteTotals.total)}</td>
-          <td class="r" style="color:#16a34a; font-size:15px;">${data.items.reduce((s, i) => s + Number(i.delivered || i.quantity || 0), 0)}</td>
+          <td class="r" style="color:#000; font-size:15px;">${data.items.reduce((s, i) => s + Number(i.delivered || i.quantity || 0), 0)}</td>
           <td></td>
         </tr>
       </tfoot>
@@ -6710,6 +6710,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
   <!-- PAYMENT + NOTES -->
   <div class="bottom-section">
+    <div class="notes-box">
+      <div class="notes-header">Delivery Notes / Instructions</div>
+      <div class="notes-body">${data.deliveryNotes ? data.deliveryNotes.replace(/\n/g, '<br>') : '<span style="color:#000;">No additional notes.</span>'}</div>
+    </div>
     <div class="payment-box">
       <div class="payment-header">Payment Summary</div>
       <div class="payment-body">
@@ -6735,17 +6739,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         </div>
         ${Number(data.creditBroughtForward || 0) !== 0 ? `<div class="payment-row">
           <div class="payment-label">Credit Brought Forward</div>
-          <div class="payment-value" style="color:#ea580c;">${formatCurrency(data.creditBroughtForward)}</div>
+          <div class="payment-value" style="color:#000;">${formatCurrency(data.creditBroughtForward)}</div>
         </div>` : ''}
         <div class="payment-row due-row">
           <div class="payment-label">Amount Due</div>
           <div class="payment-value">${formatCurrency(noteTotals.amountDue)}</div>
         </div>
       </div>
-    </div>
-    <div class="notes-box">
-      <div class="notes-header">Delivery Notes / Instructions</div>
-      <div class="notes-body">${data.deliveryNotes ? data.deliveryNotes.replace(/\n/g, '<br>') : '<span style="color:#94a3b8;">No additional notes.</span>'}</div>
     </div>
   </div>
 
