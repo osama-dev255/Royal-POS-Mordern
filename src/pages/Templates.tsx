@@ -6292,7 +6292,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       color: #1e293b;
       margin-bottom: 6px;
       padding-bottom: 4px;
-      border-bottom: 2px solid #000;
       display: flex;
       align-items: center;
       gap: 6px;
