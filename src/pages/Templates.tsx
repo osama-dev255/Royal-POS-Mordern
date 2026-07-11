@@ -6091,7 +6091,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       data.customerDistrictWard,
       data.customerAddress2
     ].filter(line => line && !line.startsWith('Customer Address'));
-    const customerAddressHTML = customerLines.map(line => `<div style="margin: 2px 0;">${line}</div>`).join('');
+    const customerAddressHTML = customerLines.map(line => `<div style="margin: 2px 0; text-align: right;">${line}</div>`).join('');
     const timeStr = new Date().toLocaleTimeString();
     const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -6227,6 +6227,18 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       flex: 1;
       background: #fff;
       overflow: hidden;
+    }
+    .party-box.from-box {
+      flex: 0 0 45%;
+    }
+    .party-box.to-box {
+      margin-left: auto;
+    }
+    .party-box.to-box .party-body {
+      text-align: right;
+    }
+    .party-box.to-box .party-header {
+      text-align: right;
     }
     .party-header {
       background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
@@ -6564,21 +6576,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   <div class="accent-bar"></div>
   
   <!-- HEADER -->
-  <div class="dn-header">
-    <div class="dn-header-top">
-      <div class="dn-company-info">
-        <div class="dn-company-name">${data.businessName}</div>
-        <div class="dn-company-details">
-          <div>${data.businessAddress}</div>
-          <div>${data.businessPhone} ${data.businessEmail ? '| ' + data.businessEmail : ''}</div>
-        </div>
-      </div>
-      <div class="dn-document-info">
-        <div class="dn-document-title">DELIVERY NOTE</div>
-        <div class="dn-document-number">#${data.deliveryNoteNumber}</div>
-        <div class="dn-copy-indicator">Original Copy</div>
-      </div>
-    </div>
+  <div class="dn-header" style="text-align: center;">
+    <div class="dn-document-title">DELIVERY NOTE</div>
+    <div class="dn-document-number">#${data.deliveryNoteNumber}</div>
+    <div class="dn-copy-indicator">Original Copy</div>
   </div>
   
   <!-- META BAR -->
@@ -6605,7 +6606,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
 
   <!-- FROM / TO -->
   <div class="party-section">
-    <div class="party-box">
+    <div class="party-box from-box">
       <div class="party-header">From (Sender)</div>
       <div class="party-body">
         <div class="party-name">${data.businessName}</div>
@@ -6620,7 +6621,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         </div>` : ''}
       </div>
     </div>
-    <div class="party-box">
+    <div class="party-box to-box">
       <div class="party-header">Deliver To (Consignee)</div>
       <div class="party-body">
         <div class="party-name">${data.customerName}</div>
