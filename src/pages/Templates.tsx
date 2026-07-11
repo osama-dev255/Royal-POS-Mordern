@@ -6258,7 +6258,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     }
     .info-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 10px;
     }
     .info-card {
@@ -6653,10 +6653,6 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         <div class="info-card-label">Total Items</div>
         <div class="info-card-value">${totals.totalItems}</div>
       </div>
-      <div class="info-card">
-        <div class="info-card-label">Total Quantity</div>
-        <div class="info-card-value">${totals.totalQuantity}</div>
-      </div>
     </div>
   </div>
 
@@ -6689,7 +6685,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
             <td class="c">${item.unit || '-'}</td>
             <td class="r">${formatCurrency(item.rate || 0)}</td>
             <td class="r item-amount">${formatCurrency(item.amount || 0)}</td>
-            <td class="r item-delivered">${item.delivered || item.quantity || 0}</td>
+            <td class="r item-delivered"></td>
             <td style="color:#000; font-size:11px;">${item.remarks || '-'}</td>
           </tr>
         `).join('')}
@@ -6701,7 +6697,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           <td></td>
           <td></td>
           <td class="r total-value">${formatCurrency(noteTotals.total)}</td>
-          <td class="r" style="color:#000; font-size:15px;">${data.items.reduce((s, i) => s + Number(i.delivered || i.quantity || 0), 0)}</td>
+          <td class="r"></td>
           <td></td>
         </tr>
       </tfoot>
