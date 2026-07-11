@@ -5043,6 +5043,16 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       missingFields.push('Prepared By (Name)');
     }
     
+    // Check each item for godown and zone
+    deliveryNoteData.items.forEach((item, index) => {
+      if (!item.godownName || item.godownName.trim() === '') {
+        missingFields.push(`Item #${index + 1} (${item.description || 'No description'}): Godown`);
+      }
+      if (!item.zoneName || item.zoneName.trim() === '') {
+        missingFields.push(`Item #${index + 1} (${item.description || 'No description'}): Zone`);
+      }
+    });
+    
     if (missingFields.length > 0) {
       alert(`Please fill in the following required fields:\n\n• ${missingFields.join('\n• ')}`);
       return false;
