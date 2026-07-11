@@ -6308,9 +6308,10 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       width: 100%;
       border-collapse: collapse;
       font-size: 11px;
+      border: 1px solid #d1d5db;
     }
     .items-table thead th {
-      background: #fff;
+      background: #f9fafb;
       color: #000;
       padding: 8px 10px;
       font-size: 10px;
@@ -6318,22 +6319,26 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       text-transform: uppercase;
       letter-spacing: 0.3px;
       text-align: left;
-      border: none;
+      border-bottom: 2px solid #d1d5db;
+      border-right: 1px solid #e5e7eb;
     }
+    .items-table thead th:last-child { border-right: none; }
     .items-table thead th.r { text-align: right; }
     .items-table thead th.c { text-align: center; }
     .items-table tbody td {
       padding: 7px 10px;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e5e7eb;
+      border-right: 1px solid #e5e7eb;
       vertical-align: middle;
     }
-    .items-table tbody tr:nth-child(even) { background: #f8fafc; }
-    .items-table tbody tr:hover { background: #f1f5f9; }
+    .items-table tbody td:last-child { border-right: none; }
+    .items-table tbody tr:nth-child(even) { background: #f9fafb; }
+    .items-table tbody tr:hover { background: #f3f4f6; }
     .items-table .r { text-align: right; }
     .items-table .c { text-align: center; }
     .items-table .item-num {
       font-weight: 700;
-      color: #64748b;
+      color: #6b7280;
       font-size: 10px;
     }
     .items-table .item-desc {
@@ -6352,10 +6357,12 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     .items-table tfoot td {
       padding: 8px 10px;
       font-weight: 700;
-      border-top: 2px solid #000;
-      background: #f1f5f9;
+      border-top: 2px solid #d1d5db;
+      border-right: 1px solid #e5e7eb;
+      background: #f3f4f6;
       font-size: 11px;
     }
+    .items-table tfoot td:last-child { border-right: none; }
     .items-table tfoot .total-label {
       text-align: right;
       color: #1e293b;
