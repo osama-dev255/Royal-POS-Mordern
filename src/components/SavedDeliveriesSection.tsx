@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Truck, Download, Printer, Eye, Calendar, Edit, Loader2, Save } from "lucide-react";
 import { SavedDeliveriesCard } from "./SavedDeliveriesCard";
 import { getSavedDeliveries, deleteDelivery, DeliveryData, updateDelivery } from "@/utils/deliveryUtils";
+import { getProducts } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { DeliveryDetails } from "./DeliveryDetails";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -34,6 +35,32 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editableItems, setEditableItems] = useState<any[]>([]);
   const [isSavingDelivery, setIsSavingDelivery] = useState(false);
+
+  // Product search dropdown state
+  const [productItemsMap, setProductItemsMap] = useState<Map<string, { rate: number; unit: string; stockQuantity: number }>>(new Map());
+  const [productDescriptions, setProductDescriptions] = useState<string[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [activeDropdownRow, setActiveDropdownRow] = useState<number | null>(null);
+
+  const loadProductItems = async () => {
+    try {
+      const products = await getProducts();
+      const itemsMap = new Map<string, { rate: number; unit: string; stockQuantity: number }>();
+      products.forEach(product => {
+        if (product.name) {
+          itemsMap.set(product.name, {
+            rate: product.cost_price || 0,
+            unit: product.unit_of_measure || 'piece',
+            stockQuantity: product.stock_quantity || 0
+          });
+        }
+      });
+      setProductItemsMap(itemsMap);
+      setProductDescriptions(Array.from(itemsMap.keys()));
+    } catch (error) {
+      console.error('Error fetching product items:', error);
+    }
+  };
 
   // Load saved deliveries from database
   useEffect(() => {
@@ -222,7 +249,9 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
       price: 0,
       unitPrice: 0,
       total: 0,
-      unit: ''
+      unit: '',
+      godownName: '',
+      zoneName: ''
     };
     const updatedItems = [...editableItems, newItem];
     setEditableItems(updatedItems);
@@ -561,6 +590,8 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                       <tr>
                         <th className="text-left p-2">#</th>
                         <th className="text-left p-2">Item Name</th>
+                        <th className="text-left p-2">Godown</th>
+                        <th className="text-left p-2">Zone</th>
                         <th className="text-right p-2">Quantity</th>
                         <th className="text-left p-2">Unit</th>
                         <th className="text-right p-2">Price</th>
@@ -573,13 +604,74 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
                         editableItems.map((item, index) => (
                           <tr key={index} className={index % 2 === 0 ? "bg-muted/50" : ""}>
                             <td className="p-2 text-sm">{index + 1}</td>
-                            <td className="p-2">
-                              <Input
-                                value={item.name || item.productName || ''}
-                                onChange={(e) => handleItemChange(index, 'name', e.target.value)}
-                                className="p-1 h-8 text-sm"
-                              />
+                            <td className="p-2 relative">
+                              <div className="relative">
+                                <Input
+                                  value={item.name || item.productName || ''}
+                                  onChange={async (e) => {
+                                    handleItemChange(index, 'name', e.target.value);
+                                    // Load products if not loaded and show dropdown
+                                    if (productDescriptions.length === 0) {
+                                      await loadProductItems();
+                                    }
+                                    setActiveDropdownRow(index);
+                                    setShowDropdown(true);
+                                  }}
+                                  onFocus={async () => {
+                                    if (productDescriptions.length === 0) {
+                                      await loadProductItems();
+                                    }
+                                    setActiveDropdownRow(index);
+                                    setShowDropdown(true);
+                                  }}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      setShowDropdown(false);
+                                      setActiveDropdownRow(null);
+                                    }, 200);
+                                  }}
+                                  className="p-1 h-8 text-sm"
+                                  placeholder="Search product..."
+                                />
+                                {showDropdown && activeDropdownRow === index && productDescriptions.length > 0 && (
+                                  <div className="absolute z-50 left-0 top-full mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-auto">
+                                    {productDescriptions
+                                      .filter(desc => {
+                                        const currentVal = item.name || item.productName || '';
+                                        return currentVal === '' || desc.toLowerCase().includes(currentVal.toLowerCase());
+                                      })
+                                      .map((desc, idx) => {
+                                        const productData = productItemsMap.get(desc);
+                                        const stockQty = productData?.stockQuantity ?? 0;
+                                        const stockColor = stockQty === 0 ? 'text-red-600' : stockQty <= 10 ? 'text-yellow-600' : 'text-green-600';
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex justify-between items-center"
+                                            onMouseDown={() => {
+                                              handleItemChange(index, 'name', desc);
+                                              if (productData) {
+                                                handleItemChange(index, 'price', productData.rate);
+                                                handleItemChange(index, 'unit', productData.unit);
+                                              }
+                                              setShowDropdown(false);
+                                              setActiveDropdownRow(null);
+                                            }}
+                                          >
+                                            <span className="flex-1">{desc}</span>
+                                            <span className={`ml-2 font-semibold ${stockColor}`}>
+                                              Stock: {stockQty}
+                                            </span>
+                                          </div>
+                                        );
+                                      })
+                                    }
+                                  </div>
+                                )}
+                              </div>
                             </td>
+                            <td className="p-2 text-sm">{item.godownName || item.godown_name || '-'}</td>
+                            <td className="p-2 text-sm">{item.zoneName || item.zone_name || '-'}</td>
                             <td className="p-2">
                               <Input
                                 type="number"

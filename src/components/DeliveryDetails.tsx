@@ -283,6 +283,8 @@ export const DeliveryDetails = ({
               <tr>
                 <th>Item</th>
                 <th>Description</th>
+                <th>Godown</th>
+                <th>Zone</th>
                 <th class="text-right">Quantity</th>
                 <th>Unit</th>
                 <th class="text-right">Rate</th>
@@ -296,6 +298,8 @@ export const DeliveryDetails = ({
                 <tr>
                   <td>${index + 1}</td>
                   <td>${item.name || item.productName || item.description}</td>
+                  <td>${item.godownName || item.godown_name || '-'}</td>
+                  <td>${item.zoneName || item.zone_name || '-'}</td>
                   <td class="text-right">${item.quantity || 0}</td>
                   <td>${item.unit || 'N/A'}</td>
                   <td class="text-right">${formatCurrency(item.price || item.rate || 0)}</td>
@@ -303,7 +307,7 @@ export const DeliveryDetails = ({
                   <td class="text-right">${item.delivered || item.quantity || 0}</td>
                   <td>${item.remarks || '-'}</td>
                 </tr>
-              `).join('') || '<tr><td colspan="8" style="text-align:center;">No items</td></tr>'}
+              `).join('') || '<tr><td colspan="10" style="text-align:center;">No items</td></tr>'}
             </tbody>
           </table>
 
@@ -590,6 +594,8 @@ export const DeliveryDetails = ({
                       <tr className="bg-muted">
                         <th className="text-left p-3 text-xs font-bold uppercase">Item</th>
                         <th className="text-left p-3 text-xs font-bold uppercase">Description</th>
+                        <th className="text-left p-3 text-xs font-bold uppercase">Godown</th>
+                        <th className="text-left p-3 text-xs font-bold uppercase">Zone</th>
                         <th className="text-right p-3 text-xs font-bold uppercase">Quantity</th>
                         <th className="text-left p-3 text-xs font-bold uppercase">Unit</th>
                         <th className="text-right p-3 text-xs font-bold uppercase">Rate</th>
@@ -603,6 +609,8 @@ export const DeliveryDetails = ({
                         <tr key={index} className={`hover:bg-muted/50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-muted/30"}`}>
                           <td className="p-3 font-semibold">{index + 1}</td>
                           <td className="p-3 font-medium">{item.name || item.productName || item.description}</td>
+                          <td className="p-3">{item.godownName || item.godown_name || '-'}</td>
+                          <td className="p-3">{item.zoneName || item.zone_name || '-'}</td>
                           <td className="p-3 text-right font-semibold">{item.quantity || 0}</td>
                           <td className="p-3">
                             <Badge variant="outline" className="text-xs">{item.unit || 'N/A'}</Badge>
