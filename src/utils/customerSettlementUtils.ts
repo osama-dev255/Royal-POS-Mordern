@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { updateOutletDebt } from '@/services/databaseService';
 
 const SAVED_SETTLEMENTS_KEY = 'savedSettlements';
 
@@ -41,6 +42,70 @@ export interface CustomerSettlementData {
   time: string;
   status?: "completed" | "pending" | "cancelled";
 }
+
+/**
+ * Allocate a settlement payment across a customer's outstanding debts (oldest first).
+ * Updates each debt's amount_paid, remaining_amount, and payment_status.
+ */
+const allocateSettlementToDebts = async (customerId: string | null, paymentAmount: number): Promise<void> => {
+  if (!customerId || paymentAmount <= 0) {
+    console.log('⏭️ Skipping debt allocation:', !customerId ? 'no customer_id' : 'payment is 0');
+    return;
+  }
+
+  try {
+    // Fetch all outstanding debts for this customer (unpaid or partial, oldest first)
+    const { data: debts, error } = await supabase
+      .from('outlet_debts')
+      .select('*')
+      .eq('customer_id', customerId)
+      .in('payment_status', ['unpaid', 'partial'])
+      .gt('remaining_amount', 0)
+      .order('debt_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching outstanding debts for settlement allocation:', error);
+      return;
+    }
+
+    if (!debts || debts.length === 0) {
+      console.log('ℹ️ No outstanding debts found for customer', customerId);
+      return;
+    }
+
+    let remainingPayment = paymentAmount;
+
+    for (const debt of debts) {
+      if (remainingPayment <= 0) break;
+
+      const currentRemaining = debt.remaining_amount || 0;
+      if (currentRemaining <= 0) continue;
+
+      const paymentTowardThisDebt = Math.min(remainingPayment, currentRemaining);
+      const newAmountPaid = (debt.amount_paid || 0) + paymentTowardThisDebt;
+      const newRemaining = currentRemaining - paymentTowardThisDebt;
+      const newStatus = newRemaining <= 0 ? 'paid' : 'partial';
+
+      console.log(`💰 Allocating ${paymentTowardThisDebt} to debt ${debt.invoice_number} (remaining: ${currentRemaining} → ${newRemaining})`);
+
+      await updateOutletDebt(debt.id, {
+        amount_paid: newAmountPaid,
+        remaining_amount: newRemaining,
+        payment_status: newStatus
+      });
+
+      remainingPayment -= paymentTowardThisDebt;
+    }
+
+    if (remainingPayment > 0) {
+      console.log(`ℹ️ ${remainingPayment} of settlement payment unallocated (no more outstanding debts)`);
+    }
+
+    console.log('✅ Settlement allocation complete');
+  } catch (error) {
+    console.error('Error allocating settlement to debts:', error);
+  }
+};
 
 export const saveCustomerSettlement = async (settlement: CustomerSettlementData): Promise<void> => {
   try {
@@ -90,6 +155,9 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
       if (error) {
         console.error('Error saving customer settlement to database:', error);
       } else {
+        // Allocate settlement across customer's outstanding debts (oldest first)
+        await allocateSettlementToDebts(getValidCustomerId(settlement.customerId), settlement.amountPaid || 0);
+        
         // Trigger refresh to update UI components
         window.dispatchEvent(new CustomEvent('refreshSettlements'));
       }
@@ -119,6 +187,9 @@ export const saveCustomerSettlement = async (settlement: CustomerSettlementData)
       if (error) {
         console.error('Error saving customer settlement to database:', error);
       } else {
+        // Allocate settlement across customer's outstanding debts (oldest first)
+        await allocateSettlementToDebts(getValidCustomerId(settlement.customerId), settlement.amountPaid || 0);
+        
         // Trigger refresh to update UI components
         window.dispatchEvent(new CustomEvent('refreshSettlements'));
       }

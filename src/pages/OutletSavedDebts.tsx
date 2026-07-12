@@ -38,7 +38,7 @@ import {
   XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
@@ -1198,6 +1198,27 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       
       if (updatedDebt) {
         console.log('✅ Debt record updated successfully');
+        
+        // Step 3b: If amount_paid increased, create a debt_payment record
+        // so the DB trigger creates a corresponding ledger entry
+        const oldAmountPaid = selectedSale.amountPaid || 0;
+        const newAmountPaid = editFormData.amountPaid || 0;
+        const paymentIncrease = newAmountPaid - oldAmountPaid;
+        
+        if (paymentIncrease > 0) {
+          console.log(`💰 Amount paid increased by ${paymentIncrease} (${oldAmountPaid} → ${newAmountPaid}), creating ledger entry...`);
+          await createOutletDebtPayment({
+            debt_id: selectedSale.id,
+            amount: paymentIncrease,
+            payment_method: 'cash', // Default to cash for edit-triggered payments
+            payment_date: new Date().toISOString(),
+            notes: `Payment recorded via edit - ${selectedSale.invoiceNumber || 'unknown'}`,
+            created_by: null
+          });
+          console.log('✅ Debt payment record created, ledger entry will be created by trigger');
+        } else if (paymentIncrease < 0) {
+          console.log(`⚠️ Amount paid decreased by ${Math.abs(paymentIncrease)} (${oldAmountPaid} → ${newAmountPaid}). Ledger reversal not automated - manual review may be needed.`);
+        }
         
         // Step 4: Delete existing items
         console.log('🗑️ Deleting existing debt items...');
