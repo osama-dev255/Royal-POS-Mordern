@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { saveGRN, GRNData, GRNItem } from "@/utils/grnUtils";
 import { formatCurrency } from "@/lib/currency";
 import { getGodowns, getZones, Godown, GodownZone } from "@/services/godownService";
+import { getProducts, updateProduct } from "@/services/databaseService";
 
 interface GRNCreateDialogProps {
   open: boolean;
@@ -280,6 +281,33 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
       };
 
       await saveGRN(grnToSave);
+
+      // Always update general products inventory (products.stock_quantity)
+      // regardless of whether a destination godown is set.
+      // When a godown IS set, saveGRN() also handles godown_stock via updateGRNGodownStock.
+      try {
+        const allProducts = await getProducts();
+        
+        for (const item of grnData.items) {
+          if (item.description && (item.delivered || item.receivedQuantity || 0) > 0) {
+            const product = allProducts.find(p => 
+              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+            );
+            
+            if (product) {
+              const receivedQty = item.delivered || item.receivedQuantity || 0;
+              const currentStock = product.stock_quantity || 0;
+              const newStock = currentStock + receivedQty;
+              await updateProduct(product.id!, { ...product, stock_quantity: newStock });
+              console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}`);
+            } else {
+              console.warn(`Product not found for: ${item.description}`);
+            }
+          }
+        }
+      } catch (inventoryError) {
+        console.error('Error updating product inventory after GRN save:', inventoryError);
+      }
 
       toast({
         title: "Success",

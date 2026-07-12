@@ -1842,31 +1842,29 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       // Use the proper saveGRN utility function
       await saveGRN(newGRN);
       
-      // Update general products inventory ONLY when no destination godown is set.
-      // When a godown IS set, saveGRN() handles stock via updateGRNGodownStock (godown_stock table).
-      // When no godown is set, we update products.stock_quantity as the general inventory record.
-      if (!grnData.destinationGodownId) {
-        try {
-          const { getProducts, updateProduct } = await import('@/services/databaseService');
-          const allProducts = await getProducts();
-          
-          for (const item of newGRN.data.items) {
-            if (item.description && item.delivered > 0) {
-              const product = allProducts.find(p => 
-                p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
-              );
-              
-              if (product) {
-                const currentStock = product.stock_quantity || 0;
-                const newStock = currentStock + item.delivered;
-                await updateProduct(product.id!, { ...product, stock_quantity: newStock });
-                console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}`);
-              }
+      // Always update general products inventory (products.stock_quantity)
+      // regardless of whether a destination godown is set.
+      // When a godown IS set, saveGRN() also handles godown_stock via updateGRNGodownStock.
+      try {
+        const { getProducts, updateProduct } = await import('@/services/databaseService');
+        const allProducts = await getProducts();
+        
+        for (const item of newGRN.data.items) {
+          if (item.description && item.delivered > 0) {
+            const product = allProducts.find(p => 
+              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+            );
+            
+            if (product) {
+              const currentStock = product.stock_quantity || 0;
+              const newStock = currentStock + item.delivered;
+              await updateProduct(product.id!, { ...product, stock_quantity: newStock });
+              console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}`);
             }
           }
-        } catch (inventoryError) {
-          console.error('Error updating product inventory after GRN save:', inventoryError);
         }
+      } catch (inventoryError) {
+        console.error('Error updating product inventory after GRN save:', inventoryError);
       }
       
       // Update local state
