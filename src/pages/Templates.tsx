@@ -40,7 +40,8 @@ import {
   CreditCard,
   FolderOpen,
   ShoppingCart,
-  Loader2
+  Loader2,
+  ClipboardCheck
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -59,6 +60,7 @@ import { SavedCustomerSettlementsSection } from '@/components/SavedCustomerSettl
 import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettlementsSection';
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
+import { SavedStockTakesSection } from '@/components/SavedStockTakesSection';
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -8280,6 +8282,14 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                       <FileText className="h-4 w-4" />
                       Saved GRNs
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedStockTakes')}
+                      className="flex items-center gap-2"
+                    >
+                      <ClipboardCheck className="h-4 w-4" />
+                      Saved Stock Takes
+                    </Button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -8406,6 +8416,27 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                   </Button>
                 </div>
                 <SavedSalesOrdersSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
+            ) : activeTab === "savedStockTakes" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Saved Stock Takes</h3>
+                    <p className="text-sm text-muted-foreground">View and manage your saved physical stock take records</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <SavedStockTakesSection 
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User" 
