@@ -1257,6 +1257,28 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const [stockTakeZoneId, setStockTakeZoneId] = useState<string>("");
   const [stockTakeZones, setStockTakeZones] = useState<GodownZone[]>([]);
 
+  // Stock Take items state
+  interface StockTakeItem {
+    id: string;
+    productId: string;
+    productName: string;
+    godownName: string;
+    zoneName: string;
+    systemQty: number;
+    physicalCount: number;
+    variance: number;
+    unitCost: number;
+    totalCost: number;
+  }
+  const [stockTakeItems, setStockTakeItems] = useState<StockTakeItem[]>([
+    { id: '1', productId: '', productName: '', godownName: '', zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+    { id: '2', productId: '', productName: '', godownName: '', zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+    { id: '3', productId: '', productName: '', godownName: '', zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+  ]);
+  const [stockTakeProductSearch, setStockTakeProductSearch] = useState<Record<string, string>>({});
+  const [stockTakeProductResults, setStockTakeProductResults] = useState<Record<string, Array<{ productId: string; name: string; quantity: number }>>>({});
+  const [stockTakeShowDropdown, setStockTakeShowDropdown] = useState<Record<string, boolean>>({});
+
   // Load zones when stock take godown changes
   useEffect(() => {
     const loadStockTakeZones = async () => {
@@ -1274,6 +1296,101 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     };
     loadStockTakeZones();
   }, [stockTakeGodownId]);
+
+  // Search products in selected godown/zone for stock take
+  const searchStockTakeProducts = async (itemId: string, query: string) => {
+    setStockTakeProductSearch(prev => ({ ...prev, [itemId]: query }));
+    if (!query || query.length < 1) {
+      setStockTakeProductResults(prev => ({ ...prev, [itemId]: [] }));
+      setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: false }));
+      return;
+    }
+    try {
+      const allProducts = await getProducts();
+      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      
+      // If a godown is selected, filter to only products with stock in that godown
+      if (stockTakeGodownId) {
+        const resultsWithQty: Array<{ productId: string; name: string; quantity: number }> = [];
+        for (const p of filtered.slice(0, 20)) {
+          if (!p.id) continue;
+          const stockData = await getGodownStock(p.id, stockTakeGodownId);
+          // Filter by zone if selected
+          const zoneFiltered = stockTakeZoneId
+            ? stockData.filter(s => s.zone_id === stockTakeZoneId || (stockTakeZoneId === '__no_zone__' && !s.zone_id))
+            : stockData;
+          const totalQty = zoneFiltered.reduce((sum, s) => sum + (s.quantity || 0), 0);
+          if (totalQty > 0) {
+            resultsWithQty.push({ productId: p.id, name: p.name, quantity: totalQty });
+          }
+        }
+        setStockTakeProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
+      } else {
+        // No godown selected - show all products with a hint
+        setStockTakeProductResults(prev => ({ ...prev, [itemId]: filtered.slice(0, 20).map(p => ({ productId: p.id || '', name: p.name, quantity: 0 })) }));
+      }
+      setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: true }));
+    } catch (error) {
+      console.error('Error searching stock take products:', error);
+    }
+  };
+
+  // Handle stock take item changes
+  const handleStockTakeItemChange = (itemId: string, field: keyof StockTakeItem, value: string | number) => {
+    setStockTakeItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const updated = { ...item, [field]: value };
+      // Auto-calculate variance
+      if (field === 'physicalCount' || field === 'systemQty') {
+        updated.variance = Number(updated.physicalCount) - Number(updated.systemQty);
+      }
+      // Auto-calculate total cost
+      if (field === 'unitCost' || field === 'physicalCount') {
+        updated.totalCost = Number(updated.unitCost) * Number(updated.physicalCount);
+      }
+      return updated;
+    }));
+  };
+
+  // Select a product for stock take item
+  const selectStockTakeProduct = async (itemId: string, productId: string, productName: string, qty: number) => {
+    const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+    const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
+    const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
+    
+    setStockTakeItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      return {
+        ...item,
+        productId,
+        productName,
+        godownName: selectedGodown?.name || '',
+        zoneName,
+        systemQty: qty,
+        variance: item.physicalCount - qty,
+      };
+    }));
+    setStockTakeProductSearch(prev => ({ ...prev, [itemId]: productName }));
+    setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: false }));
+  };
+
+  // Add new row to stock take items
+  const addStockTakeRow = () => {
+    setStockTakeItems(prev => [...prev, {
+      id: Date.now().toString(),
+      productId: '', productName: '', godownName: '', zoneName: '',
+      systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0,
+    }]);
+  };
+
+  // Stock take summary totals
+  const stockTakeTotals = stockTakeItems.reduce((acc, item) => ({
+    totalProducts: acc.totalProducts + (item.productId ? 1 : 0),
+    totalSystemQty: acc.totalSystemQty + item.systemQty,
+    totalPhysicalCount: acc.totalPhysicalCount + item.physicalCount,
+    totalVariance: acc.totalVariance + item.variance,
+    totalInvestmentValue: acc.totalInvestmentValue + item.totalCost,
+  }), { totalProducts: 0, totalSystemQty: 0, totalPhysicalCount: 0, totalVariance: 0, totalInvestmentValue: 0 });
 
   // Load outlets on component mount
   useEffect(() => {
@@ -12265,6 +12382,9 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                         {/* Items Table */}
                         <div>
                           <h3 className="font-bold mb-2">GODOWN STOCK COUNT</h3>
+                          {!stockTakeGodownId && (
+                            <p className="text-sm text-muted-foreground mb-2 italic">Select a Godown above to filter products by warehouse stock.</p>
+                          )}
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm border-collapse">
                               <thead>
@@ -12281,42 +12401,78 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                 </tr>
                               </thead>
                               <tbody>
-                                <tr className="border-b">
-                                  <td className="p-2">1</td>
-                                  <td className="p-2"><Input placeholder="Product name" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2"><Input placeholder="Godown" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2"><Input placeholder="Zone" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
-                                </tr>
-                                <tr className="border-b">
-                                  <td className="p-2">2</td>
-                                  <td className="p-2"><Input placeholder="Product name" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2"><Input placeholder="Godown" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2"><Input placeholder="Zone" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
-                                </tr>
-                                <tr className="border-b">
-                                  <td className="p-2">3</td>
-                                  <td className="p-2"><Input placeholder="Product name" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2"><Input placeholder="Godown" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2"><Input placeholder="Zone" className="text-sm p-1 h-7" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
-                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
-                                </tr>
+                                {stockTakeItems.map((item, idx) => (
+                                  <tr key={item.id} className="border-b">
+                                    <td className="p-2">{idx + 1}</td>
+                                    <td className="p-2 relative">
+                                      <Input
+                                        value={stockTakeProductSearch[item.id] || ''}
+                                        onChange={(e) => searchStockTakeProducts(item.id, e.target.value)}
+                                        onFocus={() => {
+                                          if (stockTakeProductResults[item.id]?.length) {
+                                            setStockTakeShowDropdown(prev => ({ ...prev, [item.id]: true }));
+                                          }
+                                        }}
+                                        placeholder="Search product..."
+                                        className="text-sm p-1 h-7"
+                                      />
+                                      {stockTakeShowDropdown[item.id] && stockTakeProductResults[item.id]?.length > 0 && (
+                                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md max-h-48 overflow-y-auto">
+                                          {stockTakeProductResults[item.id].map(p => (
+                                            <div
+                                              key={p.productId}
+                                              className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
+                                              onClick={() => selectStockTakeProduct(item.id, p.productId, p.name, p.quantity)}
+                                            >
+                                              <span className="text-sm">{p.name}</span>
+                                              {stockTakeGodownId && (
+                                                <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {stockTakeShowDropdown[item.id] && stockTakeProductResults[item.id]?.length === 0 && stockTakeProductSearch[item.id] && (
+                                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md p-2 text-sm text-muted-foreground">
+                                          {stockTakeGodownId ? 'No products found in selected godown/zone.' : 'Select a godown first to filter products.'}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-2"><span className="text-sm">{item.godownName || '-'}</span></td>
+                                    <td className="p-2"><span className="text-sm">{item.zoneName || '-'}</span></td>
+                                    <td className="p-2 text-right"><span className="text-sm font-semibold">{item.systemQty}</span></td>
+                                    <td className="p-2 text-right">
+                                      <Input
+                                        type="number"
+                                        value={item.physicalCount || ''}
+                                        onChange={(e) => handleStockTakeItemChange(item.id, 'physicalCount', Number(e.target.value))}
+                                        placeholder="0"
+                                        className="text-sm p-1 h-7 text-right"
+                                      />
+                                    </td>
+                                    <td className="p-2 text-right">
+                                      <span className={`text-sm font-semibold ${item.variance < 0 ? 'text-red-600' : item.variance > 0 ? 'text-green-600' : ''}`}>
+                                        {item.variance}
+                                      </span>
+                                    </td>
+                                    <td className="p-2 text-right">
+                                      <Input
+                                        type="number"
+                                        value={item.unitCost || ''}
+                                        onChange={(e) => handleStockTakeItemChange(item.id, 'unitCost', Number(e.target.value))}
+                                        placeholder="0.00"
+                                        className="text-sm p-1 h-7 text-right"
+                                      />
+                                    </td>
+                                    <td className="p-2 text-right"><span className="text-sm font-semibold">{item.totalCost.toFixed(2)}</span></td>
+                                  </tr>
+                                ))}
                               </tbody>
                             </table>
                           </div>
+                          <Button variant="outline" size="sm" onClick={addStockTakeRow} className="mt-2">
+                            <Plus className="h-4 w-4 mr-1" /> Add Row
+                          </Button>
                         </div>
 
                         {/* Summary */}
@@ -12324,11 +12480,11 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                           <div>
                             <h3 className="font-bold mb-2">INVENTORY SUMMARY</h3>
                             <div className="space-y-1 text-sm">
-                              <div className="flex justify-between"><span>Total Products:</span><span className="font-bold">0</span></div>
-                              <div className="flex justify-between"><span>Total System Quantity:</span><span className="font-bold">0</span></div>
-                              <div className="flex justify-between"><span>Total Physical Count:</span><span className="font-bold">0</span></div>
-                              <div className="flex justify-between"><span>Total Variance:</span><span className="font-bold">0</span></div>
-                              <div className="flex justify-between border-t pt-1"><span>Total Investment Value:</span><span className="font-bold">0.00</span></div>
+                              <div className="flex justify-between"><span>Total Products:</span><span className="font-bold">{stockTakeTotals.totalProducts}</span></div>
+                              <div className="flex justify-between"><span>Total System Quantity:</span><span className="font-bold">{stockTakeTotals.totalSystemQty}</span></div>
+                              <div className="flex justify-between"><span>Total Physical Count:</span><span className="font-bold">{stockTakeTotals.totalPhysicalCount}</span></div>
+                              <div className="flex justify-between"><span>Total Variance:</span><span className={`font-bold ${stockTakeTotals.totalVariance < 0 ? 'text-red-600' : stockTakeTotals.totalVariance > 0 ? 'text-green-600' : ''}`}>{stockTakeTotals.totalVariance}</span></div>
+                              <div className="flex justify-between border-t pt-1"><span>Total Investment Value:</span><span className="font-bold">{stockTakeTotals.totalInvestmentValue.toFixed(2)}</span></div>
                             </div>
                           </div>
                           <div>
