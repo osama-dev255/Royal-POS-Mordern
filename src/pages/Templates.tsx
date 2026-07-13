@@ -2164,6 +2164,11 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   // Build a GRN object from current grnData for use with printGRNDetails / exportGRNDetailsAsPDF
   const buildGRNObject = () => {
     const itemsWithCosts = distributeReceivingCosts([...grnData.items], grnData.receivingCosts);
+    // Pull supplier/business details from the suppliers array (which the form actually edits)
+    const primarySupplier = grnData.suppliers?.[0] || {} as any;
+    const effectiveSupplierName = grnData.numberOfSuppliers > 1
+      ? (grnData.suppliers?.map(s => s.name).join(', ') || grnData.supplierName)
+      : (primarySupplier.name || grnData.supplierName);
     return {
       id: Date.now().toString(),
       name: `GRN-${grnData.grnNumber}`,
@@ -2171,16 +2176,16 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         grnNumber: grnData.grnNumber,
         date: grnData.date,
         time: grnData.time,
-        supplierName: grnData.supplierName,
-        supplierId: grnData.supplierId,
-        supplierPhone: grnData.supplierPhone,
-        supplierEmail: grnData.supplierEmail,
-        supplierAddress: grnData.supplierAddress,
-        supplierTinNumber: grnData.supplierTinNumber,
-        businessName: grnData.businessName,
-        businessAddress: grnData.businessAddress,
-        businessPhone: grnData.businessPhone,
-        businessEmail: grnData.businessEmail,
+        supplierName: effectiveSupplierName,
+        supplierId: primarySupplier.supplierId || grnData.supplierId,
+        supplierPhone: primarySupplier.phone || grnData.supplierPhone,
+        supplierEmail: primarySupplier.email || grnData.supplierEmail,
+        supplierAddress: primarySupplier.address || grnData.supplierAddress,
+        supplierTinNumber: primarySupplier.tinNumber || grnData.supplierTinNumber,
+        businessName: primarySupplier.businessName || grnData.businessName,
+        businessAddress: primarySupplier.businessAddress || grnData.businessAddress,
+        businessPhone: primarySupplier.businessPhone || grnData.businessPhone,
+        businessEmail: primarySupplier.businessEmail || grnData.businessEmail,
         poNumber: grnData.poNumber,
         deliveryNoteNumber: grnData.deliveryNoteNumber,
         vehicleNumber: grnData.vehicleNumber,
@@ -2214,7 +2219,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
           remarks: item.remarks,
           receivingCostPerUnit: item.receivingCostPerUnit,
           totalWithReceivingCost: item.totalWithReceivingCost,
-          damaged: item.damaged || 0
+          damaged: (item as any).damaged || 0
         }))
       }
     };
