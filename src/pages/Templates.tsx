@@ -1383,6 +1383,11 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     }]);
   };
 
+  // Remove a row from stock take items
+  const removeStockTakeRow = (itemId: string) => {
+    setStockTakeItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
   // Stock take summary totals
   const stockTakeTotals = stockTakeItems.reduce((acc, item) => ({
     totalProducts: acc.totalProducts + (item.productId ? 1 : 0),
@@ -8784,8 +8789,76 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                         // Automatically save sales order to saved sales orders
                         await handleSaveSalesOrder();
                       } else if (currentTemplate?.type === "stock-take") {
-                        // Navigate to saved stock takes section
-                        setActiveTab('savedStockTakes');
+                        // Save stock take to database
+                        try {
+                          // Validate required fields
+                          if (!stockTakeGodownId) {
+                            alert("Please select a Godown before saving.");
+                            return;
+                          }
+                          const filledItems = stockTakeItems.filter(item => item.productId);
+                          if (filledItems.length === 0) {
+                            alert("Please add at least one product with a physical count.");
+                            return;
+                          }
+
+                          const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+                          const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
+                          const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
+
+                          const { data: { user } } = await supabase.auth.getUser();
+
+                          const stockTakeRecord = {
+                            outlet_id: null,
+                            stock_take_number: stockTakeNumber,
+                            date: new Date().toISOString().split('T')[0],
+                            total_products: stockTakeTotals.totalProducts,
+                            total_calculated_sold: 0,
+                            total_costs: stockTakeTotals.totalInvestmentValue,
+                            total_price: 0,
+                            potential_earnings: 0,
+                            avg_turnover: 0,
+                            items: stockTakeItems.filter(item => item.productId).map(item => ({
+                              product_id: item.productId,
+                              product_name: item.productName,
+                              godown_id: stockTakeGodownId,
+                              godown_name: selectedGodown?.name || '',
+                              zone_id: stockTakeZoneId || null,
+                              zone_name: zoneName,
+                              system_qty: item.systemQty,
+                              physical_count: item.physicalCount,
+                              variance: item.variance,
+                              unit_cost: item.unitCost,
+                              total_cost: item.totalCost,
+                            })),
+                            notes: '',
+                            status: 'completed',
+                            // New investment inventory fields
+                            godown_id: stockTakeGodownId,
+                            godown_name: selectedGodown?.name || '',
+                            zone_id: stockTakeZoneId || null,
+                            zone_name: zoneName,
+                            take_type: 'investment',
+                            total_system_qty: stockTakeTotals.totalSystemQty,
+                            total_physical_count: stockTakeTotals.totalPhysicalCount,
+                            total_variance: stockTakeTotals.totalVariance,
+                            total_investment_value: stockTakeTotals.totalInvestmentValue,
+                            counted_by: '',
+                            created_by: user?.id || null,
+                          };
+
+                          const { error } = await supabase
+                            .from('saved_stock_takes')
+                            .insert(stockTakeRecord);
+
+                          if (error) throw error;
+
+                          alert(`Stock Take ${stockTakeNumber} saved successfully!`);
+                          setActiveTab('savedStockTakes');
+                        } catch (error) {
+                          console.error('Error saving stock take:', error);
+                          alert('Error saving stock take. Please try again.');
+                        }
                       } else if (currentTemplate?.type === "salary-slip") {
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
                       } else if (currentTemplate?.type === "complimentary-goods") {
@@ -12398,6 +12471,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   <th className="text-right p-2">Variance</th>
                                   <th className="text-right p-2">Unit Cost</th>
                                   <th className="text-right p-2">Total Cost</th>
+                                  <th className="p-2"></th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -12465,6 +12539,16 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                       />
                                     </td>
                                     <td className="p-2 text-right"><span className="text-sm font-semibold">{item.totalCost.toFixed(2)}</span></td>
+                                    <td className="p-2 text-center">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeStockTakeRow(item.id)}
+                                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
