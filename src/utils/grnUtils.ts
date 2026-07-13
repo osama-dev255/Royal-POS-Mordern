@@ -233,19 +233,36 @@ const updateGRNGodownStock = async (grn: SavedGRN): Promise<void> => {
     console.log('📍 Destination Godown:', grn.data.destinationGodownId);
     console.log('📍 Destination Zone:', grn.data.destinationZoneId || 'All Zones');
 
-    // Import updateGodownStock dynamically to avoid circular dependencies
+    // Import dependencies dynamically to avoid circular dependencies
     const { updateGodownStock } = await import('@/services/godownService');
 
+    // Build a product name → ID lookup map for resolving items without productId
+    const productNameToId = new Map<string, string>();
+    const { data: products } = await supabase.from('products').select('id, name');
+    if (products) {
+      for (const p of products) {
+        productNameToId.set(p.name.toLowerCase().trim(), p.id);
+      }
+    }
+    console.log('📦 Product name lookup map built with', productNameToId.size, 'entries');
+
     for (const item of grn.data.items) {
-      const productId = item.productId || item.id; // GRN items may use either productId or id
+      // Resolve product ID: first try explicit productId, then look up by description
+      let productId = item.productId || null;
+      if (!productId && item.description) {
+        const lookupKey = item.description.toLowerCase().trim();
+        productId = productNameToId.get(lookupKey) || null;
+        console.log(`🔍 Name lookup for "${item.description}" → ${productId || 'NOT FOUND'}`);
+      }
+
       const quantity = item.delivered || item.receivedQuantity || 0;
 
       if (!productId || quantity <= 0) {
-        console.log(`⚠️ Skipping item: productId=${productId}, quantity=${quantity}`);
+        console.log(`⚠️ Skipping item: productId=${productId}, description=${item.description}, quantity=${quantity}`);
         continue;
       }
 
-      console.log(`📦 Processing product ${productId}: ${quantity} units`);
+      console.log(`📦 Processing product ${productId} (${item.description}): ${quantity} units`);
 
       // Increase stock in destination godown
       await updateGodownStock(
