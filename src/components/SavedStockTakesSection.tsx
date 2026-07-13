@@ -19,22 +19,33 @@ import { supabase } from "@/lib/supabaseClient";
 import { formatCurrency } from "@/lib/currency";
 
 interface StockTakeItem {
-  name: string;
-  sku: string;
-  category: string;
-  originalQuantity: number;
-  stockRemain: number;
-  physicalCount: number;
-  calculatedSold: number;
+  // Outlet-style fields
+  name?: string;
+  sku?: string;
+  category?: string;
+  originalQuantity?: number;
+  stockRemain?: number;
+  physicalCount?: number;
+  physical_count?: number;
+  calculatedSold?: number;
   unitCost: number;
-  unitPrice: number;
+  unitPrice?: number;
   totalCost: number;
-  totalPrice: number;
+  totalPrice?: number;
+  // Investment-style fields
+  product_id?: string;
+  product_name?: string;
+  godown_id?: string;
+  godown_name?: string;
+  zone_id?: string;
+  zone_name?: string;
+  system_qty?: number;
+  variance?: number;
 }
 
 interface SavedStockTake {
   id: string;
-  outlet_id: string;
+  outlet_id: string | null;
   stock_take_number: string;
   date: string;
   total_products: number;
@@ -47,6 +58,17 @@ interface SavedStockTake {
   notes: string;
   status: string;
   created_at: string;
+  // Investment inventory fields
+  godown_id?: string;
+  godown_name?: string;
+  zone_id?: string;
+  zone_name?: string;
+  take_type?: string;
+  total_system_qty?: number;
+  total_physical_count?: number;
+  total_variance?: number;
+  total_investment_value?: number;
+  counted_by?: string;
 }
 
 interface SavedStockTakesSectionProps {
@@ -122,29 +144,71 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
     setSelectedStockTake(stockTake);
   };
 
+  const isInvestmentType = (st: SavedStockTake) => st.take_type === 'investment';
+
   const handlePrintStockTake = (stockTake: SavedStockTake) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const itemsHtml = stockTake.items.map((item) => `
-      <tr>
-        <td style="padding:8px;border:1px solid #ddd;">${item.name}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${item.sku}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.stockRemain}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physicalCount}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.calculatedSold}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.unitCost)}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.totalCost)}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.unitPrice)}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.totalPrice)}</td>
-      </tr>
-    `).join('');
+    const investment = isInvestmentType(stockTake);
+
+    const itemsHtml = stockTake.items.map((item) => {
+      if (investment) {
+        return `
+          <tr>
+            <td style="padding:8px;border:1px solid #ddd;">${item.product_name || item.name || ''}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${item.godown_name || ''}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${item.zone_name || ''}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.system_qty ?? 0}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physical_count ?? item.physicalCount ?? 0}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${(item.variance ?? 0) < 0 ? '#dc2626' : (item.variance ?? 0) > 0 ? '#16a34a' : ''}">${item.variance ?? 0}</td>
+          </tr>
+        `;
+      }
+      return `
+        <tr>
+          <td style="padding:8px;border:1px solid #ddd;">${item.name || ''}</td>
+          <td style="padding:8px;border:1px solid #ddd;">${item.sku || ''}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.stockRemain ?? 0}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physicalCount}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.calculatedSold ?? 0}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.unitCost)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.totalCost)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.unitPrice || 0)}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(item.totalPrice || 0)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const headerColumns = investment
+      ? '<th>Product</th><th>Godown</th><th>Zone</th><th style="text-align:right;">System Qty</th><th style="text-align:right;">Physical Count</th><th style="text-align:right;">Variance</th>'
+      : '<th>Product</th><th>SKU</th><th style="text-align:right;">Available Stock</th><th style="text-align:right;">Physical Count</th><th style="text-align:right;">Calculated Sold</th><th style="text-align:right;">Unit Cost</th><th style="text-align:right;">Total Cost</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total Price</th>';
+
+    const summaryHtml = investment
+      ? `
+        <div class="summary-row"><span>Total Products:</span><span>${stockTake.total_products}</span></div>
+        <div class="summary-row"><span>Total System Qty:</span><span>${stockTake.total_system_qty ?? 0}</span></div>
+        <div class="summary-row"><span>Total Physical Count:</span><span>${stockTake.total_physical_count ?? 0}</span></div>
+        <div class="summary-row"><span>Total Variance:</span><span style="color:${(stockTake.total_variance ?? 0) < 0 ? '#dc2626' : (stockTake.total_variance ?? 0) > 0 ? '#16a34a' : ''}">${stockTake.total_variance ?? 0}</span></div>
+        ${stockTake.godown_name ? `<div class="summary-row"><span>Godown:</span><span>${stockTake.godown_name}</span></div>` : ''}
+        ${stockTake.zone_name ? `<div class="summary-row"><span>Zone:</span><span>${stockTake.zone_name}</span></div>` : ''}
+      `
+      : `
+        <div class="summary-row"><span>Total Products:</span><span>${stockTake.total_products}</span></div>
+        <div class="summary-row"><span>Total Calculated Sold:</span><span>${stockTake.total_calculated_sold}</span></div>
+        <div class="summary-row"><span>Total Costs:</span><span>${formatCurrency(stockTake.total_costs)}</span></div>
+        <div class="summary-row"><span>Total Price:</span><span>${formatCurrency(stockTake.total_price)}</span></div>
+        <div class="summary-row"><span>Potential Earnings:</span><span>${formatCurrency(stockTake.potential_earnings)}</span></div>
+        <div class="summary-row"><span>Avg Turnover:</span><span>${(stockTake.avg_turnover ?? 0).toFixed(2)}x</span></div>
+      `;
+
+    const title = investment ? 'Investment Stock Take' : 'Stock Take Report';
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Stock Take - ${stockTake.stock_take_number}</title>
+        <title>${title} - ${stockTake.stock_take_number}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; }
           h1 { color: #333; }
@@ -158,36 +222,20 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
         </style>
       </head>
       <body>
-        <h1>Stock Take Report</h1>
+        <h1>${title}</h1>
         <p style="color:#666;">${stockTake.stock_take_number}</p>
         <div class="info-row">
           <div><span class="info-label">Date:</span> ${new Date(stockTake.date).toLocaleDateString()}</div>
           <div><span class="info-label">Status:</span> ${stockTake.status}</div>
+          ${stockTake.counted_by ? `<div><span class="info-label">Counted By:</span> ${stockTake.counted_by}</div>` : ''}
         </div>
         <table>
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>SKU</th>
-              <th style="text-align:right;">Available Stock</th>
-              <th style="text-align:right;">Physical Count</th>
-              <th style="text-align:right;">Calculated Sold</th>
-              <th style="text-align:right;">Unit Cost</th>
-              <th style="text-align:right;">Total Cost</th>
-              <th style="text-align:right;">Unit Price</th>
-              <th style="text-align:right;">Total Price</th>
-            </tr>
-          </thead>
+          <thead><tr>${headerColumns}</tr></thead>
           <tbody>${itemsHtml}</tbody>
         </table>
         <div class="summary">
           <h3>Summary</h3>
-          <div class="summary-row"><span>Total Products:</span><span>${stockTake.total_products}</span></div>
-          <div class="summary-row"><span>Total Calculated Sold:</span><span>${stockTake.total_calculated_sold}</span></div>
-          <div class="summary-row"><span>Total Costs:</span><span>${formatCurrency(stockTake.total_costs)}</span></div>
-          <div class="summary-row"><span>Total Price:</span><span>${formatCurrency(stockTake.total_price)}</span></div>
-          <div class="summary-row"><span>Potential Earnings:</span><span>${formatCurrency(stockTake.potential_earnings)}</span></div>
-          <div class="summary-row"><span>Avg Turnover:</span><span>${stockTake.avg_turnover.toFixed(2)}x</span></div>
+          ${summaryHtml}
         </div>
         <div style="margin-top:20px;">
           <button onclick="window.print()" style="padding:10px 20px;cursor:pointer;">Print</button>
@@ -240,57 +288,118 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
               </div>
 
               {/* Summary Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Products</p>
-                  <p className="text-xl font-bold">{selectedStockTake.total_products}</p>
+              {isInvestmentType(selectedStockTake) ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Products</p>
+                      <p className="text-xl font-bold">{selectedStockTake.total_products}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">System Qty</p>
+                      <p className="text-xl font-bold">{selectedStockTake.total_system_qty ?? 0}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Physical Count</p>
+                      <p className="text-xl font-bold">{selectedStockTake.total_physical_count ?? 0}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Variance</p>
+                      <p className={`text-xl font-bold ${(selectedStockTake.total_variance ?? 0) < 0 ? 'text-red-600' : (selectedStockTake.total_variance ?? 0) > 0 ? 'text-green-600' : ''}`}>
+                        {selectedStockTake.total_variance ?? 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    {selectedStockTake.godown_name && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Godown</p>
+                        <p className="text-xl font-bold">{selectedStockTake.godown_name}</p>
+                      </div>
+                    )}
+                    {selectedStockTake.zone_name && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Zone</p>
+                        <p className="text-xl font-bold">{selectedStockTake.zone_name}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Products</p>
+                    <p className="text-xl font-bold">{selectedStockTake.total_products}</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Calculated Sold</p>
+                    <p className="text-xl font-bold">{selectedStockTake.total_calculated_sold}</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Total Costs</p>
+                    <p className="text-xl font-bold">{formatCurrency(selectedStockTake.total_costs)}</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Potential Earnings</p>
+                    <p className={`text-xl font-bold ${selectedStockTake.potential_earnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(selectedStockTake.potential_earnings)}
+                    </p>
+                  </div>
                 </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Calculated Sold</p>
-                  <p className="text-xl font-bold">{selectedStockTake.total_calculated_sold}</p>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Total Costs</p>
-                  <p className="text-xl font-bold">{formatCurrency(selectedStockTake.total_costs)}</p>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Potential Earnings</p>
-                  <p className={`text-xl font-bold ${selectedStockTake.potential_earnings >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(selectedStockTake.potential_earnings)}
-                  </p>
-                </div>
-              </div>
+              )}
 
               {/* Items Table */}
-              <h3 className="font-semibold text-lg mb-3">Stock Take Items</h3>
+              <h3 className="font-semibold text-lg mb-3">{isInvestmentType(selectedStockTake) ? 'Godown Stock Count' : 'Stock Take Items'}</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Available Stock</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Physical Count</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Calculated Sold</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Cost</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Price</th>
-                    </tr>
+                    {isInvestmentType(selectedStockTake) ? (
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Godown</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zone</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">System Qty</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Physical Count</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Variance</th>
+                      </tr>
+                    ) : (
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Available Stock</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Physical Count</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Calculated Sold</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Cost</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Price</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {selectedStockTake.items.map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-3 whitespace-nowrap">{item.name}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{item.sku}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{item.stockRemain}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{item.physicalCount}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{item.calculatedSold}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.unitCost)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.totalCost)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.totalPrice)}</td>
-                      </tr>
+                      isInvestmentType(selectedStockTake) ? (
+                        <tr key={index}>
+                          <td className="px-4 py-3 whitespace-nowrap">{item.product_name || item.name || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{item.godown_name || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{item.zone_name || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{item.system_qty ?? 0}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{item.physical_count ?? item.physicalCount ?? 0}</td>
+                          <td className={`px-4 py-3 whitespace-nowrap text-right ${(item.variance ?? 0) < 0 ? 'text-red-600' : (item.variance ?? 0) > 0 ? 'text-green-600' : ''}`}>{item.variance ?? 0}</td>
+                        </tr>
+                      ) : (
+                        <tr key={index}>
+                          <td className="px-4 py-3 whitespace-nowrap">{item.name || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{item.sku || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{item.stockRemain ?? 0}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{item.physicalCount}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{item.calculatedSold ?? 0}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.unitCost)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.totalCost)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.unitPrice || 0)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right">{formatCurrency(item.totalPrice || 0)}</td>
+                        </tr>
+                      )
                     ))}
                   </tbody>
                 </table>
@@ -442,18 +551,35 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
                           <span className="text-muted-foreground">Products:</span>
                           <span className="font-medium ml-1">{stockTake.total_products}</span>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Sold:</span>
-                          <span className="font-medium ml-1">{stockTake.total_calculated_sold}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Costs:</span>
-                          <span className="font-medium ml-1">{formatCurrency(stockTake.total_costs)}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Price:</span>
-                          <span className="font-medium ml-1 text-green-600">{formatCurrency(stockTake.total_price)}</span>
-                        </div>
+                        {isInvestmentType(stockTake) ? (
+                          <>
+                            <div>
+                              <span className="text-muted-foreground">Variance:</span>
+                              <span className={`font-medium ml-1 ${(stockTake.total_variance ?? 0) < 0 ? 'text-red-600' : (stockTake.total_variance ?? 0) > 0 ? 'text-green-600' : ''}`}>{stockTake.total_variance ?? 0}</span>
+                            </div>
+                            {stockTake.godown_name && (
+                              <div>
+                                <span className="text-muted-foreground">Godown:</span>
+                                <span className="font-medium ml-1">{stockTake.godown_name}</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <span className="text-muted-foreground">Sold:</span>
+                              <span className="font-medium ml-1">{stockTake.total_calculated_sold}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Costs:</span>
+                              <span className="font-medium ml-1">{formatCurrency(stockTake.total_costs)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Price:</span>
+                              <span className="font-medium ml-1 text-green-600">{formatCurrency(stockTake.total_price)}</span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       <div className="flex gap-2">

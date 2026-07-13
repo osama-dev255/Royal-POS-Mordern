@@ -1128,7 +1128,7 @@ COUNTED BY:
 [COUNTED_BY]
 
 GODOWN STOCK COUNT:
-No.	Product	Godown	Zone	System Qty	Physical Count	Variance	Unit Cost	Total Cost
+No.	Product	Godown	Zone	System Qty	Physical Count	Variance
 [ITEM_LIST]
 
 INVENTORY SUMMARY:
@@ -1252,7 +1252,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
-  const [stockTakeNumber, setStockTakeNumber] = useState<string>("ST-001");
+  const [stockTakeNumber, setStockTakeNumber] = useState<string>("");
   const [stockTakeGodownId, setStockTakeGodownId] = useState<string>("");
   const [stockTakeZoneId, setStockTakeZoneId] = useState<string>("");
   const [stockTakeZones, setStockTakeZones] = useState<GodownZone[]>([]);
@@ -1278,6 +1278,32 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const [stockTakeProductSearch, setStockTakeProductSearch] = useState<Record<string, string>>({});
   const [stockTakeProductResults, setStockTakeProductResults] = useState<Record<string, Array<{ productId: string; name: string; quantity: number }>>>({});
   const [stockTakeShowDropdown, setStockTakeShowDropdown] = useState<Record<string, boolean>>({});
+
+  // Generate next stock take number
+  const getNextStockTakeNumber = () => {
+    const lastNumber = localStorage.getItem('lastStockTakeNumber');
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}`;
+    
+    let nextNumber = 1;
+    if (lastNumber) {
+      const [lastDate, lastSeq] = lastNumber.split('-');
+      if (lastDate === dateStr) {
+        nextNumber = parseInt(lastSeq) + 1;
+      }
+    }
+    
+    const num = `ST-${dateStr}-${nextNumber.toString().padStart(3, '0')}`;
+    localStorage.setItem('lastStockTakeNumber', `${dateStr}-${nextNumber.toString().padStart(3, '0')}`);
+    return num;
+  };
+
+  // Set initial stock take number on mount
+  useEffect(() => {
+    if (!stockTakeNumber) {
+      setStockTakeNumber(getNextStockTakeNumber());
+    }
+  }, []);
 
   // Load zones when stock take godown changes
   useEffect(() => {
@@ -12469,8 +12495,6 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   <th className="text-right p-2">System Qty</th>
                                   <th className="text-right p-2">Physical Count</th>
                                   <th className="text-right p-2">Variance</th>
-                                  <th className="text-right p-2">Unit Cost</th>
-                                  <th className="text-right p-2">Total Cost</th>
                                   <th className="p-2"></th>
                                 </tr>
                               </thead>
@@ -12529,16 +12553,6 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                         {item.variance}
                                       </span>
                                     </td>
-                                    <td className="p-2 text-right">
-                                      <Input
-                                        type="number"
-                                        value={item.unitCost || ''}
-                                        onChange={(e) => handleStockTakeItemChange(item.id, 'unitCost', Number(e.target.value))}
-                                        placeholder="0.00"
-                                        className="text-sm p-1 h-7 text-right"
-                                      />
-                                    </td>
-                                    <td className="p-2 text-right"><span className="text-sm font-semibold">{item.totalCost.toFixed(2)}</span></td>
                                     <td className="p-2 text-center">
                                       <Button
                                         variant="ghost"
@@ -12568,7 +12582,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                               <div className="flex justify-between"><span>Total System Quantity:</span><span className="font-bold">{stockTakeTotals.totalSystemQty}</span></div>
                               <div className="flex justify-between"><span>Total Physical Count:</span><span className="font-bold">{stockTakeTotals.totalPhysicalCount}</span></div>
                               <div className="flex justify-between"><span>Total Variance:</span><span className={`font-bold ${stockTakeTotals.totalVariance < 0 ? 'text-red-600' : stockTakeTotals.totalVariance > 0 ? 'text-green-600' : ''}`}>{stockTakeTotals.totalVariance}</span></div>
-                              <div className="flex justify-between border-t pt-1"><span>Total Investment Value:</span><span className="font-bold">{stockTakeTotals.totalInvestmentValue.toFixed(2)}</span></div>
+
                             </div>
                           </div>
                           <div>
