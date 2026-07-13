@@ -2160,6 +2160,65 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
     // For now, we'll use the print function as PDF export
     handlePrintGRN();
   };
+
+  // Build a GRN object from current grnData for use with printGRNDetails / exportGRNDetailsAsPDF
+  const buildGRNObject = () => {
+    const itemsWithCosts = distributeReceivingCosts([...grnData.items], grnData.receivingCosts);
+    return {
+      id: Date.now().toString(),
+      name: `GRN-${grnData.grnNumber}`,
+      data: {
+        grnNumber: grnData.grnNumber,
+        date: grnData.date,
+        time: grnData.time,
+        supplierName: grnData.supplierName,
+        supplierId: grnData.supplierId,
+        supplierPhone: grnData.supplierPhone,
+        supplierEmail: grnData.supplierEmail,
+        supplierAddress: grnData.supplierAddress,
+        supplierTinNumber: grnData.supplierTinNumber,
+        businessName: grnData.businessName,
+        businessAddress: grnData.businessAddress,
+        businessPhone: grnData.businessPhone,
+        businessEmail: grnData.businessEmail,
+        poNumber: grnData.poNumber,
+        deliveryNoteNumber: grnData.deliveryNoteNumber,
+        vehicleNumber: grnData.vehicleNumber,
+        driverName: grnData.driverName,
+        receivedBy: grnData.receivedBy,
+        receivedLocation: grnData.receivedLocation,
+        receivedDate: grnData.receivedDate,
+        status: grnData.status || 'completed',
+        qualityCheckNotes: grnData.qualityCheckNotes,
+        discrepancies: grnData.discrepancies,
+        preparedBy: grnData.preparedBy,
+        preparedDate: grnData.preparedDate,
+        checkedBy: grnData.checkedBy,
+        checkedDate: grnData.checkedDate,
+        approvedBy: grnData.approvedBy,
+        approvedDate: grnData.approvedDate,
+        receivingCosts: grnData.receivingCosts,
+        destinationGodownId: grnData.destinationGodownId,
+        destinationZoneId: grnData.destinationZoneId,
+        destinationGodownName: grnData.destinationGodownName,
+        destinationZoneName: grnData.destinationZoneName,
+        items: itemsWithCosts.map(item => ({
+          description: item.description,
+          quantity: item.orderedQuantity,
+          delivered: item.receivedQuantity,
+          unit: item.unit,
+          unitCost: item.unitCost || 0,
+          total: item.totalWithReceivingCost || 0,
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+          remarks: item.remarks,
+          receivingCostPerUnit: item.receivingCostPerUnit,
+          totalWithReceivingCost: item.totalWithReceivingCost,
+          damaged: item.damaged || 0
+        }))
+      }
+    };
+  };
   
   const [customerSettlementData, setCustomerSettlementData] = useState<CustomerSettlementData>({
     customerName: "Customer Name",
@@ -13772,161 +13831,7 @@ Enter choice (1-3):`);
             <div className="space-y-2">
               <Button 
                 onClick={() => {
-                  // Print functionality for GRN
-                  // Create a print-friendly version of the GRN
-                  const grnContent = generateCleanGRNHTML();
-                  
-                  // Validate that we have content to print
-                  if (!grnContent || grnContent.trim() === '') {
-                    alert('No GRN data available to print. Please make sure the GRN is properly filled out.');
-                    return;
-                  }
-                  
-                  try {
-                    // Create a temporary window for printing
-                    const printWindow = window.open('', '_blank', 'width=800,height=600');
-                    if (printWindow) {
-                      printWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                          <title>Goods Received Note - ${grnData.grnNumber || 'GRN'}</title>
-                          <style>
-                            body { 
-                              margin: 0; 
-                              padding: 20px; 
-                              font-family: Arial, sans-serif; 
-                              background: white;
-                            }
-                            .grn-container { 
-                              max-width: 800px; 
-                              margin: 0 auto; 
-                              padding: 20px; 
-                              border: 1px solid #ccc; 
-                              background: white;
-                            }
-                            .text-center { text-align: center; }
-                            .border-b-2 { border-bottom: 2px solid #000; }
-                            .pb-2 { padding-bottom: 0.5rem; }
-                            .font-bold { font-weight: bold; }
-                            .text-2xl { font-size: 1.5rem; }
-                            .text-sm { font-size: 0.875rem; }
-                            .mb-1 { margin-bottom: 0.25rem; }
-                            .mb-2 { margin-bottom: 0.5rem; }
-                            .mt-4 { margin-top: 1rem; }
-                            .mt-8 { margin-top: 2rem; }
-                            .pt-4 { padding-top: 1rem; }
-                            .border-t { border-top: 1px solid #ccc; }
-                            .grid { display: grid; }
-                            .gap-8 { gap: 2rem; }
-                            .gap-4 { gap: 1rem; }
-                            .grid-cols-1 { grid-template-columns: 1fr; }
-                            .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-                            .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-                            .border { border: 1px solid #e5e7eb; }
-                            .p-3 { padding: 0.75rem; }
-                            .rounded { border-radius: 0.25rem; }
-                            .font-medium { font-weight: 500; }
-                            table { 
-                              width: 100%; 
-                              border-collapse: collapse; 
-                              font-size: 12px;
-                              margin: 10px 0;
-                            }
-                            th, td {
-                              border: 1px solid #e5e7eb;
-                              padding: 6px;
-                            }
-                            th {
-                              background-color: #f3f4f6;
-                              text-align: left;
-                            }
-                            .text-right {
-                              text-align: right;
-                            }
-                          </style>
-                        </head>
-                        <body>
-                          <div class="no-print" style="margin-bottom: 20px; text-align: center;">
-                            <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                              Print GRN
-                            </button>
-                            <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; margin-left: 10px; cursor: pointer;">
-                              Close
-                            </button>
-                          </div>
-                          ${grnContent}
-                        </body>
-                        </html>
-                      `);
-                      printWindow.document.close();
-                      
-                      // Focus the window and optionally print
-                      printWindow.focus();
-                      
-                      // Wait for content to fully load before printing
-                      setTimeout(() => {
-                        // Remove the print/close buttons from the print output
-                        const printStyle = printWindow.document.createElement('style');
-                        printStyle.textContent = '@media print { .no-print { display: none; } }';
-                        printWindow.document.head.appendChild(printStyle);
-                      }, 1000);
-                    } else {
-                      // Fallback: Direct print or clipboard method
-                      console.log('Popup blocked, falling back to alternative printing method');
-                      const blob = new Blob([`<html><head><title>Goods Received Note</title><style>
-                        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-                        .grn-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
-                        .text-center { text-align: center; }
-                        .border-b-2 { border-bottom: 2px solid #000; }
-                        .pb-2 { padding-bottom: 0.5rem; }
-                        .font-bold { font-weight: bold; }
-                        .text-2xl { font-size: 1.5rem; }
-                        .text-sm { font-size: 0.875rem; }
-                        .mb-1 { margin-bottom: 0.25rem; }
-                        .mb-2 { margin-bottom: 0.5rem; }
-                        .mt-4 { margin-top: 1rem; }
-                        .mt-8 { margin-top: 2rem; }
-                        .pt-4 { padding-top: 1rem; }
-                        .border-t { border-top: 1px solid #ccc; }
-                        .grid { display: grid; }
-                        .gap-8 { gap: 2rem; }
-                        .gap-4 { gap: 1rem; }
-                        .grid-cols-1 { grid-template-columns: 1fr; }
-                        .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-                        .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-                        .border { border: 1px solid #e5e7eb; }
-                        .p-3 { padding: 0.75rem; }
-                        .rounded { border-radius: 0.25rem; }
-                        .font-medium { font-weight: 500; }
-                        table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0; }
-                        th, td { border: 1px solid #e5e7eb; padding: 6px; }
-                        th { background-color: #f3f4f6; text-align: left; }
-                        .text-right { text-align: right; }
-                      </style></head><body>${grnContent}</body></html>`], {
-                        type: 'text/html'
-                      });
-                      
-                      const newWindow = window.open(URL.createObjectURL(blob));
-                      if (newWindow) {
-                        newWindow.onload = () => {
-                          setTimeout(() => {
-                            newWindow.print();
-                          }, 1000);
-                        };
-                      } else {
-                        // Final fallback: Copy to clipboard and show message
-                        navigator.clipboard.writeText(grnContent).then(() => {
-                          alert('GRN content copied to clipboard. You can paste it into a document or email.');
-                        }).catch(() => {
-                          alert('Unable to print or copy. Please manually copy the GRN information below:\n\n' + grnContent.substring(0, 1000) + '...');
-                        });
-                      }
-                    }
-                  } catch (error) {
-                    console.error('Error during GRN printing:', error);
-                    alert('Error occurred while trying to print the GRN. Please try again or use the Download option.');
-                  }
+                  PrintUtils.printGRNDetails(buildGRNObject());
                   closeGRNOptionsDialog();
                 }}
                 className="w-full flex items-center justify-start"
@@ -13938,12 +13843,8 @@ Enter choice (1-3):`);
               
               <Button 
                 onClick={() => {
-                  // Download functionality for GRN
-                  downloadGRNAsPDF();
+                  ExportUtils.exportGRNDetailsAsPDF(buildGRNObject(), `GRN-${grnData.grnNumber}`);
                   closeGRNOptionsDialog();
-                  
-                  // Reset form after action
-                  resetGRNData();
                 }}
                 className="w-full flex items-center justify-start"
                 variant="outline"
