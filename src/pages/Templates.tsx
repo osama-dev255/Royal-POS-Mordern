@@ -67,7 +67,7 @@ import { supabase } from '@/lib/supabaseClient';
 interface Template {
   id: string;
   name: string;
-  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order";
+  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take";
   description: string;
   content: string;
   lastModified: string;
@@ -599,7 +599,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1111,6 +1111,39 @@ Sales Representative: [SALES_REP]      Date: [AUTH_DATE]
 Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       lastModified: new Date().toISOString().split('T')[0],
       isActive: true
+    },
+    {
+      id: "16",
+      name: "Stock Take",
+      type: "stock-take",
+      description: "Physical stock take template for inventory auditing and reconciliation",
+      content: `PHYSICAL STOCK TAKE
+Stock Take #[STOCK_TAKE_NUMBER]
+Date: [DATE]
+Outlet: [OUTLET_NAME]
+
+COUNTED BY:
+[COUNTED_BY]
+
+ITEMS COUNTED:
+No.	Product	SKU	Category	System Qty	Physical Count	Variance	Unit Cost	Total Cost
+[ITEM_LIST]
+
+SUMMARY:
+Total Products: [TOTAL_PRODUCTS]
+Total System Quantity: [TOTAL_SYSTEM_QTY]
+Total Physical Count: [TOTAL_PHYSICAL_COUNT]
+Total Variance: [TOTAL_VARIANCE]
+Total Cost Value: [TOTAL_COST_VALUE]
+
+NOTES:
+[NOTES]
+
+VERIFIED BY:
+Supervisor: _________________    Date: [VERIFICATION_DATE]
+Manager: _________________    Date: [APPROVAL_DATE]`,
+      lastModified: new Date().toISOString().split('T')[0],
+      isActive: true
     }
   ]);
   
@@ -1217,6 +1250,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
   
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
+  const [stockTakeNumber, setStockTakeNumber] = useState<string>("ST-001");
 
   // Load outlets on component mount
   useEffect(() => {
@@ -8187,6 +8221,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       case "customer-settlement": return <HandCoins className="h-5 w-5" />;
       case "supplier-settlement": return <Truck className="h-5 w-5" />;
       case "sales-order": return <ShoppingCart className="h-5 w-5" />;
+      case "stock-take": return <ClipboardCheck className="h-5 w-5" />;
       default: return <FileText className="h-5 w-5" />;
     }
   };
@@ -8236,7 +8271,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                                   ? "Supplier Settlement Preview"
                                   : currentTemplate?.type === "sales-order"
                                     ? "Sales Order Preview"
-                                    : "Delivery Note Preview")
+                                    : currentTemplate?.type === "stock-take"
+                                      ? "Stock Take Preview"
+                                      : "Delivery Note Preview")
                   : viewingTemplate 
                     ? `Viewing Template: ${currentTemplate?.name || 'Template'}`
                     : selectedTemplate 
@@ -8446,7 +8483,7 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">
-                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : currentTemplate?.type === "report" ? "Report Template Preview" : currentTemplate?.type === "customer-settlement" ? "Customer Settlement Preview" : currentTemplate?.type === "supplier-settlement" ? "Supplier Settlement Preview" : currentTemplate?.type === "goods-received-note" ? "Goods Received Note Preview" : currentTemplate?.type === "sales-order" ? "Sales Order Preview" : "Delivery Note Preview"}
+                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : currentTemplate?.type === "report" ? "Report Template Preview" : currentTemplate?.type === "customer-settlement" ? "Customer Settlement Preview" : currentTemplate?.type === "supplier-settlement" ? "Supplier Settlement Preview" : currentTemplate?.type === "goods-received-note" ? "Goods Received Note Preview" : currentTemplate?.type === "sales-order" ? "Sales Order Preview" : currentTemplate?.type === "stock-take" ? "Stock Take Preview" : "Delivery Note Preview"}
                   </h3>
                   <div className="flex gap-2">
                     {currentTemplate?.type === "order-form" ? (
@@ -8519,6 +8556,14 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                         placeholder="Sales Order Number"
                         value={salesOrderData.orderNumber}
                         onChange={(e) => handleSalesOrderChange("orderNumber", e.target.value)}
+                        className="w-48 h-10"
+                      />
+                    ) : currentTemplate?.type === "stock-take" ? (
+                      <Input
+                        type="text"
+                        placeholder="Stock Take Number"
+                        value={stockTakeNumber}
+                        onChange={(e) => setStockTakeNumber(e.target.value)}
                         className="w-48 h-10"
                       />
                     ) : null}
@@ -8598,6 +8643,9 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
                       } else if (currentTemplate?.type === "sales-order") {
                         // Automatically save sales order to saved sales orders
                         await handleSaveSalesOrder();
+                      } else if (currentTemplate?.type === "stock-take") {
+                        // Navigate to saved stock takes section
+                        setActiveTab('savedStockTakes');
                       } else if (currentTemplate?.type === "salary-slip") {
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
                       } else if (currentTemplate?.type === "complimentary-goods") {
