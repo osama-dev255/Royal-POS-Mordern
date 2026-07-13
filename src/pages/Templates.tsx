@@ -1253,6 +1253,27 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const [reportName, setReportName] = useState<string>("");
   const [settlementReference, setSettlementReference] = useState<string>("");
   const [stockTakeNumber, setStockTakeNumber] = useState<string>("ST-001");
+  const [stockTakeGodownId, setStockTakeGodownId] = useState<string>("");
+  const [stockTakeZoneId, setStockTakeZoneId] = useState<string>("");
+  const [stockTakeZones, setStockTakeZones] = useState<GodownZone[]>([]);
+
+  // Load zones when stock take godown changes
+  useEffect(() => {
+    const loadStockTakeZones = async () => {
+      if (stockTakeGodownId) {
+        try {
+          const data = await getZones(stockTakeGodownId);
+          setStockTakeZones(data);
+        } catch (error) {
+          console.error('Error loading zones for stock take:', error);
+          setStockTakeZones([]);
+        }
+      } else {
+        setStockTakeZones([]);
+      }
+    };
+    loadStockTakeZones();
+  }, [stockTakeGodownId]);
 
   // Load outlets on component mount
   useEffect(() => {
@@ -12201,17 +12222,30 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                             />
 
                             <div className="font-bold mb-1">GODOWN</div>
-                            <Input
-                              placeholder="Select godown"
-                              className="text-sm mb-4 p-1 h-8"
-                            />
+                            <Select value={stockTakeGodownId} onValueChange={(val) => { setStockTakeGodownId(val); setStockTakeZoneId(""); }}>
+                              <SelectTrigger className="text-sm mb-4 p-1 h-8">
+                                <SelectValue placeholder="Select godown" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {godowns.map(g => (
+                                  <SelectItem key={g.id} value={g.id!}>{g.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <div className="font-bold mb-1">ZONE</div>
-                            <Input
-                              placeholder="Select zone (optional)"
-                              className="text-sm mb-4 p-1 h-8"
-                            />
+                            <Select value={stockTakeZoneId} onValueChange={setStockTakeZoneId}>
+                              <SelectTrigger className="text-sm mb-4 p-1 h-8">
+                                <SelectValue placeholder={stockTakeGodownId ? "Select zone (optional)" : "Select godown first"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__no_zone__">No Zone (Godown Level)</SelectItem>
+                                {stockTakeZones.map(z => (
+                                  <SelectItem key={z.id} value={z.id!}>{z.zone_name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
 
                             <div className="font-bold mb-1">COUNTED BY</div>
                             <Input
