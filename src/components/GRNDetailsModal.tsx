@@ -326,12 +326,12 @@ export const GRNDetailsModal = ({
                   <div>
                     <h4 className="text-sm font-medium mb-2">Status Information</h4>
                     <div className="space-y-1">
-                      <p className="text-sm">
+                      <div className="flex items-center gap-1 text-sm">
                         <span className="text-muted-foreground">Status:</span>{" "}
                         <Badge variant={getStatusVariant(grn.data.status || "pending")}>
                           {grn.data.status?.charAt(0).toUpperCase() + (grn.data.status?.slice(1) || "Pending")}
                         </Badge>
-                      </p>
+                      </div>
                       {grn.data.preparedBy && (
                         <p className="text-sm">
                           <span className="text-muted-foreground">Prepared By:</span>{" "}

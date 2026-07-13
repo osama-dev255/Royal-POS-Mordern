@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { getSavedGRNs, SavedGRN, deleteGRN } from "@/utils/grnUtils";
 import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer, Truck } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { PrintUtils } from "@/utils/printUtils";
+import { ExportUtils } from "@/utils/exportUtils";
 
 export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }: { username: string; onBack: () => void; onLogout: () => void; onNavigate?: (page: string) => void }) => {
   const [grns, setGrns] = useState<SavedGRN[]>([]);
@@ -69,21 +71,11 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
   };
 
   const handleGRNPrint = (grn: SavedGRN) => {
-    // Implement print functionality
-    toast({
-      title: "Print GRN",
-      description: `Printing GRN: ${grn.data.grnNumber || grn.name}`
-    });
-    // TODO: Implement actual print functionality
+    PrintUtils.printGRNDetails(grn);
   };
 
   const handleGRNDownload = (grn: SavedGRN) => {
-    // Implement download functionality
-    toast({
-      title: "Download GRN",
-      description: `Downloading GRN: ${grn.data.grnNumber || grn.name}`
-    });
-    // TODO: Implement actual download functionality (PDF/Excel)
+    ExportUtils.exportGRNDetailsAsPDF(grn, `GRN-${grn.data.grnNumber || grn.id}`);
   };
 
   const handleGRNDelete = async (grn: SavedGRN) => {

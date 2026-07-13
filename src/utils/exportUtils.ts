@@ -1040,4 +1040,176 @@ export class ExportUtils {
       }
     }
   }
-}
+  // ==================== GRN DETAILS A4 PDF EXPORT ====================
+    static exportGRNDetailsAsPDF(grn: any, filename?: string) {
+      const data = grn.data || grn;
+      const items = Array.isArray(data.items) ? data.items : [];
+      const totalValue = items.reduce((sum: number, item: any) => sum + (item.totalWithReceivingCost || item.total || 0), 0);
+      const totalQty = items.reduce((sum: number, item: any) => sum + (item.delivered || item.quantity || 0), 0);
+      const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+  
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+  
+      // Header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GOODS RECEIVED NOTE', pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100);
+      const bizLine = [data.businessName, data.businessAddress, data.businessPhone].filter(Boolean).join(' • ');
+      if (bizLine) doc.text(bizLine, pageWidth / 2, y, { align: 'center' });
+      y += 4;
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 8;
+  
+      // Info boxes
+      doc.setTextColor(0);
+      doc.setFontSize(8);
+      const colW = (pageWidth - 30) / 2;
+      const boxH = 30;
+  
+      // GRN Info box
+      doc.setDrawColor(180);
+      doc.rect(15, y, colW, boxH);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('GRN Information', 17, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`GRN #: ${data.grnNumber || 'N/A'}`, 17, y + 9);
+      doc.text(`Date: ${formatDate(data.date)}`, 17, y + 14);
+      doc.text(`Status: ${(data.status || 'pending').toUpperCase()}`, 17, y + 19);
+      doc.text(`PO #: ${data.poNumber || 'N/A'}`, 17, y + 24);
+  
+      // Supplier box
+      const x2 = 15 + colW;
+      doc.rect(x2, y, colW, boxH);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Supplier Details', x2 + 2, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Name: ${data.supplierName || 'N/A'}`, x2 + 2, y + 9);
+      if (data.supplierPhone) doc.text(`Phone: ${data.supplierPhone}`, x2 + 2, y + 14);
+      if (data.supplierEmail) doc.text(`Email: ${data.supplierEmail}`, x2 + 2, y + 19);
+      if (data.supplierTinNumber) doc.text(`TIN: ${data.supplierTinNumber}`, x2 + 2, y + 24);
+  
+      y += boxH + 5;
+  
+      // Logistics + Destination row
+      const boxH2 = 22;
+      doc.rect(15, y, colW, boxH2);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('Logistics', 17, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      let logY = y + 9;
+      if (data.vehicleNumber) { doc.text(`Vehicle: ${data.vehicleNumber}`, 17, logY); logY += 5; }
+      if (data.driverName) { doc.text(`Driver: ${data.driverName}`, 17, logY); logY += 5; }
+      if (data.receivedBy) { doc.text(`Received By: ${data.receivedBy}`, 17, logY); }
+  
+      doc.rect(x2, y, colW, boxH2);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('Destination', x2 + 2, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Godown: ${data.destinationGodownName || 'N/A'}`, x2 + 2, y + 9);
+      doc.text(`Zone: ${data.destinationZoneName || 'N/A'}`, x2 + 2, y + 14);
+      if (data.receivedDate) doc.text(`Received: ${formatDate(data.receivedDate)}`, x2 + 2, y + 19);
+  
+      y += boxH2 + 8;
+  
+      // Items table
+      const tableData = items.map((item: any, i: number) => [
+        i + 1,
+        item.description || '',
+        item.quantity || 0,
+        item.delivered || 0,
+        (item.receivingCostPerUnit || item.unitCost || 0).toFixed(2),
+        (item.totalWithReceivingCost || item.total || 0).toFixed(2),
+        item.batchNumber || '-',
+        item.expiryDate ? formatDate(item.expiryDate) : '-',
+        item.godown_name || item.godownName || '-',
+        item.zone_name || item.zoneName || '-'
+      ]);
+  
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Item', 'Ordered', 'Delivered', 'Unit Cost', 'Total', 'Batch', 'Expiry', 'Godown', 'Zone']],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'right' },
+          5: { halign: 'right' }
+        },
+        margin: { left: 15, right: 15 }
+      });
+  
+      // @ts-ignore - autoTable updates y cursor
+      y = doc.lastAutoTable?.finalY + 5 || y + 40;
+  
+      // Totals
+      doc.setFontSize(9);
+      doc.text(`Total Items: ${items.length}`, pageWidth - 15, y, { align: 'right' });
+      y += 5;
+      doc.text(`Total Quantity: ${totalQty}`, pageWidth - 15, y, { align: 'right' });
+      y += 5;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Grand Total: ${totalValue.toFixed(2)}`, pageWidth - 15, y, { align: 'right' });
+      y += 10;
+  
+      // Notes
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      if (data.qualityCheckNotes) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Quality Check Notes:', 15, y);
+        doc.setFont('helvetica', 'normal');
+        y += 4;
+        const splitNotes = doc.splitTextToSize(data.qualityCheckNotes, pageWidth - 30);
+        doc.text(splitNotes, 15, y);
+        y += splitNotes.length * 4 + 4;
+      }
+      if (data.discrepancies) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Discrepancies:', 15, y);
+        doc.setFont('helvetica', 'normal');
+        y += 4;
+        const splitDisc = doc.splitTextToSize(data.discrepancies, pageWidth - 30);
+        doc.text(splitDisc, 15, y);
+        y += splitDisc.length * 4 + 4;
+      }
+  
+      // Signatures
+      y = Math.max(y + 10, doc.internal.pageSize.getHeight() - 30);
+      const sigW = (pageWidth - 30) / 3;
+      doc.setDrawColor(0);
+      doc.line(15, y, 15 + sigW, y);
+      doc.line(15 + sigW, y, 15 + sigW * 2, y);
+      doc.line(15 + sigW * 2, y, pageWidth - 15, y);
+      doc.setFontSize(7);
+      doc.text(data.preparedBy ? `Prepared By: ${data.preparedBy}` : 'Prepared By', 15 + sigW / 2, y + 4, { align: 'center' });
+      doc.text(data.checkedBy ? `Checked By: ${data.checkedBy}` : 'Checked By', 15 + sigW * 1.5, y + 4, { align: 'center' });
+      doc.text(data.approvedBy ? `Approved By: ${data.approvedBy}` : 'Approved By', 15 + sigW * 2.5, y + 4, { align: 'center' });
+  
+      // Footer
+      doc.setFontSize(7);
+      doc.setTextColor(120);
+      doc.text(`Printed: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+  
+      // Save
+      const fname = filename || `GRN-${data.grnNumber || 'details'}`;
+      doc.save(`${fname}.pdf`);
+    }
+  }

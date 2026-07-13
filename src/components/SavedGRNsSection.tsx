@@ -104,68 +104,11 @@ export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectio
   };
 
   const handlePrintGRN = (grn: SavedGRNType) => {
-    // Create a transaction object for printing
-    const transaction = {
-      id: grn.id,
-      receiptNumber: grn.data.grnNumber,
-      date: grn.data.date,
-      items: grn.data.items.map(item => ({
-        name: item.description,
-        quantity: item.delivered,
-        unit: item.unit,
-        price: item.unitCost || 0,
-        total: item.totalWithReceivingCost || 0
-      })),
-      subtotal: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
-      tax: 0, // GRNs typically don't have tax separately
-      discount: 0,
-      total: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
-      paymentMethod: "N/A",
-      amountReceived: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
-      change: 0,
-      customer: { name: grn.data.supplierName },
-      supplier: { name: grn.data.supplierName },
-      poNumber: grn.data.poNumber,
-      deliveryNoteNumber: grn.data.deliveryNoteNumber,
-      vehicle: grn.data.vehicleNumber,
-      driver: grn.data.driverName,
-      receivedBy: grn.data.receivedBy
-    };
-
-    // For now, use printPurchaseReceipt as a fallback since there's no printGRN method
-    PrintUtils.printPurchaseReceipt(transaction);
+    PrintUtils.printGRNDetails(grn);
   };
 
   const handleDownloadGRN = (grn: SavedGRNType) => {
-    // Create a transaction object for PDF export
-    const transaction = {
-      id: grn.id,
-      receiptNumber: grn.data.grnNumber,
-      date: grn.data.date,
-      items: grn.data.items.map(item => ({
-        name: item.description,
-        quantity: item.delivered,
-        unit: item.unit,
-        price: item.unitCost || 0,
-        total: item.totalWithReceivingCost || 0
-      })),
-      subtotal: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
-      tax: 0, // GRNs typically don't have tax separately
-      discount: 0,
-      total: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
-      paymentMethod: "N/A",
-      amountReceived: grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
-      change: 0,
-      customer: { name: grn.data.supplierName },
-      supplier: { name: grn.data.supplierName },
-      poNumber: grn.data.poNumber,
-      deliveryNoteNumber: grn.data.deliveryNoteNumber,
-      vehicle: grn.data.vehicleNumber,
-      driver: grn.data.driverName,
-      receivedBy: grn.data.receivedBy
-    };
-    
-    ExportUtils.exportGRNAsPDF(transaction, `grn-${grn.data.grnNumber}`);
+    ExportUtils.exportGRNDetailsAsPDF(grn, `GRN-${grn.data.grnNumber || grn.id}`);
   };
 
   return (

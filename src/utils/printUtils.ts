@@ -4896,4 +4896,138 @@ export class PrintUtils {
       reportWindow.close();
     }, 250);
   }
+
+  // ==================== GRN DETAILS PRINT ====================
+  static printGRNDetails(grn: any) {
+    const data = grn.data || grn;
+    const items = Array.isArray(data.items) ? data.items : [];
+    const totalValue = items.reduce((sum: number, item: any) => sum + (item.totalWithReceivingCost || item.total || 0), 0);
+    const totalQty = items.reduce((sum: number, item: any) => sum + (item.delivered || item.quantity || 0), 0);
+
+    const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+
+    const rows = items.map((item: any, i: number) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${item.description || ''}</td>
+        <td style="text-align:center">${item.quantity || 0}</td>
+        <td style="text-align:center">${item.delivered || 0}</td>
+        <td style="text-align:right">${(item.receivingCostPerUnit || item.unitCost || 0).toFixed(2)}</td>
+        <td style="text-align:right">${(item.totalWithReceivingCost || item.total || 0).toFixed(2)}</td>
+        <td>${item.batchNumber || '-'}</td>
+        <td>${item.expiryDate ? formatDate(item.expiryDate) : '-'}</td>
+        <td>${item.godown_name || item.godownName || '-'}</td>
+        <td>${item.zone_name || item.zoneName || '-'}</td>
+        <td style="text-align:center">${(item.damaged || 0) > 0 ? item.damaged : '-'}</td>
+        <td>${item.remarks || '-'}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html><head><title>GRN ${data.grnNumber || ''}</title>
+<style>
+  @media print { @page { size: A4; margin: 15mm; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 20px; }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+  .header h1 { font-size: 18px; margin-bottom: 4px; }
+  .header p { font-size: 10px; color: #444; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+  .info-box { border: 1px solid #ccc; padding: 8px; font-size: 10px; }
+  .info-box h3 { font-size: 11px; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
+  .info-box p { margin: 2px 0; }
+  .info-box span.label { color: #555; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 9px; }
+  th, td { border: 1px solid #999; padding: 4px 5px; }
+  th { background: #f0f0f0; font-weight: bold; text-align: left; font-size: 9px; }
+  .totals { text-align: right; margin-bottom: 15px; font-size: 11px; }
+  .totals table { width: auto; margin-left: auto; border: none; }
+  .totals td { border: none; padding: 2px 10px; }
+  .totals tr:last-child { font-weight: bold; border-top: 2px solid #000; }
+  .notes { margin-bottom: 10px; font-size: 10px; }
+  .notes h3 { font-size: 11px; margin-bottom: 3px; }
+  .notes p { margin-bottom: 6px; white-space: pre-wrap; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; font-size: 10px; }
+  .sig-box { border-top: 1px solid #000; padding-top: 4px; text-align: center; }
+  .footer { text-align: center; margin-top: 20px; font-size: 9px; color: #666; border-top: 1px solid #ccc; padding-top: 8px; }
+</style></head><body>
+  <div class="header">
+    <h1>GOODS RECEIVED NOTE</h1>
+    <p>${data.businessName || ''} ${data.businessAddress ? '• ' + data.businessAddress : ''} ${data.businessPhone ? '• ' + data.businessPhone : ''}</p>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <h3>GRN Information</h3>
+      <p><span class="label">GRN #:</span> ${data.grnNumber || 'N/A'}</p>
+      <p><span class="label">Date:</span> ${formatDate(data.date)}</p>
+      <p><span class="label">Status:</span> ${(data.status || 'pending').toUpperCase()}</p>
+      <p><span class="label">PO #:</span> ${data.poNumber || 'N/A'}</p>
+      <p><span class="label">Delivery Note #:</span> ${data.deliveryNoteNumber || 'N/A'}</p>
+    </div>
+    <div class="info-box">
+      <h3>Supplier Details</h3>
+      <p><span class="label">Name:</span> ${data.supplierName || 'N/A'}</p>
+      ${data.supplierPhone ? '<p><span class="label">Phone:</span> ' + data.supplierPhone + '</p>' : ''}
+      ${data.supplierEmail ? '<p><span class="label">Email:</span> ' + data.supplierEmail + '</p>' : ''}
+      ${data.supplierTinNumber ? '<p><span class="label">TIN:</span> ' + data.supplierTinNumber + '</p>' : ''}
+    </div>
+    <div class="info-box">
+      <h3>Logistics</h3>
+      ${data.vehicleNumber ? '<p><span class="label">Vehicle:</span> ' + data.vehicleNumber + '</p>' : ''}
+      ${data.driverName ? '<p><span class="label">Driver:</span> ' + data.driverName + '</p>' : ''}
+      ${data.receivedBy ? '<p><span class="label">Received By:</span> ' + data.receivedBy + '</p>' : ''}
+      ${data.receivedLocation ? '<p><span class="label">Location:</span> ' + data.receivedLocation + '</p>' : ''}
+    </div>
+    <div class="info-box">
+      <h3>Destination</h3>
+      <p><span class="label">Godown:</span> ${data.destinationGodownName || 'N/A'}</p>
+      <p><span class="label">Zone:</span> ${data.destinationZoneName || 'N/A'}</p>
+      ${data.receivedDate ? '<p><span class="label">Received Date:</span> ' + formatDate(data.receivedDate) + '</p>' : ''}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Item</th><th style="text-align:center">Ordered</th><th style="text-align:center">Delivered</th>
+        <th style="text-align:right">Unit Cost</th><th style="text-align:right">Total</th>
+        <th>Batch</th><th>Expiry</th><th>Godown</th><th>Zone</th>
+        <th style="text-align:center">Damaged</th><th>Remarks</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="totals">
+    <table>
+      <tr><td>Total Items:</td><td>${items.length}</td></tr>
+      <tr><td>Total Quantity:</td><td>${totalQty}</td></tr>
+      <tr><td>Grand Total:</td><td>${totalValue.toFixed(2)}</td></tr>
+    </table>
+  </div>
+
+  ${data.qualityCheckNotes ? '<div class="notes"><h3>Quality Check Notes</h3><p>' + data.qualityCheckNotes + '</p></div>' : ''}
+  ${data.discrepancies ? '<div class="notes"><h3>Discrepancies</h3><p>' + data.discrepancies + '</p></div>' : ''}
+
+  <div class="signatures">
+    <div class="sig-box">${data.preparedBy ? 'Prepared By: ' + data.preparedBy : 'Prepared By'}<br/>${data.preparedDate ? formatDate(data.preparedDate) : ''}</div>
+    <div class="sig-box">${data.checkedBy ? 'Checked By: ' + data.checkedBy : 'Checked By'}<br/>${data.checkedDate ? formatDate(data.checkedDate) : ''}</div>
+    <div class="sig-box">${data.approvedBy ? 'Approved By: ' + data.approvedBy : 'Approved By'}<br/>${data.approvedDate ? formatDate(data.approvedDate) : ''}</div>
+  </div>
+
+  <div class="footer">
+    <p>Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+  </div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+  }
 }
