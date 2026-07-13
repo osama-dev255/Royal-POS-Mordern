@@ -1126,6 +1126,8 @@ export class ExportUtils {
       y += boxH2 + 8;
   
       // Items table
+      const defaultGodown = data.destinationGodownName || data.destinationGodownId || '-';
+      const defaultZone = data.destinationZoneName || data.destinationZoneId || '-';
       const tableData = items.map((item: any, i: number) => [
         i + 1,
         item.description || '',
@@ -1135,8 +1137,8 @@ export class ExportUtils {
         (item.totalWithReceivingCost || item.total || 0).toFixed(2),
         item.batchNumber || '-',
         item.expiryDate ? formatDate(item.expiryDate) : '-',
-        item.godown_name || item.godownName || '-',
-        item.zone_name || item.zoneName || '-'
+        item.godown_name || item.godownName || defaultGodown,
+        item.zone_name || item.zoneName || defaultZone
       ]);
   
       autoTable(doc, {

@@ -4906,6 +4906,10 @@ export class PrintUtils {
 
     const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
 
+    // GRN-level destination as fallback for items without per-item godown/zone
+    const defaultGodown = data.destinationGodownName || data.destinationGodownId || '-';
+    const defaultZone = data.destinationZoneName || data.destinationZoneId || '-';
+
     const rows = items.map((item: any, i: number) => `
       <tr>
         <td>${i + 1}</td>
@@ -4916,8 +4920,8 @@ export class PrintUtils {
         <td style="text-align:right">${(item.totalWithReceivingCost || item.total || 0).toFixed(2)}</td>
         <td>${item.batchNumber || '-'}</td>
         <td>${item.expiryDate ? formatDate(item.expiryDate) : '-'}</td>
-        <td>${item.godown_name || item.godownName || '-'}</td>
-        <td>${item.zone_name || item.zoneName || '-'}</td>
+        <td>${item.godown_name || item.godownName || defaultGodown}</td>
+        <td>${item.zone_name || item.zoneName || defaultZone}</td>
         <td style="text-align:center">${(item.damaged || 0) > 0 ? item.damaged : '-'}</td>
         <td>${item.remarks || '-'}</td>
       </tr>

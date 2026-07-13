@@ -165,7 +165,9 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       updated_at: grn.updatedAt || new Date().toISOString(),
       // Godown integration fields
       destination_godown_id: grn.data.destinationGodownId || null,
-      destination_zone_id: grn.data.destinationZoneId || null
+      destination_zone_id: grn.data.destinationZoneId || null,
+      destination_godown_name: grn.data.destinationGodownName || null,
+      destination_zone_name: grn.data.destinationZoneName || null
     };
     
     console.log('3. Attempting database insert...');
@@ -369,7 +371,12 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             receivedDate: dbGRN.received_date ? dbGRN.received_date.toString() : '',
             status: dbGRN.status || 'pending',
             receivingCosts: receivingCosts,
-            timestamp: ''
+            timestamp: '',
+            // Godown integration fields
+            destinationGodownId: dbGRN.destination_godown_id || '',
+            destinationZoneId: dbGRN.destination_zone_id || '',
+            destinationGodownName: dbGRN.destination_godown_name || '',
+            destinationZoneName: dbGRN.destination_zone_name || ''
           },
           createdAt: dbGRN.created_at || new Date().toISOString(),
           updatedAt: dbGRN.updated_at || new Date().toISOString()
