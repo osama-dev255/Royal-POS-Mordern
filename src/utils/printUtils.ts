@@ -5003,6 +5003,18 @@ export class PrintUtils {
     <tbody>${rows}</tbody>
   </table>
 
+  ${(() => {
+    const costs = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
+    if (costs.length === 0) return '';
+    const costTotal = costs.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+    const costRows = costs.map((c: any, i: number) => `<tr><td>${i + 1}</td><td>${c.description || ''}</td><td style="text-align:right">${(c.amount || 0).toFixed(2)}</td></tr>`).join('');
+    return `<table style="width:40%; margin-left:auto; margin-bottom:10px;">
+      <thead><tr><th colspan="3" style="background:#f0f0f0; text-align:left;">RECEIVING COSTS</th></tr></thead>
+      <tbody>${costRows}
+        <tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" style="text-align:right">Total Receiving Costs:</td><td style="text-align:right">${costTotal.toFixed(2)}</td></tr>
+      </tbody></table>`;
+  })()}
+
   <div class="totals">
     <table>
       <tr><td>Total Items:</td><td>${items.length}</td></tr>

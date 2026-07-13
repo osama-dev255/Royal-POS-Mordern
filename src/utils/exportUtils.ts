@@ -1161,6 +1161,41 @@ export class ExportUtils {
       // @ts-ignore - autoTable updates y cursor
       y = doc.lastAutoTable?.finalY + 5 || y + 40;
   
+      // Receiving Costs table
+      const receivingCosts = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
+      if (receivingCosts.length > 0) {
+        const costData = receivingCosts.map((c: any, i: number) => [
+          i + 1,
+          c.description || '',
+          (c.amount || 0).toFixed(2)
+        ]);
+        const costTotal = receivingCosts.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+        costData.push(['', 'Total Receiving Costs:', costTotal.toFixed(2)]);
+  
+        autoTable(doc, {
+          startY: y,
+          head: [['RECEIVING COSTS', '', '']],
+          body: costData,
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            2: { halign: 'right', fontStyle: 'bold' }
+          },
+          margin: { left: pageWidth - 80, right: 15 },
+          didParseCell: (hookData: any) => {
+            // Bold the last row (total)
+            if (hookData.section === 'body' && hookData.row.index === costData.length - 1) {
+              hookData.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+  
+        // @ts-ignore
+        y = doc.lastAutoTable?.finalY + 5 || y + 20;
+      }
+  
       // Totals
       doc.setFontSize(9);
       doc.text(`Total Items: ${items.length}`, pageWidth - 15, y, { align: 'right' });
