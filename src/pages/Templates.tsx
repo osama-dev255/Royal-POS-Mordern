@@ -1116,32 +1116,34 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
       id: "16",
       name: "Stock Take",
       type: "stock-take",
-      description: "Physical stock take template for inventory auditing and reconciliation",
+      description: "Physical stock take template for investment inventory auditing in godowns and zones",
       content: `PHYSICAL STOCK TAKE
 Stock Take #[STOCK_TAKE_NUMBER]
 Date: [DATE]
-Outlet: [OUTLET_NAME]
+Godown: [GODOWN_NAME]
+Zone: [ZONE_NAME]
+Purpose: Investment Inventory
 
 COUNTED BY:
 [COUNTED_BY]
 
-ITEMS COUNTED:
-No.	Product	SKU	Category	System Qty	Physical Count	Variance	Unit Cost	Total Cost
+GODOWN STOCK COUNT:
+No.	Product	Godown	Zone	System Qty	Physical Count	Variance	Unit Cost	Total Cost
 [ITEM_LIST]
 
-SUMMARY:
+INVENTORY SUMMARY:
 Total Products: [TOTAL_PRODUCTS]
 Total System Quantity: [TOTAL_SYSTEM_QTY]
 Total Physical Count: [TOTAL_PHYSICAL_COUNT]
 Total Variance: [TOTAL_VARIANCE]
-Total Cost Value: [TOTAL_COST_VALUE]
+Total Investment Value: [TOTAL_INVESTMENT_VALUE]
 
 NOTES:
 [NOTES]
 
 VERIFIED BY:
-Supervisor: _________________    Date: [VERIFICATION_DATE]
-Manager: _________________    Date: [APPROVAL_DATE]`,
+Counted By: _________________    Date: [COUNT_DATE]
+Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       lastModified: new Date().toISOString().split('T')[0],
       isActive: true
     }
@@ -2728,7 +2730,7 @@ Manager: _________________    Date: [APPROVAL_DATE]`,
 
   const handlePreviewTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
-    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order")) {
+    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take")) {
       setViewingTemplate(templateId);
       setActiveTab("preview");
     } else {
@@ -8981,6 +8983,11 @@ Manager: _________________    Date: [APPROVAL_DATE]`,
                         <h2 className="text-2xl font-bold">SALES ORDER</h2>
                         <p className="text-sm">Customer Order Confirmation</p>
                       </div>
+                    ) : currentTemplate?.type === "stock-take" ? (
+                      <div className="text-center border-b-2 border-gray-800 pb-2">
+                        <h2 className="text-2xl font-bold">PHYSICAL STOCK TAKE</h2>
+                        <p className="text-sm">Inventory Audit & Reconciliation</p>
+                      </div>
                     ) : (
                       <div className="text-center">
                         <h2 className="text-2xl font-bold">DELIVERY NOTE</h2>
@@ -12170,6 +12177,149 @@ Manager: _________________    Date: [APPROVAL_DATE]`,
                         <div className="text-center mt-8 pt-4 border-t border-gray-300">
                           <div className="text-sm font-bold">Thank you for your business!</div>
                           <div className="text-sm">We appreciate working with you.</div>
+                        </div>
+                      </div>
+                    ) : currentTemplate?.type === "stock-take" ? (
+                      // Stock Take Content - Investment Inventory (Godown/Zone)
+                      <div className="space-y-6">
+                        {/* Stock Take Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <div className="font-bold mb-1">STOCK TAKE #</div>
+                            <Input
+                              value={stockTakeNumber}
+                              onChange={(e) => setStockTakeNumber(e.target.value)}
+                              className="text-sm font-bold mb-4 p-1 h-8"
+                            />
+                            
+                            <div className="font-bold mb-1">DATE</div>
+                            <Input
+                              type="date"
+                              value={new Date().toISOString().split('T')[0]}
+                              onChange={(e) => {}}
+                              className="text-sm mb-4 p-1 h-8"
+                            />
+
+                            <div className="font-bold mb-1">GODOWN</div>
+                            <Input
+                              placeholder="Select godown"
+                              className="text-sm mb-4 p-1 h-8"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-bold mb-1">ZONE</div>
+                            <Input
+                              placeholder="Select zone (optional)"
+                              className="text-sm mb-4 p-1 h-8"
+                            />
+
+                            <div className="font-bold mb-1">COUNTED BY</div>
+                            <Input
+                              placeholder="Enter name"
+                              className="text-sm mb-4 p-1 h-8"
+                            />
+
+                            <div className="font-bold mb-1">PURPOSE</div>
+                            <Input
+                              value="Investment Inventory"
+                              readOnly
+                              className="text-sm mb-4 p-1 h-8 bg-gray-100"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Items Table */}
+                        <div>
+                          <h3 className="font-bold mb-2">GODOWN STOCK COUNT</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm border-collapse">
+                              <thead>
+                                <tr className="border-b-2 border-gray-800">
+                                  <th className="text-left p-2">No.</th>
+                                  <th className="text-left p-2">Product</th>
+                                  <th className="text-left p-2">Godown</th>
+                                  <th className="text-left p-2">Zone</th>
+                                  <th className="text-right p-2">System Qty</th>
+                                  <th className="text-right p-2">Physical Count</th>
+                                  <th className="text-right p-2">Variance</th>
+                                  <th className="text-right p-2">Unit Cost</th>
+                                  <th className="text-right p-2">Total Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b">
+                                  <td className="p-2">1</td>
+                                  <td className="p-2"><Input placeholder="Product name" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2"><Input placeholder="Godown" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2"><Input placeholder="Zone" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
+                                </tr>
+                                <tr className="border-b">
+                                  <td className="p-2">2</td>
+                                  <td className="p-2"><Input placeholder="Product name" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2"><Input placeholder="Godown" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2"><Input placeholder="Zone" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
+                                </tr>
+                                <tr className="border-b">
+                                  <td className="p-2">3</td>
+                                  <td className="p-2"><Input placeholder="Product name" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2"><Input placeholder="Godown" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2"><Input placeholder="Zone" className="text-sm p-1 h-7" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
+                                  <td className="p-2 text-right"><Input type="number" placeholder="0.00" className="text-sm p-1 h-7 text-right" /></td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Summary */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <h3 className="font-bold mb-2">INVENTORY SUMMARY</h3>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between"><span>Total Products:</span><span className="font-bold">0</span></div>
+                              <div className="flex justify-between"><span>Total System Quantity:</span><span className="font-bold">0</span></div>
+                              <div className="flex justify-between"><span>Total Physical Count:</span><span className="font-bold">0</span></div>
+                              <div className="flex justify-between"><span>Total Variance:</span><span className="font-bold">0</span></div>
+                              <div className="flex justify-between border-t pt-1"><span>Total Investment Value:</span><span className="font-bold">0.00</span></div>
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="font-bold mb-2">NOTES</h3>
+                            <Textarea
+                              placeholder="Enter notes about discrepancies, damages, or adjustments..."
+                              className="min-h-[80px] p-2 border rounded w-full"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Verification */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                          <div>
+                            <div className="font-bold mb-1">COUNTED BY</div>
+                            <Input placeholder="Name" className="text-sm p-1 h-8" />
+                            <div className="text-sm mt-1">Date:</div>
+                            <Input type="date" className="text-sm p-1 h-8 w-full" />
+                          </div>
+                          <div>
+                            <div className="font-bold mb-1">VERIFIED BY (MANAGER)</div>
+                            <Input placeholder="Name" className="text-sm p-1 h-8" />
+                            <div className="text-sm mt-1">Date:</div>
+                            <Input type="date" className="text-sm p-1 h-8 w-full" />
+                          </div>
                         </div>
                       </div>
                     ) : (
