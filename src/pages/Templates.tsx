@@ -2758,6 +2758,11 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         
         await saveDelivery(deliveryToSave);
         
+        // Invalidate godown stock cache so next delivery shows fresh quantities
+        setLoadedGodownProducts(new Set());
+        setProductGodownMap(new Map());
+        setProductGodownZoneMap(new Map());
+        
         // Show the delivery note options dialog after saving
         showDeliveryNoteOptionsDialog();
         
@@ -5231,6 +5236,13 @@ Manager Approval: _________________     Date: [APPROVAL_DATE]`,
         
         // NOTE: Outlet inventory update is handled by saveDelivery() in deliveryUtils.ts
         // No need to update it here to avoid double-updating
+        
+        // CRITICAL: Invalidate godown stock cache so next delivery note shows fresh quantities
+        console.log('🔄 Invalidating godown stock cache for next delivery...');
+        setLoadedGodownProducts(new Set());
+        setProductGodownMap(new Map());
+        setProductGodownZoneMap(new Map());
+        console.log('✅ Godown stock cache cleared - quantities will be re-fetched from database');
         
         if (isKilangoInvestment && isCustomerFromOutlets) {
           alert(`Delivery Note ${deliveryNoteData.deliveryNoteNumber} saved successfully to Saved Deliveries!\nGRN and product database quantities updated based on quantity for KILANGO INVESTMENT LTD.\n\n✅ Outlet inventory has been updated with delivered products.`);

@@ -252,16 +252,31 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
     }
 
     // Update godown stock if source godown is specified (warehouse deliveries)
-    console.log('🔍 Checking if delivery godown stock should be updated...');
-    console.log('📍 sourceGodownId:', delivery.sourceGodownId);
-    console.log('📍 sourceType:', delivery.sourceType);
-    console.log('📍 Number of items:', delivery.itemsList?.length);
+    console.log('🔍 ════════════════════════════════════════════════════════');
+    console.log('🔍 GODOWN STOCK UPDATE DIAGNOSTICS');
+    console.log('🔍 ════════════════════════════════════════════════════════');
+    console.log('🔍 dbSaveSuccessful:', dbSaveSuccessful);
+    console.log('🔍 delivery.sourceGodownId:', delivery.sourceGodownId);
+    console.log('🔍 delivery.sourceType:', delivery.sourceType);
+    console.log('🔍 delivery.sourceZoneId:', delivery.sourceZoneId);
+    console.log('🔍 Number of items:', delivery.itemsList?.length);
+    console.log('🔍 Items godown_ids:', delivery.itemsList?.map(i => ({ name: i.name, godown_id: i.godown_id, zone_id: i.zone_id, product_id: i.product_id, quantity: i.quantity })));
     
-    if (dbSaveSuccessful && (delivery.sourceGodownId || delivery.itemsList?.some(i => i.godown_id)) && delivery.sourceType === 'investment') {
-      console.log('✅ Source godown is set, calling updateDeliveryGodownStock...');
+    const conditionA = dbSaveSuccessful;
+    const conditionB = !!(delivery.sourceGodownId || delivery.itemsList?.some(i => i.godown_id));
+    const conditionC = delivery.sourceType === 'investment';
+    console.log('🔍 Condition A (dbSaveSuccessful):', conditionA);
+    console.log('🔍 Condition B (has godown):', conditionB, '→ sourceGodownId:', delivery.sourceGodownId, '→ items with godown_id:', delivery.itemsList?.filter(i => i.godown_id).map(i => i.name));
+    console.log('🔍 Condition C (sourceType === investment):', conditionC, '→ actual sourceType:', delivery.sourceType);
+    
+    if (conditionA && conditionB && conditionC) {
+      console.log('✅ ALL CONDITIONS MET → Calling updateDeliveryGodownStock...');
       await updateDeliveryGodownStock(delivery);
     } else {
-      console.log('⚠️ Skipping godown stock update - condition not met');
+      console.log('❌ CONDITIONS NOT MET → Skipping godown stock update!');
+      if (!conditionA) console.log('   ❌ dbSaveSuccessful is false - DB save may have failed');
+      if (!conditionB) console.log('   ❌ No godown specified - neither sourceGodownId nor item godown_ids are set');
+      if (!conditionC) console.log('   ❌ sourceType is not "investment" - it is:', delivery.sourceType);
     }
     
     console.log('✅ Delivery saved successfully:', delivery.deliveryNoteNumber);
@@ -274,9 +289,10 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
 
 // Update godown stock when delivery is saved (for warehouse deliveries)
 const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> => {
+  console.log('📦 ══════ updateDeliveryGodownStock START ══════');
   // Only update if there are items
   if (!delivery.itemsList || delivery.itemsList.length === 0) {
-    console.log('⚠️ updateDeliveryGodownStock: Skipping - items:', delivery.itemsList?.length);
+    console.log('⚠️ updateDeliveryGodownStock: Skipping - no items:', delivery.itemsList?.length);
     return;
   }
 
@@ -289,6 +305,7 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
 
     // Build a product name -> ID map so we can resolve IDs from item descriptions
     const products = await getProducts();
+    console.log('📦 Loaded', products.length, 'products from database for name→ID mapping');
     const productNameToId = new Map<string, string>();
     products.forEach(p => {
       if (p.name && p.id) {
@@ -301,6 +318,9 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
       name: i.name, product_id: i.product_id, quantity: i.quantity,
       godown_id: i.godown_id, zone_id: i.zone_id
     })));
+
+    let processedCount = 0;
+    let skippedCount = 0;
 
     for (const item of delivery.itemsList) {
       // Resolve product ID: first try explicit product_id, then look up by name
@@ -320,11 +340,16 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
 
       if (!productId || quantity <= 0) {
         console.log(`⚠️ Skipping item: name="${item.name}", productId=${productId}, quantity=${quantity}`);
+        if (!productId) console.log(`   ❌ PRODUCT ID IS NULL! Name lookup failed for "${item.name}". grnProductItems may not contain this product.`);
+        if (quantity <= 0) console.log(`   ❌ QUANTITY IS ZERO OR NEGATIVE: ${quantity}`);
+        skippedCount++;
         continue;
       }
 
       if (!itemGodownId) {
         console.log(`⚠️ Skipping item "${item.name}": no godown_id specified (per-item or delivery-level)`);
+        console.log(`   item.godown_id: ${item.godown_id}, delivery.sourceGodownId: ${delivery.sourceGodownId}`);
+        skippedCount++;
         continue;
       }
 
@@ -335,7 +360,10 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
       console.log(`📋 Existing godown stock for product ${item.name}:`, existingStock.map(s => ({ zone_id: s.zone_id, quantity: s.quantity })));
 
       if (existingStock.length === 0) {
-        console.log(`⚠️ No godown stock records found for product ${item.name} in godown ${itemGodownId}. Skipping godown decrement.`);
+        console.log(`⚠️ No godown stock records found for product "${item.name}" (ID: ${productId}) in godown ${itemGodownId}. Skipping godown decrement.`);
+        console.log(`   This means the godown_stock table has NO record for this product+godown combination.`);
+        console.log(`   Possible causes: (1) Stock was never added to this godown, (2) Previous delivery already depleted it to 0 and record was deleted.`);
+        skippedCount++;
         continue;
       }
 
@@ -380,11 +408,17 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
       );
 
       console.log(`✅ Decreased ${quantity} units of product ${item.name || productId} from godown ${itemGodownId} (zone: ${targetZoneId || 'null'})`);
+      processedCount++;
     }
 
-    console.log('✅ Godown stock update completed for delivery');
+    console.log('📦 ══════ updateDeliveryGodownStock SUMMARY ══════');
+    console.log(`📦 Total items: ${delivery.itemsList.length}`);
+    console.log(`📦 Successfully processed: ${processedCount}`);
+    console.log(`📦 Skipped: ${skippedCount}`);
+    console.log('📦 ══════ updateDeliveryGodownStock END ══════');
   } catch (error) {
     console.error('❌ Error updating godown stock for delivery:', error);
+    console.error('❌ Full error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     // Don't throw error - delivery was already saved successfully
   }
 };
