@@ -2742,6 +2742,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const [showGRNOptions, setShowGRNOptions] = useState(false);
   const [showPurchaseOrderOptions, setShowPurchaseOrderOptions] = useState(false);
   const [showSalesOrderOptions, setShowSalesOrderOptions] = useState(false);
+  const [showStockTakeOptions, setShowStockTakeOptions] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
   
@@ -6234,6 +6235,172 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const showSalesOrderOptionsDialog = () => {
     setShowSalesOrderOptions(true);
   };
+
+  // Show stock take options dialog
+  const showStockTakeOptionsDialog = () => {
+    setShowStockTakeOptions(true);
+  };
+
+  // Close stock take options dialog
+  const closeStockTakeOptionsDialog = () => {
+    setShowStockTakeOptions(false);
+  };
+
+  // Reset stock take data for new entry
+  const resetStockTakeData = () => {
+    setStockTakeGodownId('');
+    setStockTakeZoneId('');
+    setStockTakeZones([]);
+    setStockTakeItems([
+      { id: '1', productId: '', productName: '', godownName: '', zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+      { id: '2', productId: '', productName: '', godownName: '', zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+      { id: '3', productId: '', productName: '', godownName: '', zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+    ]);
+    setStockTakeProductSearch({});
+    setStockTakeProductResults({});
+    setStockTakeShowDropdown({});
+    setStockTakeNumber(getNextStockTakeNumber());
+  };
+
+  // Generate Stock Take HTML for printing
+  const generateStockTakeHTML = (): string => {
+    const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+    const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
+    const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
+    const filledItems = stockTakeItems.filter(item => item.productId);
+
+    const rowsHtml = filledItems.map((item, idx) => `
+      <tr>
+        <td style="padding:8px;border:1px solid #ddd;">${idx + 1}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${item.productName}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${selectedGodown?.name || item.godownName || ''}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${zoneName || item.zoneName || ''}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.systemQty}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physicalCount}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${item.variance < 0 ? '#dc2626' : item.variance > 0 ? '#16a34a' : ''}">${item.variance}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Stock Take - ${stockTakeNumber}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #333; }
+          .info-row { display: flex; gap: 20px; margin-bottom: 10px; }
+          .info-label { font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #f5f5f5; padding: 10px; border: 1px solid #ddd; text-align: left; }
+          .summary { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
+          .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        </style>
+      </head>
+      <body>
+        <h1 style="text-align:center;">PHYSICAL STOCK TAKE</h1>
+        <p style="text-align:center;color:#666;">${stockTakeNumber}</p>
+        <div class="info-row">
+          <div><span class="info-label">Date:</span> ${new Date().toLocaleDateString()}</div>
+          <div><span class="info-label">Godown:</span> ${selectedGodown?.name || ''}</div>
+          <div><span class="info-label">Zone:</span> ${zoneName}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>No.</th><th>Product</th><th>Godown</th><th>Zone</th>
+              <th style="text-align:right;">System Qty</th>
+              <th style="text-align:right;">Physical Count</th>
+              <th style="text-align:right;">Variance</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <div class="summary">
+          <h3>Summary</h3>
+          <div class="summary-row"><span>Total Products:</span><span>${stockTakeTotals.totalProducts}</span></div>
+          <div class="summary-row"><span>Total System Qty:</span><span>${stockTakeTotals.totalSystemQty}</span></div>
+          <div class="summary-row"><span>Total Physical Count:</span><span>${stockTakeTotals.totalPhysicalCount}</span></div>
+          <div class="summary-row"><span>Total Variance:</span><span style="color:${stockTakeTotals.totalVariance < 0 ? '#dc2626' : stockTakeTotals.totalVariance > 0 ? '#16a34a' : ''}">${stockTakeTotals.totalVariance}</span></div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  // Export stock take as CSV
+  const exportStockTakeAsCSV = () => {
+    const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+    const filledItems = stockTakeItems.filter(item => item.productId);
+    const headers = ['No.', 'Product', 'Godown', 'Zone', 'System Qty', 'Physical Count', 'Variance'];
+    const rows = filledItems.map((item, idx) => [
+      idx + 1, item.productName, selectedGodown?.name || item.godownName, item.zoneName,
+      item.systemQty, item.physicalCount, item.variance
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Stock_Take_${stockTakeNumber}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export stock take as JSON
+  const exportStockTakeAsJSON = () => {
+    const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+    const filledItems = stockTakeItems.filter(item => item.productId).map(item => ({
+      product_name: item.productName,
+      godown: selectedGodown?.name || item.godownName,
+      zone: item.zoneName,
+      system_qty: item.systemQty,
+      physical_count: item.physicalCount,
+      variance: item.variance,
+    }));
+    const data = {
+      stock_take_number: stockTakeNumber,
+      date: new Date().toISOString().split('T')[0],
+      godown: selectedGodown?.name || '',
+      zone: stockTakeZones.find(z => z.id === stockTakeZoneId)?.zone_name || '',
+      summary: {
+        total_products: stockTakeTotals.totalProducts,
+        total_system_qty: stockTakeTotals.totalSystemQty,
+        total_physical_count: stockTakeTotals.totalPhysicalCount,
+        total_variance: stockTakeTotals.totalVariance,
+      },
+      items: filledItems,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Stock_Take_${stockTakeNumber}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export stock take as PDF
+  const exportStockTakeAsPDF = () => {
+    const htmlContent = generateStockTakeHTML();
+    import('html2pdf.js').then((html2pdfModule) => {
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = htmlContent;
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      document.body.appendChild(tempContainer);
+      const opt = {
+        margin: 5,
+        filename: `Stock_Take_${stockTakeNumber}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+      html2pdfModule.default(tempContainer, opt).then(() => {
+        setTimeout(() => { document.body.removeChild(tempContainer); }, 1000);
+      });
+    });
+  };
   
   // Close sales order options dialog
   const closeSalesOrderOptionsDialog = () => {
@@ -8880,7 +9047,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                           if (error) throw error;
 
                           alert(`Stock Take ${stockTakeNumber} saved successfully!`);
-                          setActiveTab('savedStockTakes');
+                          showStockTakeOptionsDialog();
                         } catch (error) {
                           console.error('Error saving stock take:', error);
                           alert('Error saving stock take. Please try again.');
@@ -9077,7 +9244,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
                       Back to Templates
                     </Button>
-                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order") && (
+                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order" && currentTemplate?.type !== "stock-take") && (
                       <>
                         <Button onClick={() => {
                           if (currentTemplate?.type === "order-form") {
@@ -13895,6 +14062,151 @@ Enter choice (1-3):`);
         </div>
       )}
       
+      {/* Stock Take Options Dialog */}
+      {showStockTakeOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold mb-4">Stock Take Options</h3>
+            <p className="mb-4">Choose an action for your stock take:</p>
+            
+            <div className="space-y-2">
+              <Button 
+                onClick={() => {
+                  const stockTakeContent = generateStockTakeHTML();
+                  const printFrame = document.createElement('iframe');
+                  printFrame.style.position = 'absolute';
+                  printFrame.style.top = '-1000px';
+                  printFrame.style.left = '-1000px';
+                  document.body.appendChild(printFrame);
+                  const printDocument = printFrame.contentDocument || printFrame.contentWindow?.document;
+                  if (printDocument) {
+                    printDocument.open();
+                    printDocument.write(stockTakeContent);
+                    printDocument.close();
+                    printFrame.onload = () => {
+                      try {
+                        printFrame.contentWindow?.focus();
+                        printFrame.contentWindow?.print();
+                      } catch (error) {
+                        console.error('Error during printing:', error);
+                      } finally {
+                        setTimeout(() => {
+                          if (printFrame.parentNode) { printFrame.parentNode.removeChild(printFrame); }
+                        }, 1000);
+                      }
+                    };
+                  }
+                  closeStockTakeOptionsDialog();
+                  resetStockTakeData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Stock Take
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  exportStockTakeAsPDF();
+                  closeStockTakeOptionsDialog();
+                  resetStockTakeData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Stock Take
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  try {
+                    const shareData = {
+                      title: `Stock Take ${stockTakeNumber}`,
+                      text: `Physical Stock Take ${stockTakeNumber}`,
+                      url: window.location.href
+                    };
+                    if (navigator.share) {
+                      navigator.share(shareData).catch(() => {
+                        navigator.clipboard.writeText(shareData.url).then(() => {
+                          alert('Stock take link copied to clipboard!');
+                        });
+                      });
+                    } else {
+                      navigator.clipboard.writeText(shareData.url).then(() => {
+                        alert('Stock take link copied to clipboard!');
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error sharing stock take:', error);
+                  }
+                  closeStockTakeOptionsDialog();
+                  resetStockTakeData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Share className="h-4 w-4 mr-2" />
+                Share Stock Take
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  const exportChoice = prompt(`Choose export format:\n1. PDF\n2. CSV\n3. JSON\nEnter choice (1-3):`);
+                  if (exportChoice) {
+                    const choice = parseInt(exportChoice);
+                    if (choice === 1) exportStockTakeAsPDF();
+                    else if (choice === 2) exportStockTakeAsCSV();
+                    else if (choice === 3) exportStockTakeAsJSON();
+                  }
+                  closeStockTakeOptionsDialog();
+                  resetStockTakeData();
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Export Stock Take
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  closeStockTakeOptionsDialog();
+                  resetStockTakeData();
+                  setActiveTab('savedStockTakes');
+                }}
+                className="w-full flex items-center justify-start"
+                variant="outline"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Saved Stock Takes
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  closeStockTakeOptionsDialog();
+                  resetStockTakeData();
+                }}
+                className="w-full flex items-center justify-start bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Stock Take
+              </Button>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={closeStockTakeOptionsDialog}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Customer Settlement Options Dialog */}
       {showCustomerSettlementOptions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
