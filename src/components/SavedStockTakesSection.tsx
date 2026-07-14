@@ -69,6 +69,7 @@ interface SavedStockTake {
   total_variance?: number;
   total_investment_value?: number;
   counted_by?: string;
+  batch_godowns?: Array<{id: string; name: string}>;
 }
 
 interface SavedStockTakesSectionProps {
@@ -145,12 +146,19 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
   };
 
   const isInvestmentType = (st: SavedStockTake) => st.take_type === 'investment';
+  const isBatchType = (st: SavedStockTake) => st.take_type === 'batch';
+  const isGodownStockTake = (st: SavedStockTake) => st.take_type === 'investment' || st.take_type === 'batch';
 
   const handlePrintStockTake = (stockTake: SavedStockTake) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const investment = isInvestmentType(stockTake);
+    const investment = isGodownStockTake(stockTake);
+    const batch = isBatchType(stockTake);
+
+    const batchGodownsHtml = batch && stockTake.batch_godowns
+      ? `<div style="margin-bottom:10px;"><strong>Godowns:</strong> ${stockTake.batch_godowns.map((g: any) => g.name).join(', ')}</div>`
+      : '';
 
     const itemsHtml = stockTake.items.map((item) => {
       if (investment) {
@@ -190,6 +198,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
         <div class="summary-row"><span>Total System Qty:</span><span>${stockTake.total_system_qty ?? 0}</span></div>
         <div class="summary-row"><span>Total Physical Count:</span><span>${stockTake.total_physical_count ?? 0}</span></div>
         <div class="summary-row"><span>Total Variance:</span><span style="color:${(stockTake.total_variance ?? 0) < 0 ? '#dc2626' : (stockTake.total_variance ?? 0) > 0 ? '#16a34a' : ''}">${stockTake.total_variance ?? 0}</span></div>
+        ${batch ? `<div class="summary-row"><span>Mode:</span><span>Batch (${stockTake.batch_godowns?.length ?? 0} godowns)</span></div>` : ''}
         ${stockTake.godown_name ? `<div class="summary-row"><span>Godown:</span><span>${stockTake.godown_name}</span></div>` : ''}
         ${stockTake.zone_name ? `<div class="summary-row"><span>Zone:</span><span>${stockTake.zone_name}</span></div>` : ''}
       `
@@ -202,7 +211,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
         <div class="summary-row"><span>Avg Turnover:</span><span>${(stockTake.avg_turnover ?? 0).toFixed(2)}x</span></div>
       `;
 
-    const title = investment ? 'Investment Stock Take' : 'Stock Take Report';
+    const title = batch ? 'Batch Stock Take' : investment ? 'Investment Stock Take' : 'Stock Take Report';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -224,6 +233,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
       <body>
         <h1>${title}</h1>
         <p style="color:#666;">${stockTake.stock_take_number}</p>
+        ${batchGodownsHtml}
         <div class="info-row">
           <div><span class="info-label">Date:</span> ${new Date(stockTake.date).toLocaleDateString()}</div>
           <div><span class="info-label">Status:</span> ${stockTake.status}</div>
@@ -288,7 +298,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
               </div>
 
               {/* Summary Stats */}
-              {isInvestmentType(selectedStockTake) ? (
+              {isGodownStockTake(selectedStockTake) ? (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div className="p-3 bg-muted rounded-lg">
@@ -310,6 +320,16 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
                       </p>
                     </div>
                   </div>
+                  {isBatchType(selectedStockTake) && selectedStockTake.batch_godowns && (
+                    <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm font-semibold text-blue-800 mb-1">Batch Stock Take - {selectedStockTake.batch_godowns.length} Godowns</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedStockTake.batch_godowns.map((g: any) => (
+                          <Badge key={g.id} variant="outline" className="text-blue-700 border-blue-300">{g.name}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                     {selectedStockTake.godown_name && (
                       <div className="p-3 bg-muted rounded-lg">
@@ -349,11 +369,11 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
               )}
 
               {/* Items Table */}
-              <h3 className="font-semibold text-lg mb-3">{isInvestmentType(selectedStockTake) ? 'Godown Stock Count' : 'Stock Take Items'}</h3>
+              <h3 className="font-semibold text-lg mb-3">{isGodownStockTake(selectedStockTake) ? (isBatchType(selectedStockTake) ? 'Batch Stock Count' : 'Godown Stock Count') : 'Stock Take Items'}</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
-                    {isInvestmentType(selectedStockTake) ? (
+                    {isGodownStockTake(selectedStockTake) ? (
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Godown</th>
@@ -378,7 +398,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {selectedStockTake.items.map((item, index) => (
-                      isInvestmentType(selectedStockTake) ? (
+                      isGodownStockTake(selectedStockTake) ? (
                         <tr key={index}>
                           <td className="px-4 py-3 whitespace-nowrap">{item.product_name || item.name || ''}</td>
                           <td className="px-4 py-3 whitespace-nowrap">{item.godown_name || ''}</td>
@@ -551,17 +571,24 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
                           <span className="text-muted-foreground">Products:</span>
                           <span className="font-medium ml-1">{stockTake.total_products}</span>
                         </div>
-                        {isInvestmentType(stockTake) ? (
+                        {isGodownStockTake(stockTake) ? (
                           <>
                             <div>
                               <span className="text-muted-foreground">Variance:</span>
                               <span className={`font-medium ml-1 ${(stockTake.total_variance ?? 0) < 0 ? 'text-red-600' : (stockTake.total_variance ?? 0) > 0 ? 'text-green-600' : ''}`}>{stockTake.total_variance ?? 0}</span>
                             </div>
-                            {stockTake.godown_name && (
-                              <div>
-                                <span className="text-muted-foreground">Godown:</span>
-                                <span className="font-medium ml-1">{stockTake.godown_name}</span>
+                            {isBatchType(stockTake) && stockTake.batch_godowns ? (
+                              <div className="col-span-2">
+                                <span className="text-muted-foreground">Batch:</span>
+                                <span className="font-medium ml-1">{stockTake.batch_godowns.length} godowns</span>
                               </div>
+                            ) : (
+                              stockTake.godown_name && (
+                                <div>
+                                  <span className="text-muted-foreground">Godown:</span>
+                                  <span className="font-medium ml-1">{stockTake.godown_name}</span>
+                                </div>
+                              )
                             )}
                           </>
                         ) : (

@@ -1264,6 +1264,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     productName: string;
     godownName: string;
     zoneName: string;
+    zoneId?: string;
     systemQty: number;
     physicalCount: number;
     variance: number;
@@ -1278,6 +1279,20 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const [stockTakeProductSearch, setStockTakeProductSearch] = useState<Record<string, string>>({});
   const [stockTakeProductResults, setStockTakeProductResults] = useState<Record<string, Array<{ productId: string; name: string; quantity: number }>>>({});
   const [stockTakeShowDropdown, setStockTakeShowDropdown] = useState<Record<string, boolean>>({});
+
+  // Batch Mode state
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchSelectedGodowns, setBatchSelectedGodowns] = useState<Array<{id: string; name: string}>>([]);
+  const [batchCurrentIndex, setBatchCurrentIndex] = useState(0);
+  const [batchItems, setBatchItems] = useState<Record<string, StockTakeItem[]>>({});
+  const [batchStep, setBatchStep] = useState<'select' | 'wizard'>('select');
+  const [batchZones, setBatchZones] = useState<Record<string, string>>({}); // godownId -> zoneId
+  const [batchZoneOptions, setBatchZoneOptions] = useState<Record<string, GodownZone[]>>({}); // godownId -> zones
+  const [stockTakeNotes, setStockTakeNotes] = useState('');
+  const [countedByName, setCountedByName] = useState('');
+  const [countedByDate, setCountedByDate] = useState(new Date().toISOString().split('T')[0]);
+  const [verifiedByName, setVerifiedByName] = useState('');
+  const [verifiedByDate, setVerifiedByDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Generate next stock take number
   const getNextStockTakeNumber = () => {
@@ -6259,11 +6274,273 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     setStockTakeProductSearch({});
     setStockTakeProductResults({});
     setStockTakeShowDropdown({});
+    setBatchMode(false);
+    setBatchSelectedGodowns([]);
+    setBatchCurrentIndex(0);
+    setBatchItems({});
+    setBatchStep('select');
+    setBatchZones({});
+    setBatchZoneOptions({});
+    setStockTakeNotes('');
+    setCountedByName('');
+    setCountedByDate(new Date().toISOString().split('T')[0]);
+    setVerifiedByName('');
+    setVerifiedByDate(new Date().toISOString().split('T')[0]);
     setStockTakeNumber(getNextStockTakeNumber());
+  };
+
+  // Batch Mode helpers
+  const toggleBatchGodown = (godownId: string, godownName: string) => {
+    setBatchSelectedGodowns(prev => {
+      const exists = prev.find(g => g.id === godownId);
+      if (exists) return prev.filter(g => g.id !== godownId);
+      return [...prev, { id: godownId, name: godownName }];
+    });
+  };
+
+  const startBatchStockTake = () => {
+    if (batchSelectedGodowns.length === 0) return;
+    const initialItems: Record<string, StockTakeItem[]> = {};
+    batchSelectedGodowns.forEach(g => {
+      initialItems[g.id] = [
+        { id: `${g.id}-1`, productId: '', productName: '', godownName: g.name, zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+        { id: `${g.id}-2`, productId: '', productName: '', godownName: g.name, zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+        { id: `${g.id}-3`, productId: '', productName: '', godownName: g.name, zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 },
+      ];
+    });
+    setBatchItems(initialItems);
+    setBatchCurrentIndex(0);
+    setBatchStep('wizard');
+    // Load zones for first godown
+    loadBatchZones(batchSelectedGodowns[0].id);
+  };
+
+  const loadBatchZones = async (godownId: string) => {
+    if (batchZoneOptions[godownId]) return; // already loaded
+    try {
+      const zones = await getZones(godownId);
+      setBatchZoneOptions(prev => ({ ...prev, [godownId]: zones }));
+    } catch (error) {
+      console.error('Error loading batch zones:', error);
+      setBatchZoneOptions(prev => ({ ...prev, [godownId]: [] }));
+    }
+  };
+
+  const getCurrentBatchGodown = () => batchSelectedGodowns[batchCurrentIndex] || null;
+  const getCurrentBatchItems = () => {
+    const godown = getCurrentBatchGodown();
+    return godown ? (batchItems[godown.id] || []) : [];
+  };
+
+  const updateBatchItem = (itemId: string, field: keyof StockTakeItem, value: string | number) => {
+    const godown = getCurrentBatchGodown();
+    if (!godown) return;
+    setBatchItems(prev => {
+      const items = prev[godown.id] || [];
+      const updated = items.map(item => {
+        if (item.id !== itemId) return item;
+        const updatedItem = { ...item, [field]: value };
+        if (field === 'physicalCount') {
+          updatedItem.variance = Number(value) - item.systemQty;
+        }
+        return updatedItem;
+      });
+      return { ...prev, [godown.id]: updated };
+    });
+  };
+
+  const addBatchRow = () => {
+    const godown = getCurrentBatchGodown();
+    if (!godown) return;
+    setBatchItems(prev => {
+      const items = prev[godown.id] || [];
+      const newId = `${godown.id}-${Date.now()}`;
+      return {
+        ...prev,
+        [godown.id]: [...items, { id: newId, productId: '', productName: '', godownName: godown.name, zoneName: '', systemQty: 0, physicalCount: 0, variance: 0, unitCost: 0, totalCost: 0 }]
+      };
+    });
+  };
+
+  const removeBatchRow = (itemId: string) => {
+    const godown = getCurrentBatchGodown();
+    if (!godown) return;
+    setBatchItems(prev => ({
+      ...prev,
+      [godown.id]: (prev[godown.id] || []).filter(item => item.id !== itemId)
+    }));
+  };
+
+  const batchGodownCompleted = (godownId: string) => {
+    const items = batchItems[godownId] || [];
+    return items.some(item => item.productId && item.physicalCount > 0);
+  };
+
+  const batchTotals = () => {
+    let totalProducts = 0, totalSystemQty = 0, totalPhysicalCount = 0, totalVariance = 0;
+    Object.values(batchItems).forEach(items => {
+      items.forEach(item => {
+        if (item.productId) {
+          totalProducts++;
+          totalSystemQty += item.systemQty;
+          totalPhysicalCount += item.physicalCount;
+          totalVariance += item.variance;
+        }
+      });
+    });
+    return { totalProducts, totalSystemQty, totalPhysicalCount, totalVariance };
+  };
+
+  // Search products for batch mode (uses same logic as single mode but scoped to godown)
+  const [batchProductSearch, setBatchProductSearch] = useState<Record<string, string>>({});
+  const [batchProductResults, setBatchProductResults] = useState<Record<string, Array<{ productId: string; name: string; quantity: number; zoneId?: string; zoneName?: string }>>>({});
+  const [batchShowDropdown, setBatchShowDropdown] = useState<Record<string, boolean>>({});
+
+  const searchBatchProducts = async (itemId: string, query: string) => {
+    const godown = getCurrentBatchGodown();
+    if (!godown) return;
+    setBatchProductSearch(prev => ({ ...prev, [itemId]: query }));
+    if (query.length < 1) {
+      setBatchProductResults(prev => ({ ...prev, [itemId]: [] }));
+      return;
+    }
+    try {
+      const allProducts = await getProducts();
+      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      const resultsWithQty: Array<{ productId: string; name: string; quantity: number; zoneId?: string; zoneName?: string }> = [];
+      for (const p of filtered.slice(0, 10)) {
+        if (!p.id) continue;
+        const stockData = await getGodownStock(p.id, godown.id);
+        // Group by zone to show per-zone quantities
+        const zoneMap = new Map<string, { zoneId: string | null; zoneName: string; qty: number }>();
+        for (const s of stockData) {
+          const zId = s.zone_id || '__no_zone__';
+          const existing = zoneMap.get(zId);
+          const zName = zId === '__no_zone__' ? 'No Zone' : ((s as any).godown_zones?.zone_name || 'Unknown Zone');
+          if (existing) {
+            existing.qty += (s.quantity || 0);
+          } else {
+            zoneMap.set(zId, { zoneId: s.zone_id || null, zoneName: zName, qty: s.quantity || 0 });
+          }
+        }
+        // Add one result per zone (only if qty > 0)
+        for (const [, zoneInfo] of zoneMap) {
+          if (zoneInfo.qty > 0) {
+            resultsWithQty.push({
+              productId: p.id,
+              name: `${p.name} [${zoneInfo.zoneName}]`,
+              quantity: zoneInfo.qty,
+              zoneId: zoneInfo.zoneId || undefined,
+              zoneName: zoneInfo.zoneName,
+            });
+          }
+        }
+      }
+      setBatchProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
+      if (resultsWithQty.length > 0) setBatchShowDropdown(prev => ({ ...prev, [itemId]: true }));
+    } catch (error) {
+      console.error('Error searching batch products:', error);
+    }
+  };
+
+  const selectBatchProduct = (itemId: string, productId: string, productName: string, quantity: number, zoneId?: string, zoneName?: string) => {
+    const godown = getCurrentBatchGodown();
+    if (!godown) return;
+    setBatchItems(prev => {
+      const items = prev[godown.id] || [];
+      return {
+        ...prev,
+        [godown.id]: items.map(item =>
+          item.id === itemId
+            ? { ...item, productId, productName: productName.replace(/ \[.*\]$/, ''), systemQty: quantity, godownName: godown.name, zoneId: zoneId || '', zoneName: zoneName || item.zoneName }
+            : item
+        )
+      };
+    });
+    setBatchProductSearch(prev => ({ ...prev, [itemId]: productName.replace(/ \[.*\]$/, '') }));
+    setBatchShowDropdown(prev => ({ ...prev, [itemId]: false }));
   };
 
   // Generate Stock Take HTML for printing
   const generateStockTakeHTML = (): string => {
+    if (batchMode) {
+      // BATCH MODE HTML
+      const totals = batchTotals();
+      let allRowsHtml = '';
+      batchSelectedGodowns.forEach(g => {
+        const items = (batchItems[g.id] || []).filter(item => item.productId);
+        if (items.length === 0) return;
+        const rowsHtml = items.map((item, idx) => `
+          <tr>
+            <td style="padding:8px;border:1px solid #ddd;">${idx + 1}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${item.productName}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${item.zoneName || 'No Zone'}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.systemQty}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physicalCount}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${item.variance < 0 ? '#dc2626' : item.variance > 0 ? '#16a34a' : ''}">${item.variance}</td>
+          </tr>
+        `).join('');
+        allRowsHtml += `
+          <tr><td colspan="6" style="padding:10px 8px 4px;font-weight:bold;background:#f0f4ff;border:1px solid #ddd;">Godown: ${g.name}</td></tr>
+          ${rowsHtml}
+        `;
+      });
+      const godownList = batchSelectedGodowns.map(g => g.name).join(', ');
+      return `
+        <!DOCTYPE html>
+        <html><head><title>Batch Stock Take - ${stockTakeNumber}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #333; }
+          .info-row { display: flex; gap: 20px; margin-bottom: 10px; }
+          .info-label { font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #f5f5f5; padding: 10px; border: 1px solid #ddd; text-align: left; }
+          .summary { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
+          .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        </style></head>
+        <body>
+          <h1 style="text-align:center;">BATCH PHYSICAL STOCK TAKE</h1>
+          <p style="text-align:center;color:#666;">${stockTakeNumber}</p>
+          <div class="info-row">
+            <div><span class="info-label">Date:</span> ${new Date().toLocaleDateString()}</div>
+            <div><span class="info-label">Mode:</span> Batch (${batchSelectedGodowns.length} godowns)</div>
+          </div>
+          <div class="info-row"><div><span class="info-label">Godowns:</span> ${godownList}</div></div>
+          <table>
+            <thead><tr>
+              <th>No.</th><th>Product</th><th>Zone</th>
+              <th style="text-align:right;">System Qty</th>
+              <th style="text-align:right;">Physical Count</th>
+              <th style="text-align:right;">Variance</th>
+            </tr></thead>
+            <tbody>${allRowsHtml}</tbody>
+          </table>
+          <div class="summary">
+            <h3>Summary</h3>
+            <div class="summary-row"><span>Total Products:</span><span>${totals.totalProducts}</span></div>
+            <div class="summary-row"><span>Total System Qty:</span><span>${totals.totalSystemQty}</span></div>
+            <div class="summary-row"><span>Total Physical Count:</span><span>${totals.totalPhysicalCount}</span></div>
+            <div class="summary-row"><span>Total Variance:</span><span style="color:${totals.totalVariance < 0 ? '#dc2626' : totals.totalVariance > 0 ? '#16a34a' : ''}">${totals.totalVariance}</span></div>
+          </div>
+          <div style="margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;">
+            <h3>Notes</h3>
+            <p>${stockTakeNotes || '(No notes)'}</p>
+          </div>
+          <div style="margin-top:20px;padding:15px;background:#f0f4ff;border-radius:8px;">
+            <h3>Verification</h3>
+            <div style="display:flex;justify-content:space-between;margin-top:10px;">
+              <div><strong>Counted By:</strong> ${countedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${countedByDate}</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:10px;">
+              <div><strong>Verified By (Manager):</strong> ${verifiedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${verifiedByDate}</div>
+            </div>
+          </div>
+        </body></html>
+      `;
+    }
+
+    // SINGLE MODE HTML (existing)
     const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
     const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
     const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
@@ -6323,6 +6600,19 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
           <div class="summary-row"><span>Total Physical Count:</span><span>${stockTakeTotals.totalPhysicalCount}</span></div>
           <div class="summary-row"><span>Total Variance:</span><span style="color:${stockTakeTotals.totalVariance < 0 ? '#dc2626' : stockTakeTotals.totalVariance > 0 ? '#16a34a' : ''}">${stockTakeTotals.totalVariance}</span></div>
         </div>
+        <div style="margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;">
+          <h3>Notes</h3>
+          <p>${stockTakeNotes || '(No notes)'}</p>
+        </div>
+        <div style="margin-top:20px;padding:15px;background:#f0f4ff;border-radius:8px;">
+          <h3>Verification</h3>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;">
+            <div><strong>Counted By:</strong> ${countedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${countedByDate}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;">
+            <div><strong>Verified By (Manager):</strong> ${verifiedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${verifiedByDate}</div>
+          </div>
+        </div>
       </body>
       </html>
     `;
@@ -6330,13 +6620,25 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
 
   // Export stock take as CSV
   const exportStockTakeAsCSV = () => {
-    const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
-    const filledItems = stockTakeItems.filter(item => item.productId);
     const headers = ['No.', 'Product', 'Godown', 'Zone', 'System Qty', 'Physical Count', 'Variance'];
-    const rows = filledItems.map((item, idx) => [
-      idx + 1, item.productName, selectedGodown?.name || item.godownName, item.zoneName,
-      item.systemQty, item.physicalCount, item.variance
-    ]);
+    let rows: any[] = [];
+    let rowNum = 1;
+
+    if (batchMode) {
+      batchSelectedGodowns.forEach(g => {
+        const items = (batchItems[g.id] || []).filter(item => item.productId);
+        items.forEach(item => {
+          rows.push([rowNum++, item.productName, g.name, item.zoneName || 'No Zone', item.systemQty, item.physicalCount, item.variance]);
+        });
+      });
+    } else {
+      const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+      const filledItems = stockTakeItems.filter(item => item.productId);
+      rows = filledItems.map((item, idx) => [
+        idx + 1, item.productName, selectedGodown?.name || item.godownName, item.zoneName,
+        item.systemQty, item.physicalCount, item.variance
+      ]);
+    }
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -6349,28 +6651,59 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
 
   // Export stock take as JSON
   const exportStockTakeAsJSON = () => {
-    const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
-    const filledItems = stockTakeItems.filter(item => item.productId).map(item => ({
-      product_name: item.productName,
-      godown: selectedGodown?.name || item.godownName,
-      zone: item.zoneName,
-      system_qty: item.systemQty,
-      physical_count: item.physicalCount,
-      variance: item.variance,
-    }));
-    const data = {
-      stock_take_number: stockTakeNumber,
-      date: new Date().toISOString().split('T')[0],
-      godown: selectedGodown?.name || '',
-      zone: stockTakeZones.find(z => z.id === stockTakeZoneId)?.zone_name || '',
-      summary: {
-        total_products: stockTakeTotals.totalProducts,
-        total_system_qty: stockTakeTotals.totalSystemQty,
-        total_physical_count: stockTakeTotals.totalPhysicalCount,
-        total_variance: stockTakeTotals.totalVariance,
-      },
-      items: filledItems,
-    };
+    let data: any;
+    if (batchMode) {
+      const totals = batchTotals();
+      const allItems: any[] = [];
+      batchSelectedGodowns.forEach(g => {
+        (batchItems[g.id] || []).filter(item => item.productId).forEach(item => {
+          allItems.push({
+            product_name: item.productName,
+            godown: g.name,
+            zone: item.zoneName || 'No Zone',
+            system_qty: item.systemQty,
+            physical_count: item.physicalCount,
+            variance: item.variance,
+          });
+        });
+      });
+      data = {
+        stock_take_number: stockTakeNumber,
+        date: new Date().toISOString().split('T')[0],
+        mode: 'batch',
+        godowns: batchSelectedGodowns.map(g => g.name),
+        summary: {
+          total_products: totals.totalProducts,
+          total_system_qty: totals.totalSystemQty,
+          total_physical_count: totals.totalPhysicalCount,
+          total_variance: totals.totalVariance,
+        },
+        items: allItems,
+      };
+    } else {
+      const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+      const filledItems = stockTakeItems.filter(item => item.productId).map(item => ({
+        product_name: item.productName,
+        godown: selectedGodown?.name || item.godownName,
+        zone: item.zoneName,
+        system_qty: item.systemQty,
+        physical_count: item.physicalCount,
+        variance: item.variance,
+      }));
+      data = {
+        stock_take_number: stockTakeNumber,
+        date: new Date().toISOString().split('T')[0],
+        godown: selectedGodown?.name || '',
+        zone: stockTakeZones.find(z => z.id === stockTakeZoneId)?.zone_name || '',
+        summary: {
+          total_products: stockTakeTotals.totalProducts,
+          total_system_qty: stockTakeTotals.totalSystemQty,
+          total_physical_count: stockTakeTotals.totalPhysicalCount,
+          total_variance: stockTakeTotals.totalVariance,
+        },
+        items: filledItems,
+      };
+    }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -8984,67 +9317,124 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                       } else if (currentTemplate?.type === "stock-take") {
                         // Save stock take to database
                         try {
-                          // Validate required fields
-                          if (!stockTakeGodownId) {
-                            alert("Please select a Godown before saving.");
-                            return;
-                          }
-                          const filledItems = stockTakeItems.filter(item => item.productId);
-                          if (filledItems.length === 0) {
-                            alert("Please add at least one product with a physical count.");
-                            return;
-                          }
-
-                          const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
-                          const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
-                          const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
-
                           const { data: { user } } = await supabase.auth.getUser();
 
-                          const stockTakeRecord = {
-                            outlet_id: null,
-                            stock_take_number: stockTakeNumber,
-                            date: new Date().toISOString().split('T')[0],
-                            total_products: stockTakeTotals.totalProducts,
-                            total_calculated_sold: 0,
-                            total_costs: stockTakeTotals.totalInvestmentValue,
-                            total_price: 0,
-                            potential_earnings: 0,
-                            avg_turnover: 0,
-                            items: stockTakeItems.filter(item => item.productId).map(item => ({
-                              product_id: item.productId,
-                              product_name: item.productName,
+                          if (batchMode) {
+                            // BATCH MODE: Save all godowns as one combined record
+                            if (batchSelectedGodowns.length === 0) {
+                              alert("Please select at least one godown for batch stock take.");
+                              return;
+                            }
+                            // Combine all items from all godowns
+                            const allItems: any[] = [];
+                            Object.entries(batchItems).forEach(([godownId, items]) => {
+                              const godown = batchSelectedGodowns.find(g => g.id === godownId);
+                              items.forEach(item => {
+                                if (item.productId) {
+                                  const zoneId = item.zoneId || null;
+                                  allItems.push({
+                                    product_id: item.productId,
+                                    product_name: item.productName,
+                                    godown_id: godownId,
+                                    godown_name: godown?.name || '',
+                                    zone_id: zoneId,
+                                    zone_name: item.zoneName || '',
+                                    system_qty: item.systemQty,
+                                    physical_count: item.physicalCount,
+                                    variance: item.variance,
+                                    unit_cost: item.unitCost,
+                                    total_cost: item.totalCost,
+                                  });
+                                }
+                              });
+                            });
+                            if (allItems.length === 0) {
+                              alert("Please add at least one product with a physical count across all godowns.");
+                              return;
+                            }
+                            const totals = batchTotals();
+                            const stockTakeRecord = {
+                              outlet_id: null,
+                              stock_take_number: stockTakeNumber,
+                              date: new Date().toISOString().split('T')[0],
+                              total_products: totals.totalProducts,
+                              total_calculated_sold: 0,
+                              total_costs: 0,
+                              total_price: 0,
+                              potential_earnings: 0,
+                              avg_turnover: 0,
+                              items: allItems,
+                              notes: '',
+                              status: 'completed',
+                              godown_id: null,
+                              godown_name: null,
+                              zone_id: null,
+                              zone_name: null,
+                              take_type: 'batch',
+                              total_system_qty: totals.totalSystemQty,
+                              total_physical_count: totals.totalPhysicalCount,
+                              total_variance: totals.totalVariance,
+                              total_investment_value: 0,
+                              counted_by: '',
+                              batch_godowns: batchSelectedGodowns.map(g => ({ id: g.id, name: g.name })),
+                              created_by: user?.id || null,
+                            };
+                            const { error } = await supabase.from('saved_stock_takes').insert(stockTakeRecord);
+                            if (error) throw error;
+                          } else {
+                            // SINGLE MODE: Existing logic
+                            if (!stockTakeGodownId) {
+                              alert("Please select a Godown before saving.");
+                              return;
+                            }
+                            const filledItems = stockTakeItems.filter(item => item.productId);
+                            if (filledItems.length === 0) {
+                              alert("Please add at least one product with a physical count.");
+                              return;
+                            }
+                            const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
+                            const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
+                            const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
+                            const stockTakeRecord = {
+                              outlet_id: null,
+                              stock_take_number: stockTakeNumber,
+                              date: new Date().toISOString().split('T')[0],
+                              total_products: stockTakeTotals.totalProducts,
+                              total_calculated_sold: 0,
+                              total_costs: stockTakeTotals.totalInvestmentValue,
+                              total_price: 0,
+                              potential_earnings: 0,
+                              avg_turnover: 0,
+                              items: stockTakeItems.filter(item => item.productId).map(item => ({
+                                product_id: item.productId,
+                                product_name: item.productName,
+                                godown_id: stockTakeGodownId,
+                                godown_name: selectedGodown?.name || '',
+                                zone_id: stockTakeZoneId || null,
+                                zone_name: zoneName,
+                                system_qty: item.systemQty,
+                                physical_count: item.physicalCount,
+                                variance: item.variance,
+                                unit_cost: item.unitCost,
+                                total_cost: item.totalCost,
+                              })),
+                              notes: '',
+                              status: 'completed',
                               godown_id: stockTakeGodownId,
                               godown_name: selectedGodown?.name || '',
                               zone_id: stockTakeZoneId || null,
                               zone_name: zoneName,
-                              system_qty: item.systemQty,
-                              physical_count: item.physicalCount,
-                              variance: item.variance,
-                              unit_cost: item.unitCost,
-                              total_cost: item.totalCost,
-                            })),
-                            notes: '',
-                            status: 'completed',
-                            // New investment inventory fields
-                            godown_id: stockTakeGodownId,
-                            godown_name: selectedGodown?.name || '',
-                            zone_id: stockTakeZoneId || null,
-                            zone_name: zoneName,
-                            take_type: 'investment',
-                            total_system_qty: stockTakeTotals.totalSystemQty,
-                            total_physical_count: stockTakeTotals.totalPhysicalCount,
-                            total_variance: stockTakeTotals.totalVariance,
-                            total_investment_value: stockTakeTotals.totalInvestmentValue,
-                            counted_by: '',
-                            created_by: user?.id || null,
-                          };
-
-                          const { error } = await supabase
-                            .from('saved_stock_takes')
-                            .insert(stockTakeRecord);
-
-                          if (error) throw error;
+                              take_type: 'investment',
+                              total_system_qty: stockTakeTotals.totalSystemQty,
+                              total_physical_count: stockTakeTotals.totalPhysicalCount,
+                              total_variance: stockTakeTotals.totalVariance,
+                              total_investment_value: stockTakeTotals.totalInvestmentValue,
+                              counted_by: '',
+                              created_by: user?.id || null,
+                            };
+                            const { error } = await supabase.from('saved_stock_takes').insert(stockTakeRecord);
+                            if (error) throw error;
+                          }
 
                           alert(`Stock Take ${stockTakeNumber} saved successfully!`);
                           showStockTakeOptionsDialog();
@@ -12586,6 +12976,260 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                     ) : currentTemplate?.type === "stock-take" ? (
                       // Stock Take Content - Investment Inventory (Godown/Zone)
                       <div className="space-y-6">
+                        {/* Batch Mode Toggle */}
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                          <div>
+                            <span className="font-bold text-sm">BATCH MODE</span>
+                            <p className="text-xs text-muted-foreground">Count stock across multiple godowns in one session</p>
+                          </div>
+                          <button
+                            onClick={() => { setBatchMode(!batchMode); if (!batchMode) { setBatchStep('select'); setBatchSelectedGodowns([]); } }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${batchMode ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${batchMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+
+                        {batchMode ? (
+                          /* BATCH MODE UI */
+                          batchStep === 'select' ? (
+                            /* Step 1: Godown Selection */
+                            <div className="space-y-4">
+                              <h3 className="font-bold text-lg">Select Godowns for Batch Stock Take</h3>
+                              <p className="text-sm text-muted-foreground">Choose which godowns to include in this stock take session.</p>
+                              {godowns.length === 0 ? (
+                                <p className="text-sm text-muted-foreground italic">No godowns registered. Please add godowns first.</p>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                  {godowns.map(g => {
+                                    const selected = batchSelectedGodowns.some(sg => sg.id === g.id);
+                                    return (
+                                      <div
+                                        key={g.id}
+                                        onClick={() => toggleBatchGodown(g.id!, g.name)}
+                                        className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-medium text-sm">{g.name}</span>
+                                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                                            {selected && <span className="text-white text-xs">&#10003;</span>}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between pt-4 border-t">
+                                <span className="text-sm font-medium">{batchSelectedGodowns.length} godown(s) selected</span>
+                                <Button
+                                  onClick={startBatchStockTake}
+                                  disabled={batchSelectedGodowns.length === 0}
+                                  className="bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  Start Batch Stock Take
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Step 2: Wizard */
+                            <div className="space-y-4">
+                              {/* Progress Bar */}
+                              <div className="p-3 bg-gray-50 rounded-lg border">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-bold text-sm">
+                                    Godown {batchCurrentIndex + 1} of {batchSelectedGodowns.length}: {getCurrentBatchGodown()?.name}
+                                  </span>
+                                  <Button variant="ghost" size="sm" onClick={() => setBatchStep('select')} className="text-xs">
+                                    Change Godowns
+                                  </Button>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-blue-600 h-2 rounded-full transition-all"
+                                    style={{ width: `${((batchCurrentIndex + 1) / batchSelectedGodowns.length) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Godown Sidebar + Main Area */}
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                {/* Sidebar: Godown List */}
+                                <div className="md:col-span-1 space-y-2">
+                                  {batchSelectedGodowns.map((g, idx) => (
+                                    <div
+                                      key={g.id}
+                                      onClick={() => { setBatchCurrentIndex(idx); loadBatchZones(g.id); }}
+                                      className={`p-2 rounded-lg border cursor-pointer text-sm transition-all ${idx === batchCurrentIndex ? 'border-blue-600 bg-blue-50 font-semibold' : 'border-gray-200 hover:border-gray-300'}`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="truncate">{g.name}</span>
+                                        {batchGodownCompleted(g.id) ? (
+                                          <span className="text-green-600 text-xs">&#10003;</span>
+                                        ) : (
+                                          <span className="text-gray-400 text-xs">○</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Main: Stock Count Table */}
+                                <div className="md:col-span-3 space-y-4">
+                                  {/* Stock Take Header */}
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <div className="font-bold mb-1 text-sm">STOCK TAKE #</div>
+                                      <Input value={stockTakeNumber} onChange={(e) => setStockTakeNumber(e.target.value)} className="text-sm font-bold p-1 h-8" />
+                                    </div>
+                                    <div>
+                                      <div className="font-bold mb-1 text-sm">DATE</div>
+                                      <Input type="date" value={new Date().toISOString().split('T')[0]} onChange={(e) => {}} className="text-sm p-1 h-8" />
+                                    </div>
+                                  </div>
+
+                                  {/* Items Table for current godown */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h3 className="font-bold text-sm">GODOWN STOCK COUNT - {getCurrentBatchGodown()?.name}</h3>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-sm border-collapse">
+                                        <thead>
+                                          <tr className="border-b-2 border-gray-800">
+                                            <th className="text-left p-2">No.</th>
+                                            <th className="text-left p-2">Product</th>
+                                            <th className="text-left p-2">Zone</th>
+                                            <th className="text-right p-2">System Qty</th>
+                                            <th className="text-right p-2">Physical Count</th>
+                                            <th className="text-right p-2">Variance</th>
+                                            <th className="p-2"></th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {getCurrentBatchItems().map((item, idx) => (
+                                            <tr key={item.id} className="border-b">
+                                              <td className="p-2">{idx + 1}</td>
+                                              <td className="p-2 relative">
+                                                <Input
+                                                  value={batchProductSearch[item.id] || ''}
+                                                  onChange={(e) => searchBatchProducts(item.id, e.target.value)}
+                                                  onFocus={() => { if (batchProductResults[item.id]?.length) setBatchShowDropdown(prev => ({ ...prev, [item.id]: true })); }}
+                                                  placeholder="Search product..."
+                                                  className="text-sm p-1 h-7"
+                                                />
+                                                {batchShowDropdown[item.id] && batchProductResults[item.id]?.length > 0 && (
+                                                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md max-h-48 overflow-y-auto">
+                                                    {batchProductResults[item.id].map((p, pIdx) => (
+                                                      <div key={`${p.productId}-${p.zoneId || 'nz'}-${pIdx}`} className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center" onClick={() => selectBatchProduct(item.id, p.productId, p.name, p.quantity, p.zoneId, p.zoneName)}>
+                                                        <span className="text-sm">{p.name}</span>
+                                                        <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                                {batchShowDropdown[item.id] && batchProductResults[item.id]?.length === 0 && batchProductSearch[item.id] && (
+                                                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md p-2 text-sm text-muted-foreground">No products found.</div>
+                                                )}
+                                              </td>
+                                              <td className="p-2">
+                                                <Select
+                                                  value={item.zoneId || '__no_zone__'}
+                                                  onValueChange={(val) => {
+                                                    const godown = getCurrentBatchGodown();
+                                                    if (!godown) return;
+                                                    const zoneName = val === '__no_zone__' ? 'No Zone' : (batchZoneOptions[godown.id]?.find(z => z.id === val)?.zone_name || val);
+                                                    const zoneId = val === '__no_zone__' ? '' : val;
+                                                    setBatchItems(prev => ({
+                                                      ...prev,
+                                                      [godown.id]: (prev[godown.id] || []).map(i => i.id === item.id ? { ...i, zoneName, zoneId } : i)
+                                                    }));
+                                                  }}
+                                                >
+                                                  <SelectTrigger className="h-6 text-xs w-28">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="__no_zone__">No Zone</SelectItem>
+                                                    {(batchZoneOptions[getCurrentBatchGodown()?.id || ''] || []).map(z => (
+                                                      <SelectItem key={z.id} value={z.id!}>{z.zone_name}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </td>
+                                              <td className="p-2 text-right"><span className="text-sm font-semibold">{item.systemQty}</span></td>
+                                              <td className="p-2 text-right">
+                                                <Input type="number" value={item.physicalCount || ''} onChange={(e) => updateBatchItem(item.id, 'physicalCount', Number(e.target.value))} placeholder="0" className="text-sm p-1 h-7 text-right" />
+                                              </td>
+                                              <td className="p-2 text-right">
+                                                <span className={`text-sm font-semibold ${item.variance < 0 ? 'text-red-600' : item.variance > 0 ? 'text-green-600' : ''}`}>{item.variance}</span>
+                                              </td>
+                                              <td className="p-2 text-center">
+                                                <Button variant="ghost" size="sm" onClick={() => removeBatchRow(item.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={addBatchRow} className="mt-2">
+                                      <Plus className="h-4 w-4 mr-1" /> Add Row
+                                    </Button>
+                                  </div>
+
+                                  {/* Navigation */}
+                                  <div className="flex items-center justify-between pt-4 border-t">
+                                    <Button variant="outline" onClick={() => setBatchCurrentIndex(Math.max(0, batchCurrentIndex - 1))} disabled={batchCurrentIndex === 0}>
+                                      Previous
+                                    </Button>
+                                    <div className="flex gap-2">
+                                      {batchCurrentIndex < batchSelectedGodowns.length - 1 ? (
+                                        <Button onClick={() => {
+                                          const nextIdx = batchCurrentIndex + 1;
+                                          setBatchCurrentIndex(nextIdx);
+                                          loadBatchZones(batchSelectedGodowns[nextIdx].id);
+                                        }} className="bg-blue-600 text-white hover:bg-blue-700">
+                                          Next Godown
+                                        </Button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+
+                                  {/* Notes and Verification - Show on last godown or always */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t mt-4">
+                                    <div className="md:col-span-2">
+                                      <h3 className="font-bold mb-2">NOTES</h3>
+                                      <Textarea
+                                        value={stockTakeNotes}
+                                        onChange={(e) => setStockTakeNotes(e.target.value)}
+                                        placeholder="Enter notes about discrepancies, damages, or adjustments..."
+                                        className="min-h-[80px] p-2 border rounded w-full"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                                    <div>
+                                      <div className="font-bold mb-1">COUNTED BY</div>
+                                      <Input value={countedByName} onChange={(e) => setCountedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
+                                      <div className="text-sm mt-1">Date:</div>
+                                      <Input type="date" value={countedByDate} onChange={(e) => setCountedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
+                                    </div>
+                                    <div>
+                                      <div className="font-bold mb-1">VERIFIED BY (MANAGER)</div>
+                                      <Input value={verifiedByName} onChange={(e) => setVerifiedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
+                                      <div className="text-sm mt-1">Date:</div>
+                                      <Input type="date" value={verifiedByDate} onChange={(e) => setVerifiedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                        /* SINGLE GODOWN MODE (existing) */
+                        <div>
                         {/* Stock Take Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
@@ -12755,6 +13399,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                           <div>
                             <h3 className="font-bold mb-2">NOTES</h3>
                             <Textarea
+                              value={stockTakeNotes}
+                              onChange={(e) => setStockTakeNotes(e.target.value)}
                               placeholder="Enter notes about discrepancies, damages, or adjustments..."
                               className="min-h-[80px] p-2 border rounded w-full"
                             />
@@ -12765,17 +13411,19 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
                           <div>
                             <div className="font-bold mb-1">COUNTED BY</div>
-                            <Input placeholder="Name" className="text-sm p-1 h-8" />
+                            <Input value={countedByName} onChange={(e) => setCountedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
                             <div className="text-sm mt-1">Date:</div>
-                            <Input type="date" className="text-sm p-1 h-8 w-full" />
+                            <Input type="date" value={countedByDate} onChange={(e) => setCountedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
                           </div>
                           <div>
                             <div className="font-bold mb-1">VERIFIED BY (MANAGER)</div>
-                            <Input placeholder="Name" className="text-sm p-1 h-8" />
+                            <Input value={verifiedByName} onChange={(e) => setVerifiedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
                             <div className="text-sm mt-1">Date:</div>
-                            <Input type="date" className="text-sm p-1 h-8 w-full" />
+                            <Input type="date" value={verifiedByDate} onChange={(e) => setVerifiedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
                           </div>
                         </div>
+                        </div>
+                        )}
                       </div>
                     ) : (
                       // Delivery Note Content
@@ -14122,20 +14770,37 @@ Enter choice (1-3):`);
               <Button 
                 onClick={() => {
                   try {
-                    const shareData = {
-                      title: `Stock Take ${stockTakeNumber}`,
-                      text: `Physical Stock Take ${stockTakeNumber}`,
-                      url: window.location.href
-                    };
-                    if (navigator.share) {
-                      navigator.share(shareData).catch(() => {
-                        navigator.clipboard.writeText(shareData.url).then(() => {
-                          alert('Stock take link copied to clipboard!');
+                    const stockTakeContent = generateStockTakeHTML();
+                    const blob = new Blob([stockTakeContent], { type: 'text/html' });
+                    const file = new File([blob], `Stock_Take_${stockTakeNumber}.html`, { type: 'text/html' });
+                    
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                      navigator.share({
+                        title: `Stock Take ${stockTakeNumber}`,
+                        text: batchMode 
+                          ? `Batch Stock Take - ${batchSelectedGodowns.length} godowns`
+                          : `Physical Stock Take ${stockTakeNumber}`,
+                        files: [file]
+                      }).catch(() => {
+                        // Fallback: copy HTML to clipboard
+                        navigator.clipboard.writeText(stockTakeContent).then(() => {
+                          alert('Stock take HTML copied to clipboard!');
+                        });
+                      });
+                    } else if (navigator.share) {
+                      navigator.share({
+                        title: `Stock Take ${stockTakeNumber}`,
+                        text: batchMode 
+                          ? `Batch Stock Take - ${batchSelectedGodowns.length} godowns`
+                          : `Physical Stock Take ${stockTakeNumber}`,
+                      }).catch(() => {
+                        navigator.clipboard.writeText(stockTakeContent).then(() => {
+                          alert('Stock take HTML copied to clipboard!');
                         });
                       });
                     } else {
-                      navigator.clipboard.writeText(shareData.url).then(() => {
-                        alert('Stock take link copied to clipboard!');
+                      navigator.clipboard.writeText(stockTakeContent).then(() => {
+                        alert('Stock take HTML copied to clipboard!');
                       });
                     }
                   } catch (error) {
