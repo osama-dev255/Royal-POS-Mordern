@@ -6463,159 +6463,257 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
 
   // Generate Stock Take HTML for printing
   const generateStockTakeHTML = (): string => {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const varianceIcon = (v: number) => v < 0 ? '&#9660;' : v > 0 ? '&#9650;' : '&#9644;';
+    const varianceLabel = (v: number) => v < 0 ? 'Shortage' : v > 0 ? 'Surplus' : 'Balanced';
+
+    // Shared CSS for both modes - A4 optimized
+    const sharedCSS = `
+      @page { size: A4; margin: 12mm 15mm; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a202c; font-size: 11px; line-height: 1.4; }
+      .container { max-width: 180mm; margin: 0 auto; padding: 0; }
+      
+      /* Header */
+      .header { border-bottom: 2px solid #1a365d; padding-bottom: 10px; margin-bottom: 14px; }
+      .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+      .doc-title { font-size: 24px; font-weight: 700; color: #1a365d; letter-spacing: 1px; text-transform: uppercase; }
+      .doc-subtitle { font-size: 10px; color: #718096; margin-top: 2px; letter-spacing: 0.5px; }
+      .doc-number { font-size: 13px; font-weight: 600; color: #2b6cb0; text-align: right; }
+      .doc-date { font-size: 10px; color: #718096; text-align: right; margin-top: 2px; }
+      
+      /* Info Grid */
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+      .info-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; }
+      .info-card-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.8px; color: #a0aec0; font-weight: 600; margin-bottom: 2px; }
+      .info-card-value { font-size: 11px; font-weight: 600; color: #2d3748; }
+      
+      /* Table */
+      .items-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; }
+      .items-table thead th { background: #1a365d; color: #fff; padding: 5px 8px; text-align: left; font-weight: 600; font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; }
+      .items-table thead th.num { text-align: center; width: 28px; }
+      .items-table thead th.right { text-align: right; }
+      .items-table tbody td { padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+      .items-table tbody td.num { text-align: center; color: #a0aec0; font-size: 9px; }
+      .items-table tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+      .items-table tbody tr:nth-child(even) { background: #f7fafc; }
+      .godown-header td { background: #ebf4ff !important; font-weight: 700; color: #1a365d; font-size: 10px; padding: 5px 8px; border-bottom: 2px solid #1a365d; text-transform: uppercase; letter-spacing: 0.5px; }
+      .variance-neg { color: #e53e3e; font-weight: 600; }
+      .variance-pos { color: #38a169; font-weight: 600; }
+      .variance-zero { color: #a0aec0; }
+      
+      /* Summary Dashboard */
+      .summary-section { margin-bottom: 12px; }
+      .summary-title { font-size: 11px; font-weight: 700; color: #1a365d; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+      .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      .summary-card { text-align: center; padding: 8px 4px; border-radius: 4px; border: 1px solid #e2e8f0; background: #fff; }
+      .summary-card-value { font-size: 16px; font-weight: 700; color: #1a202c; }
+      .summary-card-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.4px; color: #718096; margin-top: 2px; }
+      
+      /* Variance Status Bar */
+      .variance-status { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
+      
+      /* Notes */
+      .notes-section { margin-bottom: 12px; }
+      .notes-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px 12px; min-height: 30px; }
+      .notes-box p { font-size: 10px; color: #1a202c; }
+      .notes-empty { font-style: italic; color: #a0aec0; }
+      
+      /* Signatures */
+      .signatures-section { margin-top: 16px; }
+      .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .sig-block { border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background: #f7fafc; }
+      .sig-title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; color: #a0aec0; font-weight: 600; margin-bottom: 4px; }
+      .sig-line { border-bottom: 1px solid #2d3748; height: 22px; margin-bottom: 4px; }
+      .sig-name { font-size: 11px; font-weight: 600; color: #2d3748; }
+      .sig-date { font-size: 9px; color: #718096; margin-top: 1px; }
+      
+      /* Footer */
+      .footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 8px; color: #a0aec0; }
+      
+      @media print {
+        @page { size: A4; margin: 12mm 15mm; }
+        body { padding: 0; font-size: 11px; }
+        .container { max-width: none; padding: 0; }
+        .items-table tbody tr:nth-child(even),
+        .items-table thead th,
+        .sig-block,
+        .godown-header td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `;
+
     if (batchMode) {
-      // BATCH MODE HTML
+      // BATCH MODE
       const totals = batchTotals();
+      const globalIdx = { current: 0 };
       let allRowsHtml = '';
       batchSelectedGodowns.forEach(g => {
         const items = (batchItems[g.id] || []).filter(item => item.productId);
         if (items.length === 0) return;
-        const rowsHtml = items.map((item, idx) => `
-          <tr>
-            <td style="padding:8px;border:1px solid #ddd;">${idx + 1}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${item.productName}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${item.zoneName || 'No Zone'}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.systemQty}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physicalCount}</td>
-            <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${item.variance < 0 ? '#dc2626' : item.variance > 0 ? '#16a34a' : ''}">${item.variance}</td>
-          </tr>
-        `).join('');
-        allRowsHtml += `
-          <tr><td colspan="6" style="padding:10px 8px 4px;font-weight:bold;background:#f0f4ff;border:1px solid #ddd;">Godown: ${g.name}</td></tr>
-          ${rowsHtml}
-        `;
+        const rowsHtml = items.map(item => {
+          globalIdx.current++;
+          const vClass = item.variance < 0 ? 'variance-neg' : item.variance > 0 ? 'variance-pos' : 'variance-zero';
+          return `<tr>
+            <td class="num">${globalIdx.current}</td>
+            <td>${item.productName}</td>
+            <td>${item.zoneName || 'No Zone'}</td>
+            <td class="right">${item.systemQty}</td>
+            <td class="right">${item.physicalCount}</td>
+            <td class="right ${vClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
+          </tr>`;
+        }).join('');
+        allRowsHtml += `<tr class="godown-header"><td colspan="6">&#128230; ${g.name}</td></tr>${rowsHtml}`;
       });
       const godownList = batchSelectedGodowns.map(g => g.name).join(', ');
-      return `
-        <!DOCTYPE html>
-        <html><head><title>Batch Stock Take - ${stockTakeNumber}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #333; }
-          .info-row { display: flex; gap: 20px; margin-bottom: 10px; }
-          .info-label { font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { background: #f5f5f5; padding: 10px; border: 1px solid #ddd; text-align: left; }
-          .summary { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
-        </style></head>
-        <body>
-          <h1 style="text-align:center;">BATCH PHYSICAL STOCK TAKE</h1>
-          <p style="text-align:center;color:#666;">${stockTakeNumber}</p>
-          <div class="info-row">
-            <div><span class="info-label">Date:</span> ${new Date().toLocaleDateString()}</div>
-            <div><span class="info-label">Mode:</span> Batch (${batchSelectedGodowns.length} godowns)</div>
-          </div>
-          <div class="info-row"><div><span class="info-label">Godowns:</span> ${godownList}</div></div>
-          <table>
-            <thead><tr>
-              <th>No.</th><th>Product</th><th>Zone</th>
-              <th style="text-align:right;">System Qty</th>
-              <th style="text-align:right;">Physical Count</th>
-              <th style="text-align:right;">Variance</th>
-            </tr></thead>
-            <tbody>${allRowsHtml}</tbody>
-          </table>
-          <div class="summary">
-            <h3>Summary</h3>
-            <div class="summary-row"><span>Total Products:</span><span>${totals.totalProducts}</span></div>
-            <div class="summary-row"><span>Total System Qty:</span><span>${totals.totalSystemQty}</span></div>
-            <div class="summary-row"><span>Total Physical Count:</span><span>${totals.totalPhysicalCount}</span></div>
-            <div class="summary-row"><span>Total Variance:</span><span style="color:${totals.totalVariance < 0 ? '#dc2626' : totals.totalVariance > 0 ? '#16a34a' : ''}">${totals.totalVariance}</span></div>
-          </div>
-          <div style="margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;">
-            <h3>Notes</h3>
-            <p>${stockTakeNotes || '(No notes)'}</p>
-          </div>
-          <div style="margin-top:20px;padding:15px;background:#f0f4ff;border-radius:8px;">
-            <h3>Verification</h3>
-            <div style="display:flex;justify-content:space-between;margin-top:10px;">
-              <div><strong>Counted By:</strong> ${countedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${countedByDate}</div>
+
+      return `<!DOCTYPE html><html><head><title>Batch Stock Take - ${stockTakeNumber}</title><style>${sharedCSS}</style></head><body><div class="container">
+        <div class="header">
+          <div class="header-top">
+            <div>
+              <div class="doc-title">Batch Physical Stock Take</div>
+              <div class="doc-subtitle">Multi-Godown Inventory Audit &amp; Reconciliation</div>
             </div>
-            <div style="display:flex;justify-content:space-between;margin-top:10px;">
-              <div><strong>Verified By (Manager):</strong> ${verifiedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${verifiedByDate}</div>
+            <div>
+              <div class="doc-number">${stockTakeNumber}</div>
+              <div class="doc-date">${today}</div>
             </div>
           </div>
-        </body></html>
-      `;
+        </div>
+        <div class="info-grid">
+          <div class="info-card"><div class="info-card-label">Mode</div><div class="info-card-value">Batch Count</div></div>
+          <div class="info-card"><div class="info-card-label">Godowns</div><div class="info-card-value">${batchSelectedGodowns.length} Location(s)</div></div>
+          <div class="info-card"><div class="info-card-label">Total Items</div><div class="info-card-value">${totals.totalProducts} Product(s)</div></div>
+        </div>
+        <div class="info-grid" style="grid-template-columns: 1fr;">
+          <div class="info-card"><div class="info-card-label">Locations Covered</div><div class="info-card-value">${godownList}</div></div>
+        </div>
+        <table class="items-table">
+          <thead><tr>
+            <th class="num">#</th><th>Product</th><th>Zone</th>
+            <th class="right">System Qty</th><th class="right">Physical Count</th><th class="right">Variance</th>
+          </tr></thead>
+          <tbody>${allRowsHtml}</tbody>
+        </table>
+        <div class="summary-section">
+          <div class="summary-title">Consolidated Summary</div>
+          <div class="summary-grid">
+            <div class="summary-card"><div class="summary-card-value">${totals.totalProducts}</div><div class="summary-card-label">Products</div></div>
+            <div class="summary-card"><div class="summary-card-value">${totals.totalSystemQty}</div><div class="summary-card-label">System Qty</div></div>
+            <div class="summary-card"><div class="summary-card-value">${totals.totalPhysicalCount}</div><div class="summary-card-label">Physical Count</div></div>
+            <div class="summary-card"><div class="summary-card-value">${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance}</div><div class="summary-card-label">Variance</div></div>
+          </div>
+          <div class="variance-status">${varianceIcon(totals.totalVariance)} Overall Status: ${varianceLabel(totals.totalVariance)} &mdash; ${totals.totalVariance !== 0 ? Math.abs(totals.totalVariance) + ' unit(s) ' + (totals.totalVariance < 0 ? 'short' : 'surplus') : 'All quantities match'}</div>
+        </div>
+        <div class="notes-section">
+          <div class="summary-title">Notes &amp; Observations</div>
+          <div class="notes-box">${stockTakeNotes ? `<p>${stockTakeNotes}</p>` : '<p class="notes-empty">No notes recorded</p>'}</div>
+        </div>
+        <div class="signatures-section">
+          <div class="summary-title">Verification &amp; Approval</div>
+          <div class="signatures-grid">
+            <div class="sig-block">
+              <div class="sig-title">Counted By</div>
+              <div class="sig-line"></div>
+              <div class="sig-name">${countedByName || '________________________'}</div>
+              <div class="sig-date">Date: ${countedByDate}</div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">Verified By (Manager)</div>
+              <div class="sig-line"></div>
+              <div class="sig-name">${verifiedByName || '________________________'}</div>
+              <div class="sig-date">Date: ${verifiedByDate}</div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <span>Generated: ${today}</span>
+          <span>Batch Stock Take &bull; ${stockTakeNumber}</span>
+          <span>Page 1 of 1</span>
+        </div>
+      </div></body></html>`;
     }
 
-    // SINGLE MODE HTML (existing)
+    // SINGLE MODE
     const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
     const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
     const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
     const filledItems = stockTakeItems.filter(item => item.productId);
 
-    const rowsHtml = filledItems.map((item, idx) => `
-      <tr>
-        <td style="padding:8px;border:1px solid #ddd;">${idx + 1}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${item.productName}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${selectedGodown?.name || item.godownName || ''}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${zoneName || item.zoneName || ''}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.systemQty}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${item.physicalCount}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${item.variance < 0 ? '#dc2626' : item.variance > 0 ? '#16a34a' : ''}">${item.variance}</td>
-      </tr>
-    `).join('');
+    const rowsHtml = filledItems.map((item, idx) => {
+      const vClass = item.variance < 0 ? 'variance-neg' : item.variance > 0 ? 'variance-pos' : 'variance-zero';
+      return `<tr>
+        <td class="num">${idx + 1}</td>
+        <td>${item.productName}</td>
+        <td>${selectedGodown?.name || item.godownName || ''}</td>
+        <td>${zoneName || item.zoneName || ''}</td>
+        <td class="right">${item.systemQty}</td>
+        <td class="right">${item.physicalCount}</td>
+        <td class="right ${vClass}">${item.variance > 0 ? '+' : ''}${item.variance}</td>
+      </tr>`;
+    }).join('');
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Stock Take - ${stockTakeNumber}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #333; }
-          .info-row { display: flex; gap: 20px; margin-bottom: 10px; }
-          .info-label { font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { background: #f5f5f5; padding: 10px; border: 1px solid #ddd; text-align: left; }
-          .summary { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
-        </style>
-      </head>
-      <body>
-        <h1 style="text-align:center;">PHYSICAL STOCK TAKE</h1>
-        <p style="text-align:center;color:#666;">${stockTakeNumber}</p>
-        <div class="info-row">
-          <div><span class="info-label">Date:</span> ${new Date().toLocaleDateString()}</div>
-          <div><span class="info-label">Godown:</span> ${selectedGodown?.name || ''}</div>
-          <div><span class="info-label">Zone:</span> ${zoneName}</div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>No.</th><th>Product</th><th>Godown</th><th>Zone</th>
-              <th style="text-align:right;">System Qty</th>
-              <th style="text-align:right;">Physical Count</th>
-              <th style="text-align:right;">Variance</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-        <div class="summary">
-          <h3>Summary</h3>
-          <div class="summary-row"><span>Total Products:</span><span>${stockTakeTotals.totalProducts}</span></div>
-          <div class="summary-row"><span>Total System Qty:</span><span>${stockTakeTotals.totalSystemQty}</span></div>
-          <div class="summary-row"><span>Total Physical Count:</span><span>${stockTakeTotals.totalPhysicalCount}</span></div>
-          <div class="summary-row"><span>Total Variance:</span><span style="color:${stockTakeTotals.totalVariance < 0 ? '#dc2626' : stockTakeTotals.totalVariance > 0 ? '#16a34a' : ''}">${stockTakeTotals.totalVariance}</span></div>
-        </div>
-        <div style="margin-top:20px;padding:15px;background:#f9f9f9;border-radius:8px;">
-          <h3>Notes</h3>
-          <p>${stockTakeNotes || '(No notes)'}</p>
-        </div>
-        <div style="margin-top:20px;padding:15px;background:#f0f4ff;border-radius:8px;">
-          <h3>Verification</h3>
-          <div style="display:flex;justify-content:space-between;margin-top:10px;">
-            <div><strong>Counted By:</strong> ${countedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${countedByDate}</div>
+    return `<!DOCTYPE html><html><head><title>Stock Take - ${stockTakeNumber}</title><style>${sharedCSS}</style></head><body><div class="container">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <div class="doc-title">Physical Stock Take</div>
+            <div class="doc-subtitle">Inventory Audit &amp; Reconciliation Report</div>
           </div>
-          <div style="display:flex;justify-content:space-between;margin-top:10px;">
-            <div><strong>Verified By (Manager):</strong> ${verifiedByName || '_________________'}&nbsp;&nbsp;&nbsp;&nbsp;Date: ${verifiedByDate}</div>
+          <div>
+            <div class="doc-number">${stockTakeNumber}</div>
+            <div class="doc-date">${today}</div>
           </div>
         </div>
-      </body>
-      </html>
-    `;
+      </div>
+      <div class="info-grid">
+        <div class="info-card"><div class="info-card-label">Godown</div><div class="info-card-value">${selectedGodown?.name || '-'}</div></div>
+        <div class="info-card"><div class="info-card-label">Zone</div><div class="info-card-value">${zoneName || '-'}</div></div>
+        <div class="info-card"><div class="info-card-label">Total Items</div><div class="info-card-value">${stockTakeTotals.totalProducts} Product(s)</div></div>
+      </div>
+      <table class="items-table">
+        <thead><tr>
+          <th class="num">#</th><th>Product</th><th>Godown</th><th>Zone</th>
+          <th class="right">System Qty</th><th class="right">Physical Count</th><th class="right">Variance</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div class="summary-section">
+        <div class="summary-title">Summary</div>
+        <div class="summary-grid">
+          <div class="summary-card"><div class="summary-card-value">${stockTakeTotals.totalProducts}</div><div class="summary-card-label">Products</div></div>
+          <div class="summary-card"><div class="summary-card-value">${stockTakeTotals.totalSystemQty}</div><div class="summary-card-label">System Qty</div></div>
+          <div class="summary-card"><div class="summary-card-value">${stockTakeTotals.totalPhysicalCount}</div><div class="summary-card-label">Physical Count</div></div>
+          <div class="summary-card"><div class="summary-card-value">${stockTakeTotals.totalVariance > 0 ? '+' : ''}${stockTakeTotals.totalVariance}</div><div class="summary-card-label">Variance</div></div>
+        </div>
+        <div class="variance-status">${varianceIcon(stockTakeTotals.totalVariance)} Overall Status: ${varianceLabel(stockTakeTotals.totalVariance)} &mdash; ${stockTakeTotals.totalVariance !== 0 ? Math.abs(stockTakeTotals.totalVariance) + ' unit(s) ' + (stockTakeTotals.totalVariance < 0 ? 'short' : 'surplus') : 'All quantities match'}</div>
+      </div>
+      <div class="notes-section">
+        <div class="summary-title">Notes &amp; Observations</div>
+        <div class="notes-box">${stockTakeNotes ? `<p>${stockTakeNotes}</p>` : '<p class="notes-empty">No notes recorded</p>'}</div>
+      </div>
+      <div class="signatures-section">
+        <div class="summary-title">Verification &amp; Approval</div>
+        <div class="signatures-grid">
+          <div class="sig-block">
+            <div class="sig-title">Counted By</div>
+            <div class="sig-line"></div>
+            <div class="sig-name">${countedByName || '________________________'}</div>
+            <div class="sig-date">Date: ${countedByDate}</div>
+          </div>
+          <div class="sig-block">
+            <div class="sig-title">Verified By (Manager)</div>
+            <div class="sig-line"></div>
+            <div class="sig-name">${verifiedByName || '________________________'}</div>
+            <div class="sig-date">Date: ${verifiedByDate}</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <span>Generated: ${today}</span>
+        <span>Stock Take &bull; ${stockTakeNumber}</span>
+        <span>Page 1 of 1</span>
+      </div>
+    </div></body></html>`;
   };
 
   // Export stock take as CSV
