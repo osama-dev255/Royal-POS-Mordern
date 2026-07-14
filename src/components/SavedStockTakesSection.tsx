@@ -72,6 +72,9 @@ interface SavedStockTake {
   verified_by?: string;
   counted_by_date?: string;
   verified_by_date?: string;
+  counted_by_timestamp?: string;
+  verified_by_timestamp?: string;
+  stock_take_timestamp?: string;
   batch_godowns?: Array<{id: string; name: string}>;
 }
 
@@ -159,6 +162,15 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
     const investment = isGodownStockTake(stockTake);
     const batch = isBatchType(stockTake);
     const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const formatTimestamp = (ts?: string) => {
+      if (!ts) return '';
+      const d = new Date(ts);
+      return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+    const formatDate = (d?: string) => {
+      if (!d) return '';
+      return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
     const varianceIcon = (v: number) => v < 0 ? '&#9660;' : v > 0 ? '&#9650;' : '&#9644;';
     const varianceLabel = (v: number) => v < 0 ? 'Shortage' : v > 0 ? 'Surplus' : 'Balanced';
 
@@ -270,7 +282,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
         <div class="header">
           <div class="header-top">
             <div><div class="doc-title">${title}</div><div class="doc-subtitle">${subtitle}</div></div>
-            <div><div class="doc-number">${stockTake.stock_take_number}</div><div class="doc-date">${new Date(stockTake.date).toLocaleDateString()}</div></div>
+            <div><div class="doc-number">${stockTake.stock_take_number}</div><div class="doc-date">${formatTimestamp(stockTake.stock_take_timestamp) || new Date(stockTake.date).toLocaleDateString()}</div></div>
           </div>
         </div>
         <div class="info-grid">
@@ -307,13 +319,13 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
               <div class="sig-title">Counted By</div>
               <div class="sig-line"></div>
               <div class="sig-name">${stockTake.counted_by || '________________________'}</div>
-              <div class="sig-date">Date: ${stockTake.counted_by_date || '________________'}</div>
+              <div class="sig-date">${formatTimestamp(stockTake.counted_by_timestamp) || `Date: ${stockTake.counted_by_date || '________________'}`}</div>
             </div>
             <div class="sig-block">
               <div class="sig-title">Verified By (Manager)</div>
               <div class="sig-line"></div>
               <div class="sig-name">${stockTake.verified_by || '________________________'}</div>
-              <div class="sig-date">Date: ${stockTake.verified_by_date || '________________'}</div>
+              <div class="sig-date">${formatTimestamp(stockTake.verified_by_timestamp) || `Date: ${stockTake.verified_by_date || '________________'}`}</div>
             </div>
           </div>
         </div>
@@ -340,7 +352,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
         <div class="header">
           <div class="header-top">
             <div><div class="doc-title">Stock Take Report</div><div class="doc-subtitle">Outlet Inventory Count</div></div>
-            <div><div class="doc-number">${stockTake.stock_take_number}</div><div class="doc-date">${new Date(stockTake.date).toLocaleDateString()}</div></div>
+            <div><div class="doc-number">${stockTake.stock_take_number}</div><div class="doc-date">${formatTimestamp(stockTake.stock_take_timestamp) || new Date(stockTake.date).toLocaleDateString()}</div></div>
           </div>
         </div>
         <div class="info-grid">
@@ -405,7 +417,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
                     {selectedStockTake.stock_take_number}
                   </h2>
                   <p className="text-muted-foreground">
-                    {new Date(selectedStockTake.date).toLocaleDateString()} • Status: {selectedStockTake.status}
+                    {selectedStockTake.stock_take_timestamp ? new Date(selectedStockTake.stock_take_timestamp).toLocaleString() : new Date(selectedStockTake.date).toLocaleDateString()} • Status: {selectedStockTake.status}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -681,7 +693,7 @@ export const SavedStockTakesSection = ({ onBack, onLogout, username }: SavedStoc
                           <h3 className="font-semibold">{stockTake.stock_take_number}</h3>
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(stockTake.date).toLocaleDateString()}
+                            {stockTake.stock_take_timestamp ? new Date(stockTake.stock_take_timestamp).toLocaleString() : new Date(stockTake.date).toLocaleDateString()}
                           </p>
                           <Badge variant={stockTake.status === 'completed' ? 'default' : 'secondary'} className="mt-1 text-xs">
                             {stockTake.status}

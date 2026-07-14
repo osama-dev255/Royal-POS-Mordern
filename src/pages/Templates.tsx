@@ -6464,6 +6464,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   // Generate Stock Take HTML for printing
   const generateStockTakeHTML = (): string => {
     const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const varianceIcon = (v: number) => v < 0 ? '&#9660;' : v > 0 ? '&#9650;' : '&#9644;';
     const varianceLabel = (v: number) => v < 0 ? 'Shortage' : v > 0 ? 'Surplus' : 'Balanced';
 
@@ -6626,7 +6627,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
           </div>
         </div>
         <div class="footer">
-          <span>Generated: ${today}</span>
+          <span>Generated: ${today} at ${now}</span>
           <span>Batch Stock Take &bull; ${stockTakeNumber}</span>
           <span>Page 1 of 1</span>
         </div>
@@ -6709,7 +6710,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         </div>
       </div>
       <div class="footer">
-        <span>Generated: ${today}</span>
+        <span>Generated: ${today} at ${now}</span>
         <span>Stock Take &bull; ${stockTakeNumber}</span>
         <span>Page 1 of 1</span>
       </div>
@@ -9475,8 +9476,11 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                               total_investment_value: 0,
                               counted_by: countedByName,
                               counted_by_date: countedByDate,
+                              counted_by_timestamp: countedByDate ? new Date(countedByDate).toISOString() : new Date().toISOString(),
                               verified_by: verifiedByName,
                               verified_by_date: verifiedByDate,
+                              verified_by_timestamp: verifiedByDate ? new Date(verifiedByDate).toISOString() : null,
+                              stock_take_timestamp: new Date().toISOString(),
                               batch_godowns: batchSelectedGodowns.map(g => ({ id: g.id, name: g.name })),
                               created_by: user?.id || null,
                             };
@@ -9532,8 +9536,11 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                               total_investment_value: stockTakeTotals.totalInvestmentValue,
                               counted_by: countedByName,
                               counted_by_date: countedByDate,
+                              counted_by_timestamp: countedByDate ? new Date(countedByDate).toISOString() : new Date().toISOString(),
                               verified_by: verifiedByName,
                               verified_by_date: verifiedByDate,
+                              verified_by_timestamp: verifiedByDate ? new Date(verifiedByDate).toISOString() : null,
+                              stock_take_timestamp: new Date().toISOString(),
                               created_by: user?.id || null,
                             };
                             const { error } = await supabase.from('saved_stock_takes').insert(stockTakeRecord);
