@@ -1361,7 +1361,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
             ? stockData.filter(s => s.zone_id === stockTakeZoneId || (stockTakeZoneId === '__no_zone__' && !s.zone_id))
             : stockData;
           const totalQty = zoneFiltered.reduce((sum, s) => sum + (s.quantity || 0), 0);
-          if (totalQty > 0) {
+          if (zoneFiltered.length > 0) {
             resultsWithQty.push({ productId: p.id, name: p.name, quantity: totalQty });
           }
         }
@@ -6423,17 +6423,15 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
             zoneMap.set(zId, { zoneId: s.zone_id || null, zoneName: zName, qty: s.quantity || 0 });
           }
         }
-        // Add one result per zone (only if qty > 0)
+        // Add one result per zone (include products even if qty is 0, as long as they are assigned to the zone)
         for (const [, zoneInfo] of zoneMap) {
-          if (zoneInfo.qty > 0) {
-            resultsWithQty.push({
-              productId: p.id,
-              name: `${p.name} [${zoneInfo.zoneName}]`,
-              quantity: zoneInfo.qty,
-              zoneId: zoneInfo.zoneId || undefined,
-              zoneName: zoneInfo.zoneName,
-            });
-          }
+          resultsWithQty.push({
+            productId: p.id,
+            name: `${p.name} [${zoneInfo.zoneName}]`,
+            quantity: zoneInfo.qty,
+            zoneId: zoneInfo.zoneId || undefined,
+            zoneName: zoneInfo.zoneName,
+          });
         }
       }
       setBatchProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
