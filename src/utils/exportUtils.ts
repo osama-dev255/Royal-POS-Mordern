@@ -1048,7 +1048,7 @@ export class ExportUtils {
       const totalQty = items.reduce((sum: number, item: any) => sum + (item.delivered || item.quantity || 0), 0);
       const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
   
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
       let y = 15;
   
@@ -1133,29 +1133,37 @@ export class ExportUtils {
         item.description || '',
         item.quantity || 0,
         item.delivered || 0,
-        (item.receivingCostPerUnit || item.unitCost || 0).toFixed(2),
+        item.unit || '-',
+        (item.originalUnitCost || 0).toFixed(2),
+        (item.receivingCostPerUnit || 0).toFixed(2),
+        (item.unitCost || 0).toFixed(2),
         (item.totalWithReceivingCost || item.total || 0).toFixed(2),
         item.batchNumber || '-',
         item.expiryDate ? formatDate(item.expiryDate) : '-',
         item.godown_name || item.godownName || defaultGodown,
-        item.zone_name || item.zoneName || defaultZone
+        item.zone_name || item.zoneName || defaultZone,
+        (item.damaged || 0) > 0 ? item.damaged : '-',
+        item.remarks || '-'
       ]);
   
       autoTable(doc, {
         startY: y,
-        head: [['#', 'Item', 'Ordered', 'Delivered', 'Unit Cost', 'Total', 'Batch', 'Expiry', 'Godown', 'Zone']],
+        head: [['#', 'Item', 'Ordered', 'Received', 'Unit', 'Orig. Cost', 'Recv. Cost', 'New Cost', 'Total', 'Batch', 'Expiry', 'Godown', 'Zone', 'Dmg', 'Remarks']],
         body: tableData,
         theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2 },
-        headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
+        styles: { fontSize: 6, cellPadding: 1.5 },
+        headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold', fontSize: 6 },
         columnStyles: {
-          0: { cellWidth: 8, halign: 'center' },
+          0: { cellWidth: 7, halign: 'center' },
           2: { halign: 'center' },
           3: { halign: 'center' },
-          4: { halign: 'right' },
-          5: { halign: 'right' }
+          5: { halign: 'right' },
+          6: { halign: 'right' },
+          7: { halign: 'right' },
+          8: { halign: 'right' },
+          13: { halign: 'center' }
         },
-        margin: { left: 15, right: 15 }
+        margin: { left: 10, right: 10 }
       });
   
       // @ts-ignore - autoTable updates y cursor

@@ -4,14 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Edit, Trash2, Truck, Phone, Mail, MapPin, BarChart3, User, Download, Upload, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Plus, Edit, Trash2, Truck, Phone, Mail, MapPin, User, RefreshCw, Building2, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { AutomationService } from "@/services/automationService";
-import { ExportImportManager } from "@/components/ExportImportManager";
 import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from "@/services/databaseService";
 
 interface Supplier {
@@ -21,10 +19,14 @@ interface Supplier {
   email: string;
   phone: string;
   address: string;
-  tax_id?: string;
-  products: string[];
+  city: string;
+  state: string;
+  zip_code: string;
+  country: string;
+  tax_id: string;
+  payment_terms: string;
   status: "active" | "inactive";
-  lastOrder?: string;
+  created_at?: string;
 }
 
 export const SupplierManagement = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
@@ -33,19 +35,22 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [newSupplier, setNewSupplier] = useState<Omit<Supplier, "id">>({
+  const [newSupplier, setNewSupplier] = useState<Omit<Supplier, "id" | "created_at">>({
     name: "",
     contactPerson: "",
     email: "",
     phone: "",
     address: "",
+    city: "",
+    state: "",
+    zip_code: "",
+    country: "",
     tax_id: "",
-    products: [],
+    payment_terms: "",
     status: "active"
   });
   const { toast } = useToast();
 
-  // Load suppliers from database
   useEffect(() => {
     const loadSuppliers = async () => {
       try {
@@ -58,9 +63,14 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           email: supplier.email || '',
           phone: supplier.phone || '',
           address: supplier.address || '',
-          products: [], // Will need to be loaded from a separate table or field
+          city: supplier.city || '',
+          state: supplier.state || '',
+          zip_code: supplier.zip_code || '',
+          country: supplier.country || '',
+          tax_id: supplier.tax_id || '',
+          payment_terms: supplier.payment_terms || '',
           status: supplier.is_active ? "active" as const : "inactive" as const,
-          // lastOrder would need to be calculated from purchase orders
+          created_at: supplier.created_at,
         }));
         setSuppliers(formattedSuppliers);
       } catch (error) {
@@ -95,7 +105,12 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         email: newSupplier.email,
         phone: newSupplier.phone,
         address: newSupplier.address,
-        tax_id: newSupplier.tax_id || "",
+        city: newSupplier.city,
+        state: newSupplier.state,
+        zip_code: newSupplier.zip_code,
+        country: newSupplier.country,
+        tax_id: newSupplier.tax_id,
+        payment_terms: newSupplier.payment_terms,
         is_active: newSupplier.status === "active"
       };
 
@@ -109,9 +124,14 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           email: createdSupplier.email || '',
           phone: createdSupplier.phone || '',
           address: createdSupplier.address || '',
+          city: createdSupplier.city || '',
+          state: createdSupplier.state || '',
+          zip_code: createdSupplier.zip_code || '',
+          country: createdSupplier.country || '',
           tax_id: createdSupplier.tax_id || '',
-          products: [],
-          status: createdSupplier.is_active ? "active" as const : "inactive" as const
+          payment_terms: createdSupplier.payment_terms || '',
+          status: createdSupplier.is_active ? "active" as const : "inactive" as const,
+          created_at: createdSupplier.created_at,
         };
 
         setSuppliers([...suppliers, formattedSupplier]);
@@ -120,7 +140,7 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         
         toast({
           title: "Success",
-          description: "Supplier added successfully"
+          description: "Supplier registered successfully"
         });
       } else {
         throw new Error("Failed to create supplier");
@@ -133,38 +153,6 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         variant: "destructive"
       });
     }
-  };
-
-  // Handle supplier import
-  const handleImportSuppliers = (importedSuppliers: any[]) => {
-    // This would need to be updated to work with the database
-    const updatedSuppliers = [...suppliers];
-    
-    importedSuppliers.forEach(importedSupplier => {
-      // Check if supplier already exists (by name)
-      const existingIndex = updatedSuppliers.findIndex(s => s.name === importedSupplier.name);
-      
-      if (existingIndex >= 0) {
-        // Update existing supplier
-        updatedSuppliers[existingIndex] = {
-          ...updatedSuppliers[existingIndex],
-          ...importedSupplier
-        };
-      } else {
-        // Add new supplier
-        updatedSuppliers.push({
-          ...importedSupplier,
-          id: Date.now().toString() + Math.random()
-        });
-      }
-    });
-    
-    setSuppliers(updatedSuppliers);
-    
-    toast({
-      title: "Import Successful",
-      description: `Successfully imported ${importedSuppliers.length} suppliers`
-    });
   };
 
   const handleUpdateSupplier = async () => {
@@ -184,7 +172,12 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         email: editingSupplier.email,
         phone: editingSupplier.phone,
         address: editingSupplier.address,
-        tax_id: editingSupplier.tax_id || "",
+        city: editingSupplier.city,
+        state: editingSupplier.state,
+        zip_code: editingSupplier.zip_code,
+        country: editingSupplier.country,
+        tax_id: editingSupplier.tax_id,
+        payment_terms: editingSupplier.payment_terms,
         is_active: editingSupplier.status === "active"
       };
 
@@ -198,9 +191,13 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           email: updatedSupplier.email || '',
           phone: updatedSupplier.phone || '',
           address: updatedSupplier.address || '',
+          city: updatedSupplier.city || '',
+          state: updatedSupplier.state || '',
+          zip_code: updatedSupplier.zip_code || '',
+          country: updatedSupplier.country || '',
           tax_id: updatedSupplier.tax_id || '',
-          products: [],
-          status: updatedSupplier.is_active ? "active" as const : "inactive" as const
+          payment_terms: updatedSupplier.payment_terms || '',
+          status: updatedSupplier.is_active ? "active" as const : "inactive" as const,
         };
 
         setSuppliers(suppliers.map(s => s.id === editingSupplier.id ? formattedSupplier : s));
@@ -225,6 +222,10 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
   };
 
   const handleDeleteSupplier = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this supplier?")) {
+      return;
+    }
+
     try {
       const success = await deleteSupplier(id);
       
@@ -239,11 +240,22 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
       }
     } catch (error) {
       console.error("Error deleting supplier:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete supplier: " + (error as Error).message,
-        variant: "destructive"
-      });
+      const errorMsg = (error as Error).message;
+      
+      // Check for foreign key constraint violation
+      if (errorMsg.includes("23503") || errorMsg.includes("foreign key") || errorMsg.includes("still referenced")) {
+        toast({
+          title: "Cannot Delete Supplier",
+          description: "This supplier is linked to existing purchase orders or records and cannot be deleted. You can mark it as inactive instead by editing the supplier.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete supplier: " + errorMsg,
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -254,8 +266,12 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
       email: "",
       phone: "",
       address: "",
+      city: "",
+      state: "",
+      zip_code: "",
+      country: "",
       tax_id: "",
-      products: [],
+      payment_terms: "",
       status: "active"
     });
     setEditingSupplier(null);
@@ -271,7 +287,6 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
     setIsDialogOpen(true);
   };
 
-  // Refresh suppliers from database
   const refreshSuppliers = async () => {
     try {
       setLoading(true);
@@ -283,7 +298,12 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         email: supplier.email || '',
         phone: supplier.phone || '',
         address: supplier.address || '',
-        products: [],
+        city: supplier.city || '',
+        state: supplier.state || '',
+        zip_code: supplier.zip_code || '',
+        country: supplier.country || '',
+        tax_id: supplier.tax_id || '',
+        payment_terms: supplier.payment_terms || '',
         status: supplier.is_active ? "active" as const : "inactive" as const,
       }));
       setSuppliers(formattedSuppliers);
@@ -303,15 +323,18 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
     }
   };
 
-  // Apply automated supplier performance tracking
-  const suppliersWithPerformance = AutomationService.trackSupplierPerformance(suppliers, []);
-  
-  const filteredSuppliers = suppliersWithPerformance.filter(supplier => 
+  const filteredSuppliers = suppliers.filter(supplier => 
     supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
     supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.phone.includes(searchTerm)
+    supplier.phone.includes(searchTerm) ||
+    supplier.city.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const formatAddress = (supplier: Supplier) => {
+    const parts = [supplier.address, supplier.city, supplier.state, supplier.zip_code, supplier.country].filter(p => p);
+    return parts.length > 0 ? parts.join(", ") : "No address provided";
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -325,8 +348,8 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
       <main className="container mx-auto p-6">
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-3xl font-bold">Suppliers</h2>
-            <p className="text-muted-foreground">Manage your suppliers and vendor relationships</p>
+            <h2 className="text-3xl font-bold">Supplier Registration</h2>
+            <p className="text-muted-foreground">Register and manage your suppliers</p>
           </div>
           
           <div className="flex gap-2">
@@ -347,110 +370,225 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
               <DialogTrigger asChild>
                 <Button onClick={openAddDialog}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Supplier
+                  Register Supplier
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>
-                    {editingSupplier ? "Edit Supplier" : "Add New Supplier"}
+                  <DialogTitle className="text-xl">
+                    {editingSupplier ? "Edit Supplier Details" : "Register New Supplier"}
                   </DialogTitle>
                 </DialogHeader>
                 
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Company Name *</Label>
-                    <Input
-                      id="name"
-                      value={editingSupplier ? editingSupplier.name : newSupplier.name}
-                      onChange={(e) => 
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, name: e.target.value}) 
-                          : setNewSupplier({...newSupplier, name: e.target.value})
-                      }
-                    />
+                <div className="grid gap-6 py-4">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-primary border-b pb-2">Basic Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Company Name *</Label>
+                        <Input
+                          id="name"
+                          value={editingSupplier ? editingSupplier.name : newSupplier.name}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, name: e.target.value}) 
+                              : setNewSupplier({...newSupplier, name: e.target.value})
+                          }
+                          placeholder="Enter company name"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="contactPerson">Contact Person *</Label>
+                        <Input
+                          id="contactPerson"
+                          value={editingSupplier ? editingSupplier.contactPerson : newSupplier.contactPerson}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, contactPerson: e.target.value}) 
+                              : setNewSupplier({...newSupplier, contactPerson: e.target.value})
+                          }
+                          placeholder="Enter contact person name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={editingSupplier ? editingSupplier.email : newSupplier.email}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, email: e.target.value}) 
+                              : setNewSupplier({...newSupplier, email: e.target.value})
+                          }
+                          placeholder="supplier@company.com"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          value={editingSupplier ? editingSupplier.phone : newSupplier.phone}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, phone: e.target.value}) 
+                              : setNewSupplier({...newSupplier, phone: e.target.value})
+                          }
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="contactPerson">Contact Person *</Label>
-                    <Input
-                      id="contactPerson"
-                      value={editingSupplier ? editingSupplier.contactPerson : newSupplier.contactPerson}
-                      onChange={(e) => 
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, contactPerson: e.target.value}) 
-                          : setNewSupplier({...newSupplier, contactPerson: e.target.value})
-                      }
-                    />
+
+                  {/* Address Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-primary border-b pb-2">Address Information</h3>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Street Address</Label>
+                      <Textarea
+                        id="address"
+                        value={editingSupplier ? editingSupplier.address : newSupplier.address}
+                        onChange={(e) => 
+                          editingSupplier 
+                            ? setEditingSupplier({...editingSupplier, address: e.target.value}) 
+                            : setNewSupplier({...newSupplier, address: e.target.value})
+                        }
+                        placeholder="Enter street address"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="city">City</Label>
+                        <Input
+                          id="city"
+                          value={editingSupplier ? editingSupplier.city : newSupplier.city}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, city: e.target.value}) 
+                              : setNewSupplier({...newSupplier, city: e.target.value})
+                          }
+                          placeholder="Enter city"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="state">State/Province</Label>
+                        <Input
+                          id="state"
+                          value={editingSupplier ? editingSupplier.state : newSupplier.state}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, state: e.target.value}) 
+                              : setNewSupplier({...newSupplier, state: e.target.value})
+                          }
+                          placeholder="Enter state or province"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="zip_code">ZIP/Postal Code</Label>
+                        <Input
+                          id="zip_code"
+                          value={editingSupplier ? editingSupplier.zip_code : newSupplier.zip_code}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, zip_code: e.target.value}) 
+                              : setNewSupplier({...newSupplier, zip_code: e.target.value})
+                          }
+                          placeholder="Enter ZIP or postal code"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="country">Country</Label>
+                        <Input
+                          id="country"
+                          value={editingSupplier ? editingSupplier.country : newSupplier.country}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, country: e.target.value}) 
+                              : setNewSupplier({...newSupplier, country: e.target.value})
+                          }
+                          placeholder="Enter country"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={editingSupplier ? editingSupplier.email : newSupplier.email}
-                      onChange={(e) => 
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, email: e.target.value}) 
-                          : setNewSupplier({...newSupplier, email: e.target.value})
-                      }
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={editingSupplier ? editingSupplier.phone : newSupplier.phone}
-                      onChange={(e) => 
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, phone: e.target.value}) 
-                          : setNewSupplier({...newSupplier, phone: e.target.value})
-                      }
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea
-                      id="address"
-                      value={editingSupplier ? editingSupplier.address : newSupplier.address}
-                      onChange={(e) => 
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, address: e.target.value}) 
-                          : setNewSupplier({...newSupplier, address: e.target.value})
-                      }
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="taxId">Tax ID (TIN)</Label>
-                    <Input
-                      id="taxId"
-                      value={editingSupplier ? (editingSupplier.tax_id || "") : (newSupplier.tax_id || "")}
-                      onChange={(e) => 
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, tax_id: e.target.value}) 
-                          : setNewSupplier({...newSupplier, tax_id: e.target.value})
-                      }
-                      placeholder="Enter tax identification number"
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="products">Products Supplied</Label>
-                    <Input
-                      id="products"
-                      placeholder="e.g., Electronics, Clothing"
-                      value={editingSupplier ? editingSupplier.products.join(", ") : newSupplier.products.join(", ")}
-                      onChange={(e) => {
-                        const products = e.target.value.split(",").map(p => p.trim()).filter(p => p);
-                        editingSupplier 
-                          ? setEditingSupplier({...editingSupplier, products}) 
-                          : setNewSupplier({...newSupplier, products})
-                      }}
-                    />
+
+                  {/* Business Details */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-primary border-b pb-2">Business Details</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tax_id">Tax ID / TIN</Label>
+                        <Input
+                          id="tax_id"
+                          value={editingSupplier ? editingSupplier.tax_id : newSupplier.tax_id}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, tax_id: e.target.value}) 
+                              : setNewSupplier({...newSupplier, tax_id: e.target.value})
+                          }
+                          placeholder="Enter tax identification number"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="payment_terms">Payment Terms</Label>
+                        <Select
+                          value={editingSupplier ? editingSupplier.payment_terms : newSupplier.payment_terms}
+                          onValueChange={(value) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, payment_terms: value}) 
+                              : setNewSupplier({...newSupplier, payment_terms: value})
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select payment terms" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="net_30">Net 30 Days</SelectItem>
+                            <SelectItem value="net_60">Net 60 Days</SelectItem>
+                            <SelectItem value="net_90">Net 90 Days</SelectItem>
+                            <SelectItem value="cod">Cash on Delivery</SelectItem>
+                            <SelectItem value="prepaid">Prepaid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select
+                        value={editingSupplier ? editingSupplier.status : newSupplier.status}
+                        onValueChange={(value: "active" | "inactive") => 
+                          editingSupplier 
+                            ? setEditingSupplier({...editingSupplier, status: value}) 
+                            : setNewSupplier({...newSupplier, status: value})
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
                 
@@ -459,132 +597,138 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
                     Cancel
                   </Button>
                   <Button onClick={editingSupplier ? handleUpdateSupplier : handleAddSupplier}>
-                    {editingSupplier ? "Update" : "Add"} Supplier
+                    {editingSupplier ? "Update" : "Register"} Supplier
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
         </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Supplier Directory
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Products</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Order</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSuppliers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No suppliers found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredSuppliers.map((supplier) => (
-                    <TableRow key={supplier.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{supplier.name}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {supplier.contactPerson}
-                          </div>
-                          {supplier.email && (
-                            <div className="flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
-                              {supplier.email}
-                            </div>
-                          )}
-                          {supplier.phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {supplier.phone}
-                            </div>
-                          )}
-                          {supplier.address && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {supplier.address.substring(0, 30)}...
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {supplier.products.map((product, index) => (
-                            <Badge key={index} variant="secondary">
-                              {product}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={supplier.status === "active" ? "default" : "destructive"}>
+
+        {/* Supplier Cards Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <p className="text-muted-foreground">Loading suppliers...</p>
+          </div>
+        ) : filteredSuppliers.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Truck className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Suppliers Found</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                {searchTerm ? "No suppliers match your search criteria" : "Start by registering your first supplier"}
+              </p>
+              {!searchTerm && (
+                <Button onClick={openAddDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Register Supplier
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSuppliers.map((supplier) => (
+              <Card key={supplier.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Building2 className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{supplier.name}</CardTitle>
+                        <Badge variant={supplier.status === "active" ? "default" : "secondary"} className="mt-1">
                           {supplier.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          {supplier.lastOrder || "N/A"}
-                          {supplier.performance && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              <div>On-time: {supplier.performance.onTimeDeliveryRate.toFixed(1)}%</div>
-                              <div>Avg. Order: {supplier.performance.averageOrderValue.toFixed(2)}</div>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => openEditDialog(supplier)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => handleDeleteSupplier(supplier.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        
-        <div className="mt-6">
-          <ExportImportManager 
-            data={suppliers}
-            dataType="suppliers"
-            onImport={handleImportSuppliers}
-          />
-        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Contact Information */}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Contact:</span>
+                      <span className="font-medium">{supplier.contactPerson || "N/A"}</span>
+                    </div>
+                    
+                    {supplier.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <a href={`mailto:${supplier.email}`} className="text-primary hover:underline">
+                          {supplier.email}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {supplier.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <a href={`tel:${supplier.phone}`} className="text-primary hover:underline">
+                          {supplier.phone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Address */}
+                  <div className="border-t pt-3">
+                    <div className="flex items-start gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-muted-foreground mb-1">Address:</p>
+                        <p className="text-foreground">{formatAddress(supplier)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Business Details */}
+                  {(supplier.tax_id || supplier.payment_terms) && (
+                    <div className="border-t pt-3">
+                      <div className="space-y-1 text-sm">
+                        {supplier.tax_id && (
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">Tax ID:</span>
+                            <span className="font-medium">{supplier.tax_id}</span>
+                          </div>
+                        )}
+                        {supplier.payment_terms && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Payment:</span>
+                            <Badge variant="outline">{supplier.payment_terms.replace('_', ' ').toUpperCase()}</Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => openEditDialog(supplier)}
+                      className="flex-1"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => handleDeleteSupplier(supplier.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );

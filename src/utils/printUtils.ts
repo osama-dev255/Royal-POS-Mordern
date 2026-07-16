@@ -4916,7 +4916,10 @@ export class PrintUtils {
         <td>${item.description || ''}</td>
         <td style="text-align:center">${item.quantity || 0}</td>
         <td style="text-align:center">${item.delivered || 0}</td>
-        <td style="text-align:right">${(item.receivingCostPerUnit || item.unitCost || 0).toFixed(2)}</td>
+        <td>${item.unit || '-'}</td>
+        <td style="text-align:right">${(item.originalUnitCost || 0).toFixed(2)}</td>
+        <td style="text-align:right">${(item.receivingCostPerUnit || 0).toFixed(2)}</td>
+        <td style="text-align:right">${(item.unitCost || 0).toFixed(2)}</td>
         <td style="text-align:right">${(item.totalWithReceivingCost || item.total || 0).toFixed(2)}</td>
         <td>${item.batchNumber || '-'}</td>
         <td>${item.expiryDate ? formatDate(item.expiryDate) : '-'}</td>
@@ -4941,9 +4944,9 @@ export class PrintUtils {
   .info-box h3 { font-size: 11px; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
   .info-box p { margin: 2px 0; }
   .info-box span.label { color: #555; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 9px; }
-  th, td { border: 1px solid #999; padding: 4px 5px; }
-  th { background: #f0f0f0; font-weight: bold; text-align: left; font-size: 9px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 7.5px; }
+  th, td { border: 1px solid #999; padding: 2px 3px; }
+  th { background: #f0f0f0; font-weight: bold; text-align: left; font-size: 7.5px; }
   .totals { text-align: right; margin-bottom: 15px; font-size: 11px; }
   .totals table { width: auto; margin-left: auto; border: none; }
   .totals td { border: none; padding: 2px 10px; }
@@ -4994,8 +4997,8 @@ export class PrintUtils {
   <table>
     <thead>
       <tr>
-        <th>#</th><th>Item</th><th style="text-align:center">Ordered</th><th style="text-align:center">Delivered</th>
-        <th style="text-align:right">Unit Cost</th><th style="text-align:right">Total</th>
+        <th>#</th><th>Item</th><th style="text-align:center">Ordered</th><th style="text-align:center">Received</th>
+        <th>Unit</th><th style="text-align:right">Orig. Cost</th><th style="text-align:right">Recv. Cost</th><th style="text-align:right">New Cost</th><th style="text-align:right">Total</th>
         <th>Batch</th><th>Expiry</th><th>Godown</th><th>Zone</th>
         <th style="text-align:center">Damaged</th><th>Remarks</th>
       </tr>
