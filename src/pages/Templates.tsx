@@ -1887,8 +1887,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         { id: "2", description: "Offloaders Charges", amount: 0 },
         { id: "3", description: "Traffic Charges", amount: 0 }
       ],
-      qualityCheckNotes: "All items inspected. Overall condition good. Minor damage to 2 units of Product B.",
-      discrepancies: "Product B: 2 units damaged, will need replacement",
+      qualityCheckNotes: "",
+      discrepancies: "",
       preparedBy: "Inventory Clerk",
       preparedDate: new Date().toISOString().split('T')[0],
       checkedBy: "Quality Inspector",
@@ -2326,12 +2326,12 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
           
           <div class="section">
             <h3 class="font-bold mb-2">QUALITY CHECK:</h3>
-            <p>${grnData.qualityCheckNotes || 'No quality issues noted.'}</p>
+            <p>${grnData.qualityCheckNotes || ''}</p>
           </div>
           
           <div class="section">
             <h3 class="font-bold mb-2">DISCREPANCIES:</h3>
-            <p>${grnData.discrepancies || 'None'}</p>
+            <p>${grnData.discrepancies || ''}</p>
           </div>
           
           <div class="signatures">
@@ -2621,8 +2621,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       { id: "2", description: "Offloaders Charges", amount: 0 },
       { id: "3", description: "Traffic Charges", amount: 0 }
     ],
-    qualityCheckNotes: "All items inspected. Overall condition good. Minor damage to 2 units of Product B.",
-    discrepancies: "Product B: 2 units damaged, will need replacement",
+    qualityCheckNotes: "",
+    discrepancies: "",
     preparedBy: "Inventory Clerk",
     preparedDate: new Date().toISOString().split('T')[0],
     checkedBy: "Quality Inspector",
