@@ -12416,6 +12416,15 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                         placeholder="Enter supplier TIN number"
                                       />
                                     </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Compliance Section */}
+                                <div className="border border-gray-300 rounded-lg p-4 mb-4 bg-gray-50">
+                                  <div className="font-bold text-lg mb-3 text-green-800">
+                                    COMPLIANCE
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                       <div className="text-sm font-medium text-gray-700">Stock Type:</div>
                                       <Select
