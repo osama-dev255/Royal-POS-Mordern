@@ -38,7 +38,7 @@ import {
   XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, getOutletDebtsByCustomerId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
@@ -863,18 +863,21 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             price: item.unit_price
           }));
           
-          // Calculate customer's previous balance (credit brought forward)
-          // Use stored value from database if available, otherwise calculate
-          let creditBroughtForward = debt.credit_brought_forward || 0;
-          
-          // If no stored value, calculate from previous debts (backward compatibility)
-          if (!debt.credit_brought_forward && debt.customer_id && debt.created_at) {
-            const allCustomerDebts = await getOutletDebtsByCustomerId(outletId, debt.customer_id);
-            // Filter debts created before this one and sum their remaining amounts
-            creditBroughtForward = allCustomerDebts
-              .filter(otherDebt => 
-                otherDebt.id !== debt.id && 
-                otherDebt.created_at && 
+          // Calculate customer's credit brought forward LIVE from the CURRENT
+          // remaining amounts of the customer's earlier debts.
+          // NOTE: We intentionally do NOT use the stored `credit_brought_forward`
+          // column. That column is a snapshot captured at creation time and
+          // becomes stale when an earlier invoice is later edited or paid down
+          // (e.g. a paid invoice printing an inflated "Amount Due"). Computing it
+          // live from `data` (all outlet debts already fetched above) always
+          // reflects reality and requires no extra DB calls.
+          let creditBroughtForward = 0;
+          if (debt.customer_id && debt.created_at) {
+            creditBroughtForward = data
+              .filter(otherDebt =>
+                otherDebt.id !== debt.id &&
+                otherDebt.customer_id === debt.customer_id &&
+                otherDebt.created_at &&
                 new Date(otherDebt.created_at) < new Date(debt.created_at!)
               )
               .reduce((sum, otherDebt) => sum + (otherDebt.remaining_amount || 0), 0);
