@@ -107,6 +107,71 @@ const allocateSettlementToDebts = async (customerId: string | null, paymentAmoun
   }
 };
 
+/**
+ * Reverse a previously allocated settlement amount by adding it back to the
+ * customer's debts. Used when a settlement is deleted or its amount is reduced.
+ * Undoes allocation in reverse order (newest debts first) to mirror the
+ * oldest-first allocation performed by allocateSettlementToDebts.
+ */
+const deallocateSettlementFromDebts = async (customerId: string | null, amount: number): Promise<void> => {
+  if (!customerId || amount <= 0) {
+    console.log('⏭️ Skipping debt de-allocation:', !customerId ? 'no customer_id' : 'amount is 0');
+    return;
+  }
+
+  try {
+    // Fetch debts that have received payment (newest first, to undo in reverse)
+    const { data: debts, error } = await supabase
+      .from('outlet_debts')
+      .select('*')
+      .eq('customer_id', customerId)
+      .gt('amount_paid', 0)
+      .order('debt_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching debts for settlement de-allocation:', error);
+      return;
+    }
+
+    if (!debts || debts.length === 0) {
+      console.log('ℹ️ No paid debts found to reverse for customer', customerId);
+      return;
+    }
+
+    let remainingToReverse = amount;
+
+    for (const debt of debts) {
+      if (remainingToReverse <= 0) break;
+
+      const currentPaid = debt.amount_paid || 0;
+      if (currentPaid <= 0) continue;
+
+      const reverseFromThisDebt = Math.min(remainingToReverse, currentPaid);
+      const newAmountPaid = currentPaid - reverseFromThisDebt;
+      const newRemaining = (debt.remaining_amount || 0) + reverseFromThisDebt;
+      const newStatus = newAmountPaid <= 0 ? 'unpaid' : (newRemaining <= 0 ? 'paid' : 'partial');
+
+      console.log(`↩️ Reversing ${reverseFromThisDebt} from debt ${debt.invoice_number} (paid: ${currentPaid} → ${newAmountPaid})`);
+
+      await updateOutletDebt(debt.id, {
+        amount_paid: newAmountPaid,
+        remaining_amount: newRemaining,
+        payment_status: newStatus
+      });
+
+      remainingToReverse -= reverseFromThisDebt;
+    }
+
+    if (remainingToReverse > 0) {
+      console.log(`ℹ️ ${remainingToReverse} of settlement reversal unapplied (no more paid debts)`);
+    }
+
+    console.log('✅ Settlement de-allocation complete');
+  } catch (error) {
+    console.error('Error de-allocating settlement from debts:', error);
+  }
+};
+
 export const saveCustomerSettlement = async (settlement: CustomerSettlementData): Promise<void> => {
   try {
     // Validate required fields
@@ -331,6 +396,7 @@ export const getSavedSettlements = async (): Promise<CustomerSettlementData[]> =
 export const deleteCustomerSettlement = async (settlementId: string): Promise<void> => {
   try {
     const savedSettlements = await getSavedSettlements();
+    const settlementToDelete = savedSettlements.find(settlement => settlement.id === settlementId);
     const updatedSettlements = savedSettlements.filter(settlement => settlement.id !== settlementId);
     localStorage.setItem(SAVED_SETTLEMENTS_KEY, JSON.stringify(updatedSettlements));
     
@@ -364,6 +430,14 @@ export const deleteCustomerSettlement = async (settlementId: string): Promise<vo
       console.error('Error deleting customer settlement from database:', error);
       // Don't throw error - still have local storage backup
     } else {
+      // Reverse this settlement's effect on the customer's outstanding debts so
+      // the saved-debts print stays in sync after the settlement is removed.
+      if (settlementToDelete) {
+        await deallocateSettlementFromDebts(
+          getValidCustomerId(settlementToDelete.customerId),
+          settlementToDelete.amountPaid || 0
+        );
+      }
       // Trigger refresh to update UI components
       window.dispatchEvent(new CustomEvent('refreshSettlements'));
     }
@@ -376,6 +450,7 @@ export const deleteCustomerSettlement = async (settlementId: string): Promise<vo
 export const updateCustomerSettlement = async (updatedSettlement: CustomerSettlementData): Promise<void> => {
   try {
     const savedSettlements = await getSavedSettlements();
+    const oldSettlement = savedSettlements.find(settlement => settlement.id === updatedSettlement.id);
     const updatedSettlements = savedSettlements.map(settlement => 
       settlement.id === updatedSettlement.id ? updatedSettlement : settlement
     );
@@ -427,6 +502,28 @@ export const updateCustomerSettlement = async (updatedSettlement: CustomerSettle
       console.error('Error updating customer settlement in database:', error);
       // Don't throw error - still have local storage backup
     } else {
+      // Re-sync the customer's outstanding debts to match the edited settlement
+      // amount so the saved-debts print reflects the change.
+      const oldCustomerId = getValidCustomerId(oldSettlement?.customerId);
+      const newCustomerId = getValidCustomerId(updatedSettlement.customerId);
+      const oldAmountPaid = oldSettlement?.amountPaid || 0;
+      const newAmountPaid = updatedSettlement.amountPaid || 0;
+
+      if (oldCustomerId && oldCustomerId !== newCustomerId) {
+        // Customer changed: fully reverse from the old customer, re-apply to the new one
+        await deallocateSettlementFromDebts(oldCustomerId, oldAmountPaid);
+        if (newCustomerId) {
+          await allocateSettlementToDebts(newCustomerId, newAmountPaid);
+        }
+      } else if (newCustomerId) {
+        // Same customer: apply only the difference between old and new amounts
+        const delta = newAmountPaid - oldAmountPaid;
+        if (delta > 0) {
+          await allocateSettlementToDebts(newCustomerId, delta);
+        } else if (delta < 0) {
+          await deallocateSettlementFromDebts(newCustomerId, -delta);
+        }
+      }
       // Trigger refresh to update UI components
       window.dispatchEvent(new CustomEvent('refreshSettlements'));
     }

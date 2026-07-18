@@ -1350,13 +1350,26 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   };
 
   const handlePrint = (sale: SavedSale) => {
-    // Calculate the correct remaining balance
-    // remainingAmount = total - amountPaid (current transaction balance)
-    // Total balance = remainingAmount + creditBroughtForward - debtPaymentAmount
+    // remainingAmount = total - amountPaid (this invoice's own current balance).
+    // sale.creditBroughtForward is the LIVE sum of the customer's EARLIER
+    // invoices' CURRENT remaining amounts (computed in fetchSavedDebts).
     const remainingAmount = (sale.remainingAmount || 0);
-    const creditBroughtForward = sale.creditBroughtForward || 0;
+    const earlierRemaining = sale.creditBroughtForward || 0;
     const debtPaymentAmount = sale.debtPaymentAmount || 0;
-    const totalBalance = remainingAmount + creditBroughtForward - debtPaymentAmount;
+
+    // Amount Due = this invoice's current remaining + current remaining of all
+    // earlier invoices. This equals the customer's true outstanding balance and
+    // stays correct even after earlier invoices are edited or paid down.
+    // We do NOT subtract debtPaymentAmount here: any debt payment made in this
+    // transaction already reduced the earlier invoices' live remaining, so
+    // subtracting it again would double-count the payment.
+    const totalBalance = remainingAmount + earlierRemaining;
+
+    // For the printed line items to reconcile (Total + Previous Balance -
+    // Amount Paid - Debt Payment = Amount Due), reconstruct the PRE-payment
+    // carried-forward balance by adding the debt payment back to the live
+    // earlier remaining.
+    const creditBroughtForward = earlierRemaining + debtPaymentAmount;
     
     // Create transaction object that matches PrintUtils.printDebtInvoice expectations
     const transaction = {
