@@ -393,18 +393,18 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   
   const adjustmentsAmount = parseFloat(adjustments) || 0;
   
+  // Tax is 18% VAT - displayed for reference only, NOT included in totals
+  const tax = (subtotal - discountAmount) * 0.18;
+  
   const total = subtotal - discountAmount + shippingAmount + adjustmentsAmount;
   
-  // Tax is displayed as 18% but doesn't affect calculation (for display purposes only)
-  const tax = (subtotal - discountAmount) * 0.18; // 18% tax for display on subtotal after discount
-  
-  // Apply customer credit balance to reduce the total
+  // Apply customer credit balance to determine effective payment amount
   // creditBroughtForward is negative for credit (overpayment), positive for debt
   // When customer has credit, it reduces what they need to pay
   // effectiveTotal cannot be negative - if credit exceeds total, customer pays 0
   const effectiveTotal = Math.max(0, total - (creditBroughtForward < 0 ? Math.abs(creditBroughtForward) : 0));
   
-  const totalWithTax = total; // Tax doesn't affect the actual total
+  const totalWithTax = total; // Tax is display-only, not included in total
   
   const amountReceivedNum = parseFloat(amountReceived) || 0;
   const debtPaymentNum = parseFloat(debtPaymentAmount) || 0;
@@ -667,6 +667,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       // Set processing state
       setIsProcessing(true);
       
+      // Generate invoice number ONCE to ensure consistency across all records
+      const invoiceNumber = `INV-${Date.now()}`;
+      
       // Create the sale record in the database
       // Use outlet_sales table for outlet-specific sales, otherwise use general sales table
       let createdSale;
@@ -677,7 +680,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           outlet_id: outletId,
           customer_id: selectedCustomer?.id || null,
           user_id: null,
-          invoice_number: `INV-${Date.now()}`,
+          invoice_number: invoiceNumber,
           sale_date: new Date().toISOString(),
           subtotal: Number(subtotal) || 0,
           discount_amount: Number(discountAmount) || 0,
@@ -734,7 +737,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         const saleData = {
           customer_id: selectedCustomer?.id || null,
           user_id: null,
-          invoice_number: `INV-${Date.now()}`,
+          invoice_number: invoiceNumber,
           sale_date: new Date().toISOString(),
           subtotal: Number(subtotal) || 0,
           discount_amount: Number(discountAmount) || 0,
@@ -772,11 +775,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           customer_id: selectedCustomer.id,
           transaction_type: saleType,
           reference_id: createdSale.id || '',
-          reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
+          reference_number: invoiceNumber,
           debit_amount: totalWithTax, // Full sale amount
           credit_amount: 0,
           transaction_date: new Date().toISOString(),
-          description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Sale - ${createdSale.invoice_number}`,
+          description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Sale - ${invoiceNumber}`,
           payment_method: paymentMethod,
           notes: `Sale total: ${totalWithTax}`
         });
@@ -790,11 +793,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             customer_id: selectedCustomer.id,
             transaction_type: 'adjustment',
             reference_id: createdSale.id || '',
-            reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
+            reference_number: invoiceNumber,
             debit_amount: 0,
             credit_amount: creditApplied, // Credit amount applied
             transaction_date: new Date().toISOString(),
-            description: `Credit applied from previous overpayment - ${createdSale.invoice_number}`,
+            description: `Credit applied from previous overpayment - ${invoiceNumber}`,
             payment_method: paymentMethod,
             notes: `Customer credit balance applied: ${formatCurrency(creditApplied)}`
           });
@@ -814,11 +817,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               customer_id: selectedCustomer.id,
               transaction_type: 'debt_payment', // Use debt_payment for cash/card/mobile payments
               reference_id: createdSale.id || '',
-              reference_number: createdSale.invoice_number || `INV-${Date.now()}`,
+              reference_number: invoiceNumber,
               debit_amount: 0,
               credit_amount: paymentForSale, // Payment for sale (excludes overpayment if storing as credit)
               transaction_date: new Date().toISOString(),
-              description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Payment - ${createdSale.invoice_number}`,
+              description: `${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)} Payment - ${invoiceNumber}`,
               payment_method: paymentMethod,
               notes: `Payment received: ${formatCurrency(paymentForSale)}${storeOverpaymentAsCredit && rawChange > 0 ? ` (overpayment ${formatCurrency(rawChange)} stored as credit)` : ''}`
             });
@@ -927,8 +930,9 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         
         // Create new debt record for current transaction
         // Always create a debt record for debt transactions, even if fully paid or overpaid
-        // Use effectiveTotal to account for customer's credit balance
-        const remainingNewDebt = effectiveTotal - actualAmountPaid;
+        // Use totalWithTax (not effectiveTotal) to avoid double-counting credit.
+        // Credit is accounted for separately via earlierRemaining in the print formula.
+        const remainingNewDebt = totalWithTax - actualAmountPaid;
         if (paymentMethod === "debt") {
           // Determine payment status based on amount paid
           const paymentStatus = remainingNewDebt <= 0 ? 'paid' : (actualAmountPaid > 0 ? 'partial' : 'unpaid');
@@ -939,7 +943,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
             customer_name: selectedCustomer.name || `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() || 'Unknown Customer',
-            invoice_number: `INV-${Date.now()}`, // Generate unique invoice number
+            invoice_number: invoiceNumber, // Use same invoice number for consistency
             debt_date: new Date().toISOString(),
             due_date: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             subtotal: subtotal,
@@ -1047,11 +1051,12 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           // CHECKBOX TICKED: Create credit record for next transaction
           console.log(`✅ Storing overpayment ${rawChange} as customer credit`);
           
+          const creditInvoiceNumber = `CREDIT-${Date.now()}`;
           const outletDebtData = {
             outlet_id: outletId,
             customer_id: selectedCustomer.id,
             customer_name: selectedCustomer.name || `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() || 'Unknown Customer',
-            invoice_number: `CREDIT-${Date.now()}`,
+            invoice_number: creditInvoiceNumber,
             debt_date: new Date().toISOString(),
             due_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // Valid for 1 year
             subtotal: 0,
@@ -1080,7 +1085,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
               customer_id: selectedCustomer.id,
               transaction_type: 'adjustment',
               reference_id: createdCreditDebt.id || '',
-              reference_number: createdCreditDebt.invoice_number || `CREDIT-${Date.now()}`,
+              reference_number: creditInvoiceNumber,
               debit_amount: 0,
               credit_amount: rawChange,
               transaction_date: new Date().toISOString(),
@@ -1155,7 +1160,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       // Create transaction object for printing
       const transaction = {
         id: createdSale.id || Date.now().toString(),
-        receiptNumber: createdSale.invoice_number || `INV-${Date.now()}`,
+        receiptNumber: invoiceNumber,
         date: createdSale.sale_date || new Date().toISOString(),
         items: cart,
         subtotal: subtotal,
@@ -1200,7 +1205,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         
         const invoiceToSave: InvoiceData = {
           id: createdSale.id || Date.now().toString(),
-          invoiceNumber: createdSale.invoice_number || `INV-${Date.now()}`,
+          invoiceNumber: invoiceNumber,
           date: createdSale.sale_date || new Date().toISOString(),
           customer: selectedCustomer?.name || 'Walk-in Customer',
           items: cart.reduce((sum, item) => sum + item.quantity, 0),
@@ -1242,7 +1247,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         if (outletId) {
           const savedSaleData = {
             outlet_id: outletId,
-            invoice_number: createdSale.invoice_number || `INV-${Date.now()}`,
+            invoice_number: invoiceNumber,
             customer: selectedCustomer?.name || 'Walk-in Customer',
             customer_id: selectedCustomer?.id,
             items: cart.map(item => ({
