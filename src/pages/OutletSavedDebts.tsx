@@ -1405,7 +1405,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       salesman: sale.salesman || 'Not Assigned',
       driver: sale.driver || 'Not Assigned',
       truck: sale.truck || 'Not Assigned',
-      dueDate: sale.date, // Use sale date as due date if not specified
+      dueDate: sale.dueDate || sale.date, // Use user-assigned due date, fallback to sale date
       isEdited: sale.isEdited || false, // Pass the edited flag
       editedAt: sale.editedAt // Pass the edit date/time
     };
