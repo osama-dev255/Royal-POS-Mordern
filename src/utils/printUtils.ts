@@ -4697,26 +4697,16 @@ export class PrintUtils {
               <span>${formatCurrency(transaction.debtPaymentAmount)}</span>
             </div>
             ` : ''}
-            ${transaction.customerBalance !== undefined && transaction.customerBalance < 0 ? `
-            <div class="summary-row" style="color: #16a34a; font-size: 11px; font-weight: bold; background: #f0fdf4; padding: 4px 6px; margin-top: 4px;">
-              <span>Customer Credit (Overpayment):</span>
-              <span>-${formatCurrency(Math.abs(transaction.customerBalance))}</span>
-            </div>
-            <div class="summary-row amount-due-final" style="color: ${(transaction.totalBalance || 0) + (transaction.customerBalance || 0) <= 0 ? '#16a34a' : '#dc2626'};">
-              <span class="summary-label">EFFECTIVE AMOUNT DUE:</span>
-              <span>${formatCurrency(Math.max(0, (transaction.totalBalance || 0) + (transaction.customerBalance || 0)))}</span>
-            </div>
-            ${(transaction.totalBalance || 0) + (transaction.customerBalance || 0) < 0 ? `
-            <div style="font-size: 9px; color: #16a34a; text-align: center; margin-top: 2px; font-weight: bold;">
-              Remaining Credit: ${formatCurrency(Math.abs((transaction.totalBalance || 0) + (transaction.customerBalance || 0)))}
-            </div>
-            ` : ''}
-            ` : `
             <div class="summary-row amount-due-final">
               <span class="summary-label">AMOUNT DUE:</span>
               <span>${formatCurrency(transaction.totalBalance !== undefined ? transaction.totalBalance : (total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0)))}</span>
             </div>
-            `}
+            ${transaction.customerBalance !== undefined && transaction.customerBalance < 0 ? `
+            <div class="summary-row" style="color: #16a34a; font-size: 10px; font-weight: bold; background: #f0fdf4; padding: 4px 6px; margin-top: 4px;">
+              <span>Customer Account Credit:</span>
+              <span>${formatCurrency(Math.abs(transaction.customerBalance))}</span>
+            </div>
+            ` : ''}
             ${transaction.amountPaid > 0 ? `
             <div class="summary-row" style="color: #666; font-size: 12px;">
               <span>Payment Status: ${transaction.amountPaid >= total ? 'FULLY PAID' : 'PARTIALLY PAID'}</span>
