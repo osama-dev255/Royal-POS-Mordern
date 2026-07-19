@@ -1376,7 +1376,17 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     // the actual amount the customer paid by adding back the credit.
     // Example: debt = 100,000, customer paid 110,000 → debt.amount_paid = 100,000,
     // customerBalance = -10,000 → actualPaid = 100,000 + 10,000 = 110,000
-    const actualPaid = (sale.customerBalance !== undefined && sale.customerBalance < 0)
+    //
+    // IMPORTANT: customerBalance is a GLOBAL figure (across ALL the customer's
+    // debts). To avoid duplicating the overpayment across multiple debts, only
+    // apply the adjustment to the most recent fully-paid debt for this customer.
+    const isLatestDebtForCustomer = !sales.some(other =>
+      other.customerId === sale.customerId &&
+      other.id !== sale.id &&
+      (other.date || '') >= (sale.date || '') &&
+      (other.amountPaid || 0) >= (other.total || 0)
+    );
+    const actualPaid = (sale.customerBalance !== undefined && sale.customerBalance < 0 && isLatestDebtForCustomer)
       ? (sale.amountPaid || 0) + Math.abs(sale.customerBalance)
       : (sale.amountPaid || 0);
     
