@@ -1370,6 +1370,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     // carried-forward balance by adding the debt payment back to the live
     // earlier remaining.
     const creditBroughtForward = earlierRemaining + debtPaymentAmount;
+
+    // When the customer overpaid (has a negative ledger balance / credit),
+    // the debt's stored amount_paid is capped at the debt total. Recover
+    // the actual amount the customer paid by adding back the credit.
+    // Example: debt = 100,000, customer paid 110,000 → debt.amount_paid = 100,000,
+    // customerBalance = -10,000 → actualPaid = 100,000 + 10,000 = 110,000
+    const actualPaid = (sale.customerBalance !== undefined && sale.customerBalance < 0)
+      ? (sale.amountPaid || 0) + Math.abs(sale.customerBalance)
+      : (sale.amountPaid || 0);
     
     // Create transaction object that matches PrintUtils.printDebtInvoice expectations
     const transaction = {
@@ -1384,7 +1393,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       adjustmentReason: sale.adjustmentReason,
       total: sale.total,
       paymentMethod: 'debt',
-      amountPaid: sale.amountPaid || 0,
+      amountPaid: actualPaid,
       remainingAmount: remainingAmount,
       totalBalance: totalBalance,
       debtPaymentAmount: debtPaymentAmount,
