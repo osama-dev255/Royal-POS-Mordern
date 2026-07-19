@@ -1390,6 +1390,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       debtPaymentAmount: debtPaymentAmount,
       previousDebtBalance: creditBroughtForward,
       change: 0,
+      customerBalance: sale.customerBalance,
       customer: {
         name: sale.customer,
         phone: sale.customerPhone || '',

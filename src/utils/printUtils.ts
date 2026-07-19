@@ -3884,6 +3884,7 @@ export class PrintUtils {
     
     // Get status badge
     const getStatusBadge = () => {
+      if (newBalance < 0) return '◉ CREDIT BALANCE (Overpayment)';
       if (newBalance === 0) return '✓ FULLY SETTLED';
       if (amountPaid > 0 && newBalance > 0) return '◐ PARTIAL PAYMENT';
       return '○ PENDING';
@@ -4177,20 +4178,25 @@ export class PrintUtils {
       <div class="calculation-section">
         <div class="calc-header">Account Summary</div>
         <div class="calc-body">
-          ${previousBalance > 0 ? `
+          ${previousBalance !== 0 ? `
           <div class="calc-row">
-            <span>Opening Balance</span>
-            <span class="row-value">${formatCurrency(previousBalance)}</span>
+            <span>Opening Balance ${previousBalance < 0 ? '(Credit)' : ''}</span>
+            <span class="row-value" style="${previousBalance < 0 ? 'color: #16a34a;' : ''}">${formatCurrency(previousBalance)}</span>
           </div>
           ` : ''}
           <div class="calc-row">
             <span>Payment Received</span>
             <span class="row-value amount-negative">- ${formatCurrency(amountPaid)}</span>
           </div>
-          <div class="calc-row grand-total">
-            <span>Closing Balance</span>
-            <span class="row-value">${formatCurrency(newBalance)}</span>
+          <div class="calc-row grand-total" style="${newBalance < 0 ? 'background: #f0fdf4;' : ''}">
+            <span>Closing Balance ${newBalance < 0 ? '(Credit Due to Overpayment)' : ''}</span>
+            <span class="row-value" style="${newBalance < 0 ? 'color: #16a34a; font-weight: 900;' : ''}">${formatCurrency(newBalance)}</span>
           </div>
+          ${newBalance < 0 ? `
+          <div style="margin-top: 6px; padding: 4px 6px; background: #fef3c7; font-size: 10px; font-weight: 600; text-align: center;">
+            ⚠ Customer has a credit of ${formatCurrency(Math.abs(newBalance))} available for future purchases
+          </div>
+          ` : ''}
         </div>
       </div>
       
@@ -4553,8 +4559,8 @@ export class PrintUtils {
             ${isEdited ? `<div class="edited-date">Edited: ${transaction.editedAt ? new Date(transaction.editedAt).toLocaleString() : 'N/A'}</div>` : ''}
             <div class="invoice-number">${invoiceNumber}</div>
             <div class="generated-date">Generated: ${new Date().toLocaleString()}</div>
-            <div class="amount-due-label">AMOUNT DUE</div>
-            <div class="amount-due">${formatCurrency(transaction.totalBalance !== undefined ? transaction.totalBalance : (total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0)))}</div>
+            <div class="amount-due-label">${transaction.customerBalance !== undefined && transaction.customerBalance < 0 ? 'CREDIT BALANCE (Overpayment)' : 'AMOUNT DUE'}</div>
+            <div class="amount-due" style="${transaction.customerBalance !== undefined && transaction.customerBalance < 0 ? 'color: #16a34a;' : ''}">${formatCurrency(transaction.customerBalance !== undefined && transaction.customerBalance < 0 ? Math.abs(transaction.customerBalance) : (transaction.totalBalance !== undefined ? transaction.totalBalance : (total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0))))}</div>
           </div>
           
           <div class="info-section">
@@ -4691,10 +4697,26 @@ export class PrintUtils {
               <span>${formatCurrency(transaction.debtPaymentAmount)}</span>
             </div>
             ` : ''}
+            ${transaction.customerBalance !== undefined && transaction.customerBalance < 0 ? `
+            <div class="summary-row" style="color: #16a34a; font-size: 11px; font-weight: bold; background: #f0fdf4; padding: 4px 6px; margin-top: 4px;">
+              <span>Customer Credit (Overpayment):</span>
+              <span>-${formatCurrency(Math.abs(transaction.customerBalance))}</span>
+            </div>
+            <div class="summary-row amount-due-final" style="color: ${(transaction.totalBalance || 0) + (transaction.customerBalance || 0) <= 0 ? '#16a34a' : '#dc2626'};">
+              <span class="summary-label">EFFECTIVE AMOUNT DUE:</span>
+              <span>${formatCurrency(Math.max(0, (transaction.totalBalance || 0) + (transaction.customerBalance || 0)))}</span>
+            </div>
+            ${(transaction.totalBalance || 0) + (transaction.customerBalance || 0) < 0 ? `
+            <div style="font-size: 9px; color: #16a34a; text-align: center; margin-top: 2px; font-weight: bold;">
+              Remaining Credit: ${formatCurrency(Math.abs((transaction.totalBalance || 0) + (transaction.customerBalance || 0)))}
+            </div>
+            ` : ''}
+            ` : `
             <div class="summary-row amount-due-final">
               <span class="summary-label">AMOUNT DUE:</span>
               <span>${formatCurrency(transaction.totalBalance !== undefined ? transaction.totalBalance : (total + (transaction.previousDebtBalance || 0) - (transaction.amountPaid || 0) - (transaction.debtPaymentAmount || 0)))}</span>
             </div>
+            `}
             ${transaction.amountPaid > 0 ? `
             <div class="summary-row" style="color: #666; font-size: 12px;">
               <span>Payment Status: ${transaction.amountPaid >= total ? 'FULLY PAID' : 'PARTIALLY PAID'}</span>
