@@ -4990,6 +4990,7 @@ export class PrintUtils {
       ${data.supplierPhone ? '<p><span class="label">Phone:</span> ' + data.supplierPhone + '</p>' : ''}
       ${data.supplierEmail ? '<p><span class="label">Email:</span> ' + data.supplierEmail + '</p>' : ''}
       ${data.supplierTinNumber ? '<p><span class="label">TIN:</span> ' + data.supplierTinNumber + '</p>' : ''}
+      ${data.documentUrl ? '<p><span class="label">Document:</span> <a href="' + data.documentUrl + '" target="_blank" style="color:#2563eb;">' + (data.documentName || 'View PDF') + '</a></p>' : ''}
     </div>
     <div class="info-box">
       <h3>Logistics</h3>

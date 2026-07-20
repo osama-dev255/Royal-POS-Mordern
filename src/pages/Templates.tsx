@@ -54,6 +54,7 @@ import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettleme
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
 import { getGodowns, getZones, getGodownStock, Godown, GodownZone, GodownStock } from '@/services/godownService';
 import { getSuppliers, createSupplier, Supplier as DBSupplier } from '@/services/databaseService';
+import { uploadFile } from '@/utils/fileUploadUtils';
 import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
@@ -531,6 +532,8 @@ interface SupplierInfo {
   tinNumber?: string;
   businessTin?: string;  // Business TIN number separate from supplier TIN
   stockType: 'exempt' | 'vatable' | '';  // Stock type specific to each supplier
+  documentUrl?: string;  // URL of uploaded supplier document (PDF)
+  documentName?: string; // Original filename of uploaded document
 }
 
 interface LogisticDetails {
@@ -2297,6 +2300,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
               <p><strong>Phone:</strong> ${grnData.supplierPhone}</p>
               <p><strong>Email:</strong> ${grnData.supplierEmail}</p>
               <p><strong>Address:</strong> ${grnData.supplierAddress}</p>
+              ${grnData.suppliers?.[0]?.documentUrl ? `<p><strong>Document:</strong> <a href="${grnData.suppliers[0].documentUrl}" target="_blank" style="color:blue;">${grnData.suppliers[0].documentName || 'View PDF'}</a></p>` : ''}
             </div>
             
             <div>
@@ -2477,6 +2481,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         supplierEmail: primarySupplier.email || grnData.supplierEmail,
         supplierAddress: primarySupplier.address || grnData.supplierAddress,
         supplierTinNumber: primarySupplier.tinNumber || grnData.supplierTinNumber,
+        documentUrl: primarySupplier.documentUrl || '',
+        documentName: primarySupplier.documentName || '',
         businessName: primarySupplier.businessName || grnData.businessName,
         businessAddress: primarySupplier.businessAddress || grnData.businessAddress,
         businessPhone: primarySupplier.businessPhone || grnData.businessPhone,
@@ -4555,6 +4561,11 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                   <div class="text-sm mb-1">
                     <span class="font-medium">Stock Type:</span> ${supplier.stockType || 'N/A'}
                   </div>
+                  ${supplier.documentUrl ? `
+                  <div class="text-sm mb-1">
+                    <span class="font-medium">Document:</span> <a href="${supplier.documentUrl}" target="_blank" class="text-blue-600 underline">${supplier.documentName || 'View PDF'}</a>
+                  </div>
+                  ` : ''}
                 </div>
               `).join('')}
               
@@ -12671,6 +12682,83 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                           placeholder="Enter business TIN number"
                                         />
                                       </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Supplier Document Upload */}
+                                <div className="border border-gray-300 rounded-lg p-4 mb-4 bg-orange-50">
+                                  <div className="font-bold text-lg mb-3 text-orange-800">
+                                    SUPPLIER DOCUMENT
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <label className="cursor-pointer bg-orange-600 hover:bg-orange-700 text-white text-sm px-4 py-2 rounded flex items-center gap-2">
+                                      <FileText size={16} />
+                                      {supplierInfo.documentUrl ? 'Replace PDF' : 'Upload PDF'}
+                                      <input
+                                        type="file"
+                                        accept=".pdf,application/pdf"
+                                        className="hidden"
+                                        onChange={async (e) => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          if (file.type !== 'application/pdf') {
+                                            alert('Please select a PDF file');
+                                            return;
+                                          }
+                                          const updatedSuppliers = [...grnData.suppliers];
+                                          const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                          if (supplierIndex >= 0) {
+                                            updatedSuppliers[supplierIndex].documentName = file.name;
+                                          }
+                                          setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                          const url = await uploadFile(file, 'assets', 'grn-documents');
+                                          if (url) {
+                                            const upd = [...grnData.suppliers];
+                                            const idx = upd.findIndex(s => s.id === supplierId);
+                                            if (idx >= 0) {
+                                              upd[idx].documentUrl = url;
+                                            }
+                                            setGrnData(prev => ({ ...prev, suppliers: upd }));
+                                          } else {
+                                            alert('Failed to upload document. Please try again.');
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                    {supplierInfo.documentUrl && (
+                                      <div className="flex items-center gap-2">
+                                        <a
+                                          href={supplierInfo.documentUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:underline text-sm flex items-center gap-1"
+                                        >
+                                          <ExternalLink size={14} />
+                                          {supplierInfo.documentName || 'View Document'}
+                                        </a>
+                                        <button
+                                          type="button"
+                                          className="text-red-500 hover:text-red-700 text-xs"
+                                          onClick={() => {
+                                            const updatedSuppliers = [...grnData.suppliers];
+                                            const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                            if (supplierIndex >= 0) {
+                                              updatedSuppliers[supplierIndex].documentUrl = undefined;
+                                              updatedSuppliers[supplierIndex].documentName = undefined;
+                                            }
+                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                          }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    )}
+                                    {!supplierInfo.documentUrl && supplierInfo.documentName && (
+                                      <span className="text-sm text-gray-500 flex items-center gap-1">
+                                        <Loader2 size={14} className="animate-spin" />
+                                        Uploading {supplierInfo.documentName}...
+                                      </span>
                                     )}
                                   </div>
                                 </div>
