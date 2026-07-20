@@ -12607,22 +12607,17 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                       <div className="flex space-x-2 mt-1">
                                         <Button
                                           type="button"
-                                          variant={supplierInfo.tinNumber ? "default" : "outline"}
+                                          variant={supplierInfo.businessTin !== undefined ? "default" : "outline"}
                                           size="sm"
                                           onClick={() => {
-                                            // This button should just indicate that TIN is implemented
-                                            // We don't need to change anything in the supplierInfo.tinNumber field
-                                            // since the user enters it directly in the Supplier Tin field
-                                            // The Business Tin field visibility depends on whether supplier has TIN
+                                            // Show Business TIN field - user wants TIN implemented
                                             const updatedSuppliers = [...grnData.suppliers];
                                             const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                             if (supplierIndex >= 0) {
-                                              // Ensure businessTin exists so the Business Tin field appears
-                                              if (!updatedSuppliers[supplierIndex].businessTin) {
+                                              if (updatedSuppliers[supplierIndex].businessTin === undefined) {
                                                 updatedSuppliers[supplierIndex].businessTin = "";
                                               }
                                             } else {
-                                              // Create supplier entry with empty businessTin to show the field
                                               updatedSuppliers.push({
                                                 id: supplierId,
                                                 name: `Supplier ${supplierIndex + 1}`,
@@ -12630,7 +12625,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                                 phone: "",
                                                 email: "",
                                                 address: "",
-                                                tinNumber: supplierInfo.tinNumber || "",  // Keep existing supplier tin
+                                                tinNumber: supplierInfo.tinNumber || "",
                                                 businessTin: "",
                                                 stockType: ""
                                               });
@@ -12642,11 +12637,10 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                         </Button>
                                         <Button
                                           type="button"
-                                          variant={!supplierInfo.tinNumber ? "default" : "outline"}
+                                          variant={supplierInfo.businessTin === undefined ? "default" : "outline"}
                                           size="sm"
                                           onClick={() => {
-                                            // This button should indicate that TIN is not implemented
-                                            // Clear the businessTin to hide the Business Tin field
+                                            // Hide Business TIN field - keep supplier tinNumber intact
                                             const updatedSuppliers = [...grnData.suppliers];
                                             const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
                                             if (supplierIndex >= 0) {
@@ -12659,7 +12653,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                         </Button>
                                       </div>
                                     </div>
-                                    {supplierInfo.tinNumber && (
+                                    {supplierInfo.businessTin !== undefined && (
                                       <div className="md:col-span-2">
                                         <div className="text-sm font-medium text-gray-700">Business Tin:</div>
                                         <Input
