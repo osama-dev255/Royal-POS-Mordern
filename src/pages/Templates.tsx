@@ -508,6 +508,11 @@ interface GRNItem {
   remarks?: string;
   supplierId?: string;  // To track which supplier this item belongs to
   productId?: string;  // To track which product this item corresponds to
+  // Per-item godown/zone fields for multi-godown support
+  destinationGodownId?: string;
+  destinationZoneId?: string;
+  destinationGodownName?: string;
+  destinationZoneName?: string;
 }
 
 interface GRNReceivingCost {
@@ -1996,6 +2001,21 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       alert('Please enter a GRN number');
       return;
     }
+
+    // Validate per-item godown assignments
+    const itemsWithoutGodown = grnData.items.filter(item => !item.destinationGodownId);
+    if (itemsWithoutGodown.length > 0) {
+      alert(`Please select a Destination Godown for all items. ${itemsWithoutGodown.length} item(s) missing godown: ${itemsWithoutGodown.map(i => i.description || '(unnamed)').join(', ')}`);
+      setIsSavingGRN(false);
+      return;
+    }
+
+    const itemsWithoutZone = grnData.items.filter(item => !item.destinationZoneId);
+    if (itemsWithoutZone.length > 0) {
+      alert(`Please select a Destination Zone for all items. ${itemsWithoutZone.length} item(s) missing zone: ${itemsWithoutZone.map(i => i.description || '(unnamed)').join(', ')}`);
+      setIsSavingGRN(false);
+      return;
+    }
     
     console.log('GRN Data:', grnData);
     
@@ -2059,7 +2079,12 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
           remarks: itemWithCost.remarks,
           receivingCostPerUnit: itemWithCost.receivingCostPerUnit,
           totalWithReceivingCost: itemWithCost.totalWithReceivingCost,
-          originalUnitCost: itemWithCost.originalUnitCost
+          originalUnitCost: itemWithCost.originalUnitCost,
+          // Per-item godown/zone fields
+          destinationGodownId: itemWithCost.destinationGodownId,
+          destinationZoneId: itemWithCost.destinationZoneId,
+          destinationGodownName: itemWithCost.destinationGodownName,
+          destinationZoneName: itemWithCost.destinationZoneName
         };
       }),
       qualityCheckNotes: grnData.qualityCheckNotes,
@@ -2324,12 +2349,14 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                   <th>Ordered</th>
                   <th>Received</th>
                   <th>Unit</th>
-                  <th>Original Unit Cost</th>
-                  <th>Receiving Cost Per Unit</th>
-                  <th>New Unit Cost</th>
-                  <th>Total Cost with Receiving</th>
+                  <th>Orig. Cost</th>
+                  <th>Recv. Cost</th>
+                  <th>New Cost</th>
+                  <th>Total</th>
                   <th>Batch #</th>
                   <th>Expiry</th>
+                  <th>Godown</th>
+                  <th>Zone</th>
                   <th>Remarks</th>
                 </tr>
               </thead>
@@ -2346,6 +2373,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                     <td>${formatCurrency(item.totalWithReceivingCost || 0)}</td>
                     <td>${item.batchNumber || ''}</td>
                     <td>${item.expiryDate || ''}</td>
+                    <td>${item.destinationGodownName || item.destinationGodownId || ''}</td>
+                    <td>${item.destinationZoneName || ''}</td>
                     <td>${item.remarks}</td>
                   </tr>
                 `).join('')}
@@ -2667,9 +2696,23 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   
   // GRN Godown state
   const [grnGodowns, setGrnGodowns] = useState<Godown[]>([]);
-  const [grnZones, setGrnZones] = useState<GodownZone[]>([]);
-  const [grnDestinationGodownId, setGrnDestinationGodownId] = useState("");
-  const [grnDestinationZoneId, setGrnDestinationZoneId] = useState("");
+  const [grnZonesByGodown, setGrnZonesByGodown] = useState<Map<string, GodownZone[]>>(new Map());
+
+
+  // Helper to get zones for a specific godown (loads if not cached)
+  const getZonesForGodown = async (godownId: string): Promise<GodownZone[]> => {
+    if (grnZonesByGodown.has(godownId)) {
+      return grnZonesByGodown.get(godownId)!;
+    }
+    try {
+      const data = await getZones(godownId);
+      setGrnZonesByGodown(prev => new Map(prev).set(godownId, data));
+      return data;
+    } catch (error) {
+      console.error('Error loading zones for godown:', error);
+      return [];
+    }
+  };
   
   // Load godowns for GRN
   useEffect(() => {
@@ -2683,23 +2726,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     };
     loadGodowns();
   }, []);
-  
-  // Load zones when godown changes
-  useEffect(() => {
-    const loadZones = async () => {
-      if (grnDestinationGodownId) {
-        try {
-          const data = await getZones(grnDestinationGodownId);
-          setGrnZones(data);
-        } catch (error) {
-          console.error('Error loading zones for GRN:', error);
-        }
-      } else {
-        setGrnZones([]);
-      }
-    };
-    loadZones();
-  }, [grnDestinationGodownId]);
+
   
   const [savedGRNs, setSavedGRNs] = useState<any[]>(() => {
     const saved = localStorage.getItem('savedGRNs');
@@ -4569,19 +4596,6 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
               <div class="text-sm mb-1">
                 <span class="font-medium">Received Date:</span> ${grnData.receivedDate || 'N/A'}
               </div>
-              ${grnData.destinationGodownId ? `
-              <div class="text-sm mb-1" style="background-color: #dbeafe; padding: 8px; border-radius: 4px; margin-top: 8px;">
-                <span class="font-medium" style="color: #1e40af;">DESTINATION GODOWN:</span>
-                <div class="text-sm mb-1">
-                  <span class="font-medium">Godown:</span> ${grnData.destinationGodownName || grnData.destinationGodownId}
-                </div>
-                ${grnData.destinationZoneName ? `
-                <div class="text-sm">
-                  <span class="font-medium">Zone:</span> ${grnData.destinationZoneName}
-                </div>
-                ` : ''}
-              </div>
-              ` : ''}
             </div>
             
             <div>
@@ -4649,12 +4663,14 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Ordered</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Received</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Unit</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Original Unit Cost</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Receiving Cost Per Unit</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Unit Cost</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total Cost with Receiving</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Orig. Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Recv. Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Batch #</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Expiry</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Godown</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Zone</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Remarks</th>
                         </tr>
                       </thead>
@@ -4671,6 +4687,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.batchNumber || ''}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.expiryDate || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.destinationGodownName || item.destinationGodownId || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.destinationZoneName || ''}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.remarks || ''}</td>
                           </tr>
                         `).join('')}
@@ -4694,12 +4712,14 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Ordered</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Received</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Unit</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Original Unit Cost</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Receiving Cost Per Unit</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Unit Cost</th>
-                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total Cost with Receiving</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Orig. Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Recv. Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">New Cost</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Total</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Batch #</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Expiry</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Godown</th>
+                          <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Zone</th>
                           <th style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">Remarks</th>
                         </tr>
                       </thead>
@@ -4716,6 +4736,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${(item.totalWithReceivingCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.batchNumber || ''}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.expiryDate || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.destinationGodownName || item.destinationGodownId || ''}</td>
+                            <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.destinationZoneName || ''}</td>
                             <td style="border: 1px solid #e5e7eb; padding: 6px; text-align: right;">${item.remarks || ''}</td>
                           </tr>
                         `).join('')}
@@ -12094,71 +12116,6 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                 </div>
                               </div>
                             </div>
-                            
-                            {/* GRN Godown Selection Section */}
-                            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="font-bold mb-3 text-blue-900">DESTINATION GODOWN</div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <div className="text-sm font-medium text-blue-800">Destination Godown *</div>
-                                  <Select 
-                                    value={grnDestinationGodownId} 
-                                    onValueChange={(val) => {
-                                      setGrnDestinationGodownId(val);
-                                      setGrnDestinationZoneId(""); // Reset zone
-                                      // Update grnData
-                                      const selectedGodown = grnGodowns.find(g => g.id === val);
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        destinationGodownId: val,
-                                        destinationGodownName: selectedGodown?.name || ''
-                                      }));
-                                    }}
-                                  >
-                                    <SelectTrigger className="w-full mt-1">
-                                      <SelectValue placeholder="Select destination godown" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {grnGodowns.map((godown) => (
-                                        <SelectItem key={godown.id} value={godown.id!}>
-                                          {godown.name} ({godown.code})
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                
-                                <div>
-                                  <div className="text-sm font-medium text-blue-800">Destination Zone (Optional)</div>
-                                  <Select 
-                                    value={grnDestinationZoneId || "no-zone"} 
-                                    onValueChange={(val) => {
-                                      const zoneId = val === "no-zone" ? "" : val;
-                                      setGrnDestinationZoneId(zoneId);
-                                      // Update grnData
-                                      const selectedZone = grnZones.find(z => z.id === zoneId);
-                                      setGrnData(prev => ({ 
-                                        ...prev, 
-                                        destinationZoneId: zoneId,
-                                        destinationZoneName: selectedZone?.zone_name || ''
-                                      }));
-                                    }}
-                                  >
-                                    <SelectTrigger className="w-full mt-1">
-                                      <SelectValue placeholder="Select zone" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="no-zone">All Zones</SelectItem>
-                                      {grnZones.map((zone) => (
-                                        <SelectItem key={zone.id} value={zone.id!}>
-                                          {zone.zone_name} ({zone.zone_code})
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </div>
-                            </div>
 
                           </div>
                           
@@ -12709,18 +12666,20 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   <table className="w-full border-collapse border border-gray-300 text-sm">
                                     <thead>
                                       <tr className="bg-gray-100">
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '25%', minWidth: '200px' }}>Description</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Ordered</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Received</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Unit</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%' }}>Original Unit Cost</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '12%' }}>Receiving Cost Per Unit</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%' }}>New Unit Cost</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '12%' }}>Total Cost with Receiving</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Batch #</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Expiry</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Remarks</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Actions</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '18%', minWidth: '180px' }}>Description</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Ordered</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Received</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '5%' }}>Unit</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Orig. Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Recv. Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>New Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '9%' }}>Total</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Batch #</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '7%' }}>Expiry</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%', minWidth: '120px' }}>Godown *</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%', minWidth: '120px' }}>Zone *</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Remarks</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '4%' }}>Actions</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -12870,6 +12829,67 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                               }))}
                                               className="p-1 h-8 text-sm w-full"
                                             />
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <select
+                                              value={item.destinationGodownId || ""}
+                                              onChange={async (e) => {
+                                                const godownId = e.target.value;
+                                                const selectedGodown = grnGodowns.find(g => g.id === godownId);
+                                                setGrnData(prev => ({
+                                                  ...prev,
+                                                  items: prev.items.map(i =>
+                                                    i.id === item.id ? {
+                                                      ...i,
+                                                      destinationGodownId: godownId,
+                                                      destinationGodownName: selectedGodown?.name || '',
+                                                      destinationZoneId: '',
+                                                      destinationZoneName: ''
+                                                    } : i
+                                                  )
+                                                }));
+                                                if (godownId) {
+                                                  await getZonesForGodown(godownId);
+                                                }
+                                              }}
+                                              className="p-1 h-8 text-xs w-full border border-gray-300 rounded"
+                                            >
+                                              <option value="">Select...</option>
+                                              {grnGodowns.map((godown) => (
+                                                <option key={godown.id} value={godown.id!}>
+                                                  {godown.name}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </td>
+                                          <td className="border border-gray-300 p-2">
+                                            <select
+                                              value={item.destinationZoneId || ""}
+                                              onChange={(e) => {
+                                                const zoneId = e.target.value;
+                                                const zones = grnZonesByGodown.get(item.destinationGodownId || '') || [];
+                                                const selectedZone = zones.find(z => z.id === zoneId);
+                                                setGrnData(prev => ({
+                                                  ...prev,
+                                                  items: prev.items.map(i =>
+                                                    i.id === item.id ? {
+                                                      ...i,
+                                                      destinationZoneId: zoneId,
+                                                      destinationZoneName: selectedZone?.zone_name || ''
+                                                    } : i
+                                                  )
+                                                }));
+                                              }}
+                                              className="p-1 h-8 text-xs w-full border border-gray-300 rounded"
+                                              disabled={!item.destinationGodownId}
+                                            >
+                                              <option value="">All Zones</option>
+                                              {(grnZonesByGodown.get(item.destinationGodownId || '') || []).map((zone) => (
+                                                <option key={zone.id} value={zone.id!}>
+                                                  {zone.zone_name}
+                                                </option>
+                                              ))}
+                                            </select>
                                           </td>
                                           <td className="border border-gray-300 p-2">
                                             <Input
@@ -13065,25 +13085,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                               <div className="text-xs mt-2">(Signature Required)</div>
                             </div>
                           </div>
-                          
-                          {/* Godown Information Display */}
-                          {grnData.destinationGodownId && (
-                            <div>
-                              <div className="font-bold mb-2 text-blue-800">Destination Godown</div>
-                              <div className="text-sm space-y-2 bg-blue-50 p-3 rounded border border-blue-200">
-                                <div>
-                                  <span className="font-medium">Godown:</span>{" "}
-                                  <span className="text-blue-900">{grnData.destinationGodownName || grnData.destinationGodownId}</span>
-                                </div>
-                                {grnData.destinationZoneName && (
-                                  <div>
-                                    <span className="font-medium">Zone:</span>{" "}
-                                    <span className="text-blue-900">{grnData.destinationZoneName}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+
                         </div>
                       </div>
                     ) : currentTemplate?.type === "supplier-settlement" ? (

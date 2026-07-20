@@ -28,6 +28,11 @@ export interface GRNItem {
   productId?: string;  // Product ID from product selection
   receivedQuantity?: number;  // Received quantity (alternative to delivered)
   orderedQuantity?: number;  // Ordered quantity
+  // Per-item godown/zone fields for multi-godown support
+  destinationGodownId?: string;
+  destinationZoneId?: string;
+  destinationGodownName?: string;
+  destinationZoneName?: string;
 }
 
 export interface GRNData {
@@ -189,14 +194,14 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
     console.log('✓ Database insert successful');
     console.log('Inserted record ID:', data?.[0]?.id);
     
-    // Update godown stock if destination godown is specified
+    // Update godown stock if any item has a destination godown
     console.log('🔍 Checking if godown stock should be updated...');
-    console.log('📍 destinationGodownId:', grn.data.destinationGodownId);
-    console.log('📍 destinationZoneId:', grn.data.destinationZoneId);
+    const hasAnyItemGodown = grn.data.items?.some(item => item.destinationGodownId || grn.data.destinationGodownId);
+    console.log('📍 Has per-item godown assignments:', hasAnyItemGodown);
     console.log('📍 Number of items:', grn.data.items?.length);
     
-    if (grn.data.destinationGodownId) {
-      console.log('✅ Destination godown is set, calling updateGRNGodownStock...');
+    if (hasAnyItemGodown) {
+      console.log('✅ Destination godown(s) set, calling updateGRNGodownStock...');
       await updateGRNGodownStock(grn);
     } else {
       console.log('⚠️ No destination godown set, skipping godown stock update');
@@ -223,15 +228,13 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
 
 // Update godown stock when GRN is saved (for incoming goods)
 const updateGRNGodownStock = async (grn: SavedGRN): Promise<void> => {
-  // Only update if destination godown is specified and there are items
-  if (!grn.data.destinationGodownId || !grn.data.items || grn.data.items.length === 0) {
+  // Only update if there are items
+  if (!grn.data.items || grn.data.items.length === 0) {
     return;
   }
 
   try {
     console.log('📦 Updating godown stock for GRN:', grn.data.grnNumber);
-    console.log('📍 Destination Godown:', grn.data.destinationGodownId);
-    console.log('📍 Destination Zone:', grn.data.destinationZoneId || 'All Zones');
 
     // Import dependencies dynamically to avoid circular dependencies
     const { updateGodownStock } = await import('@/services/godownService');
@@ -262,17 +265,26 @@ const updateGRNGodownStock = async (grn: SavedGRN): Promise<void> => {
         continue;
       }
 
-      console.log(`📦 Processing product ${productId} (${item.description}): ${quantity} units`);
+      // Use per-item godown/zone, fallback to header-level for backward compatibility
+      const itemGodownId = item.destinationGodownId || grn.data.destinationGodownId;
+      const itemZoneId = item.destinationZoneId || grn.data.destinationZoneId || null;
+
+      if (!itemGodownId) {
+        console.log(`⚠️ No godown set for item: ${item.description}, skipping godown stock update`);
+        continue;
+      }
+
+      console.log(`📦 Processing product ${productId} (${item.description}): ${quantity} units → Godown: ${itemGodownId}, Zone: ${itemZoneId || 'All'}`);
 
       // Increase stock in destination godown
       await updateGodownStock(
         productId,
-        grn.data.destinationGodownId!,
-        grn.data.destinationZoneId || null,
+        itemGodownId,
+        itemZoneId,
         quantity // Positive to increase
       );
 
-      console.log(`✅ Increased ${quantity} units of product ${productId} in godown`);
+      console.log(`✅ Increased ${quantity} units of product ${productId} in godown ${itemGodownId}`);
     }
 
     console.log('✅ Godown stock update completed for GRN');
