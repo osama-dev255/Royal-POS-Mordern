@@ -53,6 +53,7 @@ import { saveSalesOrder, SalesOrderData as SavedSalesOrderData } from '@/utils/s
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
 import { getGodowns, getZones, getGodownStock, Godown, GodownZone, GodownStock } from '@/services/godownService';
+import { getSuppliers, createSupplier, Supplier as DBSupplier } from '@/services/databaseService';
 import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
 import { saveSupplierSettlement, SupplierSettlementData as UtilsSupplierSettlementData, generateSupplierSettlementReference } from '@/utils/supplierSettlementUtils';
 import { SavedDeliveriesSection } from '@/components/SavedDeliveriesSection';
@@ -1203,6 +1204,15 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
     const [isSavingGRN, setIsSavingGRN] = useState<boolean>(false);
 
+  // Registered suppliers state
+  const [registeredSuppliers, setRegisteredSuppliers] = useState<DBSupplier[]>([]);
+  const [filteredSuppliers, setFilteredSuppliers] = useState<DBSupplier[]>([]);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState<boolean>(false);
+  const [loadingSuppliers, setLoadingSuppliers] = useState<boolean>(false);
+  const [showNewSupplierDialog, setShowNewSupplierDialog] = useState<boolean>(false);
+  const [newSupplierForm, setNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+  const [savingNewSupplier, setSavingNewSupplier] = useState<boolean>(false);
+
   // Map of product name -> Map of godownId -> total quantity available
   const [productGodownMap, setProductGodownMap] = useState<Map<string, Map<string, number>>>(new Map());
   // Map of product name -> Map of godownId -> Map of zoneId -> quantity (for zone-level quantities)
@@ -1469,6 +1479,25 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       }
     };
     loadGodowns();
+  }, []);
+
+  // Load registered suppliers for GRN searchable dropdown
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      setLoadingSuppliers(true);
+      try {
+        const data = await getSuppliers();
+        setRegisteredSuppliers(data);
+        setFilteredSuppliers(data);
+      } catch (error) {
+        console.error('Error loading suppliers:', error);
+        setRegisteredSuppliers([]);
+        setFilteredSuppliers([]);
+      } finally {
+        setLoadingSuppliers(false);
+      }
+    };
+    loadSuppliers();
   }, []);
 
   // Load ALL zones on mount (needed for per-row zone name resolution across multiple godowns)
@@ -11995,7 +12024,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-sm font-medium text-gray-700">Delivery Location:</div>
+                                  <div className="text-sm font-medium text-gray-700">Driver's License:</div>
                                   <Input
                                     value={grnData.logisticDetails.deliveryLocation}
                                     onChange={(e) => setGrnData(prev => ({
@@ -12006,7 +12035,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                       }
                                     }))}
                                     className="p-2 text-sm w-full mt-1"
-                                    placeholder="Enter delivery location"
+                                    placeholder="Enter driver's license"
                                   />
                                 </div>
                                 <div className="md:col-span-2">
@@ -12287,30 +12316,163 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                       <div className="text-sm font-medium text-gray-700">Supplier Name:</div>
-                                      <Input
-                                        value={supplierInfo.name}
-                                        onChange={(e) => {
-                                          const updatedSuppliers = [...grnData.suppliers];
-                                          const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
-                                          if (supplierIndex >= 0) {
-                                            updatedSuppliers[supplierIndex].name = e.target.value;
-                                          } else {
-                                            updatedSuppliers.push({
-                                              id: supplierId,
-                                              name: e.target.value,
-                                              supplierId: `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
-                                              phone: "",
-                                              email: "",
-                                              address: "",
-                                              tinNumber: "",
-                                              stockType: ""  // Add the stockType field
-                                            });
-                                          }
-                                          setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
-                                        }}
-                                        className="p-2 text-sm w-full mt-1"
-                                        placeholder="Enter supplier name"
-                                      />
+                                      <div className="relative mt-1">
+                                        <Command className="rounded-lg border shadow-sm" shouldFilter={false}>
+                                          <CommandInput
+                                            placeholder="Search supplier..."
+                                            value={supplierInfo.name}
+                                            onValueChange={(value) => {
+                                              const updatedSuppliers = [...grnData.suppliers];
+                                              const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                              if (supplierIndex >= 0) {
+                                                updatedSuppliers[supplierIndex].name = value;
+                                              } else {
+                                                updatedSuppliers.push({
+                                                  id: supplierId,
+                                                  name: value,
+                                                  supplierId: `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
+                                                  phone: "",
+                                                  email: "",
+                                                  address: "",
+                                                  tinNumber: "",
+                                                  stockType: ""
+                                                });
+                                              }
+                                              setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                              // Filter suppliers
+                                              const filtered = registeredSuppliers.filter(s =>
+                                                s.name.toLowerCase().includes(value.toLowerCase()) ||
+                                                (s.contact_person && s.contact_person.toLowerCase().includes(value.toLowerCase())) ||
+                                                (s.phone && s.phone.includes(value))
+                                              );
+                                              setFilteredSuppliers(filtered);
+                                              setShowSupplierDropdown(true);
+                                            }}
+                                            onFocus={() => {
+                                              setFilteredSuppliers(registeredSuppliers);
+                                              setShowSupplierDropdown(true);
+                                            }}
+                                            onBlur={() => {
+                                              setTimeout(() => setShowSupplierDropdown(false), 200);
+                                            }}
+                                            className="h-9 text-sm"
+                                          />
+                                        </Command>
+                                        {supplierInfo.name && (
+                                          <button
+                                            onClick={() => {
+                                              const updatedSuppliers = [...grnData.suppliers];
+                                              const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                              if (supplierIndex >= 0) {
+                                                updatedSuppliers[supplierIndex] = {
+                                                  ...updatedSuppliers[supplierIndex],
+                                                  name: "",
+                                                  supplierId: "",
+                                                  phone: "",
+                                                  email: "",
+                                                  address: "",
+                                                  tinNumber: "",
+                                                  stockType: ""
+                                                };
+                                              }
+                                              setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-100 p-1 rounded z-10"
+                                          >
+                                            <svg
+                                              xmlns="http://www.w3.org/2000/svg"
+                                              width="24"
+                                              height="24"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              className="h-4 w-4"
+                                            >
+                                              <path d="M18 6 6 18" />
+                                              <path d="m6 6 12 12" />
+                                            </svg>
+                                          </button>
+                                        )}
+                                        {showSupplierDropdown && (
+                                          <div className="max-h-48 overflow-auto absolute z-50 bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                            {loadingSuppliers ? (
+                                              <div className="p-3 text-center text-sm text-muted-foreground">
+                                                Loading suppliers...
+                                              </div>
+                                            ) : filteredSuppliers.length > 0 ? (
+                                              <div>
+                                                {filteredSuppliers.map((supplier) => (
+                                                  <div
+                                                    key={supplier.id}
+                                                    onMouseDown={(e) => {
+                                                      e.preventDefault();
+                                                      const updatedSuppliers = [...grnData.suppliers];
+                                                      const supplierIndex = updatedSuppliers.findIndex(s => s.id === supplierId);
+                                                      if (supplierIndex >= 0) {
+                                                        updatedSuppliers[supplierIndex] = {
+                                                          ...updatedSuppliers[supplierIndex],
+                                                          name: supplier.name,
+                                                          supplierId: supplier.tax_id || `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
+                                                          phone: supplier.phone || "",
+                                                          email: supplier.email || "",
+                                                          address: supplier.address || "",
+                                                          tinNumber: supplier.tax_id || "",
+                                                          stockType: updatedSuppliers[supplierIndex].stockType || ""
+                                                        };
+                                                      } else {
+                                                        updatedSuppliers.push({
+                                                          id: supplierId,
+                                                          name: supplier.name,
+                                                          supplierId: supplier.tax_id || `SUP-${String(updatedSuppliers.length + 1).padStart(3, '0')}`,
+                                                          phone: supplier.phone || "",
+                                                          email: supplier.email || "",
+                                                          address: supplier.address || "",
+                                                          tinNumber: supplier.tax_id || "",
+                                                          stockType: ""
+                                                        });
+                                                      }
+                                                      setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                                      setShowSupplierDropdown(false);
+                                                    }}
+                                                    className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                                  >
+                                                    <div className="flex flex-col gap-0.5 w-full">
+                                                      <span className="font-semibold text-sm">{supplier.name}</span>
+                                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                        {supplier.contact_person && (
+                                                          <span>Contact: {supplier.contact_person}</span>
+                                                        )}
+                                                        {supplier.phone && (
+                                                          <span>Phone: {supplier.phone}</span>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <div className="p-3 text-center text-sm text-muted-foreground">
+                                                No suppliers found.
+                                              </div>
+                                            )}
+                                            <div
+                                              onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setShowSupplierDropdown(false);
+                                                setNewSupplierForm({ name: supplierInfo.name || '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                                                setShowNewSupplierDialog(true);
+                                              }}
+                                              className="cursor-pointer py-2 px-3 hover:bg-blue-50 border-t text-blue-600 flex items-center gap-2 text-sm font-medium"
+                                            >
+                                              <Plus className="h-4 w-4" />
+                                              Register New Supplier
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
                                     <div>
                                       <div className="text-sm font-medium text-gray-700">Supplier ID:</div>
@@ -15847,6 +16009,151 @@ Enter choice (1-3):`);
                 variant="outline"
               >
                 Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Supplier Registration Dialog */}
+      {showNewSupplierDialog && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Register New Supplier</h3>
+              <button
+                onClick={() => setShowNewSupplierDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Supplier Name <span className="text-red-500">*</span></label>
+                <Input
+                  value={newSupplierForm.name}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter supplier name"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Contact Person <span className="text-red-500">*</span></label>
+                <Input
+                  value={newSupplierForm.contact_person}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, contact_person: e.target.value }))}
+                  placeholder="Enter contact person"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Phone</label>
+                  <Input
+                    value={newSupplierForm.phone}
+                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Phone number"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <Input
+                    value={newSupplierForm.email}
+                    onChange={(e) => setNewSupplierForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="Email address"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Address</label>
+                <Input
+                  value={newSupplierForm.address}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Enter address"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Tax ID / TIN</label>
+                <Input
+                  value={newSupplierForm.tax_id}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, tax_id: e.target.value }))}
+                  placeholder="Enter tax ID"
+                  className="mt-1 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowNewSupplierDialog(false)}
+                disabled={savingNewSupplier}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!newSupplierForm.name || !newSupplierForm.contact_person) {
+                    toast({ title: "Error", description: "Please fill in Supplier Name and Contact Person", variant: "destructive" });
+                    return;
+                  }
+                  setSavingNewSupplier(true);
+                  try {
+                    const created = await createSupplier({
+                      name: newSupplierForm.name,
+                      contact_person: newSupplierForm.contact_person,
+                      phone: newSupplierForm.phone,
+                      email: newSupplierForm.email,
+                      address: newSupplierForm.address,
+                      tax_id: newSupplierForm.tax_id,
+                      is_active: true
+                    });
+                    if (created) {
+                      const newSupplier: DBSupplier = {
+                        ...created,
+                        id: created.id || ''
+                      };
+                      setRegisteredSuppliers(prev => [...prev, newSupplier]);
+                      setFilteredSuppliers(prev => [...prev, newSupplier]);
+                      // Auto-select the newly created supplier
+                      const updatedSuppliers = [...grnData.suppliers];
+                      const supplierIndex = updatedSuppliers.findIndex(s => s.id === grnData.suppliers[0]?.id);
+                      if (supplierIndex >= 0) {
+                        updatedSuppliers[supplierIndex] = {
+                          ...updatedSuppliers[supplierIndex],
+                          name: created.name,
+                          supplierId: created.tax_id || `SUP-${String(supplierIndex + 1).padStart(3, '0')}`,
+                          phone: created.phone || "",
+                          email: created.email || "",
+                          address: created.address || "",
+                          tinNumber: created.tax_id || "",
+                          stockType: updatedSuppliers[supplierIndex].stockType || ""
+                        };
+                      }
+                      setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                      setShowNewSupplierDialog(false);
+                      setNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                      toast({ title: "Success", description: "Supplier registered successfully" });
+                    } else {
+                      throw new Error("Failed to create supplier");
+                    }
+                  } catch (error) {
+                    console.error("Error creating supplier:", error);
+                    toast({ title: "Error", description: "Failed to register supplier: " + (error as Error).message, variant: "destructive" });
+                  } finally {
+                    setSavingNewSupplier(false);
+                  }
+                }}
+                disabled={savingNewSupplier}
+              >
+                {savingNewSupplier ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                ) : (
+                  "Register & Select"
+                )}
               </Button>
             </div>
           </div>
