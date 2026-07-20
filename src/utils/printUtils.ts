@@ -4935,8 +4935,8 @@ export class PrintUtils {
         <td style="text-align:right">${(item.totalWithReceivingCost || item.total || 0).toFixed(2)}</td>
         <td>${item.batchNumber || '-'}</td>
         <td>${item.expiryDate ? formatDate(item.expiryDate) : '-'}</td>
-        <td>${item.godown_name || item.godownName || defaultGodown}</td>
-        <td>${item.zone_name || item.zoneName || defaultZone}</td>
+        <td>${item.destinationGodownName || item.destinationGodownId || item.godown_name || item.godownName || defaultGodown}</td>
+        <td>${item.destinationZoneName || item.destinationZoneId || item.zone_name || item.zoneName || defaultZone}</td>
         <td style="text-align:center">${(item.damaged || 0) > 0 ? item.damaged : '-'}</td>
         <td>${item.remarks || '-'}</td>
       </tr>
@@ -4993,16 +4993,25 @@ export class PrintUtils {
     </div>
     <div class="info-box">
       <h3>Logistics</h3>
-      ${data.vehicleNumber ? '<p><span class="label">Vehicle:</span> ' + data.vehicleNumber + '</p>' : ''}
-      ${data.driverName ? '<p><span class="label">Driver:</span> ' + data.driverName + '</p>' : ''}
+      ${data.logisticDetails?.vehicleNumber || data.vehicleNumber ? '<p><span class="label">Vehicle:</span> ' + (data.logisticDetails?.vehicleNumber || data.vehicleNumber) + '</p>' : ''}
+      ${data.logisticDetails?.driverName || data.driverName ? '<p><span class="label">Driver:</span> ' + (data.logisticDetails?.driverName || data.driverName) + '</p>' : ''}
+      ${data.logisticDetails?.driverPhone ? '<p><span class="label">Driver Phone:</span> ' + data.logisticDetails.driverPhone + '</p>' : ''}
+      ${data.logisticDetails?.transportCompany ? '<p><span class="label">Transport Co.:</span> ' + data.logisticDetails.transportCompany + '</p>' : ''}
+      ${data.logisticDetails?.estimatedArrival ? '<p><span class="label">Est. Arrival:</span> ' + formatDate(data.logisticDetails.estimatedArrival) + '</p>' : ''}
+      ${data.logisticDetails?.actualArrival ? '<p><span class="label">Actual Arrival:</span> ' + formatDate(data.logisticDetails.actualArrival) + '</p>' : ''}
+      ${data.logisticDetails?.departureTime ? '<p><span class="label">Departure:</span> ' + formatDate(data.logisticDetails.departureTime) + '</p>' : ''}
+      ${data.logisticDetails?.deliveryLocation ? '<p><span class="label">Driver\'s License:</span> ' + data.logisticDetails.deliveryLocation + '</p>' : ''}
+      ${data.logisticDetails?.shippingMethod ? '<p><span class="label">Shipping:</span> ' + data.logisticDetails.shippingMethod + '</p>' : ''}
+      ${data.logisticDetails?.trackingNumber ? '<p><span class="label">Tracking #:</span> ' + data.logisticDetails.trackingNumber + '</p>' : ''}
       ${data.receivedBy ? '<p><span class="label">Received By:</span> ' + data.receivedBy + '</p>' : ''}
       ${data.receivedLocation ? '<p><span class="label">Location:</span> ' + data.receivedLocation + '</p>' : ''}
+      ${data.logisticDetails?.specialInstructions ? '<p><span class="label">Instructions:</span> ' + data.logisticDetails.specialInstructions + '</p>' : ''}
     </div>
     <div class="info-box">
-      <h3>Destination</h3>
-      <p><span class="label">Godown:</span> ${data.destinationGodownName || 'N/A'}</p>
-      <p><span class="label">Zone:</span> ${data.destinationZoneName || 'N/A'}</p>
-      ${data.receivedDate ? '<p><span class="label">Received Date:</span> ' + formatDate(data.receivedDate) + '</p>' : ''}
+      <h3>Compliance</h3>
+      <p><span class="label">Stock Type:</span> ${data.stockType || (data.isVatable ? 'Vatable' : 'Exempt')}</p>
+      <p><span class="label">Is TIN Implemented?:</span> ${data.isVatable ? 'Yes' : 'No'}</p>
+      ${data.businessTin ? '<p><span class="label">Business TIN:</span> ' + data.businessTin + '</p>' : ''}
     </div>
   </div>
 

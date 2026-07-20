@@ -2002,6 +2002,21 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       return;
     }
 
+    // Validate Stock Type is filled for at least one supplier
+    const suppliersWithoutStockType = (grnData.suppliers || []).filter(s => !s.stockType);
+    if (suppliersWithoutStockType.length > 0) {
+      alert(`Please select a Stock Type for all suppliers. ${suppliersWithoutStockType.length} supplier(s) missing stock type: ${suppliersWithoutStockType.map(s => s.name || '(unnamed)').join(', ')}`);
+      setIsSavingGRN(false);
+      return;
+    }
+
+    // Validate Delivery Note # is filled
+    if (!grnData.deliveryNoteNumber?.trim()) {
+      alert('Please enter a Delivery Note #');
+      setIsSavingGRN(false);
+      return;
+    }
+
     // Validate per-item godown assignments
     const itemsWithoutGodown = grnData.items.filter(item => !item.destinationGodownId);
     if (itemsWithoutGodown.length > 0) {
@@ -2473,6 +2488,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         receivedBy: grnData.receivedBy,
         receivedLocation: grnData.receivedLocation,
         receivedDate: grnData.receivedDate,
+        logisticDetails: grnData.logisticDetails,
         status: grnData.status || 'completed',
         qualityCheckNotes: grnData.qualityCheckNotes,
         discrepancies: grnData.discrepancies,
@@ -2483,6 +2499,9 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         approvedBy: grnData.approvedBy,
         approvedDate: grnData.approvedDate,
         receivingCosts: grnData.receivingCosts,
+        isVatable: grnData.isVatable,
+        stockType: primarySupplier.stockType || (grnData.suppliers?.[0]?.stockType) || '',
+        businessTin: primarySupplier.businessTin || '',
         destinationGodownId: grnData.destinationGodownId,
         destinationZoneId: grnData.destinationZoneId,
         destinationGodownName: grnData.destinationGodownName,
@@ -2500,7 +2519,11 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
           remarks: item.remarks,
           receivingCostPerUnit: item.receivingCostPerUnit,
           totalWithReceivingCost: item.totalWithReceivingCost,
-          damaged: (item as any).damaged || 0
+          damaged: (item as any).damaged || 0,
+          destinationGodownId: item.destinationGodownId,
+          destinationZoneId: item.destinationZoneId,
+          destinationGodownName: item.destinationGodownName,
+          destinationZoneName: item.destinationZoneName
         }))
       }
     };
@@ -12167,7 +12190,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                             />
                           </div>
                           <div>
-                            <div className="text-sm font-medium">Delivery Note #:</div>
+                            <div className="text-sm font-medium">Delivery Note #: <span className="text-red-500">*</span></div>
                             <Input
                               value={grnData.deliveryNoteNumber || ""}
                               onChange={(e) => setGrnData(prev => ({ ...prev, deliveryNoteNumber: e.target.value }))}
@@ -12545,7 +12568,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   </div>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                      <div className="text-sm font-medium text-gray-700">Stock Type:</div>
+                                      <div className="text-sm font-medium text-gray-700">Stock Type: <span className="text-red-500">*</span></div>
                                       <Select
                                         value={(supplierInfo as SupplierInfo).stockType}
                                         onValueChange={(value) => {
