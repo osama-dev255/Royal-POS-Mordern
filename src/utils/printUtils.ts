@@ -4975,7 +4975,7 @@ export class PrintUtils {
 
   /* Items Table */
   .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 14px; }
-  .items-table th { background: #4a5568; color: #fff; padding: 4px 3px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; border: none; }
+  .items-table th { background: #1e3a5f; color: #fff; padding: 4px 3px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; border: none; }
   .items-table td { border: 1px solid #e2e8f0; padding: 3px; }
   .items-table tr.alt td { background: transparent; }
   .items-table tfoot td { background: transparent; font-weight: 700; border-top: 2px solid #1e3a5f; font-size: 14px; }
