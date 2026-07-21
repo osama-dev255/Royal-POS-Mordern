@@ -4934,7 +4934,7 @@ export class PrintUtils {
         <td style="text-align:right">${(item.originalUnitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
         <td style="text-align:right">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
         <td style="text-align:right;font-weight:600">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-        <td style="text-align:right;font-weight:600">${((item.originalUnitCost || 0) * (item.delivered || item.quantity || 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td style="text-align:right;font-weight:700">${((item.originalUnitCost || 0) * (item.delivered || item.quantity || 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
         <td>${item.batchNumber || '-'}</td>
         <td>${item.expiryDate ? formatShortDate(item.expiryDate) : '-'}</td>
         <td>${item.destinationGodownName || item.destinationGodownId || item.godown_name || item.godownName || defaultGodown}</td>

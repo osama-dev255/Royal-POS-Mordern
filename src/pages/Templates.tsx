@@ -2167,8 +2167,12 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
             if (product) {
               const currentStock = product.stock_quantity || 0;
               const newStock = currentStock + item.delivered;
-              await updateProduct(product.id!, { ...product, stock_quantity: newStock });
-              console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}`);
+              // Update cost_price if a new Orig. Cost was assigned
+              const newCostPrice = item.originalUnitCost && item.originalUnitCost > 0
+                ? item.originalUnitCost
+                : product.cost_price;
+              await updateProduct(product.id!, { ...product, stock_quantity: newStock, cost_price: newCostPrice });
+              console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}, cost_price updated to ${newCostPrice}`);
             }
           }
         }
