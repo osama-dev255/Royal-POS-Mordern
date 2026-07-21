@@ -2714,9 +2714,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     receivedBy: "Warehouse Staff",
     receivedLocation: "",
     items: [
-      { id: "1", description: "Product A", orderedQuantity: 100, receivedQuantity: 100, unit: "pcs", unitCost: 10, totalCost: 1000, receivingCostPerUnit: 0, totalWithReceivingCost: 1000, batchNumber: "BATCH-001", expiryDate: "2025-12-31", remarks: "Good condition", productId: undefined },
-      { id: "2", description: "Product B", orderedQuantity: 50, receivedQuantity: 48, unit: "boxes", unitCost: 15, totalCost: 750, receivingCostPerUnit: 0, totalWithReceivingCost: 750, batchNumber: "BATCH-002", expiryDate: "2026-06-30", remarks: "2 units damaged", productId: undefined },
-      { id: "3", description: "Product C", orderedQuantity: 25, receivedQuantity: 25, unit: "units", unitCost: 20, totalCost: 500, receivingCostPerUnit: 0, totalWithReceivingCost: 500, batchNumber: "BATCH-003", expiryDate: "2025-09-15", remarks: "", productId: undefined }
+      { id: "1", description: "", orderedQuantity: 0, receivedQuantity: 0, unit: "", unitCost: 0, totalCost: 0, receivingCostPerUnit: 0, totalWithReceivingCost: 0, batchNumber: "", expiryDate: "", remarks: "", productId: undefined }
     ],
     receivingCosts: [
       { id: "1", description: "Transport Charges", amount: 0 },
