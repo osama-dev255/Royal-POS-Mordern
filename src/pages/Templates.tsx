@@ -12262,8 +12262,8 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                               email: "",
                               address: "",
                               tinNumber: "",
-                              businessTin: "",  // Add the businessTin field
-                              stockType: ""  // Add the stockType field
+                              businessTin: undefined,
+                              stockType: ""
                             };
                             const supplierItems = distributeReceivingCosts(grnData.items, grnData.receivingCosts).filter(item => 
                               item.supplierId === supplierId || (!item.supplierId && supplierIndex === 0)
@@ -12636,7 +12636,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                         </Button>
                                       </div>
                                     </div>
-                                    {supplierInfo.businessTin !== undefined && (
+                                    {supplierInfo.businessTin !== undefined && supplierInfo.businessTin !== null && (
                                       <div className="md:col-span-2">
                                         <div className="text-sm font-medium text-gray-700">Business Tin:</div>
                                         <Input
