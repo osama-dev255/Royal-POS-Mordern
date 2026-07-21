@@ -2005,6 +2005,13 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       return;
     }
 
+    // Validate at least one supplier is selected
+    if (!grnData.suppliers || grnData.suppliers.length === 0 || !grnData.suppliers[0]?.name?.trim()) {
+      alert('Please select a supplier');
+      setIsSavingGRN(false);
+      return;
+    }
+
     // Validate Stock Type is filled for at least one supplier
     const suppliersWithoutStockType = (grnData.suppliers || []).filter(s => !s.stockType);
     if (suppliersWithoutStockType.length > 0) {
@@ -2016,6 +2023,14 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     // Validate Delivery Note # is filled
     if (!grnData.deliveryNoteNumber?.trim()) {
       alert('Please enter a Delivery Note #');
+      setIsSavingGRN(false);
+      return;
+    }
+
+    // Validate Supplier Document is uploaded for all suppliers
+    const suppliersWithoutDocument = (grnData.suppliers || []).filter(s => !s.documentUrl);
+    if (suppliersWithoutDocument.length > 0) {
+      alert(`Please upload the supplier document (PDF) for all suppliers. ${suppliersWithoutDocument.length} supplier(s) missing document: ${suppliersWithoutDocument.map(s => s.name || '(unnamed)').join(', ')}`);
       setIsSavingGRN(false);
       return;
     }
@@ -12035,51 +12050,6 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-sm font-medium text-gray-700">Estimated Arrival:</div>
-                                  <Input
-                                    type="datetime-local"
-                                    value={grnData.logisticDetails.estimatedArrival}
-                                    onChange={(e) => setGrnData(prev => ({
-                                      ...prev,
-                                      logisticDetails: {
-                                        ...prev.logisticDetails,
-                                        estimatedArrival: e.target.value
-                                      }
-                                    }))}
-                                    className="p-2 text-sm w-full mt-1"
-                                  />
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium text-gray-700">Actual Arrival:</div>
-                                  <Input
-                                    type="datetime-local"
-                                    value={grnData.logisticDetails.actualArrival}
-                                    onChange={(e) => setGrnData(prev => ({
-                                      ...prev,
-                                      logisticDetails: {
-                                        ...prev.logisticDetails,
-                                        actualArrival: e.target.value
-                                      }
-                                    }))}
-                                    className="p-2 text-sm w-full mt-1"
-                                  />
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium text-gray-700">Departure Time:</div>
-                                  <Input
-                                    type="datetime-local"
-                                    value={grnData.logisticDetails.departureTime}
-                                    onChange={(e) => setGrnData(prev => ({
-                                      ...prev,
-                                      logisticDetails: {
-                                        ...prev.logisticDetails,
-                                        departureTime: e.target.value
-                                      }
-                                    }))}
-                                    className="p-2 text-sm w-full mt-1"
-                                  />
-                                </div>
-                                <div>
                                   <div className="text-sm font-medium text-gray-700">Driver's License:</div>
                                   <Input
                                     value={grnData.logisticDetails.deliveryLocation}
@@ -12302,7 +12272,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                 {/* Supplier Details Section */}
                                 <div className="border border-gray-300 rounded-lg p-4 mb-4 bg-gray-50">
                                   <div className="font-bold text-lg mb-3 text-blue-800">
-                                    SUPPLIER DETAILS - {supplierInfo.name}
+                                    SUPPLIER DETAILS - {supplierInfo.name} <span className="text-red-600">*</span>
                                   </div>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
@@ -12689,7 +12659,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                 {/* Supplier Document Upload */}
                                 <div className="border border-gray-300 rounded-lg p-4 mb-4 bg-orange-50">
                                   <div className="font-bold text-lg mb-3 text-orange-800">
-                                    SUPPLIER DOCUMENT
+                                    SUPPLIER DOCUMENT <span className="text-red-600">*</span>
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <label className="cursor-pointer bg-orange-600 hover:bg-orange-700 text-white text-sm px-4 py-2 rounded flex items-center gap-2">

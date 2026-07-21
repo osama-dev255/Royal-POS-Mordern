@@ -4914,27 +4914,29 @@ export class PrintUtils {
     const data = grn.data || grn;
     const items = Array.isArray(data.items) ? data.items : [];
     const totalValue = items.reduce((sum: number, item: any) => sum + (item.totalWithReceivingCost || item.total || 0), 0);
+    const totalExclValue = items.reduce((sum: number, item: any) => sum + ((item.originalUnitCost || 0) * (item.delivered || item.quantity || 0)), 0);
     const totalQty = items.reduce((sum: number, item: any) => sum + (item.delivered || item.quantity || 0), 0);
+    const totalOrdered = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
 
     const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    const formatShortDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
 
-    // GRN-level destination as fallback for items without per-item godown/zone
     const defaultGodown = data.destinationGodownName || data.destinationGodownId || '-';
     const defaultZone = data.destinationZoneName || data.destinationZoneId || '-';
 
     const rows = items.map((item: any, i: number) => `
-      <tr>
-        <td>${i + 1}</td>
+      <tr class="${i % 2 === 1 ? 'alt' : ''}">
+        <td style="text-align:center">${i + 1}</td>
         <td>${item.description || ''}</td>
-        <td style="text-align:center">${item.quantity || 0}</td>
-        <td style="text-align:center">${item.delivered || 0}</td>
+        <td style="text-align:right">${item.quantity || 0}</td>
+        <td style="text-align:right">${item.delivered || 0}</td>
         <td>${item.unit || '-'}</td>
-        <td style="text-align:right">${(item.originalUnitCost || 0).toFixed(2)}</td>
-        <td style="text-align:right">${(item.receivingCostPerUnit || 0).toFixed(2)}</td>
-        <td style="text-align:right">${(item.unitCost || 0).toFixed(2)}</td>
-        <td style="text-align:right">${(item.totalWithReceivingCost || item.total || 0).toFixed(2)}</td>
+        <td style="text-align:right">${(item.originalUnitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td style="text-align:right">${(item.receivingCostPerUnit || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td style="text-align:right;font-weight:600">${(item.unitCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td style="text-align:right;font-weight:600">${((item.originalUnitCost || 0) * (item.delivered || item.quantity || 0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
         <td>${item.batchNumber || '-'}</td>
-        <td>${item.expiryDate ? formatDate(item.expiryDate) : '-'}</td>
+        <td>${item.expiryDate ? formatShortDate(item.expiryDate) : '-'}</td>
         <td>${item.destinationGodownName || item.destinationGodownId || item.godown_name || item.godownName || defaultGodown}</td>
         <td>${item.destinationZoneName || item.destinationZoneId || item.zone_name || item.zoneName || defaultZone}</td>
         <td style="text-align:center">${(item.damaged || 0) > 0 ? item.damaged : '-'}</td>
@@ -4942,123 +4944,186 @@ export class PrintUtils {
       </tr>
     `).join('');
 
+    const statusColor = (data.status || '').toLowerCase() === 'completed' ? '#16a34a' : (data.status || '').toLowerCase() === 'pending' ? '#d97706' : '#2563eb';
+
     const html = `<!DOCTYPE html>
 <html><head><title>GRN ${data.grnNumber || ''}</title>
 <style>
-  @media print { @page { size: A4; margin: 15mm; } }
+  @media print {
+    @page { size: A4 portrait; margin: 12mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 20px; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
-  .header h1 { font-size: 18px; margin-bottom: 4px; }
-  .header p { font-size: 10px; color: #444; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-  .info-box { border: 1px solid #ccc; padding: 8px; font-size: 10px; }
-  .info-box h3 { font-size: 11px; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
-  .info-box p { margin: 2px 0; }
-  .info-box span.label { color: #555; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 7.5px; }
-  th, td { border: 1px solid #999; padding: 2px 3px; }
-  th { background: #f0f0f0; font-weight: bold; text-align: left; font-size: 7.5px; }
-  .totals { text-align: right; margin-bottom: 15px; font-size: 11px; }
-  .totals table { width: auto; margin-left: auto; border: none; }
-  .totals td { border: none; padding: 2px 10px; }
-  .totals tr:last-child { font-weight: bold; border-top: 2px solid #000; }
-  .notes { margin-bottom: 10px; font-size: 10px; }
-  .notes h3 { font-size: 11px; margin-bottom: 3px; }
-  .notes p { margin-bottom: 6px; white-space: pre-wrap; }
-  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; font-size: 10px; }
-  .sig-box { border-top: 1px solid #000; padding-top: 4px; text-align: center; }
-  .footer { text-align: center; margin-top: 20px; font-size: 9px; color: #666; border-top: 1px solid #ccc; padding-top: 8px; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: #1a1a1a; }
+
+  /* Header */
+  .doc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 12px; }
+  .doc-header .company { font-size: 20px; font-weight: 700; color: #1e3a5f; }
+  .doc-header .company-sub { font-size: 12px; color: #555; margin-top: 2px; }
+  .doc-header .doc-title { text-align: right; }
+  .doc-header .doc-title h1 { font-size: 26px; color: #1e3a5f; letter-spacing: 1px; margin-bottom: 4px; }
+  .doc-header .doc-title .grn-no { font-size: 16px; font-weight: 600; color: #333; }
+  .doc-header .doc-title .status { display: inline-block; padding: 2px 10px; border-radius: 3px; color: #fff; font-size: 12px; font-weight: 700; margin-top: 4px; }
+
+  /* Info Section */
+  .info-section { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .info-card { background: transparent; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px 10px; }
+  .info-card h4 { font-size: 14px; text-transform: uppercase; color: #1e3a5f; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 5px; letter-spacing: 0.5px; }
+  .info-card .row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 14px; }
+  .info-card .row .lbl { color: #64748b; }
+  .info-card .row .val { font-weight: 600; color: #1e293b; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Items Table */
+  .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 14px; }
+  .items-table th { background: #4a5568; color: #fff; padding: 4px 3px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; border: none; }
+  .items-table td { border: 1px solid #e2e8f0; padding: 3px; }
+  .items-table tr.alt td { background: transparent; }
+  .items-table tfoot td { background: transparent; font-weight: 700; border-top: 2px solid #1e3a5f; font-size: 14px; }
+
+  /* Bottom Section */
+  .bottom-section { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .costs-table { width: 50%; border-collapse: collapse; font-size: 14px; }
+  .costs-table th { background: transparent; padding: 4px 6px; text-align: left; border: 1px solid #cbd5e1; font-size: 14px; }
+  .costs-table td { padding: 3px 6px; border: 1px solid #e2e8f0; }
+  .costs-table tfoot td { font-weight: 700; background: transparent; border-top: 2px solid #1e3a5f; }
+
+  .summary-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
+
+  /* Signatures */
+  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 25px; }
+  .sig-item { text-align: center; font-size: 14px; }
+  .sig-item .sig-line { border-top: 1px solid #333; margin-top: 25px; padding-top: 3px; }
+  .sig-item .sig-name { font-weight: 600; }
+  .sig-item .sig-date { color: #64748b; font-size: 14px; }
+
+  /* Footer */
+  .doc-footer { margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; justify-content: space-between; font-size: 14px; color: #94a3b8; }
 </style></head><body>
-  <div class="header">
-    <h1>GOODS RECEIVED NOTE</h1>
-    <p>${data.businessName || ''} ${data.businessAddress ? '• ' + data.businessAddress : ''} ${data.businessPhone ? '• ' + data.businessPhone : ''}</p>
-  </div>
 
-  <div class="info-grid">
-    <div class="info-box">
-      <h3>GRN Information</h3>
-      <p><span class="label">GRN #:</span> ${data.grnNumber || 'N/A'}</p>
-      <p><span class="label">Date:</span> ${formatDate(data.date)}</p>
-      <p><span class="label">Status:</span> ${(data.status || 'pending').toUpperCase()}</p>
-      <p><span class="label">PO #:</span> ${data.poNumber || 'N/A'}</p>
-      <p><span class="label">Delivery Note #:</span> ${data.deliveryNoteNumber || 'N/A'}</p>
+  <!-- HEADER -->
+  <div class="doc-header">
+    <div>
+      <div class="company">${data.businessName || ''}</div>
+      <div class="company-sub">${data.businessAddress || ''} ${data.businessPhone ? '| ' + data.businessPhone : ''} ${data.businessEmail ? '| ' + data.businessEmail : ''}</div>
     </div>
-    <div class="info-box">
-      <h3>Supplier Details</h3>
-      <p><span class="label">Name:</span> ${data.supplierName || 'N/A'}</p>
-      ${data.supplierPhone ? '<p><span class="label">Phone:</span> ' + data.supplierPhone + '</p>' : ''}
-      ${data.supplierEmail ? '<p><span class="label">Email:</span> ' + data.supplierEmail + '</p>' : ''}
-      ${data.supplierTinNumber ? '<p><span class="label">TIN:</span> ' + data.supplierTinNumber + '</p>' : ''}
-      ${data.documentUrl ? '<p><span class="label">Document:</span> <a href="' + data.documentUrl + '" target="_blank" style="color:#2563eb;">' + (data.documentName || 'View PDF') + '</a></p>' : ''}
-    </div>
-    <div class="info-box">
-      <h3>Logistics</h3>
-      ${data.logisticDetails?.vehicleNumber || data.vehicleNumber ? '<p><span class="label">Vehicle:</span> ' + (data.logisticDetails?.vehicleNumber || data.vehicleNumber) + '</p>' : ''}
-      ${data.logisticDetails?.driverName || data.driverName ? '<p><span class="label">Driver:</span> ' + (data.logisticDetails?.driverName || data.driverName) + '</p>' : ''}
-      ${data.logisticDetails?.driverPhone ? '<p><span class="label">Driver Phone:</span> ' + data.logisticDetails.driverPhone + '</p>' : ''}
-      ${data.logisticDetails?.transportCompany ? '<p><span class="label">Transport Co.:</span> ' + data.logisticDetails.transportCompany + '</p>' : ''}
-      ${data.logisticDetails?.estimatedArrival ? '<p><span class="label">Est. Arrival:</span> ' + formatDate(data.logisticDetails.estimatedArrival) + '</p>' : ''}
-      ${data.logisticDetails?.actualArrival ? '<p><span class="label">Actual Arrival:</span> ' + formatDate(data.logisticDetails.actualArrival) + '</p>' : ''}
-      ${data.logisticDetails?.departureTime ? '<p><span class="label">Departure:</span> ' + formatDate(data.logisticDetails.departureTime) + '</p>' : ''}
-      ${data.logisticDetails?.deliveryLocation ? '<p><span class="label">Driver\'s License:</span> ' + data.logisticDetails.deliveryLocation + '</p>' : ''}
-      ${data.logisticDetails?.shippingMethod ? '<p><span class="label">Shipping:</span> ' + data.logisticDetails.shippingMethod + '</p>' : ''}
-      ${data.logisticDetails?.trackingNumber ? '<p><span class="label">Tracking #:</span> ' + data.logisticDetails.trackingNumber + '</p>' : ''}
-      ${data.receivedBy ? '<p><span class="label">Received By:</span> ' + data.receivedBy + '</p>' : ''}
-      ${data.receivedLocation ? '<p><span class="label">Location:</span> ' + data.receivedLocation + '</p>' : ''}
-      ${data.logisticDetails?.specialInstructions ? '<p><span class="label">Instructions:</span> ' + data.logisticDetails.specialInstructions + '</p>' : ''}
-    </div>
-    <div class="info-box">
-      <h3>Compliance</h3>
-      <p><span class="label">Stock Type:</span> ${data.stockType || (data.isVatable ? 'Vatable' : 'Exempt')}</p>
-      <p><span class="label">Is TIN Implemented?:</span> ${data.isVatable ? 'Yes' : 'No'}</p>
-      ${data.businessTin ? '<p><span class="label">Business TIN:</span> ' + data.businessTin + '</p>' : ''}
+    <div class="doc-title">
+      <h1>GOODS RECEIVED NOTE</h1>
+      <div class="grn-no">${data.grnNumber || 'N/A'}</div>
+      <div class="status" style="background:${statusColor}">${(data.status || 'PENDING').toUpperCase()}</div>
     </div>
   </div>
 
-  <table>
+  <!-- INFO CARDS -->
+  <div class="info-section">
+    <div class="info-card">
+      <h4>Document Details</h4>
+      <div class="row"><span class="lbl">Date</span><span class="val">${formatDate(data.date)}</span></div>
+      <div class="row"><span class="lbl">GRN #</span><span class="val">${data.grnNumber || 'N/A'}</span></div>
+      <div class="row"><span class="lbl">PO #</span><span class="val">${data.poNumber || '-'}</span></div>
+      <div class="row"><span class="lbl">Delivery Note #</span><span class="val">${data.deliveryNoteNumber || '-'}</span></div>
+      <div class="row"><span class="lbl">Received Date</span><span class="val">${data.receivedDate ? formatDate(data.receivedDate) : '-'}</span></div>
+    </div>
+    <div class="info-card">
+      <h4>Supplier</h4>
+      <div class="row"><span class="lbl">Name</span><span class="val">${data.supplierName || 'N/A'}</span></div>
+      ${data.supplierPhone ? '<div class="row"><span class="lbl">Phone</span><span class="val">' + data.supplierPhone + '</span></div>' : ''}
+      ${data.supplierEmail ? '<div class="row"><span class="lbl">Email</span><span class="val">' + data.supplierEmail + '</span></div>' : ''}
+      ${data.supplierTinNumber ? '<div class="row"><span class="lbl">TIN</span><span class="val">' + data.supplierTinNumber + '</span></div>' : ''}
+      ${data.documentUrl ? '<div class="row"><span class="lbl">Document</span><span class="val"><a href="' + data.documentUrl + '" target="_blank" style="color:#2563eb;">' + (data.documentName || 'View PDF') + '</a></span></div>' : ''}
+    </div>
+    <div class="info-card">
+      <h4>Logistics</h4>
+      ${data.logisticDetails?.vehicleNumber || data.vehicleNumber ? '<div class="row"><span class="lbl">Vehicle</span><span class="val">' + (data.logisticDetails?.vehicleNumber || data.vehicleNumber) + '</span></div>' : ''}
+      ${data.logisticDetails?.driverName || data.driverName ? '<div class="row"><span class="lbl">Driver</span><span class="val">' + (data.logisticDetails?.driverName || data.driverName) + '</span></div>' : ''}
+      ${data.logisticDetails?.driverPhone ? '<div class="row"><span class="lbl">Driver Ph.</span><span class="val">' + data.logisticDetails.driverPhone + '</span></div>' : ''}
+      ${data.logisticDetails?.transportCompany ? '<div class="row"><span class="lbl">Transport</span><span class="val">' + data.logisticDetails.transportCompany + '</span></div>' : ''}
+      ${data.logisticDetails?.deliveryLocation ? '<div class="row"><span class="lbl">License</span><span class="val">' + data.logisticDetails.deliveryLocation + '</span></div>' : ''}
+      ${data.receivedBy ? '<div class="row"><span class="lbl">Received By</span><span class="val">' + data.receivedBy + '</span></div>' : ''}
+      ${data.logisticDetails?.specialInstructions ? '<div class="row"><span class="lbl">Instructions</span><span class="val">' + data.logisticDetails.specialInstructions + '</span></div>' : ''}
+    </div>
+    <div class="info-card">
+      <h4>Compliance</h4>
+      <div class="row"><span class="lbl">Stock Type</span><span class="val">${data.stockType || (data.isVatable ? 'Vatable' : 'Exempt')}</span></div>
+      <div class="row"><span class="lbl">TIN Implemented</span><span class="val">${data.isVatable ? 'Yes' : 'No'}</span></div>
+      ${data.businessTin ? '<div class="row"><span class="lbl">Business TIN</span><span class="val">' + data.businessTin + '</span></div>' : ''}
+      ${data.receivedLocation ? '<div class="row"><span class="lbl">Location</span><span class="val">' + data.receivedLocation + '</span></div>' : ''}
+    </div>
+  </div>
+
+  <!-- ITEMS TABLE -->
+  <table class="items-table">
     <thead>
       <tr>
-        <th>#</th><th>Item</th><th style="text-align:center">Ordered</th><th style="text-align:center">Received</th>
-        <th>Unit</th><th style="text-align:right">Orig. Cost</th><th style="text-align:right">Recv. Cost</th><th style="text-align:right">New Cost</th><th style="text-align:right">Total</th>
-        <th>Batch</th><th>Expiry</th><th>Godown</th><th>Zone</th>
-        <th style="text-align:center">Damaged</th><th>Remarks</th>
+        <th style="width:2%">#</th>
+        <th style="width:14%">Description</th>
+        <th style="text-align:right;width:5%">Ordered</th>
+        <th style="text-align:right;width:5%">Received</th>
+        <th style="width:4%">Unit</th>
+        <th style="text-align:right;width:7%">Orig. Cost</th>
+        <th style="text-align:right;width:6%">Recv. Cost</th>
+        <th style="text-align:right;width:7%">New Cost</th>
+        <th style="text-align:right;width:9%">Total Excl.</th>
+        <th style="width:5%">Batch</th>
+        <th style="width:7%">Expiry</th>
+        <th style="width:8%">Godown</th>
+        <th style="width:6%">Zone</th>
+        <th style="text-align:center;width:4%">Dmg</th>
+        <th style="width:8%">Remarks</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" style="text-align:right">TOTALS</td>
+        <td style="text-align:right">${totalOrdered}</td>
+        <td style="text-align:right">${totalQty}</td>
+        <td colspan="5"></td>
+        <td style="text-align:right">${totalExclValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td colspan="5"></td>
+      </tr>
+    </tfoot>
   </table>
 
-  ${(() => {
-    const costs = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
-    if (costs.length === 0) return '';
-    const costTotal = costs.reduce((s: number, c: any) => s + (c.amount || 0), 0);
-    const costRows = costs.map((c: any, i: number) => `<tr><td>${i + 1}</td><td>${c.description || ''}</td><td style="text-align:right">${(c.amount || 0).toFixed(2)}</td></tr>`).join('');
-    return `<table style="width:40%; margin-left:auto; margin-bottom:10px;">
-      <thead><tr><th colspan="3" style="background:#f0f0f0; text-align:left;">RECEIVING COSTS</th></tr></thead>
-      <tbody>${costRows}
-        <tr style="font-weight:bold; border-top:2px solid #000;"><td colspan="2" style="text-align:right">Total Receiving Costs:</td><td style="text-align:right">${costTotal.toFixed(2)}</td></tr>
-      </tbody></table>`;
-  })()}
-
-  <div class="totals">
-    <table>
-      <tr><td>Total Items:</td><td>${items.length}</td></tr>
-      <tr><td>Total Quantity:</td><td>${totalQty}</td></tr>
-      <tr><td>Grand Total:</td><td>${totalValue.toFixed(2)}</td></tr>
-    </table>
+  <!-- BOTTOM: RECEIVING COSTS -->
+  <div class="bottom-section">
+    <div>
+      ${(() => {
+        const costs = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
+        if (costs.length === 0) return '<div style="color:#94a3b8;font-size:14px;font-style:italic;">No receiving costs recorded.</div>';
+        const costTotal = costs.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+        const costRows = costs.map((c: any, i: number) => `<tr><td>${i + 1}</td><td>${c.description || ''}</td><td style="text-align:right">${(c.amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>`).join('');
+        return `<table class="costs-table">
+          <thead><tr><th style="width:8%">#</th><th>Description</th><th style="text-align:right;width:30%">Amount</th></tr></thead>
+          <tbody>${costRows}</tbody>
+          <tfoot><tr><td colspan="2" style="text-align:right">Total Receiving Costs</td><td style="text-align:right">${costTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr></tfoot>
+        </table>`;
+      })()}
+    </div>
   </div>
 
-  ${data.qualityCheckNotes ? '<div class="notes"><h3>Quality Check Notes</h3><p>' + data.qualityCheckNotes + '</p></div>' : ''}
-  ${data.discrepancies ? '<div class="notes"><h3>Discrepancies</h3><p>' + data.discrepancies + '</p></div>' : ''}
+  ${data.qualityCheckNotes ? '<div style="margin-top:10px;font-size:9px;"><strong>Quality Check:</strong> ' + data.qualityCheckNotes + '</div>' : ''}
+  ${data.discrepancies ? '<div style="margin-top:6px;font-size:9px;color:#dc2626;"><strong>Discrepancies:</strong> ' + data.discrepancies + '</div>' : ''}
 
+  <!-- SIGNATURES -->
   <div class="signatures">
-    <div class="sig-box">${data.preparedBy ? 'Prepared By: ' + data.preparedBy : 'Prepared By'}<br/>${data.preparedDate ? formatDate(data.preparedDate) : ''}</div>
-    <div class="sig-box">${data.checkedBy ? 'Checked By: ' + data.checkedBy : 'Checked By'}<br/>${data.checkedDate ? formatDate(data.checkedDate) : ''}</div>
-    <div class="sig-box">${data.approvedBy ? 'Approved By: ' + data.approvedBy : 'Approved By'}<br/>${data.approvedDate ? formatDate(data.approvedDate) : ''}</div>
+    <div class="sig-item">
+      <div class="sig-line"><span class="sig-name">${data.preparedBy || 'Prepared By'}</span></div>
+      <div class="sig-date">${data.preparedDate ? formatDate(data.preparedDate) : ''}</div>
+    </div>
+    <div class="sig-item">
+      <div class="sig-line"><span class="sig-name">${data.checkedBy || 'Checked By'}</span></div>
+      <div class="sig-date">${data.checkedDate ? formatDate(data.checkedDate) : ''}</div>
+    </div>
+    <div class="sig-item">
+      <div class="sig-line"><span class="sig-name">${data.approvedBy || 'Approved By'}</span></div>
+      <div class="sig-date">${data.approvedDate ? formatDate(data.approvedDate) : ''}</div>
+    </div>
   </div>
 
-  <div class="footer">
-    <p>Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+  <!-- FOOTER -->
+  <div class="doc-footer">
+    <span>Printed: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</span>
+    <span>${data.businessName || ''} - Confidential</span>
   </div>
 
   <script>window.onload = function() { window.print(); }</script>
