@@ -12745,7 +12745,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                         <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Ordered</th>
                                         <th className="border border-gray-300 p-2 text-left" style={{ width: '6%' }}>Received</th>
                                         <th className="border border-gray-300 p-2 text-left" style={{ width: '5%' }}>Unit</th>
-                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Orig. Cost</th>
+                                        <th className="border border-gray-300 p-2 text-left" style={{ width: '10%' }}>Orig. Cost</th>
                                         <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>Recv. Cost</th>
                                         <th className="border border-gray-300 p-2 text-left" style={{ width: '8%' }}>New Cost</th>
                                         <th className="border border-gray-300 p-2 text-left" style={{ width: '9%' }}>Total</th>
@@ -12853,23 +12853,29 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                               className="p-1 h-8 text-sm w-full"
                                             />
                                           </td>
-                                          <td className="border border-gray-300 p-2">
-                                            <Input
-                                              type="number"
-                                              step="0.01"
-                                              value={item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}
-                                              onChange={(e) => setGrnData(prev => ({
-                                                ...prev,
-                                                items: prev.items.map(i => 
-                                                  i.id === item.id ? { 
-                                                    ...i, 
-                                                    originalUnitCost: parseFloat(e.target.value) || 0,
-                                                    unitCost: (parseFloat(e.target.value) || 0) + (item.receivingCostPerUnit || 0)
-                                                  } : i
-                                                )
-                                              }))}
-                                              className="p-1 h-8 text-sm w-full"
-                                            />
+                                          <td className="border border-gray-300 p-2 text-right cursor-pointer" onClick={(e) => {
+                                            const input = e.currentTarget.querySelector('input');
+                                            if (input) { input.focus(); input.select(); }
+                                          }}>
+                                            <div className="relative">
+                                              <span className="cost-display">{formatCurrency(item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0))}</span>
+                                              <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={item.originalUnitCost || (item.unitCost ? item.unitCost - (item.receivingCostPerUnit || 0) : 0)}
+                                                onChange={(e) => setGrnData(prev => ({
+                                                  ...prev,
+                                                  items: prev.items.map(i => 
+                                                    i.id === item.id ? { 
+                                                      ...i, 
+                                                      originalUnitCost: parseFloat(e.target.value) || 0,
+                                                      unitCost: (parseFloat(e.target.value) || 0) + (item.receivingCostPerUnit || 0)
+                                                    } : i
+                                                  )
+                                                }))}
+                                                className="p-1 h-8 text-sm w-full text-right absolute inset-0 opacity-0 focus:opacity-100 focus:z-10"
+                                              />
+                                            </div>
                                           </td>
                                           <td className="border border-gray-300 p-2">
                                             {formatCurrency(item.receivingCostPerUnit || 0)}
