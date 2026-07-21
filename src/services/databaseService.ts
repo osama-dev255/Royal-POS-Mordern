@@ -5969,6 +5969,7 @@ export const getCustomerLedgerBalance = async (
       .eq('outlet_id', outletId)
       .eq('customer_id', customerId)
       .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1);
       
     if (error) {
@@ -6104,6 +6105,25 @@ export const getOutletDebtPaymentsByDebtId = async (debtId: string): Promise<Out
   } catch (error) {
     console.error('Error fetching outlet debt payments:', error);
     return [];
+  }
+};
+
+export const updateOutletDebtPayment = async (id: string, updates: Partial<OutletDebtPayment>): Promise<OutletDebtPayment | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debt_payments')
+      .update({
+        ...updates,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.error('Error updating outlet debt payment:', error);
+    return null;
   }
 };
 

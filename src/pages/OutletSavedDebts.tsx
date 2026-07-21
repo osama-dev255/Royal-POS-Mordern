@@ -38,7 +38,7 @@ import {
   XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getOutletDebtPaymentsByDebtId, updateOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance, recalculateCustomerLedgerBalance } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
@@ -1202,25 +1202,35 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       if (updatedDebt) {
         console.log('✅ Debt record updated successfully');
         
-        // Step 3b: If amount_paid increased, create a debt_payment record
-        // so the DB trigger creates a corresponding ledger entry
-        const oldAmountPaid = selectedSale.amountPaid || 0;
+        // Step 3b: Sync the credit side of the ledger by updating the existing
+        // debt_payment record (or creating one if none exists).
+        // The DB trigger 'trg_update_ledger_entry_for_debt_payment' will
+        // automatically update the customer_ledger credit entry.
         const newAmountPaid = editFormData.amountPaid || 0;
-        const paymentIncrease = newAmountPaid - oldAmountPaid;
+        const existingPayments = await getOutletDebtPaymentsByDebtId(selectedSale.id);
         
-        if (paymentIncrease > 0) {
-          console.log(`💰 Amount paid increased by ${paymentIncrease} (${oldAmountPaid} → ${newAmountPaid}), creating ledger entry...`);
+        if (existingPayments.length > 0) {
+          // Update the most recent payment record to match the new amount_paid
+          const latestPayment = existingPayments[0];
+          console.log(`💰 Updating existing payment ${latestPayment.id} amount to ${newAmountPaid} (was ${latestPayment.amount})...`);
+          await updateOutletDebtPayment(latestPayment.id!, {
+            amount: newAmountPaid,
+            payment_date: new Date().toISOString(),
+            notes: `Payment updated via edit - ${selectedSale.invoiceNumber || 'unknown'}`
+          });
+          console.log('✅ Payment record updated, ledger credit entry will be updated by trigger');
+        } else if (newAmountPaid > 0) {
+          // No existing payment record but amount_paid > 0: create one
+          console.log(`💰 No existing payment record, creating one for amount ${newAmountPaid}...`);
           await createOutletDebtPayment({
             debt_id: selectedSale.id,
-            amount: paymentIncrease,
-            payment_method: 'cash', // Default to cash for edit-triggered payments
+            amount: newAmountPaid,
+            payment_method: 'cash',
             payment_date: new Date().toISOString(),
             notes: `Payment recorded via edit - ${selectedSale.invoiceNumber || 'unknown'}`,
             created_by: null
           });
-          console.log('✅ Debt payment record created, ledger entry will be created by trigger');
-        } else if (paymentIncrease < 0) {
-          console.log(`⚠️ Amount paid decreased by ${Math.abs(paymentIncrease)} (${oldAmountPaid} → ${newAmountPaid}). Ledger reversal not automated - manual review may be needed.`);
+          console.log('✅ Debt payment record created, ledger credit entry will be created by trigger');
         }
         
         // Step 4: Delete existing items
@@ -1263,6 +1273,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         }
         
         console.log('✅ All items created and inventory updated successfully');
+        
+        // Step 6: Force recalculate customer ledger balances as a safety net
+        // This ensures the ledger is always in sync after an edit, even if the
+        // DB trigger didn't fire (e.g. when total_amount didn't change)
+        if (selectedSale.customerId) {
+          console.log('🔄 Force recalculating customer ledger balances...');
+          await recalculateCustomerLedgerBalance(outletId, selectedSale.customerId);
+          console.log('✅ Customer ledger balances recalculated');
+        }
         
         toast({
           title: "Success",

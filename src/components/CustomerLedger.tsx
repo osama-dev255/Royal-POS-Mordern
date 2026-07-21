@@ -21,7 +21,8 @@ import {
   X,
   FileText,
   Share2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  RefreshCw
 } from "lucide-react";
 import { getCustomerLedgerByCustomerId, getCustomerLedgerBalance, OutletCustomer, CustomerLedgerEntry } from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
@@ -1218,6 +1219,10 @@ Generated: ${new Date().toLocaleDateString('en-TZ', { year: 'numeric', month: 'l
             <p className="text-muted-foreground">Customer Ledger Account</p>
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={loadLedgerData}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       {/* Customer Info */}
