@@ -9314,6 +9314,18 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                   onEditGRN={(grn) => {
                     setGrnData({
                       ...grn.data,
+                      numberOfSuppliers: grn.data.numberOfSuppliers || 1,
+                      suppliers: grn.data.suppliers || [{
+                        id: "supplier-1",
+                        name: grn.data.supplierName || "",
+                        supplierId: grn.data.supplierId || "",
+                        phone: grn.data.supplierPhone || "",
+                        email: grn.data.supplierEmail || "",
+                        address: grn.data.supplierAddress || "",
+                        tinNumber: grn.data.supplierTinNumber || "",
+                        businessTin: grn.data.businessTin || "",
+                        stockType: grn.data.businessStockType || ""
+                      }],
                       businessStockType: grn.data.businessStockType || "",
                       isVatable: grn.data.isVatable ?? false,
                       supplierTinNumber: grn.data.supplierTinNumber || "",
