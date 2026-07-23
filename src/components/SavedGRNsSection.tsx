@@ -138,6 +138,35 @@ export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectio
                   <p>Driver: {selectedGRN.data.driverName}</p>
                   <p>Received By: {selectedGRN.data.receivedBy}</p>
                 </div>
+                {selectedGRN.data.logisticDetails && (
+                  <div className="md:col-span-2">
+                    <h3 className="font-semibold">Logistic Details</h3>
+                    {selectedGRN.data.logisticDetails.vehicleNumber && (
+                      <p>Vehicle Number: {selectedGRN.data.logisticDetails.vehicleNumber}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.driverName && (
+                      <p>Driver Name: {selectedGRN.data.logisticDetails.driverName}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.driverPhone && (
+                      <p>Driver Phone: {selectedGRN.data.logisticDetails.driverPhone}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.transportCompany && (
+                      <p>Transport Company: {selectedGRN.data.logisticDetails.transportCompany}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.deliveryLocation && (
+                      <p>Driver's License: {selectedGRN.data.logisticDetails.deliveryLocation}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.specialInstructions && (
+                      <p>Special Instructions: {selectedGRN.data.logisticDetails.specialInstructions}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.shippingMethod && (
+                      <p>Shipping Method: {selectedGRN.data.logisticDetails.shippingMethod}</p>
+                    )}
+                    {selectedGRN.data.logisticDetails.trackingNumber && (
+                      <p>Tracking Number: {selectedGRN.data.logisticDetails.trackingNumber}</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="mt-4">
                 <h3 className="font-semibold">Items Received</h3>

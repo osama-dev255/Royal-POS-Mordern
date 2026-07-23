@@ -58,6 +58,19 @@ export interface GRNData {
   driverName: string;
   receivedBy: string;
   receivedLocation?: string;
+  logisticDetails?: {
+    vehicleNumber: string;
+    driverName: string;
+    driverPhone: string;
+    transportCompany: string;
+    estimatedArrival: string;
+    actualArrival: string;
+    departureTime: string;
+    deliveryLocation: string;
+    specialInstructions: string;
+    shippingMethod: string;
+    trackingNumber: string;
+  };
   items: GRNItem[];
   qualityCheckNotes: string;
   discrepancies: string;
@@ -153,6 +166,7 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       delivery_note_number: grn.data.deliveryNoteNumber || '',
       vehicle_number: grn.data.vehicleNumber || '',
       driver_name: grn.data.driverName || '',
+      logistic_details: grn.data.logisticDetails || null,
       received_by: grn.data.receivedBy || '',
       received_location: grn.data.receivedLocation || '',
       items: Array.isArray(grn.data.items) ? grn.data.items : [],
@@ -391,6 +405,19 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             driverName: dbGRN.driver_name || '',
             receivedBy: dbGRN.received_by || '',
             receivedLocation: dbGRN.received_location || '',
+            logisticDetails: dbGRN.logistic_details || {
+              vehicleNumber: dbGRN.vehicle_number || '',
+              driverName: dbGRN.driver_name || '',
+              driverPhone: '',
+              transportCompany: '',
+              estimatedArrival: '',
+              actualArrival: '',
+              departureTime: '',
+              deliveryLocation: '',
+              specialInstructions: '',
+              shippingMethod: '',
+              trackingNumber: ''
+            },
             items: items,
             qualityCheckNotes: dbGRN.quality_check_notes || '',
             discrepancies: dbGRN.discrepancies || '',
