@@ -51,6 +51,7 @@ export interface GRNData {
   businessStockType?: string;
   isVatable?: boolean;
   supplierTinNumber?: string;
+  businessTin?: string;
   poNumber: string;
   deliveryNoteNumber: string;
   vehicleNumber: string;
@@ -147,6 +148,7 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       business_stock_type: grn.data.businessStockType || null,
       is_vatable: grn.data.isVatable || false,
       supplier_tin_number: grn.data.supplierTinNumber || '',
+      business_tin: grn.data.businessTin || '',
       po_number: grn.data.poNumber || '',
       delivery_note_number: grn.data.deliveryNoteNumber || '',
       vehicle_number: grn.data.vehicleNumber || '',
@@ -382,6 +384,7 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             businessStockType: dbGRN.business_stock_type || '',
             isVatable: dbGRN.is_vatable || false,
             supplierTinNumber: dbGRN.supplier_tin_number || '',
+            businessTin: dbGRN.business_tin || '',
             poNumber: dbGRN.po_number || '',
             deliveryNoteNumber: dbGRN.delivery_note_number || '',
             vehicleNumber: dbGRN.vehicle_number || '',

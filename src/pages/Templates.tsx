@@ -569,6 +569,7 @@ interface GRNData {
   // businessStockType field removed - now supplier-specific
   isVatable: boolean;
   supplierTinNumber: string;
+  businessTin?: string;
   poNumber: string;
   deliveryNoteNumber: string;
   vehicleNumber: string;
@@ -2076,6 +2077,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       businessEmail: grnData.businessEmail,
       isVatable: grnData.isVatable,
       supplierTinNumber: grnData.supplierTinNumber,
+      businessTin: grnData.suppliers?.[0]?.businessTin || '',
       poNumber: grnData.poNumber,
       deliveryNoteNumber: grnData.deliveryNoteNumber,
       vehicleNumber: grnData.vehicleNumber,
@@ -2526,7 +2528,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         receivingCosts: grnData.receivingCosts,
         isVatable: grnData.isVatable,
         stockType: primarySupplier.stockType || (grnData.suppliers?.[0]?.stockType) || '',
-        businessTin: primarySupplier.businessTin || '',
+        businessTin: primarySupplier.businessTin || grnData.businessTin || '',
         destinationGodownId: grnData.destinationGodownId,
         destinationZoneId: grnData.destinationZoneId,
         destinationGodownName: grnData.destinationGodownName,
@@ -12613,7 +12615,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                                 stockType: ""
                                               });
                                             }
-                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers, isVatable: true }));
                                           }}
                                         >
                                           Yes
@@ -12629,7 +12631,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                             if (supplierIndex >= 0) {
                                               updatedSuppliers[supplierIndex].businessTin = undefined;
                                             }
-                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
+                                            setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers, isVatable: false }));
                                           }}
                                         >
                                           No
