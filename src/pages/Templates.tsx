@@ -2057,9 +2057,10 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     const totalAmount = grnData.items.reduce((sum, item) => sum + Number(item.totalWithReceivingCost || 0), 0);
     
     // For multi-supplier GRNs, combine supplier names or use the first supplier
+    const primarySupplier = grnData.suppliers?.[0] || {} as any;
     const effectiveSupplierName = grnData.numberOfSuppliers > 1 
-      ? (grnData.suppliers?.map(s => s.name).join(', ') || grnData.supplierName)
-      : grnData.supplierName;
+      ? (grnData.suppliers?.map(s => s.name).join(', ') || primarySupplier.name || grnData.supplierName)
+      : (primarySupplier.name || grnData.supplierName);
     
     // Convert Templates GRN data to grnUtils format
     const convertedGRNData: any = {
@@ -2067,17 +2068,18 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
       date: grnData.date,
       time: grnData.time,
       supplierName: effectiveSupplierName,
-      supplierId: grnData.supplierId,
-      supplierPhone: grnData.supplierPhone,
-      supplierEmail: grnData.supplierEmail,
-      supplierAddress: grnData.supplierAddress,
-      businessName: grnData.businessName,
-      businessAddress: grnData.businessAddress,
-      businessPhone: grnData.businessPhone,
-      businessEmail: grnData.businessEmail,
+      supplierId: primarySupplier.supplierId || grnData.supplierId,
+      supplierPhone: primarySupplier.phone || grnData.supplierPhone,
+      supplierEmail: primarySupplier.email || grnData.supplierEmail,
+      supplierAddress: primarySupplier.address || grnData.supplierAddress,
+      businessName: primarySupplier.name || grnData.businessName,
+      businessAddress: primarySupplier.address || grnData.businessAddress,
+      businessPhone: primarySupplier.phone || grnData.businessPhone,
+      businessEmail: primarySupplier.email || grnData.businessEmail,
       isVatable: grnData.isVatable,
-      supplierTinNumber: grnData.supplierTinNumber,
+      supplierTinNumber: primarySupplier.tinNumber || grnData.supplierTinNumber,
       businessTin: grnData.suppliers?.[0]?.businessTin || '',
+      businessStockType: primarySupplier.stockType || '',
       poNumber: grnData.poNumber,
       deliveryNoteNumber: grnData.deliveryNoteNumber,
       vehicleNumber: grnData.vehicleNumber,
@@ -2504,10 +2506,10 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
         supplierTinNumber: primarySupplier.tinNumber || grnData.supplierTinNumber,
         documentUrl: primarySupplier.documentUrl || '',
         documentName: primarySupplier.documentName || '',
-        businessName: primarySupplier.businessName || grnData.businessName,
-        businessAddress: primarySupplier.businessAddress || grnData.businessAddress,
-        businessPhone: primarySupplier.businessPhone || grnData.businessPhone,
-        businessEmail: primarySupplier.businessEmail || grnData.businessEmail,
+        businessName: primarySupplier.name || grnData.businessName,
+        businessAddress: primarySupplier.address || grnData.businessAddress,
+        businessPhone: primarySupplier.phone || grnData.businessPhone,
+        businessEmail: primarySupplier.email || grnData.businessEmail,
         poNumber: grnData.poNumber,
         deliveryNoteNumber: grnData.deliveryNoteNumber,
         vehicleNumber: grnData.vehicleNumber,
