@@ -9311,20 +9311,17 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User"
-                  onEditGRN={(grnId) => {
-                    const grn = savedGRNs.find(g => g.id === grnId);
-                    if (grn) {
-                      setGrnData({
-                        ...grn.data,
-                        businessStockType: grn.data.businessStockType || "",
-                        isVatable: grn.data.isVatable ?? false,
-                        supplierTinNumber: grn.data.supplierTinNumber || "",
-                        receivingCosts: grn.data.receivingCosts || [],
-                        status: grn.data.status || "completed"
-                      });
-                      setViewingTemplate('14');
-                      setActiveTab('preview');
-                    }
+                  onEditGRN={(grn) => {
+                    setGrnData({
+                      ...grn.data,
+                      businessStockType: grn.data.businessStockType || "",
+                      isVatable: grn.data.isVatable ?? false,
+                      supplierTinNumber: grn.data.supplierTinNumber || "",
+                      receivingCosts: grn.data.receivingCosts || [],
+                      status: grn.data.status || "completed"
+                    });
+                    setViewingTemplate('14');
+                    setActiveTab('preview');
                   }}
                 />
               </div>

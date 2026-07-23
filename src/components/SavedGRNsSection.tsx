@@ -13,7 +13,7 @@ interface SavedGRNsSectionProps {
   onBack: () => void;
   onLogout: () => void;
   username: string;
-  onEditGRN?: (grnId: string) => void;
+  onEditGRN?: (grn: SavedGRNType) => void;
 }
 
 export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: SavedGRNsSectionProps) => {
@@ -121,7 +121,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
               ← Back to Saved GRNs
             </Button>
             {onEditGRN && (
-              <Button onClick={() => onEditGRN(selectedGRN.id)} variant="default">
+              <Button onClick={() => onEditGRN(selectedGRN)} variant="default">
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit GRN
               </Button>
@@ -326,7 +326,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                     onPrintGRN={() => handlePrintGRN(grn)}
                     onDownloadGRN={() => handleDownloadGRN(grn)}
                     onDeleteGRN={() => handleDeleteGRN(grn.id)}
-                    onEditGRN={onEditGRN ? () => onEditGRN(grn.id) : undefined}
+                    onEditGRN={onEditGRN ? () => onEditGRN(grn) : undefined}
                   />
                 ))}
               </div>
