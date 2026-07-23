@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Package, Download, Printer, Eye } from "lucide-react";
+import { Search, Package, Download, Printer, Eye, Pencil } from "lucide-react";
 import { SavedGRNsCard } from "./SavedGRNsCard";
 import { getSavedGRNs, deleteGRN, SavedGRN as SavedGRNType } from "@/utils/grnUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -13,9 +13,10 @@ interface SavedGRNsSectionProps {
   onBack: () => void;
   onLogout: () => void;
   username: string;
+  onEditGRN?: (grnId: string) => void;
 }
 
-export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectionProps) => {
+export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: SavedGRNsSectionProps) => {
   const [grns, setGrns] = useState<SavedGRNType[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -115,9 +116,17 @@ export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectio
     <div className="min-h-screen bg-background">
       {selectedGRN ? (
         <div className="container mx-auto p-4 sm:p-6">
-          <Button onClick={() => setSelectedGRN(null)} variant="outline" className="mb-4">
-            ← Back to Saved GRNs
-          </Button>
+          <div className="flex gap-2 mb-4">
+            <Button onClick={() => setSelectedGRN(null)} variant="outline">
+              ← Back to Saved GRNs
+            </Button>
+            {onEditGRN && (
+              <Button onClick={() => onEditGRN(selectedGRN.id)} variant="default">
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit GRN
+              </Button>
+            )}
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>GRN Details: {selectedGRN.data.grnNumber}</CardTitle>
@@ -317,6 +326,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username }: SavedGRNsSectio
                     onPrintGRN={() => handlePrintGRN(grn)}
                     onDownloadGRN={() => handleDownloadGRN(grn)}
                     onDeleteGRN={() => handleDeleteGRN(grn.id)}
+                    onEditGRN={onEditGRN ? () => onEditGRN(grn.id) : undefined}
                   />
                 ))}
               </div>

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer } from "lucide-react";
+import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer, Pencil } from "lucide-react";
 
 interface SavedGRN {
   id: string;
@@ -22,6 +22,7 @@ interface SavedGRNsCardProps {
   onPrintGRN: () => void;
   onDownloadGRN: () => void;
   onDeleteGRN: () => void;
+  onEditGRN?: () => void;
   className?: string;
 }
 
@@ -31,6 +32,7 @@ export const SavedGRNsCard = ({
   onPrintGRN,
   onDownloadGRN,
   onDeleteGRN,
+  onEditGRN,
   className 
 }: SavedGRNsCardProps) => {
   const getStatusVariant = (status: string) => {
@@ -101,6 +103,17 @@ export const SavedGRNsCard = ({
               <Eye className="h-4 w-4 mr-1" />
               View
             </Button>
+            {onEditGRN && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                onClick={onEditGRN}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm" 
