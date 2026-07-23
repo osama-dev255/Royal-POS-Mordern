@@ -12794,7 +12794,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                           <td className="border border-gray-300 p-2 relative" style={{ width: '25%', minWidth: '200px' }}>
                                             <div className="relative">
                                               <Input
-                                                value={item.description}
+                                                value={item.description || ""}
                                                 onChange={(e) => {
                                                   setGrnData(prev => ({
                                                     ...prev,
@@ -12851,7 +12851,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                           <td className="border border-gray-300 p-2">
                                             <Input
                                               type="number"
-                                              value={item.orderedQuantity}
+                                              value={item.orderedQuantity || 0}
                                               onChange={(e) => setGrnData(prev => ({
                                                 ...prev,
                                                 items: prev.items.map(i => 
@@ -12864,7 +12864,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                           <td className="border border-gray-300 p-2">
                                             <Input
                                               type="number"
-                                              value={item.receivedQuantity}
+                                              value={item.receivedQuantity || 0}
                                               onChange={(e) => {
                                                 const newQuantity = parseInt(e.target.value) || 0;
                                                 handleReceivedQuantityChange(item.id, newQuantity);
@@ -12874,7 +12874,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                           </td>
                                           <td className="border border-gray-300 p-2">
                                             <Input
-                                              value={item.unit}
+                                              value={item.unit || ""}
                                               onChange={(e) => setGrnData(prev => ({
                                                 ...prev,
                                                 items: prev.items.map(i => 
@@ -13005,7 +13005,7 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                                           </td>
                                           <td className="border border-gray-300 p-2">
                                             <Input
-                                              value={item.remarks}
+                                              value={item.remarks || ""}
                                               onChange={(e) => setGrnData(prev => ({
                                                 ...prev,
                                                 items: prev.items.map(i => 
