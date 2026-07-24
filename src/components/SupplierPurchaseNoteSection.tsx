@@ -19,8 +19,8 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedNote, setSelectedNote] = useState<SavedSupplierPurchaseNote | null>(null);
-  const [showSellingPrice, setShowSellingPrice] = useState(true);
-  const [showProjectedProfit, setShowProjectedProfit] = useState(true);
+  const [showSellingPrice, setShowSellingPrice] = useState(false);
+  const [showProjectedProfit, setShowProjectedProfit] = useState(false);
 
   // Load saved supplier purchase notes from database
   useEffect(() => {
