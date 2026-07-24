@@ -93,14 +93,14 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="font-semibold">Supplier Information</h3>
+                  <h3 className="font-semibold">FROM (Supplier)</h3>
                   <p>Supplier: {selectedNote.supplierName || 'N/A'}</p>
                   <p>Phone: {selectedNote.supplierPhone || 'N/A'}</p>
                   <p>Email: {selectedNote.supplierEmail || 'N/A'}</p>
                   <p>Address: {selectedNote.supplierAddress || 'N/A'}</p>
                 </div>
                 <div>
-                  <h3 className="font-semibold">Business Information</h3>
+                  <h3 className="font-semibold">TO (Business)</h3>
                   <p>Business: {selectedNote.businessName || 'N/A'}</p>
                   <p>Phone: {selectedNote.businessPhone || 'N/A'}</p>
                   <p>Email: {selectedNote.businessEmail || 'N/A'}</p>

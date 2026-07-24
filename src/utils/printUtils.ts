@@ -5198,19 +5198,19 @@ export class PrintUtils {
   </div>
 
   <div class="info-grid">
-    <div class="info-box business">
-      <h3>FROM (Business)</h3>
-      <p><strong>${data.businessName || ''}</strong></p>
-      <p>${data.businessAddress || ''}</p>
-      <p>Phone: ${data.businessPhone || ''}</p>
-      <p>Email: ${data.businessEmail || ''}</p>
-    </div>
     <div class="info-box supplier">
-      <h3>ON BEHALF OF (Supplier)</h3>
+      <h3>FROM (Supplier)</h3>
       <p><strong>${data.supplierName || ''}</strong></p>
       <p>${data.supplierAddress || ''}</p>
       <p>Phone: ${data.supplierPhone || ''}</p>
       <p>Email: ${data.supplierEmail || ''}</p>
+    </div>
+    <div class="info-box business">
+      <h3>TO (Business)</h3>
+      <p><strong>${data.businessName || ''}</strong></p>
+      <p>${data.businessAddress || ''}</p>
+      <p>Phone: ${data.businessPhone || ''}</p>
+      <p>Email: ${data.businessEmail || ''}</p>
     </div>
   </div>
 

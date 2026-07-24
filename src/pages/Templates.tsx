@@ -1198,17 +1198,17 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
 Note #[NOTE_NUMBER]
 Date: [DATE]
 
-FROM (Business):
-[BUSINESS_NAME]
-[BUSINESS_ADDRESS]
-Phone: [BUSINESS_PHONE]
-Email: [BUSINESS_EMAIL]
-
-ON BEHALF OF (Supplier):
+FROM (Supplier):
 [SUPPLIER_NAME]
 [SUPPLIER_ADDRESS]
 Phone: [SUPPLIER_PHONE]
 Email: [SUPPLIER_EMAIL]
+
+TO (Business):
+[BUSINESS_NAME]
+[BUSINESS_ADDRESS]
+Phone: [BUSINESS_PHONE]
+Email: [BUSINESS_EMAIL]
 
 ITEMS PURCHASED:
 [ITEM_LIST]
@@ -14039,21 +14039,21 @@ No inventory adjustment will be made.`,
                         {/* Business and Supplier Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50/30">
-                            <h3 className="font-bold text-indigo-900 mb-2">FROM (Business)</h3>
-                            <Input placeholder="Business Name" value={supplierPurchaseNoteData.businessName} onChange={(e) => handleSupplierPurchaseNoteChange('businessName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
-                            <Input placeholder="Business Address" value={supplierPurchaseNoteData.businessAddress} onChange={(e) => handleSupplierPurchaseNoteChange('businessAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input placeholder="Phone" value={supplierPurchaseNoteData.businessPhone} onChange={(e) => handleSupplierPurchaseNoteChange('businessPhone', e.target.value)} className="p-1 h-8 text-sm" />
-                              <Input placeholder="Email" value={supplierPurchaseNoteData.businessEmail} onChange={(e) => handleSupplierPurchaseNoteChange('businessEmail', e.target.value)} className="p-1 h-8 text-sm" />
-                            </div>
-                          </div>
-                          <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/30">
-                            <h3 className="font-bold text-amber-900 mb-2">ON BEHALF OF (Supplier)</h3>
+                            <h3 className="font-bold text-amber-900 mb-2">FROM (Supplier)</h3>
                             <Input placeholder="Supplier Name" value={supplierPurchaseNoteData.supplierName} onChange={(e) => handleSupplierPurchaseNoteChange('supplierName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
                             <Input placeholder="Supplier Address" value={supplierPurchaseNoteData.supplierAddress} onChange={(e) => handleSupplierPurchaseNoteChange('supplierAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
                             <div className="grid grid-cols-2 gap-2">
                               <Input placeholder="Phone" value={supplierPurchaseNoteData.supplierPhone} onChange={(e) => handleSupplierPurchaseNoteChange('supplierPhone', e.target.value)} className="p-1 h-8 text-sm" />
                               <Input placeholder="Email" value={supplierPurchaseNoteData.supplierEmail} onChange={(e) => handleSupplierPurchaseNoteChange('supplierEmail', e.target.value)} className="p-1 h-8 text-sm" />
+                            </div>
+                          </div>
+                          <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50/30">
+                            <h3 className="font-bold text-indigo-900 mb-2">TO (Business)</h3>
+                            <Input placeholder="Business Name" value={supplierPurchaseNoteData.businessName} onChange={(e) => handleSupplierPurchaseNoteChange('businessName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <Input placeholder="Business Address" value={supplierPurchaseNoteData.businessAddress} onChange={(e) => handleSupplierPurchaseNoteChange('businessAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input placeholder="Phone" value={supplierPurchaseNoteData.businessPhone} onChange={(e) => handleSupplierPurchaseNoteChange('businessPhone', e.target.value)} className="p-1 h-8 text-sm" />
+                              <Input placeholder="Email" value={supplierPurchaseNoteData.businessEmail} onChange={(e) => handleSupplierPurchaseNoteChange('businessEmail', e.target.value)} className="p-1 h-8 text-sm" />
                             </div>
                           </div>
                         </div>
