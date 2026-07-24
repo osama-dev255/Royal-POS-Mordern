@@ -7288,8 +7288,8 @@ No inventory adjustment will be made.`,
     
     /* === HEADER === */
     .dn-header {
-      background: #000;
-      color: #fff;
+      background: #e5e7eb;
+      color: #000;
       padding: 12px 24px;
       position: relative;
     }
@@ -7558,8 +7558,8 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .payment-header {
-      background: #000;
-      color: #fff;
+      background: #e5e7eb;
+      color: #000;
       padding: 8px 12px;
       font-size: 12px;
       font-weight: 700;
@@ -7684,8 +7684,8 @@ No inventory adjustment will be made.`,
     
     /* === FOOTER === */
     .dn-footer {
-      background: #000;
-      color: #fff;
+      background: #e5e7eb;
+      color: #000;
       padding: 10px 24px;
       margin-top: 12px;
     }
@@ -8112,8 +8112,8 @@ No inventory adjustment will be made.`,
       text-align: right;
     }
     .party-header {
-      background: #000;
-      color: #fff;
+      background: #e5e7eb;
+      color: #000;
       padding: 8px 12px;
       font-size: 11px;
       font-weight: 700;
@@ -8263,8 +8263,8 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .payment-header {
-      background: #000;
-      color: #fff;
+      background: #e5e7eb;
+      color: #000;
       padding: 8px 12px;
       font-size: 12px;
       font-weight: 700;
