@@ -8551,7 +8551,7 @@ No inventory adjustment will be made.`,
       </thead>
       <tbody>
         ${data.items.map((item, index) => {
-          const profit = ((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0);
+          const profit = (item.sellingPrice || 0) - (item.unitPrice || 0);
           return `
           <tr>
             <td class="c item-num">${String(index + 1).padStart(2, '0')}</td>
@@ -8573,7 +8573,7 @@ No inventory adjustment will be made.`,
           <td></td>
           <td></td>
           <td class="r total-value">${formatCurrency(noteTotals.total)}</td>
-          <td class="r total-value" style="color:#16a34a">${formatCurrency(data.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}</td>
+          <td class="r total-value" style="color:#16a34a">${formatCurrency(data.items.reduce((sum, item) => sum + ((item.sellingPrice || 0) - (item.unitPrice || 0)), 0))}</td>
         </tr>
       </tfoot>
     </table>
@@ -8602,7 +8602,7 @@ No inventory adjustment will be made.`,
         </div>
         <div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
           <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
-          <div class="payment-value" style="color: #16a34a; font-weight: 800;">${formatCurrency(data.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}</div>
+          <div class="payment-value" style="color: #16a34a; font-weight: 800;">${formatCurrency(data.items.reduce((sum, item) => sum + ((item.sellingPrice || 0) - (item.unitPrice || 0)), 0))}</div>
         </div>
       </div>
     </div>

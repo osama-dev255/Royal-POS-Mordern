@@ -5154,10 +5154,10 @@ export class PrintUtils {
       return `${businessCurrency} ${amount.toFixed(2)}`;
     };
 
-    const totalProjectedProfit = items.reduce((sum: number, item: any) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0);
+    const totalProjectedProfit = items.reduce((sum: number, item: any) => sum + ((item.sellingPrice || 0) - (item.unitPrice || 0)), 0);
 
     const itemsRows = items.length > 0 ? items.map((item: any, index: number) => {
-          const profit = ((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0);
+          const profit = (item.sellingPrice || 0) - (item.unitPrice || 0);
           return `
           <tr>
             <td class="c item-num">${String(index + 1).padStart(2, '0')}</td>
