@@ -6,6 +6,7 @@ export interface SupplierPurchaseNoteItem {
   quantity: number;
   unit: string;
   unitPrice: number;
+  sellingPrice: number;
   total: number;
 }
 

@@ -80,100 +80,180 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
   return (
     <div className="min-h-screen bg-background">
       {selectedNote ? (
-        <div className="container mx-auto p-4 sm:p-6">
-          <div className="flex gap-2 mb-4">
-            <Button onClick={() => setSelectedNote(null)} variant="outline">
-              ← Back to Saved Notes
-            </Button>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Supplier Purchase Note: #{selectedNote.purchaseNoteNumber}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-semibold">FROM (Supplier)</h3>
-                  <p>Supplier: {selectedNote.supplierName || 'N/A'}</p>
-                  <p>Phone: {selectedNote.supplierPhone || 'N/A'}</p>
-                  <p>Email: {selectedNote.supplierEmail || 'N/A'}</p>
-                  <p>Address: {selectedNote.supplierAddress || 'N/A'}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold">TO (Business)</h3>
-                  <p>Business: {selectedNote.businessName || 'N/A'}</p>
-                  <p>Phone: {selectedNote.businessPhone || 'N/A'}</p>
-                  <p>Email: {selectedNote.businessEmail || 'N/A'}</p>
-                  <p>Address: {selectedNote.businessAddress || 'N/A'}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold">Note Details</h3>
-                  <p>Date: {new Date(selectedNote.date).toLocaleDateString()}</p>
-                  <p>Status: {selectedNote.status}</p>
-                  <p>Prepared By: {selectedNote.preparedBy || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="mt-4">
-                <h3 className="font-semibold">Items</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedNote.items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.description}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.unit}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.unitPrice)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.total)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-gray-50">
-                      <tr>
-                        <td colSpan={4} className="px-6 py-3 text-right font-semibold">Subtotal:</td>
-                        <td className="px-6 py-3">{formatCurrency(selectedNote.subtotal)}</td>
-                      </tr>
-                      {selectedNote.discount > 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-3 text-right font-semibold">Discount:</td>
-                          <td className="px-6 py-3">{formatCurrency(selectedNote.discount)}</td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td colSpan={4} className="px-6 py-3 text-right font-bold">Total:</td>
-                        <td className="px-6 py-3 font-bold">{formatCurrency(selectedNote.total)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-              {selectedNote.notes && (
-                <div className="mt-4">
-                  <h3 className="font-semibold">Notes</h3>
-                  <p className="text-sm whitespace-pre-line">{selectedNote.notes}</p>
-                </div>
-              )}
-              <div className="mt-4 flex gap-2">
-                <Button onClick={() => handlePrintNote(selectedNote)}>
+        <div className="min-h-screen bg-white">
+          {/* Action Bar */}
+          <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
+            <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+              <Button onClick={() => setSelectedNote(null)} variant="outline" size="sm">
+                ← Back to Saved Notes
+              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => handlePrintNote(selectedNote)} size="sm">
                   <Printer className="h-4 w-4 mr-2" />
-                  Print Note
+                  Print
                 </Button>
-                <Button onClick={() => handleDownloadNote(selectedNote)}>
+                <Button onClick={() => handleDownloadNote(selectedNote)} size="sm" variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Download PDF
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* Document Content */}
+          <div className="container mx-auto max-w-[850px] py-6 px-0">
+            {/* Accent Bar */}
+            <div className="h-1 bg-black" />
+
+            {/* Header */}
+            <div className="text-center py-3 px-6 border-b-[3px] border-black relative">
+              <h1 className="text-2xl font-extrabold uppercase tracking-wide">Supplier Purchase Note</h1>
+              <p className="text-sm font-semibold">#{selectedNote.purchaseNoteNumber}</p>
+            </div>
+
+            {/* Meta Bar */}
+            <div className="bg-gray-50 px-6 py-2 flex justify-between items-center border-b-2 border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase text-gray-600">Date</span>
+                <span className="text-xs font-bold">{new Date(selectedNote.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase text-gray-600">Status</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded ${selectedNote.status === 'completed' ? 'bg-green-100 text-green-800' : selectedNote.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  {selectedNote.status.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase text-gray-600">Prepared By</span>
+                <span className="text-xs font-bold">{selectedNote.preparedBy || 'N/A'}</span>
+              </div>
+            </div>
+
+            {/* Party Sections */}
+            <div className="px-6 py-3 flex gap-4">
+              <div className="flex-1 border rounded overflow-hidden">
+                <div className="bg-gray-100 px-3 py-2 text-xs font-bold uppercase tracking-wide">From (Supplier)</div>
+                <div className="p-3">
+                  <p className="font-bold text-sm border-b-2 border-gray-200 pb-1 mb-1">{selectedNote.supplierName || 'N/A'}</p>
+                  {selectedNote.supplierPhone && <p className="text-xs text-gray-700">Phone: {selectedNote.supplierPhone}</p>}
+                  {selectedNote.supplierEmail && <p className="text-xs text-gray-700">Email: {selectedNote.supplierEmail}</p>}
+                  {selectedNote.supplierAddress && <p className="text-xs text-gray-700">Address: {selectedNote.supplierAddress}</p>}
+                </div>
+              </div>
+              <div className="flex-1 border rounded overflow-hidden">
+                <div className="bg-gray-100 px-3 py-2 text-xs font-bold uppercase tracking-wide">To (Business)</div>
+                <div className="p-3">
+                  <p className="font-bold text-sm border-b-2 border-gray-200 pb-1 mb-1">{selectedNote.businessName || 'N/A'}</p>
+                  {selectedNote.businessPhone && <p className="text-xs text-gray-700">Phone: {selectedNote.businessPhone}</p>}
+                  {selectedNote.businessEmail && <p className="text-xs text-gray-700">Email: {selectedNote.businessEmail}</p>}
+                  {selectedNote.businessAddress && <p className="text-xs text-gray-700">Address: {selectedNote.businessAddress}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Info Grid */}
+            <div className="px-6 pb-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 p-2 text-center">
+                  <div className="text-[10px] font-semibold uppercase text-gray-500">Total Items</div>
+                  <div className="text-sm font-extrabold">{selectedNote.items.length}</div>
+                </div>
+                <div className="bg-gray-50 p-2 text-center">
+                  <div className="text-[10px] font-semibold uppercase text-gray-500">Total Quantity</div>
+                  <div className="text-sm font-extrabold">{selectedNote.items.reduce((s, i) => s + (i.quantity || 0), 0)}</div>
+                </div>
+                <div className="bg-gray-50 p-2 text-center">
+                  <div className="text-[10px] font-semibold uppercase text-gray-500">Grand Total</div>
+                  <div className="text-sm font-extrabold">{formatCurrency(selectedNote.total)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div className="px-6 pb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-2">
+                <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
+                Items Purchased
+              </h3>
+              <div className="overflow-x-auto border border-gray-300">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b-2 border-gray-300">
+                      <th className="text-center px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-8">#</th>
+                      <th className="text-left px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200">Description</th>
+                      <th className="text-center px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-16">Qty</th>
+                      <th className="text-center px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-16">Unit</th>
+                      <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Cost Price</th>
+                      <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Selling Price</th>
+                      <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Total</th>
+                      <th className="text-right px-2 py-2 font-bold uppercase tracking-wider w-24">Proj. Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedNote.items.map((item, index) => {
+                      const profit = ((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0);
+                      return (
+                        <tr key={index} className={index % 2 === 1 ? 'bg-gray-50' : ''}>
+                          <td className="text-center px-2 py-2 font-bold border-r border-gray-200 border-b border-gray-200">{String(index + 1).padStart(2, '0')}</td>
+                          <td className="px-2 py-2 font-semibold border-r border-gray-200 border-b border-gray-200">{item.description}</td>
+                          <td className="text-center px-2 py-2 border-r border-gray-200 border-b border-gray-200">{item.quantity}</td>
+                          <td className="text-center px-2 py-2 border-r border-gray-200 border-b border-gray-200">{item.unit || '-'}</td>
+                          <td className="text-right px-2 py-2 border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.unitPrice)}</td>
+                          <td className="text-right px-2 py-2 border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.sellingPrice || 0)}</td>
+                          <td className="text-right px-2 py-2 font-bold border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.total)}</td>
+                          <td className={`text-right px-2 py-2 border-b border-gray-200 ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                            {formatCurrency(profit)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-100 border-t-2 border-gray-300">
+                      <td colSpan={6} className="text-right px-2 py-2 font-bold uppercase text-[10px] tracking-wide border-r border-gray-200">Subtotal</td>
+                      <td className="text-right px-2 py-2 font-bold border-r border-gray-200">{formatCurrency(selectedNote.subtotal)}</td>
+                      <td className="text-right px-2 py-2 font-bold">
+                        {formatCurrency(selectedNote.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}
+                      </td>
+                    </tr>
+                    {selectedNote.discount > 0 && (
+                      <tr className="bg-gray-100">
+                        <td colSpan={6} className="text-right px-2 py-2 font-bold uppercase text-[10px] tracking-wide border-r border-gray-200">Discount</td>
+                        <td className="text-right px-2 py-2 font-bold border-r border-gray-200">{formatCurrency(selectedNote.discount)}</td>
+                        <td className="px-2 py-2 border-gray-200" />
+                      </tr>
+                    )}
+                    <tr className="bg-gray-200">
+                      <td colSpan={6} className="text-right px-2 py-2 font-extrabold uppercase text-xs tracking-wide border-r border-gray-200">Grand Total</td>
+                      <td className="text-right px-2 py-2 font-extrabold text-sm border-r border-gray-200">{formatCurrency(selectedNote.total)}</td>
+                      <td className="px-2 py-2" />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {selectedNote.notes && (
+              <div className="px-6 pb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center gap-2">
+                  <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
+                  Notes
+                </h3>
+                <p className="text-xs whitespace-pre-line bg-gray-50 p-3 rounded border text-gray-700">{selectedNote.notes}</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="px-6 pb-6 mt-4">
+              <div className="border-t-2 border-gray-300 pt-3 flex justify-between">
+                <div className="text-[10px] text-gray-500">
+                  Generated on {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+                <div className="text-[10px] text-gray-500">Supplier Purchase Note #{selectedNote.purchaseNoteNumber}</div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <>

@@ -611,6 +611,7 @@ interface SupplierPurchaseNoteItem {
   quantity: number;
   unit: string;
   unitPrice: number;
+  sellingPrice: number;
   total: number;
 }
 
@@ -2889,7 +2890,7 @@ No inventory adjustment will be made.`,
     businessAddress: '64, Muheza - Tanga - Tanzania',
     businessPhone: '0711 299 266',
     businessEmail: 'kilangogroup1@gmail.com',
-    items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, total: 0 }],
+    items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, sellingPrice: 0, total: 0 }],
     subtotal: 0,
     tax: 0,
     discount: 0,
@@ -2907,7 +2908,7 @@ No inventory adjustment will be made.`,
   const handleAddSupplierPurchaseItem = () => {
     setSupplierPurchaseNoteData(prev => ({
       ...prev,
-      items: [...prev.items, { id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, total: 0 }]
+      items: [...prev.items, { id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, sellingPrice: 0, total: 0 }]
     }));
   };
 
@@ -2968,7 +2969,7 @@ No inventory adjustment will be made.`,
           businessAddress: '',
           businessPhone: '',
           businessEmail: '',
-          items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, total: 0 }],
+          items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, sellingPrice: 0, total: 0 }],
           subtotal: 0,
           tax: 0,
           discount: 0,
@@ -8542,21 +8543,27 @@ No inventory adjustment will be made.`,
           <th>Description</th>
           <th class="r">Qty</th>
           <th class="c">Unit</th>
-          <th class="r">Unit Price</th>
+          <th class="r">Cost Price</th>
+          <th class="r">Selling Price</th>
           <th class="r">Total</th>
+          <th class="r">Proj. Profit</th>
         </tr>
       </thead>
       <tbody>
-        ${data.items.map((item, index) => `
+        ${data.items.map((item, index) => {
+          const profit = ((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0);
+          return `
           <tr>
             <td class="c item-num">${String(index + 1).padStart(2, '0')}</td>
             <td class="item-desc">${item.description || ''}</td>
             <td class="r">${item.quantity || 0}</td>
             <td class="c">${item.unit || '-'}</td>
             <td class="r">${formatCurrency(item.unitPrice || 0)}</td>
+            <td class="r">${formatCurrency(item.sellingPrice || 0)}</td>
             <td class="r item-amount">${formatCurrency(item.total || 0)}</td>
+            <td class="r" style="color:${profit >= 0 ? '#16a34a' : '#dc2626'}">${formatCurrency(profit)}</td>
           </tr>
-        `).join('')}
+        `}).join('')}
       </tbody>
       <tfoot>
         <tr>
@@ -8564,7 +8571,9 @@ No inventory adjustment will be made.`,
           <td class="r total-value">${totals.totalQuantity}</td>
           <td></td>
           <td></td>
+          <td></td>
           <td class="r total-value">${formatCurrency(noteTotals.total)}</td>
+          <td class="r total-value" style="color:#16a34a">${formatCurrency(data.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}</td>
         </tr>
       </tfoot>
     </table>
@@ -8590,6 +8599,10 @@ No inventory adjustment will be made.`,
         <div class="payment-row total-row">
           <div class="payment-label">Total</div>
           <div class="payment-value">${formatCurrency(noteTotals.total)}</div>
+        </div>
+        <div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
+          <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
+          <div class="payment-value" style="color: #16a34a; font-weight: 800;">${formatCurrency(data.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}</div>
         </div>
       </div>
     </div>
@@ -14864,7 +14877,8 @@ No inventory adjustment will be made.`,
                                   <th className="text-left p-2">Description</th>
                                   <th className="text-center p-2 w-20">Qty</th>
                                   <th className="text-left p-2 w-20">Unit</th>
-                                  <th className="text-right p-2 w-28">Unit Price</th>
+                                  <th className="text-right p-2 w-28">Cost Price</th>
+                                  <th className="text-right p-2 w-28">Selling Price</th>
                                   <th className="text-right p-2 w-28">Total</th>
                                   <th className="p-2 w-10"></th>
                                 </tr>
@@ -14910,6 +14924,7 @@ No inventory adjustment will be made.`,
                                                         handleSupplierPurchaseItemChange(item.id, 'description', product.name);
                                                         handleSupplierPurchaseItemChange(item.id, 'unit', product.unit_of_measure || '');
                                                         handleSupplierPurchaseItemChange(item.id, 'unitPrice', product.cost_price || 0);
+                                                        handleSupplierPurchaseItemChange(item.id, 'sellingPrice', product.selling_price || 0);
                                                         setSpnItemProductSearch(prev => ({ ...prev, [item.id]: product.name }));
                                                         setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
                                                       }}
@@ -14963,6 +14978,9 @@ No inventory adjustment will be made.`,
                                     <td className="p-2">
                                       <Input type="number" step="0.01" value={item.unitPrice || 0} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm text-right" />
                                     </td>
+                                    <td className="p-2">
+                                      <Input type="number" step="0.01" value={item.sellingPrice || 0} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'sellingPrice', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm text-right" />
+                                    </td>
                                     <td className="p-2 text-right font-medium">{formatCurrency(item.total || 0)}</td>
                                     <td className="p-2">
                                       <Button onClick={() => handleRemoveSupplierPurchaseItem(item.id)} variant="outline" size="sm" className="p-1 h-8"><Trash2 className="h-4 w-4" /></Button>
@@ -14972,7 +14990,7 @@ No inventory adjustment will be made.`,
                               </tbody>
                               <tfoot>
                                 <tr className="border-t-2 border-indigo-300">
-                                  <td colSpan={4} className="p-2 text-right font-bold">Subtotal:</td>
+                                  <td colSpan={5} className="p-2 text-right font-bold">Subtotal:</td>
                                   <td className="p-2 text-right font-bold">{formatCurrency(supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0))}</td>
                                   <td></td>
                                 </tr>
