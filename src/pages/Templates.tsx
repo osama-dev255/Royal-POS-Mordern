@@ -8426,6 +8426,7 @@ No inventory adjustment will be made.`,
   <!-- HEADER -->
   <div class="spn-header">
     <div class="spn-document-title">SUPPLIER PURCHASE NOTE</div>
+    <div class="spn-document-number">Cash Purchase</div>
     <div class="spn-document-number">#${data.purchaseNoteNumber}</div>
     <div class="spn-copy-indicator">Original Copy</div>
   </div>
