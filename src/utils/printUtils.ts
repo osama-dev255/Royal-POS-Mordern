@@ -5137,8 +5137,8 @@ export class PrintUtils {
     }
   }
 
-  static printSupplierPurchaseNoteDetails(note: any, options: { showSellingPrice?: boolean; showProjectedProfit?: boolean } = {}) {
-    const { showSellingPrice = true, showProjectedProfit = true } = options;
+  static printSupplierPurchaseNoteDetails(note: any, options: { showSellingPrice?: boolean; showProjectedProfit?: boolean; fontSize?: number } = {}) {
+    const { showSellingPrice = true, showProjectedProfit = true, fontSize = 11 } = options;
     const data = note.data || note;
     const items = Array.isArray(data.items) ? data.items : [];
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
@@ -5186,7 +5186,7 @@ export class PrintUtils {
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       max-width: 850px; margin: 0 auto; padding: 0;
-      font-size: 20px; color: #000; line-height: 1.5; background: #fff;
+      font-size: ${fontSize}px; color: #000; line-height: 1.5; background: #fff;
     }
     .accent-bar { height: 4px; background: #000; }
     .spn-header {

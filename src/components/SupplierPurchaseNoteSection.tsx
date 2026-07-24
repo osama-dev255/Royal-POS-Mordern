@@ -22,6 +22,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
   const [selectedNote, setSelectedNote] = useState<SavedSupplierPurchaseNote | null>(null);
   const [showSellingPrice, setShowSellingPrice] = useState(false);
   const [showProjectedProfit, setShowProjectedProfit] = useState(false);
+  const [printFontSize, setPrintFontSize] = useState(11);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -85,7 +86,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
   };
 
   const handlePrintNote = (note: SavedSupplierPurchaseNote) => {
-    PrintUtils.printSupplierPurchaseNoteDetails(note, { showSellingPrice, showProjectedProfit });
+    PrintUtils.printSupplierPurchaseNoteDetails(note, { showSellingPrice, showProjectedProfit, fontSize: printFontSize });
   };
 
   const handleDownloadNote = (note: SavedSupplierPurchaseNote) => {
@@ -128,6 +129,26 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                   {showProjectedProfit ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                   Proj. Profit
                 </Button>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-medium">Font:</label>
+                  <select
+                    value={printFontSize}
+                    onChange={(e) => setPrintFontSize(Number(e.target.value))}
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                  >
+                    <option value={8}>8px</option>
+                    <option value={9}>9px</option>
+                    <option value={10}>10px</option>
+                    <option value={11}>11px</option>
+                    <option value={12}>12px</option>
+                    <option value={14}>14px</option>
+                    <option value={16}>16px</option>
+                    <option value={18}>18px</option>
+                    <option value={20}>20px</option>
+                    <option value={22}>22px</option>
+                    <option value={24}>24px</option>
+                  </select>
+                </div>
                 <Button onClick={() => handlePrintNote(selectedNote)} size="sm">
                   <Printer className="h-4 w-4 mr-2" />
                   Print
