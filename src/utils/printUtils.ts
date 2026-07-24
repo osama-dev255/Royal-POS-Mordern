@@ -5143,108 +5143,370 @@ export class PrintUtils {
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
     const discount = data.discount || 0;
     const total = subtotal - discount;
+    const totalItems = items.length;
+    const totalQuantity = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+    const totalPackages = items.filter((item: any) => item.unit && item.quantity).length;
+    const timeStr = new Date().toLocaleTimeString();
+    const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fmtCurrency = (amount: number) => {
+      const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
+      return `${businessCurrency} ${amount.toFixed(2)}`;
+    };
 
-    const itemsHtml = items.length > 0 ? items.map((item: any, idx: number) => `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${item.description || ''}</td>
-        <td style="text-align:center">${item.quantity || 0}</td>
-        <td style="text-align:center">${item.unit || ''}</td>
-        <td style="text-align:right">${(item.unitPrice || 0).toFixed(2)}</td>
-        <td style="text-align:right">${(item.total || 0).toFixed(2)}</td>
-      </tr>
-    `).join('') : '<tr><td colspan="6" style="text-align:center;padding:20px">No items</td></tr>';
+    const itemsRows = items.length > 0 ? items.map((item: any, index: number) => `
+          <tr>
+            <td class="c item-num">${String(index + 1).padStart(2, '0')}</td>
+            <td class="item-desc">${item.description || ''}</td>
+            <td class="r">${item.quantity || 0}</td>
+            <td class="c">${item.unit || '-'}</td>
+            <td class="r">${fmtCurrency(item.unitPrice || 0)}</td>
+            <td class="r item-amount">${fmtCurrency(item.total || 0)}</td>
+          </tr>
+        `).join('') : '<tr><td colspan="6" class="c" style="padding:20px">No items</td></tr>';
 
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <title>Supplier Purchase Note - ${data.purchaseNoteNumber || ''}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    @page { size: A4 portrait; margin: 15mm; }
+    @media print {
+      @page { margin: 0.3in; size: A4; }
+      body { margin: 0; padding: 0; }
+      .no-break { page-break-inside: avoid; }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #222; padding: 0; }
-    .header { text-align: center; border-bottom: 3px solid #4338ca; padding-bottom: 10px; margin-bottom: 15px; }
-    .header h1 { font-size: 20px; color: #4338ca; margin-bottom: 4px; }
-    .header p { font-size: 10px; color: #666; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-    .info-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
-    .info-box.business { border-color: #4338ca; background: #faf9ff; }
-    .info-box.supplier { border-color: #d97706; background: #fffdf5; }
-    .info-box h3 { font-size: 11px; margin-bottom: 6px; }
-    .info-box.business h3 { color: #4338ca; }
-    .info-box.supplier h3 { color: #d97706; }
-    .info-box p { font-size: 10px; margin-bottom: 2px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-    th { background: #4338ca; color: #fff; padding: 6px 8px; text-align: left; font-size: 10px; }
-    td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
-    tr:nth-child(even) { background: #f9fafb; }
-    .totals { text-align: right; margin-bottom: 15px; }
-    .totals .row { display: flex; justify-content: flex-end; gap: 80px; padding: 3px 0; }
-    .totals .row.total-row { font-weight: bold; font-size: 13px; border-top: 2px solid #4338ca; padding-top: 5px; }
-    .notes { margin-bottom: 15px; padding: 8px; background: #f9fafb; border-radius: 4px; }
-    .notes h3 { font-size: 11px; margin-bottom: 4px; }
-    .notes p { font-size: 10px; white-space: pre-line; }
-    .signature { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px; }
-    .signature p { font-size: 10px; margin-bottom: 3px; }
-    .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #888; border-top: 1px solid #eee; padding-top: 8px; }
+    body {
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      max-width: 850px; margin: 0 auto; padding: 0;
+      font-size: 11px; color: #000; line-height: 1.5; background: #fff;
+    }
+    .accent-bar { height: 4px; background: #000; }
+    .spn-header {
+      background: #fff; color: #000; padding: 12px 24px;
+      position: relative; text-align: center; border-bottom: 3px solid #000;
+    }
+    .spn-header::after {
+      content: ''; position: absolute; right: 24px; top: 50%;
+      transform: translateY(-50%); width: 50px; height: 50px;
+      border: 2px solid #ccc; border-radius: 50%;
+    }
+    .spn-document-title {
+      font-size: 24px; font-weight: 800; letter-spacing: 1px;
+      margin-bottom: 4px; text-transform: uppercase; color: #000;
+    }
+    .spn-document-number {
+      font-size: 13px; font-weight: 600; color: #000; letter-spacing: 0.5px;
+    }
+    .spn-copy-indicator {
+      display: inline-block; margin-top: 4px; padding: 2px 8px;
+      background: #fff; border: 1px solid #000; border-radius: 3px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase; color: #000;
+    }
+    .meta-bar {
+      background: #f8fafc; padding: 6px 24px; display: flex;
+      justify-content: space-between; align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .meta-bar-item { display: flex; align-items: center; }
+    .meta-bar-text { display: flex; flex-direction: column; }
+    .meta-bar-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      color: #000; letter-spacing: 0.3px;
+    }
+    .meta-bar-value { font-size: 12px; font-weight: 700; color: #000; }
+    .party-section { padding: 12px 24px; display: flex; gap: 16px; }
+    .party-box { flex: 1; background: #fff; overflow: hidden; }
+    .party-box.from-box { flex: 0 0 45%; }
+    .party-box.to-box { margin-left: auto; }
+    .party-box.to-box .party-body { text-align: right; }
+    .party-box.to-box .party-header { text-align: right; }
+    .party-header {
+      background: #e5e7eb; color: #000; padding: 8px 12px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .party-body { padding: 10px 12px; }
+    .party-name {
+      font-size: 13px; font-weight: 700; color: #000;
+      margin-bottom: 4px; padding-bottom: 4px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .party-detail { font-size: 11px; color: #000; margin: 2px 0; }
+    .info-grid-section { padding: 0 24px 12px; }
+    .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .info-card { background: #f8fafc; padding: 8px 10px; text-align: center; }
+    .info-card-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      color: #000; letter-spacing: 0.3px; margin-bottom: 2px;
+    }
+    .info-card-value { font-size: 13px; font-weight: 800; color: #000; }
+    .items-section { padding: 0 24px 12px; }
+    .section-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #000; margin-bottom: 6px;
+      padding-bottom: 4px; display: flex; align-items: center; gap: 6px;
+    }
+    .section-title::before {
+      content: ''; width: 3px; height: 14px; background: #000; border-radius: 2px;
+    }
+    .items-table {
+      width: 100%; border-collapse: collapse; font-size: 11px;
+      border: 1px solid #d1d5db;
+    }
+    .items-table thead th {
+      background: #f9fafb; color: #000; padding: 8px 10px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.3px; text-align: left;
+      border-bottom: 2px solid #d1d5db; border-right: 1px solid #e5e7eb;
+    }
+    .items-table thead th:last-child { border-right: none; }
+    .items-table thead th.r { text-align: right; }
+    .items-table thead th.c { text-align: center; }
+    .items-table tbody td {
+      padding: 7px 10px; border-bottom: 1px solid #e5e7eb;
+      border-right: 1px solid #e5e7eb; vertical-align: middle;
+    }
+    .items-table tbody td:last-child { border-right: none; }
+    .items-table tbody tr:nth-child(even) { background: #f9fafb; }
+    .items-table .r { text-align: right; }
+    .items-table .c { text-align: center; }
+    .items-table .item-num { font-weight: 700; color: #000; font-size: 10px; }
+    .items-table .item-desc { font-weight: 600; color: #000; }
+    .items-table .item-amount { font-weight: 700; color: #000; }
+    .items-table tfoot td {
+      padding: 8px 10px; font-weight: 700; border-top: 2px solid #d1d5db;
+      border-right: 1px solid #e5e7eb; background: #f3f4f6; font-size: 11px;
+    }
+    .items-table tfoot td:last-child { border-right: none; }
+    .items-table tfoot .total-label {
+      text-align: right; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .items-table tfoot .total-value { color: #000; font-size: 12px; }
+    .bottom-section { padding: 0 24px 12px; display: flex; gap: 16px; }
+    .payment-box { width: 400px; flex-shrink: 0; overflow: hidden; }
+    .payment-header {
+      background: #f1f3f5; color: #000; padding: 8px 12px;
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .payment-body { padding: 2px 0; }
+    .payment-row {
+      display: flex; justify-content: space-between;
+      padding: 6px 10px; border-bottom: 1px solid #f1f5f9;
+    }
+    .payment-row:last-child { border-bottom: none; }
+    .payment-label { color: #000; font-size: 11px; }
+    .payment-value { font-weight: 600; color: #000; font-size: 11px; }
+    .payment-row.total-row {
+      background: #f8fafc; border-top: 2px solid #000; margin-top: 2px;
+    }
+    .payment-row.total-row .payment-label,
+    .payment-row.total-row .payment-value {
+      font-size: 12px; font-weight: 800; color: #000;
+    }
+    .notes-box { flex: 1; overflow: hidden; }
+    .notes-header {
+      background: #f5f5f5; padding: 8px 12px; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      color: #000; border-bottom: 1px solid #ddd;
+    }
+    .notes-body {
+      padding: 10px 12px; font-size: 11px; color: #000;
+      min-height: 50px; line-height: 1.4;
+    }
+    .sig-section { padding: 0 24px 12px; }
+    .sig-grid {
+      display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 300px;
+    }
+    .sig-box { padding: 10px; text-align: center; background: #fff; }
+    .sig-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #000; margin-bottom: 6px;
+      padding-bottom: 4px; border-bottom: 2px solid #e2e8f0;
+    }
+    .sig-field { margin: 4px 0; }
+    .sig-label {
+      font-size: 10px; color: #000; text-transform: uppercase;
+      letter-spacing: 0.3px; margin-bottom: 1px;
+    }
+    .sig-value { font-size: 11px; font-weight: 600; color: #000; }
+    .sig-line {
+      margin-top: 12px; padding-top: 4px; border-top: 2px dashed #94a3b8;
+      font-size: 10px; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .spn-footer {
+      background: #fff; color: #000; padding: 10px 24px; margin-top: 12px;
+      border-top: 3px solid #000;
+    }
+    .footer-content {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+    }
+    .footer-thankyou { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+    .footer-generated { font-size: 9px; opacity: 0.8; }
+    .footer-bottom {
+      text-align: center; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2);
+      font-size: 8px; opacity: 0.7; letter-spacing: 0.3px;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>SUPPLIER PURCHASE NOTE</h1>
-    <p>Note #${data.purchaseNoteNumber || ''} | Date: ${data.date ? new Date(data.date).toLocaleDateString() : ''}</p>
-    <p style="font-style:italic">Purchase made on behalf of supplier - No inventory adjustment</p>
+  <!-- ACCENT BAR -->
+  <div class="accent-bar"></div>
+
+  <!-- HEADER -->
+  <div class="spn-header">
+    <div class="spn-document-title">SUPPLIER PURCHASE NOTE</div>
+    <div class="spn-document-number">Cash Purchase</div>
+    <div class="spn-document-number">#${data.purchaseNoteNumber || ''}</div>
+    <div class="spn-copy-indicator">Original Copy</div>
   </div>
 
-  <div class="info-grid">
-    <div class="info-box supplier">
-      <h3>FROM (Supplier)</h3>
-      <p><strong>${data.supplierName || ''}</strong></p>
-      <p>${data.supplierAddress || ''}</p>
-      <p>Phone: ${data.supplierPhone || ''}</p>
-      <p>Email: ${data.supplierEmail || ''}</p>
+  <!-- META BAR -->
+  <div class="meta-bar">
+    <div class="meta-bar-item">
+      <div class="meta-bar-text">
+        <div class="meta-bar-label">Document Date</div>
+        <div class="meta-bar-value">${data.date ? new Date(data.date).toLocaleDateString() : ''}</div>
+      </div>
     </div>
-    <div class="info-box business">
-      <h3>TO (Business)</h3>
-      <p><strong>${data.businessName || ''}</strong></p>
-      <p>${data.businessAddress || ''}</p>
-      <p>Phone: ${data.businessPhone || ''}</p>
-      <p>Email: ${data.businessEmail || ''}</p>
+    <div class="meta-bar-item">
+      <div class="meta-bar-text">
+        <div class="meta-bar-label">Time</div>
+        <div class="meta-bar-value">${timeStr}</div>
+      </div>
+    </div>
+    <div class="meta-bar-item">
+      <div class="meta-bar-text">
+        <div class="meta-bar-label">Status</div>
+        <div class="meta-bar-value">${data.status || 'Completed'}</div>
+      </div>
     </div>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th style="width:30px">#</th>
-        <th>Description</th>
-        <th style="text-align:center;width:60px">Qty</th>
-        <th style="text-align:center;width:60px">Unit</th>
-        <th style="text-align:right;width:80px">Unit Price</th>
-        <th style="text-align:right;width:80px">Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemsHtml}
-    </tbody>
-  </table>
-
-  <div class="totals">
-    <div class="row"><span>Subtotal:</span><span>${subtotal.toFixed(2)}</span></div>
-    ${discount > 0 ? `<div class="row"><span>Discount:</span><span>${discount.toFixed(2)}</span></div>` : ''}
-    <div class="row total-row"><span>TOTAL:</span><span>${total.toFixed(2)}</span></div>
+  <!-- FROM / TO -->
+  <div class="party-section">
+    <div class="party-box from-box">
+      <div class="party-header">From (Supplier)</div>
+      <div class="party-body">
+        <div class="party-name">${data.supplierName || 'N/A'}</div>
+        <div class="party-detail"><span>${data.supplierAddress || ''}</span></div>
+        <div class="party-detail"><span>${data.supplierPhone || ''}</span></div>
+        ${data.supplierEmail ? `<div class="party-detail"><span>${data.supplierEmail}</span></div>` : ''}
+      </div>
+    </div>
+    <div class="party-box to-box">
+      <div class="party-header">To (Business)</div>
+      <div class="party-body">
+        <div class="party-name">${data.businessName || 'N/A'}</div>
+        <div class="party-detail"><span>${data.businessAddress || ''}</span></div>
+        <div class="party-detail"><span>${data.businessPhone || ''}</span></div>
+        ${data.businessEmail ? `<div class="party-detail"><span>${data.businessEmail}</span></div>` : ''}
+      </div>
+    </div>
   </div>
 
-  ${data.notes ? `<div class="notes"><h3>Notes:</h3><p>${data.notes}</p></div>` : ''}
-
-  <div class="signature">
-    <p><strong>Prepared By:</strong> ${data.preparedBy || '_________________'}</p>
-    <p><strong>Date:</strong> ${data.preparedDate ? new Date(data.preparedDate).toLocaleDateString() : '_________'}</p>
+  <!-- INFO GRID -->
+  <div class="info-grid-section">
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-card-label">Total Items</div>
+        <div class="info-card-value">${totalItems}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Total Quantity</div>
+        <div class="info-card-value">${totalQuantity}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Total Packages</div>
+        <div class="info-card-value">${totalPackages}</div>
+      </div>
+    </div>
   </div>
 
-  <div class="footer">
-    <p>This document records a purchase made on behalf of the supplier. No inventory adjustment has been made.</p>
-    <p>Printed: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+  <!-- ITEMS TABLE -->
+  <div class="items-section">
+    <div class="section-title">Items Purchased</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:40px;" class="c">#</th>
+          <th>Description</th>
+          <th class="r">Qty</th>
+          <th class="c">Unit</th>
+          <th class="r">Unit Price</th>
+          <th class="r">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" class="total-label">Totals:</td>
+          <td class="r total-value">${totalQuantity}</td>
+          <td></td>
+          <td></td>
+          <td class="r total-value">${fmtCurrency(total)}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- PAYMENT + NOTES -->
+  <div class="bottom-section">
+    <div class="notes-box">
+      <div class="notes-header">Notes</div>
+      <div class="notes-body">${data.notes ? data.notes.replace(/\n/g, '<br>') : '<span style="color:#000;">No additional notes.</span>'}</div>
+    </div>
+    <div class="payment-box">
+      <div class="payment-header">Payment Summary</div>
+      <div class="payment-body">
+        <div class="payment-row">
+          <div class="payment-label">Subtotal</div>
+          <div class="payment-value">${fmtCurrency(subtotal)}</div>
+        </div>
+        ${discount > 0 ? `<div class="payment-row discount-row">
+          <div class="payment-label">Discount</div>
+          <div class="payment-value">-${fmtCurrency(discount)}</div>
+        </div>` : ''}
+        <div class="payment-row total-row">
+          <div class="payment-label">Total</div>
+          <div class="payment-value">${fmtCurrency(total)}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="sig-section no-break">
+    <div class="section-title">Authorization & Signatures</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-title">Prepared By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.preparedBy || '\u2014'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.preparedDate ? new Date(data.preparedDate).toLocaleDateString() : '\u2014'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="spn-footer">
+    <div class="footer-content">
+      <div class="footer-thankyou">Thank you for your business!</div>
+      <div class="footer-generated">Generated: ${currentDate} at ${timeStr}</div>
+    </div>
+    <div class="footer-bottom">
+      ${data.businessName || ''} &bull; ${data.businessPhone || ''} ${data.businessEmail ? '&bull; ' + data.businessEmail : ''}
+    </div>
   </div>
 
   <script>window.onload = function() { window.print(); }</script>
