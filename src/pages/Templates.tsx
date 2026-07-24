@@ -10739,6 +10739,7 @@ No inventory adjustment will be made.`,
                             window.print();
                           } else if (currentTemplate?.type === "supplier-purchase-note") {
                             console.log('✅ Printing Supplier Purchase Note');
+                            alert('Printing Supplier Purchase Note...');
                             const printWindow = window.open('', '_blank');
                             if (printWindow) {
                               const htmlContent = generateSupplierPurchaseNoteHTML();
@@ -10747,6 +10748,7 @@ No inventory adjustment will be made.`,
                             }
                           } else {
                             console.log('⚠️ Falling through to delivery note print. Template type:', currentTemplate?.type);
+                            alert('WARNING: Printing Delivery Note! Template type: ' + currentTemplate?.type);
                             handlePrintDeliveryNote();
                           }
                         }}>
