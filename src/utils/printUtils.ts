@@ -5151,13 +5151,13 @@ export class PrintUtils {
     const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const fmtCurrency = (amount: number) => {
       const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
-      return `${businessCurrency} ${amount.toFixed(2)}`;
+      return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    const totalProjectedProfit = items.reduce((sum: number, item: any) => sum + ((item.sellingPrice || 0) - (item.unitPrice || 0)), 0);
+    const totalProjectedProfit = items.reduce((sum: number, item: any) => sum + ((item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0))), 0);
 
     const itemsRows = items.length > 0 ? items.map((item: any, index: number) => {
-          const profit = (item.sellingPrice || 0) - (item.unitPrice || 0);
+          const profit = (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0));
           return `
           <tr>
             <td class="c item-num">${String(index + 1).padStart(2, '0')}</td>
@@ -5167,7 +5167,7 @@ export class PrintUtils {
             <td class="r">${fmtCurrency(item.unitPrice || 0)}</td>
             ${showSellingPrice ? `<td class="r">${fmtCurrency(item.sellingPrice || 0)}</td>` : ''}
             <td class="r item-amount">${fmtCurrency(item.total || 0)}</td>
-            ${showProjectedProfit ? `<td class="r" style="color:${profit >= 0 ? '#16a34a' : '#dc2626'}">${fmtCurrency(profit)}</td>` : ''}
+            ${showProjectedProfit ? `<td class="r" style="font-weight:bold; color:${profit >= 0 ? '#16a34a' : '#dc2626'}">${fmtCurrency(profit)}</td>` : ''}
           </tr>
         `}).join('') : `<tr><td colspan="${4 + (showSellingPrice ? 1 : 0) + (showProjectedProfit ? 1 : 0)}" class="c" style="padding:20px">No items</td></tr>`;
 

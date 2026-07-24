@@ -231,7 +231,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                   </thead>
                   <tbody>
                     {selectedNote.items.map((item, index) => {
-                      const profit = (item.sellingPrice || 0) - (item.unitPrice || 0);
+                      const profit = (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0));
                       return (
                         <tr key={index} className={index % 2 === 1 ? 'bg-gray-50' : ''}>
                           <td className="text-center px-2 py-2 font-bold border-r border-gray-200 border-b border-gray-200">{String(index + 1).padStart(2, '0')}</td>
@@ -242,7 +242,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                           {showSellingPrice && <td className="text-right px-2 py-2 border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.sellingPrice || 0)}</td>}
                           <td className="text-right px-2 py-2 font-bold border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.total)}</td>
                           {showProjectedProfit && (
-                            <td className={`text-right px-2 py-2 border-b border-gray-200 ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                            <td className={`text-right px-2 py-2 border-b border-gray-200 font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
                               {formatCurrency(profit)}
                             </td>
                           )}
@@ -256,7 +256,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                       <td className="text-right px-2 py-2 font-bold border-r border-gray-200">{formatCurrency(selectedNote.subtotal)}</td>
                       {showProjectedProfit && (
                         <td className="text-right px-2 py-2 font-bold">
-                          {formatCurrency(selectedNote.items.reduce((sum, item) => sum + ((item.sellingPrice || 0) - (item.unitPrice || 0)), 0))}
+                          {formatCurrency(selectedNote.items.reduce((sum, item) => sum + ((item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0))), 0))}
                         </td>
                       )}
                     </tr>
