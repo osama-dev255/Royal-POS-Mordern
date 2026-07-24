@@ -3204,7 +3204,7 @@ No inventory adjustment will be made.`,
 
   const handlePreviewTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
-    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take")) {
+    if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take" || template.type === "supplier-purchase-note")) {
       setViewingTemplate(templateId);
       setActiveTab("preview");
     } else {
