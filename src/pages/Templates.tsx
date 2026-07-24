@@ -1293,6 +1293,13 @@ No inventory adjustment will be made.`,
   const [newSupplierForm, setNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
   const [savingNewSupplier, setSavingNewSupplier] = useState<boolean>(false);
 
+  // SPN Supplier dropdown state
+  const [spnSupplierSearch, setSpnSupplierSearch] = useState<string>('');
+  const [spnShowSupplierDropdown, setSpnShowSupplierDropdown] = useState<boolean>(false);
+  const [spnShowNewSupplierDialog, setSpnShowNewSupplierDialog] = useState<boolean>(false);
+  const [spnNewSupplierForm, setSpnNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+  const [spnSavingNewSupplier, setSpnSavingNewSupplier] = useState<boolean>(false);
+
   // Map of product name -> Map of godownId -> total quantity available
   const [productGodownMap, setProductGodownMap] = useState<Map<string, Map<string, number>>>(new Map());
   // Map of product name -> Map of godownId -> Map of zoneId -> quantity (for zone-level quantities)
@@ -2931,6 +2938,7 @@ No inventory adjustment will be made.`,
       if (result.success) {
         toast({ title: 'Success', description: 'Supplier Purchase Note saved successfully' });
         // Reset form
+        setSpnSupplierSearch('');
         setSupplierPurchaseNoteData({
           purchaseNoteNumber: generatePurchaseNoteNumber(),
           date: new Date().toISOString().split('T')[0],
@@ -14706,7 +14714,102 @@ No inventory adjustment will be made.`,
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50/30">
                             <h3 className="font-bold text-amber-900 mb-2">FROM (Supplier)</h3>
-                            <Input placeholder="Supplier Name" value={supplierPurchaseNoteData.supplierName} onChange={(e) => handleSupplierPurchaseNoteChange('supplierName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            {/* Supplier Searchable Dropdown */}
+                            <div className="relative mb-2">
+                              <Input
+                                placeholder="Search supplier..."
+                                value={spnSupplierSearch || supplierPurchaseNoteData.supplierName}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setSpnSupplierSearch(value);
+                                  const filtered = registeredSuppliers.filter(s =>
+                                    s.name.toLowerCase().includes(value.toLowerCase()) ||
+                                    (s.contact_person && s.contact_person.toLowerCase().includes(value.toLowerCase())) ||
+                                    (s.phone && s.phone.includes(value))
+                                  );
+                                  setFilteredSuppliers(filtered);
+                                  setSpnShowSupplierDropdown(true);
+                                  // Clear auto-filled fields when user starts typing manually
+                                  if (!value) {
+                                    handleSupplierPurchaseNoteChange('supplierName', '');
+                                    handleSupplierPurchaseNoteChange('supplierPhone', '');
+                                    handleSupplierPurchaseNoteChange('supplierEmail', '');
+                                    handleSupplierPurchaseNoteChange('supplierAddress', '');
+                                  }
+                                }}
+                                onFocus={() => {
+                                  setFilteredSuppliers(registeredSuppliers);
+                                  setSpnShowSupplierDropdown(true);
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => setSpnShowSupplierDropdown(false), 200);
+                                }}
+                                className="p-1 h-8 text-sm"
+                              />
+                              {supplierPurchaseNoteData.supplierName && (
+                                <button
+                                  onClick={() => {
+                                    setSpnSupplierSearch('');
+                                    handleSupplierPurchaseNoteChange('supplierName', '');
+                                    handleSupplierPurchaseNoteChange('supplierPhone', '');
+                                    handleSupplierPurchaseNoteChange('supplierEmail', '');
+                                    handleSupplierPurchaseNoteChange('supplierAddress', '');
+                                  }}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-100 p-1 rounded z-10"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                </button>
+                              )}
+                              {spnShowSupplierDropdown && (
+                                <div className="max-h-48 overflow-auto absolute z-50 bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                  {loadingSuppliers ? (
+                                    <div className="p-3 text-center text-sm text-muted-foreground">Loading suppliers...</div>
+                                  ) : filteredSuppliers.length > 0 ? (
+                                    <div>
+                                      {filteredSuppliers.map((supplier) => (
+                                        <div
+                                          key={supplier.id}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            // Auto-fill supplier fields
+                                            setSpnSupplierSearch(supplier.name);
+                                            handleSupplierPurchaseNoteChange('supplierName', supplier.name);
+                                            handleSupplierPurchaseNoteChange('supplierPhone', supplier.phone || '');
+                                            handleSupplierPurchaseNoteChange('supplierEmail', supplier.email || '');
+                                            handleSupplierPurchaseNoteChange('supplierAddress', supplier.address || '');
+                                            setSpnShowSupplierDropdown(false);
+                                          }}
+                                          className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                        >
+                                          <div className="flex flex-col gap-0.5 w-full">
+                                            <span className="font-semibold text-sm">{supplier.name}</span>
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                              {supplier.contact_person && <span>Contact: {supplier.contact_person}</span>}
+                                              {supplier.phone && <span>Phone: {supplier.phone}</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="p-3 text-center text-sm text-muted-foreground">No suppliers found</div>
+                                  )}
+                                  {/* Create New Supplier Button */}
+                                  <div
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      setSpnShowSupplierDropdown(false);
+                                      setSpnNewSupplierForm({ name: spnSupplierSearch || '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                                      setSpnShowNewSupplierDialog(true);
+                                    }}
+                                    className="cursor-pointer py-2 px-3 hover:bg-amber-50 border-t bg-amber-100/50 text-amber-800 font-medium text-sm flex items-center gap-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                    Register New Supplier
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                             <Input placeholder="Supplier Address" value={supplierPurchaseNoteData.supplierAddress} onChange={(e) => handleSupplierPurchaseNoteChange('supplierAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
                             <div className="grid grid-cols-2 gap-2">
                               <Input placeholder="Phone" value={supplierPurchaseNoteData.supplierPhone} onChange={(e) => handleSupplierPurchaseNoteChange('supplierPhone', e.target.value)} className="p-1 h-8 text-sm" />
@@ -17276,6 +17379,141 @@ Enter choice (1-3):`);
                 disabled={savingNewSupplier}
               >
                 {savingNewSupplier ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                ) : (
+                  "Register & Select"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SPN New Supplier Registration Dialog */}
+      {spnShowNewSupplierDialog && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Register New Supplier</h3>
+              <button
+                onClick={() => setSpnShowNewSupplierDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Supplier Name <span className="text-red-500">*</span></label>
+                <Input
+                  value={spnNewSupplierForm.name}
+                  onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter supplier name"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Contact Person <span className="text-red-500">*</span></label>
+                <Input
+                  value={spnNewSupplierForm.contact_person}
+                  onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, contact_person: e.target.value }))}
+                  placeholder="Enter contact person"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Phone</label>
+                  <Input
+                    value={spnNewSupplierForm.phone}
+                    onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Phone number"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <Input
+                    value={spnNewSupplierForm.email}
+                    onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="Email address"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Address</label>
+                <Input
+                  value={spnNewSupplierForm.address}
+                  onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Enter address"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Tax ID / TIN</label>
+                <Input
+                  value={spnNewSupplierForm.tax_id}
+                  onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, tax_id: e.target.value }))}
+                  placeholder="Enter tax ID"
+                  className="mt-1 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setSpnShowNewSupplierDialog(false)}
+                disabled={spnSavingNewSupplier}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!spnNewSupplierForm.name || !spnNewSupplierForm.contact_person) {
+                    toast({ title: "Error", description: "Please fill in Supplier Name and Contact Person", variant: "destructive" });
+                    return;
+                  }
+                  setSpnSavingNewSupplier(true);
+                  try {
+                    const created = await createSupplier({
+                      name: spnNewSupplierForm.name,
+                      contact_person: spnNewSupplierForm.contact_person,
+                      phone: spnNewSupplierForm.phone,
+                      email: spnNewSupplierForm.email,
+                      address: spnNewSupplierForm.address,
+                      tax_id: spnNewSupplierForm.tax_id,
+                      is_active: true
+                    });
+                    if (created) {
+                      const newSupplier: DBSupplier = {
+                        ...created,
+                        id: created.id || ''
+                      };
+                      setRegisteredSuppliers(prev => [...prev, newSupplier]);
+                      setFilteredSuppliers(prev => [...prev, newSupplier]);
+                      // Auto-fill SPN supplier fields
+                      setSpnSupplierSearch(created.name);
+                      handleSupplierPurchaseNoteChange('supplierName', created.name);
+                      handleSupplierPurchaseNoteChange('supplierPhone', created.phone || '');
+                      handleSupplierPurchaseNoteChange('supplierEmail', created.email || '');
+                      handleSupplierPurchaseNoteChange('supplierAddress', created.address || '');
+                      setSpnShowNewSupplierDialog(false);
+                      setSpnNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                      toast({ title: "Success", description: "Supplier registered and selected successfully" });
+                    } else {
+                      throw new Error("Failed to create supplier");
+                    }
+                  } catch (error) {
+                    console.error("Error creating supplier:", error);
+                    toast({ title: "Error", description: "Failed to register supplier: " + (error as Error).message, variant: "destructive" });
+                  } finally {
+                    setSpnSavingNewSupplier(false);
+                  }
+                }}
+                disabled={spnSavingNewSupplier}
+              >
+                {spnSavingNewSupplier ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
                 ) : (
                   "Register & Select"
