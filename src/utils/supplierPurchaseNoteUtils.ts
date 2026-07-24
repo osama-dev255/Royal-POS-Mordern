@@ -208,3 +208,48 @@ export const deleteSupplierPurchaseNote = async (
     return { success: false, error: 'Failed to delete supplier purchase note' };
   }
 };
+
+// Update supplier purchase note
+export const updateSupplierPurchaseNote = async (
+  id: string,
+  noteData: Partial<SupplierPurchaseNoteData>
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+    if (noteData.purchaseNoteNumber) updateData.purchase_note_number = noteData.purchaseNoteNumber;
+    if (noteData.date) updateData.date = noteData.date;
+    if (noteData.supplierName !== undefined) updateData.supplier_name = noteData.supplierName;
+    if (noteData.supplierPhone !== undefined) updateData.supplier_phone = noteData.supplierPhone;
+    if (noteData.supplierEmail !== undefined) updateData.supplier_email = noteData.supplierEmail;
+    if (noteData.supplierAddress !== undefined) updateData.supplier_address = noteData.supplierAddress;
+    if (noteData.businessName !== undefined) updateData.business_name = noteData.businessName;
+    if (noteData.businessAddress !== undefined) updateData.business_address = noteData.businessAddress;
+    if (noteData.businessPhone !== undefined) updateData.business_phone = noteData.businessPhone;
+    if (noteData.businessEmail !== undefined) updateData.business_email = noteData.businessEmail;
+    if (noteData.items) updateData.items = noteData.items;
+    if (noteData.subtotal !== undefined) updateData.subtotal = noteData.subtotal;
+    if (noteData.tax !== undefined) updateData.tax = noteData.tax;
+    if (noteData.discount !== undefined) updateData.discount = noteData.discount;
+    if (noteData.total !== undefined) updateData.total = noteData.total;
+    if (noteData.notes !== undefined) updateData.notes = noteData.notes;
+    if (noteData.preparedBy !== undefined) updateData.prepared_by = noteData.preparedBy;
+    if (noteData.status) updateData.status = noteData.status;
+
+    const { error } = await supabase
+      .from('supplier_purchase_notes')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating supplier purchase note:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error updating supplier purchase note:', err);
+    return { success: false, error: 'Failed to update supplier purchase note' };
+  }
+};

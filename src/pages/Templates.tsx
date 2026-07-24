@@ -640,9 +640,11 @@ interface SupplierPurchaseNoteData {
 
 interface TemplatesProps {
   onBack?: () => void;
+  editSPNData?: any;
+  onEditSPNLoaded?: () => void;
 }
 
-export const Templates = ({ onBack }: TemplatesProps) => {
+export const Templates = ({ onBack, editSPNData, onEditSPNLoaded }: TemplatesProps) => {
   const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
@@ -2901,6 +2903,48 @@ No inventory adjustment will be made.`,
     status: 'draft'
   });
 
+  // Load edit data when provided from saved notes
+  useEffect(() => {
+    if (editSPNData) {
+      const data = editSPNData.data || editSPNData;
+      setSupplierPurchaseNoteData({
+        purchaseNoteNumber: data.purchaseNoteNumber || editSPNData.purchaseNoteNumber || '',
+        date: data.date || '',
+        supplierId: data.supplierId || '',
+        supplierName: data.supplierName || '',
+        supplierPhone: data.supplierPhone || '',
+        supplierEmail: data.supplierEmail || '',
+        supplierAddress: data.supplierAddress || '',
+        businessName: data.businessName || '',
+        businessAddress: data.businessAddress || '',
+        businessPhone: data.businessPhone || '',
+        businessEmail: data.businessEmail || '',
+        items: (data.items || []).map((item: any) => ({
+          ...item,
+          sellingPrice: item.sellingPrice || 0
+        })),
+        subtotal: data.subtotal || 0,
+        tax: data.tax || 0,
+        discount: data.discount || 0,
+        total: data.total || 0,
+        notes: data.notes || '',
+        preparedBy: data.preparedBy || '',
+        preparedDate: data.preparedDate || '',
+        status: data.status || 'draft'
+      });
+      // Store the note ID for update
+      setEditingSPNId(editSPNData.id || '');
+      // Navigate to SPN preview
+      setViewingTemplate('17');
+      setSelectedTemplate(null);
+      setActiveTab('preview');
+      // Clear the edit data
+      onEditSPNLoaded?.();
+    }
+  }, [editSPNData]);
+
+  const [editingSPNId, setEditingSPNId] = useState<string>('');
+
   const handleSupplierPurchaseNoteChange = (field: keyof SupplierPurchaseNoteData, value: any) => {
     setSupplierPurchaseNoteData(prev => ({ ...prev, [field]: value }));
   };
@@ -2947,16 +2991,23 @@ No inventory adjustment will be made.`,
         status: 'completed' as const
       };
 
-      const { saveSupplierPurchaseNote } = await import('@/utils/supplierPurchaseNoteUtils');
-      const result = await saveSupplierPurchaseNote(noteData);
+      let result;
+      if (editingSPNId) {
+        const { updateSupplierPurchaseNote } = await import('@/utils/supplierPurchaseNoteUtils');
+        result = await updateSupplierPurchaseNote(editingSPNId, noteData);
+      } else {
+        const { saveSupplierPurchaseNote } = await import('@/utils/supplierPurchaseNoteUtils');
+        result = await saveSupplierPurchaseNote(noteData);
+      }
 
       if (result.success) {
-        toast({ title: 'Success', description: 'Supplier Purchase Note saved successfully' });
+        toast({ title: 'Success', description: editingSPNId ? 'Supplier Purchase Note updated successfully' : 'Supplier Purchase Note saved successfully' });
         // Reset form
         setSpnSupplierSearch('');
         setSpnSupplierProducts([]);
         setSpnItemProductSearch({});
         setSpnItemShowProductDropdown({});
+        setEditingSPNId('');
         setSupplierPurchaseNoteData({
           purchaseNoteNumber: generatePurchaseNoteNumber(),
           date: new Date().toISOString().split('T')[0],
@@ -15055,7 +15106,7 @@ No inventory adjustment will be made.`,
                             <Printer className="h-4 w-4 mr-2" /> Print
                           </Button>
                           <Button onClick={handleSaveSupplierPurchaseNote} className="bg-indigo-600 hover:bg-indigo-700">
-                            <Save className="h-4 w-4 mr-2" /> Save Purchase Note
+                            <Save className="h-4 w-4 mr-2" /> {editingSPNId ? 'Update Purchase Note' : 'Save Purchase Note'}
                           </Button>
                         </div>
                       </div>

@@ -102,6 +102,7 @@ export const Index = () => {
   const [assets, setAssets] = useState<any[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
   const { user, login, logout, isLoading: authLoading } = useAuth();
+  const [editingSPNData, setEditingSPNData] = useState<any>(null);
 
   // Show splash screen for 2 seconds
   useEffect(() => {
@@ -2604,7 +2605,7 @@ export const Index = () => {
 
             case "templates":
               console.log("Rendering Templates");
-              return <Templates onBack={handleBack} />;
+              return <Templates onBack={handleBack} editSPNData={editingSPNData} onEditSPNLoaded={() => setEditingSPNData(null)} />;
             case "saved-grns":
               console.log("Rendering SavedGRNsSection");
               return (
@@ -2648,6 +2649,11 @@ export const Index = () => {
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
+                  onEditNote={(note) => {
+                    setEditingSPNData(note);
+                    setCurrentView("comprehensive");
+                    window.location.hash = '#templates';
+                  }}
                 />
               );
             case "supplier-products":

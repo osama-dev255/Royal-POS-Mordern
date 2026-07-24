@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Download, Printer, Eye, EyeOff } from "lucide-react";
+import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil } from "lucide-react";
 import { SupplierPurchaseNoteCard } from "./SupplierPurchaseNoteCard";
 import { getSavedSupplierPurchaseNotes, deleteSupplierPurchaseNote, SavedSupplierPurchaseNote } from "@/utils/supplierPurchaseNoteUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -12,9 +12,10 @@ interface SupplierPurchaseNoteSectionProps {
   onBack: () => void;
   onLogout: () => void;
   username: string;
+  onEditNote?: (note: SavedSupplierPurchaseNote) => void;
 }
 
-export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: SupplierPurchaseNoteSectionProps) => {
+export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEditNote }: SupplierPurchaseNoteSectionProps) => {
   const [notes, setNotes] = useState<SavedSupplierPurchaseNote[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -90,6 +91,12 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
                 ← Back to Saved Notes
               </Button>
               <div className="flex gap-2 items-center">
+                {onEditNote && (
+                  <Button onClick={() => onEditNote(selectedNote)} size="sm" variant="outline">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
                 <Button
                   onClick={() => setShowSellingPrice(!showSellingPrice)}
                   variant={showSellingPrice ? "default" : "outline"}
