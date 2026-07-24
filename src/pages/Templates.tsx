@@ -14143,8 +14143,14 @@ No inventory adjustment will be made.`,
                           </div>
                         </div>
 
-                        {/* Save Button */}
+                        {/* Save and Print Buttons */}
                         <div className="flex justify-end gap-2">
+                          <Button 
+                            onClick={() => PrintUtils.printSupplierPurchaseNoteDetails(supplierPurchaseNoteData)} 
+                            variant="outline"
+                          >
+                            <Printer className="h-4 w-4 mr-2" /> Print
+                          </Button>
                           <Button onClick={handleSaveSupplierPurchaseNote} className="bg-indigo-600 hover:bg-indigo-700">
                             <Save className="h-4 w-4 mr-2" /> Save Purchase Note
                           </Button>
