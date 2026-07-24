@@ -5186,7 +5186,7 @@ export class PrintUtils {
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       max-width: 850px; margin: 0 auto; padding: 0;
-      font-size: 11px; color: #000; line-height: 1.5; background: #fff;
+      font-size: 20px; color: #000; line-height: 1.5; background: #fff;
     }
     .accent-bar { height: 4px; background: #000; }
     .spn-header {
@@ -5199,16 +5199,16 @@ export class PrintUtils {
       border: 2px solid #ccc; border-radius: 50%;
     }
     .spn-document-title {
-      font-size: 24px; font-weight: 800; letter-spacing: 1px;
+      font-size: 20px; font-weight: 800; letter-spacing: 1px;
       margin-bottom: 4px; text-transform: uppercase; color: #000;
     }
     .spn-document-number {
-      font-size: 13px; font-weight: 600; color: #000; letter-spacing: 0.5px;
+      font-size: 20px; font-weight: 600; color: #000; letter-spacing: 0.5px;
     }
     .spn-copy-indicator {
       display: inline-block; margin-top: 4px; padding: 2px 8px;
       background: #fff; border: 1px solid #000; border-radius: 3px;
-      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+      font-size: 20px; font-weight: 700; letter-spacing: 0.5px;
       text-transform: uppercase; color: #000;
     }
     .meta-bar {
@@ -5219,10 +5219,10 @@ export class PrintUtils {
     .meta-bar-item { display: flex; align-items: center; }
     .meta-bar-text { display: flex; flex-direction: column; }
     .meta-bar-label {
-      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      font-size: 20px; font-weight: 600; text-transform: uppercase;
       color: #000; letter-spacing: 0.3px;
     }
-    .meta-bar-value { font-size: 12px; font-weight: 700; color: #000; }
+    .meta-bar-value { font-size: 20px; font-weight: 700; color: #000; }
     .party-section { padding: 12px 24px; display: flex; gap: 16px; }
     .party-box { flex: 1; background: #fff; overflow: hidden; }
     .party-box.from-box { flex: 0 0 45%; }
@@ -5231,27 +5231,27 @@ export class PrintUtils {
     .party-box.to-box .party-header { text-align: right; }
     .party-header {
       background: #e5e7eb; color: #000; padding: 8px 12px;
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      font-size: 20px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .party-body { padding: 10px 12px; }
     .party-name {
-      font-size: 13px; font-weight: 700; color: #000;
+      font-size: 20px; font-weight: 700; color: #000;
       margin-bottom: 4px; padding-bottom: 4px;
       border-bottom: 2px solid #e2e8f0;
     }
-    .party-detail { font-size: 11px; color: #000; margin: 2px 0; }
+    .party-detail { font-size: 20px; color: #000; margin: 2px 0; }
     .info-grid-section { padding: 0 24px 12px; }
     .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .info-card { background: #f8fafc; padding: 8px 10px; text-align: center; }
     .info-card-label {
-      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      font-size: 20px; font-weight: 600; text-transform: uppercase;
       color: #000; letter-spacing: 0.3px; margin-bottom: 2px;
     }
-    .info-card-value { font-size: 13px; font-weight: 800; color: #000; }
+    .info-card-value { font-size: 20px; font-weight: 800; color: #000; }
     .items-section { padding: 0 24px 12px; }
     .section-title {
-      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      font-size: 20px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.5px; color: #000; margin-bottom: 6px;
       padding-bottom: 4px; display: flex; align-items: center; gap: 6px;
     }
@@ -5259,12 +5259,12 @@ export class PrintUtils {
       content: ''; width: 3px; height: 14px; background: #000; border-radius: 2px;
     }
     .items-table {
-      width: 100%; border-collapse: collapse; font-size: 11px;
+      width: 100%; border-collapse: collapse; font-size: 20px;
       border: 1px solid #d1d5db;
     }
     .items-table thead th {
       background: #f9fafb; color: #000; padding: 8px 10px;
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      font-size: 20px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.3px; text-align: left;
       border-bottom: 2px solid #d1d5db; border-right: 1px solid #e5e7eb;
     }
@@ -5279,23 +5279,23 @@ export class PrintUtils {
     .items-table tbody tr:nth-child(even) { background: #f9fafb; }
     .items-table .r { text-align: right; }
     .items-table .c { text-align: center; }
-    .items-table .item-num { font-weight: 700; color: #000; font-size: 10px; }
+    .items-table .item-num { font-weight: 700; color: #000; font-size: 20px; }
     .items-table .item-desc { font-weight: 600; color: #000; }
     .items-table .item-amount { font-weight: 700; color: #000; }
     .items-table tfoot td {
       padding: 8px 10px; font-weight: 700; border-top: 2px solid #d1d5db;
-      border-right: 1px solid #e5e7eb; background: #f3f4f6; font-size: 11px;
+      border-right: 1px solid #e5e7eb; background: #f3f4f6; font-size: 20px;
     }
     .items-table tfoot td:last-child { border-right: none; }
     .items-table tfoot .total-label {
       text-align: right; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
     }
-    .items-table tfoot .total-value { color: #000; font-size: 12px; }
+    .items-table tfoot .total-value { color: #000; font-size: 20px; }
     .bottom-section { padding: 0 24px 12px; display: flex; gap: 16px; }
     .payment-box { width: 400px; flex-shrink: 0; overflow: hidden; }
     .payment-header {
       background: #f1f3f5; color: #000; padding: 8px 12px;
-      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      font-size: 20px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .payment-body { padding: 2px 0; }
@@ -5304,24 +5304,24 @@ export class PrintUtils {
       padding: 6px 10px; border-bottom: 1px solid #f1f5f9;
     }
     .payment-row:last-child { border-bottom: none; }
-    .payment-label { color: #000; font-size: 11px; }
-    .payment-value { font-weight: 600; color: #000; font-size: 11px; }
+    .payment-label { color: #000; font-size: 20px; }
+    .payment-value { font-weight: 600; color: #000; font-size: 20px; }
     .payment-row.total-row {
       background: #f8fafc; border-top: 2px solid #000; margin-top: 2px;
     }
     .payment-row.total-row .payment-label,
     .payment-row.total-row .payment-value {
-      font-size: 12px; font-weight: 800; color: #000;
+      font-size: 20px; font-weight: 800; color: #000;
     }
     .notes-box { flex: 1; overflow: hidden; }
     .notes-header {
-      background: #f5f5f5; padding: 8px 12px; font-size: 12px;
+      background: #f5f5f5; padding: 8px 12px; font-size: 20px;
       font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
       color: #000; border-bottom: 1px solid #ddd;
     }
     .notes-body {
-      padding: 10px 12px; font-size: 11px; color: #000;
-      min-height: 50px; line-height: 1.4;
+      padding: 10px 12px; font-size: 20px; color: #000;
+      min-height: 50px; line-height: 1.4,
     }
     .sig-section { padding: 0 24px 12px; }
     .sig-grid {
@@ -5329,19 +5329,19 @@ export class PrintUtils {
     }
     .sig-box { padding: 10px; text-align: center; background: #fff; }
     .sig-title {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      font-size: 20px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.5px; color: #000; margin-bottom: 6px;
       padding-bottom: 4px; border-bottom: 2px solid #e2e8f0;
     }
     .sig-field { margin: 4px 0; }
     .sig-label {
-      font-size: 10px; color: #000; text-transform: uppercase;
+      font-size: 20px; color: #000; text-transform: uppercase;
       letter-spacing: 0.3px; margin-bottom: 1px;
     }
-    .sig-value { font-size: 11px; font-weight: 600; color: #000; }
+    .sig-value { font-size: 20px; font-weight: 600; color: #000; }
     .sig-line {
       margin-top: 12px; padding-top: 4px; border-top: 2px dashed #94a3b8;
-      font-size: 10px; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
+      font-size: 20px; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
     }
     .spn-footer {
       background: #fff; color: #000; padding: 10px 24px; margin-top: 12px;
@@ -5350,11 +5350,11 @@ export class PrintUtils {
     .footer-content {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
     }
-    .footer-thankyou { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
-    .footer-generated { font-size: 9px; opacity: 0.8; }
+    .footer-thankyou { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+    .footer-generated { font-size: 20px; opacity: 0.8; }
     .footer-bottom {
       text-align: center; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2);
-      font-size: 8px; opacity: 0.7; letter-spacing: 0.3px;
+      font-size: 20px; opacity: 0.7; letter-spacing: 0.3px;
     }
   </style>
 </head>
