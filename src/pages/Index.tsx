@@ -57,6 +57,7 @@ import { Templates } from "@/pages/Templates";
 import { SavedGRNsSection } from "@/components/SavedGRNsSection";
 import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettlementsSection";
 import { SupplierPurchaseNoteSection } from "@/components/SupplierPurchaseNoteSection";
+import { SupplierProductsSection } from "@/components/SupplierProductsSection";
 import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 import { OutletDetails } from "@/pages/OutletDetails";
@@ -541,6 +542,9 @@ export const Index = () => {
       case "saved-supplier-purchase-notes":
         setCurrentView("purchase");
         break;
+      case "supplier-products":
+        setCurrentView("purchase");
+        break;
       default:
         setCurrentView("comprehensive");
     }
@@ -595,7 +599,7 @@ export const Index = () => {
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
-    "saved-supplier-purchase-notes",
+    "saved-supplier-purchase-notes", "supplier-products",
     "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses",
     "godowns", "stock-transfers"
   ];
@@ -2641,6 +2645,15 @@ export const Index = () => {
               console.log("Rendering SupplierPurchaseNoteSection");
               return (
                 <SupplierPurchaseNoteSection
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "supplier-products":
+              console.log("Rendering SupplierProductsSection");
+              return (
+                <SupplierProductsSection
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
