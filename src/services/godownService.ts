@@ -73,6 +73,8 @@ export interface StockTransfer {
   // Joined properties from Supabase queries
   from_godown?: { name: string };
   to_godown?: { name: string };
+  from_zone?: { zone_name: string; zone_code?: string };
+  to_zone?: { zone_name: string; zone_code?: string };
   stock_transfer_items?: StockTransferItem[];
 }
 
@@ -351,6 +353,8 @@ export const getStockTransfers = async (status?: string): Promise<StockTransfer[
         *,
         from_godown:godowns!from_godown_id (name, code),
         to_godown:godowns!to_godown_id (name, code),
+        from_zone:godown_zones!from_zone_id (zone_name, zone_code),
+        to_zone:godown_zones!to_zone_id (zone_name, zone_code),
         stock_transfer_items (
           *,
           products (name, sku)

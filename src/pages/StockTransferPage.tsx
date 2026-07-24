@@ -106,6 +106,10 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState({
+    start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0],
+  });
 
   // State for new transfer dialog
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -514,12 +518,20 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
         <div class="grid">
           <div>
-            <div class="label">From</div>
+            <div class="label">From Godown</div>
             <div class="value">${t.from_godown?.name || t.from_godown_id}</div>
           </div>
           <div>
-            <div class="label">To</div>
+            <div class="label">To Godown</div>
             <div class="value">${t.to_godown?.name || t.to_godown_id}</div>
+          </div>
+          <div>
+            <div class="label">From Zone</div>
+            <div class="value">${t.from_zone?.zone_name ? `${t.from_zone.zone_name}${t.from_zone.zone_code ? ` (${t.from_zone.zone_code})` : ""}` : "—"}</div>
+          </div>
+          <div>
+            <div class="label">To Zone</div>
+            <div class="value">${t.to_zone?.zone_name ? `${t.to_zone.zone_name}${t.to_zone.zone_code ? ` (${t.to_zone.zone_code})` : ""}` : "—"}</div>
           </div>
           <div>
             <div class="label">Transfer Date</div>
@@ -584,7 +596,23 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
     const matchesStatus = statusFilter === "all" || transfer.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    // Date range filter
+    let matchesDateRange = true;
+    if (dateRange.start || dateRange.end) {
+      const transferDate = new Date(transfer.transfer_date);
+      if (dateRange.start) {
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        if (transferDate < startDate) matchesDateRange = false;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        if (transferDate > endDate) matchesDateRange = false;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesDateRange;
   });
 
   // Format date
@@ -676,6 +704,42 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
           </Card>
         </div>
 
+        {/* Date Range Picker */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Input
+              type="date"
+              value={dateRange.start}
+              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+              className="w-40"
+            />
+          </div>
+          <span className="text-muted-foreground">to</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dateRange.end}
+              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+              className="w-40"
+            />
+          </div>
+          {(dateRange.start || dateRange.end) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDateRange({
+                start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
+                end: new Date().toISOString().split('T')[0],
+              })}
+              className="h-9"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Reset
+            </Button>
+          )}
+        </div>
+
         {/* Search and Actions */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
@@ -712,7 +776,9 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
               <TableRow>
                 <TableHead>Transfer Number</TableHead>
                 <TableHead>From</TableHead>
+                <TableHead>From Zone</TableHead>
                 <TableHead>To</TableHead>
+                <TableHead>To Zone</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Qty</TableHead>
@@ -723,13 +789,13 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : filteredTransfers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     No transfers found
                   </TableCell>
                 </TableRow>
@@ -741,7 +807,13 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
                       {transfer.from_godown?.name || transfer.from_godown_id}
                     </TableCell>
                     <TableCell>
+                      {transfer.from_zone?.zone_name || "—"}
+                    </TableCell>
+                    <TableCell>
                       {transfer.to_godown?.name || transfer.to_godown_id}
+                    </TableCell>
+                    <TableCell>
+                      {transfer.to_zone?.zone_name || "—"}
                     </TableCell>
                     <TableCell>{formatDate(transfer.transfer_date)}</TableCell>
                     <TableCell>{transfer.stock_transfer_items?.length || 0}</TableCell>
@@ -1067,15 +1139,34 @@ export const StockTransferPage = ({ username, onBack, onLogout }: StockTransferP
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground">From</Label>
+                  <Label className="text-muted-foreground">From Godown</Label>
                   <p className="mt-1 font-medium">
                     {selectedTransfer.from_godown?.name || selectedTransfer.from_godown_id}
                   </p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">To</Label>
+                  <Label className="text-muted-foreground">To Godown</Label>
                   <p className="mt-1 font-medium">
                     {selectedTransfer.to_godown?.name || selectedTransfer.to_godown_id}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">From Zone</Label>
+                  <p className="mt-1 font-medium">
+                    {selectedTransfer.from_zone?.zone_name
+                      ? `${selectedTransfer.from_zone.zone_name}${selectedTransfer.from_zone.zone_code ? ` (${selectedTransfer.from_zone.zone_code})` : ""}`
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">To Zone</Label>
+                  <p className="mt-1 font-medium">
+                    {selectedTransfer.to_zone?.zone_name
+                      ? `${selectedTransfer.to_zone.zone_name}${selectedTransfer.to_zone.zone_code ? ` (${selectedTransfer.to_zone.zone_code})` : ""}`
+                      : "—"}
                   </p>
                 </div>
               </div>
