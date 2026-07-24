@@ -5137,7 +5137,8 @@ export class PrintUtils {
     }
   }
 
-  static printSupplierPurchaseNoteDetails(note: any) {
+  static printSupplierPurchaseNoteDetails(note: any, options: { showSellingPrice?: boolean; showProjectedProfit?: boolean } = {}) {
+    const { showSellingPrice = true, showProjectedProfit = true } = options;
     const data = note.data || note;
     const items = Array.isArray(data.items) ? data.items : [];
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
@@ -5164,11 +5165,11 @@ export class PrintUtils {
             <td class="r">${item.quantity || 0}</td>
             <td class="c">${item.unit || '-'}</td>
             <td class="r">${fmtCurrency(item.unitPrice || 0)}</td>
-            <td class="r">${fmtCurrency(item.sellingPrice || 0)}</td>
+            ${showSellingPrice ? `<td class="r">${fmtCurrency(item.sellingPrice || 0)}</td>` : ''}
             <td class="r item-amount">${fmtCurrency(item.total || 0)}</td>
-            <td class="r" style="color:${profit >= 0 ? '#16a34a' : '#dc2626'}">${fmtCurrency(profit)}</td>
+            ${showProjectedProfit ? `<td class="r" style="color:${profit >= 0 ? '#16a34a' : '#dc2626'}">${fmtCurrency(profit)}</td>` : ''}
           </tr>
-        `}).join('') : '<tr><td colspan="8" class="c" style="padding:20px">No items</td></tr>';
+        `}).join('') : `<tr><td colspan="${4 + (showSellingPrice ? 1 : 0) + (showProjectedProfit ? 1 : 0)}" class="c" style="padding:20px">No items</td></tr>`;
 
     const html = `<!DOCTYPE html>
 <html>
@@ -5442,9 +5443,9 @@ export class PrintUtils {
           <th class="r">Qty</th>
           <th class="c">Unit</th>
           <th class="r">Cost Price</th>
-          <th class="r">Selling Price</th>
+          ${showSellingPrice ? '<th class="r">Selling Price</th>' : ''}
           <th class="r">Total</th>
-          <th class="r">Proj. Profit</th>
+          ${showProjectedProfit ? '<th class="r">Proj. Profit</th>' : ''}
         </tr>
       </thead>
       <tbody>
@@ -5456,9 +5457,9 @@ export class PrintUtils {
           <td class="r total-value">${totalQuantity}</td>
           <td></td>
           <td></td>
-          <td></td>
+          ${showSellingPrice ? '<td></td>' : ''}
           <td class="r total-value">${fmtCurrency(total)}</td>
-          <td class="r total-value" style="color:#16a34a">${fmtCurrency(totalProjectedProfit)}</td>
+          ${showProjectedProfit ? `<td class="r total-value" style="color:#16a34a">${fmtCurrency(totalProjectedProfit)}</td>` : ''}
         </tr>
       </tfoot>
     </table>
@@ -5485,10 +5486,10 @@ export class PrintUtils {
           <div class="payment-label">Total</div>
           <div class="payment-value">${fmtCurrency(total)}</div>
         </div>
-        <div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
+        ${showProjectedProfit ? `<div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
           <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
           <div class="payment-value" style="color: #16a34a; font-weight: 800;">${fmtCurrency(totalProjectedProfit)}</div>
-        </div>
+        </div>` : ''}
       </div>
     </div>
   </div>

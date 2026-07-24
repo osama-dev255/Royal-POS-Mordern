@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Download, Printer, Eye } from "lucide-react";
+import { Search, FileText, Download, Printer, Eye, EyeOff } from "lucide-react";
 import { SupplierPurchaseNoteCard } from "./SupplierPurchaseNoteCard";
 import { getSavedSupplierPurchaseNotes, deleteSupplierPurchaseNote, SavedSupplierPurchaseNote } from "@/utils/supplierPurchaseNoteUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -19,6 +19,8 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedNote, setSelectedNote] = useState<SavedSupplierPurchaseNote | null>(null);
+  const [showSellingPrice, setShowSellingPrice] = useState(true);
+  const [showProjectedProfit, setShowProjectedProfit] = useState(true);
 
   // Load saved supplier purchase notes from database
   useEffect(() => {
@@ -69,7 +71,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
   };
 
   const handlePrintNote = (note: SavedSupplierPurchaseNote) => {
-    PrintUtils.printSupplierPurchaseNoteDetails(note);
+    PrintUtils.printSupplierPurchaseNoteDetails(note, { showSellingPrice, showProjectedProfit });
   };
 
   const handleDownloadNote = (note: SavedSupplierPurchaseNote) => {
@@ -87,7 +89,25 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
               <Button onClick={() => setSelectedNote(null)} variant="outline" size="sm">
                 ← Back to Saved Notes
               </Button>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <Button
+                  onClick={() => setShowSellingPrice(!showSellingPrice)}
+                  variant={showSellingPrice ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {showSellingPrice ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  Selling Price
+                </Button>
+                <Button
+                  onClick={() => setShowProjectedProfit(!showProjectedProfit)}
+                  variant={showProjectedProfit ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  {showProjectedProfit ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  Proj. Profit
+                </Button>
                 <Button onClick={() => handlePrintNote(selectedNote)} size="sm">
                   <Printer className="h-4 w-4 mr-2" />
                   Print
@@ -184,9 +204,9 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
                       <th className="text-center px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-16">Qty</th>
                       <th className="text-center px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-16">Unit</th>
                       <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Cost Price</th>
-                      <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Selling Price</th>
+                      {showSellingPrice && <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Selling Price</th>}
                       <th className="text-right px-2 py-2 font-bold uppercase tracking-wider border-r border-gray-200 w-24">Total</th>
-                      <th className="text-right px-2 py-2 font-bold uppercase tracking-wider w-24">Proj. Profit</th>
+                      {showProjectedProfit && <th className="text-right px-2 py-2 font-bold uppercase tracking-wider w-24">Proj. Profit</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -199,34 +219,38 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
                           <td className="text-center px-2 py-2 border-r border-gray-200 border-b border-gray-200">{item.quantity}</td>
                           <td className="text-center px-2 py-2 border-r border-gray-200 border-b border-gray-200">{item.unit || '-'}</td>
                           <td className="text-right px-2 py-2 border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.unitPrice)}</td>
-                          <td className="text-right px-2 py-2 border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.sellingPrice || 0)}</td>
+                          {showSellingPrice && <td className="text-right px-2 py-2 border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.sellingPrice || 0)}</td>}
                           <td className="text-right px-2 py-2 font-bold border-r border-gray-200 border-b border-gray-200">{formatCurrency(item.total)}</td>
-                          <td className={`text-right px-2 py-2 border-b border-gray-200 ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                            {formatCurrency(profit)}
-                          </td>
+                          {showProjectedProfit && (
+                            <td className={`text-right px-2 py-2 border-b border-gray-200 ${profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                              {formatCurrency(profit)}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-100 border-t-2 border-gray-300">
-                      <td colSpan={6} className="text-right px-2 py-2 font-bold uppercase text-[10px] tracking-wide border-r border-gray-200">Subtotal</td>
+                      <td colSpan={4 + (showSellingPrice ? 1 : 0)} className="text-right px-2 py-2 font-bold uppercase text-[10px] tracking-wide border-r border-gray-200">Subtotal</td>
                       <td className="text-right px-2 py-2 font-bold border-r border-gray-200">{formatCurrency(selectedNote.subtotal)}</td>
-                      <td className="text-right px-2 py-2 font-bold">
-                        {formatCurrency(selectedNote.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}
-                      </td>
+                      {showProjectedProfit && (
+                        <td className="text-right px-2 py-2 font-bold">
+                          {formatCurrency(selectedNote.items.reduce((sum, item) => sum + (((item.sellingPrice || 0) - (item.unitPrice || 0)) * (item.quantity || 0)), 0))}
+                        </td>
+                      )}
                     </tr>
                     {selectedNote.discount > 0 && (
                       <tr className="bg-gray-100">
-                        <td colSpan={6} className="text-right px-2 py-2 font-bold uppercase text-[10px] tracking-wide border-r border-gray-200">Discount</td>
+                        <td colSpan={4 + (showSellingPrice ? 1 : 0)} className="text-right px-2 py-2 font-bold uppercase text-[10px] tracking-wide border-r border-gray-200">Discount</td>
                         <td className="text-right px-2 py-2 font-bold border-r border-gray-200">{formatCurrency(selectedNote.discount)}</td>
-                        <td className="px-2 py-2 border-gray-200" />
+                        {showProjectedProfit && <td className="px-2 py-2 border-gray-200" />}
                       </tr>
                     )}
                     <tr className="bg-gray-200">
-                      <td colSpan={6} className="text-right px-2 py-2 font-extrabold uppercase text-xs tracking-wide border-r border-gray-200">Grand Total</td>
+                      <td colSpan={4 + (showSellingPrice ? 1 : 0)} className="text-right px-2 py-2 font-extrabold uppercase text-xs tracking-wide border-r border-gray-200">Grand Total</td>
                       <td className="text-right px-2 py-2 font-extrabold text-sm border-r border-gray-200">{formatCurrency(selectedNote.total)}</td>
-                      <td className="px-2 py-2" />
+                      {showProjectedProfit && <td className="px-2 py-2" />}
                     </tr>
                   </tfoot>
                 </table>
