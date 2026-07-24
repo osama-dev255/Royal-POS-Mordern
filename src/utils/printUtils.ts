@@ -5141,9 +5141,8 @@ export class PrintUtils {
     const data = note.data || note;
     const items = Array.isArray(data.items) ? data.items : [];
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
-    const tax = data.tax || 0;
     const discount = data.discount || 0;
-    const total = subtotal + tax - discount;
+    const total = subtotal - discount;
 
     const itemsHtml = items.length > 0 ? items.map((item: any, idx: number) => `
       <tr>
@@ -5232,7 +5231,6 @@ export class PrintUtils {
 
   <div class="totals">
     <div class="row"><span>Subtotal:</span><span>${subtotal.toFixed(2)}</span></div>
-    ${tax > 0 ? `<div class="row"><span>Tax:</span><span>${tax.toFixed(2)}</span></div>` : ''}
     ${discount > 0 ? `<div class="row"><span>Discount:</span><span>${discount.toFixed(2)}</span></div>` : ''}
     <div class="row total-row"><span>TOTAL:</span><span>${total.toFixed(2)}</span></div>
   </div>

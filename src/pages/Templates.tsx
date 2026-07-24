@@ -1215,7 +1215,6 @@ ITEMS PURCHASED:
 
 SUMMARY:
 Subtotal: [SUBTOTAL]
-Tax: [TAX]
 Discount: [DISCOUNT]
 TOTAL: [TOTAL]
 
@@ -2915,14 +2914,12 @@ No inventory adjustment will be made.`,
   const handleSaveSupplierPurchaseNote = async () => {
     try {
       const subtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
-      const tax = supplierPurchaseNoteData.tax || 0;
       const discount = supplierPurchaseNoteData.discount || 0;
-      const total = subtotal + tax - discount;
+      const total = subtotal - discount;
 
       const noteData = {
         ...supplierPurchaseNoteData,
         subtotal,
-        tax,
         discount,
         total,
         status: 'completed' as const
@@ -14109,12 +14106,8 @@ No inventory adjustment will be made.`,
                           </Button>
                         </div>
 
-                        {/* Tax, Discount, Total */}
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <label className="text-xs font-bold">Tax</label>
-                            <Input type="number" step="0.01" value={supplierPurchaseNoteData.tax} onChange={(e) => handleSupplierPurchaseNoteChange('tax', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm" />
-                          </div>
+                        {/* Discount, Total */}
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="text-xs font-bold">Discount</label>
                             <Input type="number" step="0.01" value={supplierPurchaseNoteData.discount} onChange={(e) => handleSupplierPurchaseNoteChange('discount', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm" />
@@ -14122,7 +14115,7 @@ No inventory adjustment will be made.`,
                           <div>
                             <label className="text-xs font-bold">Total</label>
                             <div className="p-1 h-8 text-sm font-bold flex items-center bg-indigo-50 rounded px-2">
-                              {formatCurrency((supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0)) + (supplierPurchaseNoteData.tax || 0) - (supplierPurchaseNoteData.discount || 0))}
+                              {formatCurrency((supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0)) - (supplierPurchaseNoteData.discount || 0))}
                             </div>
                           </div>
                         </div>

@@ -142,12 +142,6 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
                         <td colSpan={4} className="px-6 py-3 text-right font-semibold">Subtotal:</td>
                         <td className="px-6 py-3">{formatCurrency(selectedNote.subtotal)}</td>
                       </tr>
-                      {selectedNote.tax > 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-3 text-right font-semibold">Tax:</td>
-                          <td className="px-6 py-3">{formatCurrency(selectedNote.tax)}</td>
-                        </tr>
-                      )}
                       {selectedNote.discount > 0 && (
                         <tr>
                           <td colSpan={4} className="px-6 py-3 text-right font-semibold">Discount:</td>
