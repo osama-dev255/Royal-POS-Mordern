@@ -5339,6 +5339,12 @@ No inventory adjustment will be made.`,
   const handlePrintPreview = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
+      // Handle Supplier Purchase Note separately
+      if (template.type === "supplier-purchase-note") {
+        PrintUtils.printSupplierPurchaseNoteDetails(supplierPurchaseNoteData);
+        return;
+      }
+      
       // Create a mock transaction for preview
       const mockTransaction = {
         id: "TXN-001",
