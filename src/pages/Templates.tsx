@@ -3202,6 +3202,7 @@ No inventory adjustment will be made.`,
   const handlePreviewTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take" || template.type === "supplier-purchase-note")) {
+      setSelectedTemplate(null); // Clear any previously selected template
       setViewingTemplate(templateId);
       setActiveTab("preview");
     } else {
@@ -5337,9 +5338,7 @@ No inventory adjustment will be made.`,
   };
   
   const handlePrintPreview = (templateId: string) => {
-    console.log('🖨️ handlePrintPreview called with templateId:', templateId);
     const template = templates.find(t => t.id === templateId);
-    console.log('🖨️ Found template:', template?.type);
     if (template) {
       // Handle Supplier Purchase Note separately
       if (template.type === "supplier-purchase-note") {
@@ -9892,7 +9891,7 @@ No inventory adjustment will be made.`,
   }, [complimentaryGoodsData.items]);
 
   // Find the template being viewed/edited
-  const currentTemplate = templates.find(t => t.id === (selectedTemplate || viewingTemplate)) || templates[0];
+  const currentTemplate = templates.find(t => t.id === (viewingTemplate || selectedTemplate)) || templates[0];
 
   // Get icon for template type
   const getTemplateIcon = (type: string) => {
@@ -10724,7 +10723,6 @@ No inventory adjustment will be made.`,
                     {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order" && currentTemplate?.type !== "stock-take") && (
                       <>
                         <Button onClick={() => {
-                          console.log('🖨️ Print button clicked. currentTemplate type:', currentTemplate?.type, 'id:', currentTemplate?.id);
                           if (currentTemplate?.type === "order-form") {
                             window.print();
                           } else if (currentTemplate?.type === "salary-slip") {
@@ -10738,8 +10736,6 @@ No inventory adjustment will be made.`,
                           } else if (currentTemplate?.type === "goods-received-note") {
                             window.print();
                           } else if (currentTemplate?.type === "supplier-purchase-note") {
-                            console.log('✅ Printing Supplier Purchase Note');
-                            alert('Printing Supplier Purchase Note...');
                             const printWindow = window.open('', '_blank');
                             if (printWindow) {
                               const htmlContent = generateSupplierPurchaseNoteHTML();
@@ -10747,8 +10743,6 @@ No inventory adjustment will be made.`,
                               printWindow.document.close();
                             }
                           } else {
-                            console.log('⚠️ Falling through to delivery note print. Template type:', currentTemplate?.type);
-                            alert('WARNING: Printing Delivery Note! Template type: ' + currentTemplate?.type);
                             handlePrintDeliveryNote();
                           }
                         }}>
@@ -14822,11 +14816,9 @@ No inventory adjustment will be made.`,
                         <div className="flex justify-end gap-2">
                           <Button 
                             onClick={() => {
-                              console.log('🖨️ SPN form Print button clicked');
                               const printWindow = window.open('', '_blank');
                               if (printWindow) {
                                 const htmlContent = generateSupplierPurchaseNoteHTML();
-                                console.log('✅ Generated SPN HTML, length:', htmlContent.length);
                                 printWindow.document.write(htmlContent);
                                 printWindow.document.close();
                               }
