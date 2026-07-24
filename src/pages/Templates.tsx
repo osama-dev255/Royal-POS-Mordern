@@ -5612,31 +5612,7 @@ No inventory adjustment will be made.`,
 
   // Validate required delivery note fields
   const validateDeliveryNoteRequiredFields = (): boolean => {
-    const missingFields: string[] = [];
-    
-    if (!deliveryNoteData.customerName || deliveryNoteData.customerName.trim() === '') {
-      missingFields.push('TO: (Customer Name)');
-    }
-    
-    if (!deliveryNoteData.preparedByName || deliveryNoteData.preparedByName.trim() === '') {
-      missingFields.push('Prepared By (Name)');
-    }
-    
-    // Check each item for godown and zone
-    deliveryNoteData.items.forEach((item, index) => {
-      if (!item.godownName || item.godownName.trim() === '') {
-        missingFields.push(`Item #${index + 1} (${item.description || 'No description'}): Godown`);
-      }
-      if (!item.zoneName || item.zoneName.trim() === '') {
-        missingFields.push(`Item #${index + 1} (${item.description || 'No description'}): Zone`);
-      }
-    });
-    
-    if (missingFields.length > 0) {
-      alert(`Please fill in the following required fields:\n\n• ${missingFields.join('\n• ')}`);
-      return false;
-    }
-    
+    // Validation disabled - allow saving without required fields
     return true;
   };
 
