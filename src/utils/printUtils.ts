@@ -5136,4 +5136,127 @@ export class PrintUtils {
       printWindow.focus();
     }
   }
+
+  static printSupplierPurchaseNoteDetails(note: any) {
+    const data = note.data || note;
+    const items = Array.isArray(data.items) ? data.items : [];
+    const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+    const tax = data.tax || 0;
+    const discount = data.discount || 0;
+    const total = subtotal + tax - discount;
+
+    const itemsHtml = items.length > 0 ? items.map((item: any, idx: number) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${item.description || ''}</td>
+        <td style="text-align:center">${item.quantity || 0}</td>
+        <td style="text-align:center">${item.unit || ''}</td>
+        <td style="text-align:right">${(item.unitPrice || 0).toFixed(2)}</td>
+        <td style="text-align:right">${(item.total || 0).toFixed(2)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="text-align:center;padding:20px">No items</td></tr>';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Supplier Purchase Note - ${data.purchaseNoteNumber || ''}</title>
+  <style>
+    @page { size: A4 portrait; margin: 15mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #222; padding: 0; }
+    .header { text-align: center; border-bottom: 3px solid #4338ca; padding-bottom: 10px; margin-bottom: 15px; }
+    .header h1 { font-size: 20px; color: #4338ca; margin-bottom: 4px; }
+    .header p { font-size: 10px; color: #666; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    .info-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+    .info-box.business { border-color: #4338ca; background: #f5f3ff; }
+    .info-box.supplier { border-color: #d97706; background: #fffbeb; }
+    .info-box h3 { font-size: 11px; margin-bottom: 6px; }
+    .info-box.business h3 { color: #4338ca; }
+    .info-box.supplier h3 { color: #d97706; }
+    .info-box p { font-size: 10px; margin-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+    th { background: #4338ca; color: #fff; padding: 6px 8px; text-align: left; font-size: 10px; }
+    td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
+    tr:nth-child(even) { background: #f9fafb; }
+    .totals { text-align: right; margin-bottom: 15px; }
+    .totals .row { display: flex; justify-content: flex-end; gap: 80px; padding: 3px 0; }
+    .totals .row.total-row { font-weight: bold; font-size: 13px; border-top: 2px solid #4338ca; padding-top: 5px; }
+    .notes { margin-bottom: 15px; padding: 8px; background: #f9fafb; border-radius: 4px; }
+    .notes h3 { font-size: 11px; margin-bottom: 4px; }
+    .notes p { font-size: 10px; white-space: pre-line; }
+    .signature { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px; }
+    .signature p { font-size: 10px; margin-bottom: 3px; }
+    .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #888; border-top: 1px solid #eee; padding-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>SUPPLIER PURCHASE NOTE</h1>
+    <p>Note #${data.purchaseNoteNumber || ''} | Date: ${data.date ? new Date(data.date).toLocaleDateString() : ''}</p>
+    <p style="font-style:italic">Purchase made on behalf of supplier - No inventory adjustment</p>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box business">
+      <h3>FROM (Business)</h3>
+      <p><strong>${data.businessName || ''}</strong></p>
+      <p>${data.businessAddress || ''}</p>
+      <p>Phone: ${data.businessPhone || ''}</p>
+      <p>Email: ${data.businessEmail || ''}</p>
+    </div>
+    <div class="info-box supplier">
+      <h3>ON BEHALF OF (Supplier)</h3>
+      <p><strong>${data.supplierName || ''}</strong></p>
+      <p>${data.supplierAddress || ''}</p>
+      <p>Phone: ${data.supplierPhone || ''}</p>
+      <p>Email: ${data.supplierEmail || ''}</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th>Description</th>
+        <th style="text-align:center;width:60px">Qty</th>
+        <th style="text-align:center;width:60px">Unit</th>
+        <th style="text-align:right;width:80px">Unit Price</th>
+        <th style="text-align:right;width:80px">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsHtml}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="row"><span>Subtotal:</span><span>${subtotal.toFixed(2)}</span></div>
+    ${tax > 0 ? `<div class="row"><span>Tax:</span><span>${tax.toFixed(2)}</span></div>` : ''}
+    ${discount > 0 ? `<div class="row"><span>Discount:</span><span>${discount.toFixed(2)}</span></div>` : ''}
+    <div class="row total-row"><span>TOTAL:</span><span>${total.toFixed(2)}</span></div>
+  </div>
+
+  ${data.notes ? `<div class="notes"><h3>Notes:</h3><p>${data.notes}</p></div>` : ''}
+
+  <div class="signature">
+    <p><strong>Prepared By:</strong> ${data.preparedBy || '_________________'}</p>
+    <p><strong>Date:</strong> ${data.preparedDate ? new Date(data.preparedDate).toLocaleDateString() : '_________'}</p>
+  </div>
+
+  <div class="footer">
+    <p>This document records a purchase made on behalf of the supplier. No inventory adjustment has been made.</p>
+    <p>Printed: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+  </div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+  }
 }

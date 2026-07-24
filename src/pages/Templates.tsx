@@ -63,13 +63,14 @@ import { SavedSupplierSettlementsSection } from '@/components/SavedSupplierSettl
 import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
 import { SavedStockTakesSection } from '@/components/SavedStockTakesSection';
+import { SupplierPurchaseNoteSection } from '@/components/SupplierPurchaseNoteSection';
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
   id: string;
   name: string;
-  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take";
+  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note";
   description: string;
   content: string;
   lastModified: string;
@@ -604,12 +605,43 @@ interface SavedGRN {
   updatedAt: string;
 }
 
+interface SupplierPurchaseNoteItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  total: number;
+}
+
+interface SupplierPurchaseNoteData {
+  purchaseNoteNumber: string;
+  date: string;
+  supplierName: string;
+  supplierPhone: string;
+  supplierEmail: string;
+  supplierAddress: string;
+  businessName: string;
+  businessAddress: string;
+  businessPhone: string;
+  businessEmail: string;
+  items: SupplierPurchaseNoteItem[];
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  notes: string;
+  preparedBy: string;
+  preparedDate: string;
+  status: 'draft' | 'completed' | 'cancelled';
+}
+
 interface TemplatesProps {
   onBack?: () => void;
 }
 
 export const Templates = ({ onBack }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1154,6 +1186,46 @@ NOTES:
 VERIFIED BY:
 Counted By: _________________    Date: [COUNT_DATE]
 Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
+      lastModified: new Date().toISOString().split('T')[0],
+      isActive: true
+    },
+    {
+      id: "17",
+      name: "Supplier Purchase Note",
+      type: "supplier-purchase-note",
+      description: "Professional template for recording purchases on behalf of suppliers without documents",
+      content: `SUPPLIER PURCHASE NOTE
+Note #[NOTE_NUMBER]
+Date: [DATE]
+
+FROM (Business):
+[BUSINESS_NAME]
+[BUSINESS_ADDRESS]
+Phone: [BUSINESS_PHONE]
+Email: [BUSINESS_EMAIL]
+
+ON BEHALF OF (Supplier):
+[SUPPLIER_NAME]
+[SUPPLIER_ADDRESS]
+Phone: [SUPPLIER_PHONE]
+Email: [SUPPLIER_EMAIL]
+
+ITEMS PURCHASED:
+[ITEM_LIST]
+
+SUMMARY:
+Subtotal: [SUBTOTAL]
+Tax: [TAX]
+Discount: [DISCOUNT]
+TOTAL: [TOTAL]
+
+NOTES:
+[NOTES]
+
+Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
+
+This document records a purchase made on behalf of the supplier.
+No inventory adjustment will be made.`,
       lastModified: new Date().toISOString().split('T')[0],
       isActive: true
     }
@@ -2783,7 +2855,116 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
     const saved = localStorage.getItem('savedGRNs');
     return saved ? JSON.parse(saved) : [];
   });
-  
+
+  // Supplier Purchase Note state
+  const generatePurchaseNoteNumber = () => `SPN-${String(Date.now()).slice(-6)}`;
+  const [supplierPurchaseNoteData, setSupplierPurchaseNoteData] = useState<SupplierPurchaseNoteData>({
+    purchaseNoteNumber: generatePurchaseNoteNumber(),
+    date: new Date().toISOString().split('T')[0],
+    supplierName: '',
+    supplierPhone: '',
+    supplierEmail: '',
+    supplierAddress: '',
+    businessName: '',
+    businessAddress: '',
+    businessPhone: '',
+    businessEmail: '',
+    items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, total: 0 }],
+    subtotal: 0,
+    tax: 0,
+    discount: 0,
+    total: 0,
+    notes: '',
+    preparedBy: '',
+    preparedDate: new Date().toISOString().split('T')[0],
+    status: 'draft'
+  });
+
+  const handleSupplierPurchaseNoteChange = (field: keyof SupplierPurchaseNoteData, value: any) => {
+    setSupplierPurchaseNoteData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddSupplierPurchaseItem = () => {
+    setSupplierPurchaseNoteData(prev => ({
+      ...prev,
+      items: [...prev.items, { id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, total: 0 }]
+    }));
+  };
+
+  const handleRemoveSupplierPurchaseItem = (itemId: string) => {
+    setSupplierPurchaseNoteData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }));
+  };
+
+  const handleSupplierPurchaseItemChange = (itemId: string, field: keyof SupplierPurchaseNoteItem, value: any) => {
+    setSupplierPurchaseNoteData(prev => ({
+      ...prev,
+      items: prev.items.map(item => {
+        if (item.id !== itemId) return item;
+        const updated = { ...item, [field]: value };
+        if (field === 'quantity' || field === 'unitPrice') {
+          updated.total = (updated.quantity || 0) * (updated.unitPrice || 0);
+        }
+        return updated;
+      })
+    }));
+  };
+
+  const handleSaveSupplierPurchaseNote = async () => {
+    try {
+      const subtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+      const tax = supplierPurchaseNoteData.tax || 0;
+      const discount = supplierPurchaseNoteData.discount || 0;
+      const total = subtotal + tax - discount;
+
+      const noteData = {
+        ...supplierPurchaseNoteData,
+        subtotal,
+        tax,
+        discount,
+        total,
+        status: 'completed' as const
+      };
+
+      const { saveSupplierPurchaseNote } = await import('@/utils/supplierPurchaseNoteUtils');
+      const result = await saveSupplierPurchaseNote(noteData);
+
+      if (result.success) {
+        toast({ title: 'Success', description: 'Supplier Purchase Note saved successfully' });
+        // Reset form
+        setSupplierPurchaseNoteData({
+          purchaseNoteNumber: generatePurchaseNoteNumber(),
+          date: new Date().toISOString().split('T')[0],
+          supplierName: '',
+          supplierPhone: '',
+          supplierEmail: '',
+          supplierAddress: '',
+          businessName: '',
+          businessAddress: '',
+          businessPhone: '',
+          businessEmail: '',
+          items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, total: 0 }],
+          subtotal: 0,
+          tax: 0,
+          discount: 0,
+          total: 0,
+          notes: '',
+          preparedBy: '',
+          preparedDate: new Date().toISOString().split('T')[0],
+          status: 'draft'
+        });
+        setActiveTab('manage');
+      } else {
+        toast({ title: 'Error', description: result.error || 'Failed to save note', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error saving supplier purchase note:', error);
+      toast({ title: 'Error', description: 'Failed to save supplier purchase note', variant: 'destructive' });
+    }
+  };
+
   // State to store the settlement data to be printed (preserved after save)
   const [settlementToPrint, setSettlementToPrint] = useState<CustomerSettlementData | null>(null);
     
@@ -9203,6 +9384,14 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                       <ClipboardCheck className="h-4 w-4" />
                       Saved Stock Takes
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedSupplierPurchaseNotes')}
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Supplier Purchase Notes
+                    </Button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -9379,11 +9568,32 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                   username="User" 
                 />
               </div>
+            ) : activeTab === "savedSupplierPurchaseNotes" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Supplier Purchase Notes</h3>
+                    <p className="text-sm text-muted-foreground">View and manage purchase notes created on behalf of suppliers</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <SupplierPurchaseNoteSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
             ) : activeTab === "preview" ? (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">
-                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : currentTemplate?.type === "report" ? "Report Template Preview" : currentTemplate?.type === "customer-settlement" ? "Customer Settlement Preview" : currentTemplate?.type === "supplier-settlement" ? "Supplier Settlement Preview" : currentTemplate?.type === "goods-received-note" ? "Goods Received Note Preview" : currentTemplate?.type === "sales-order" ? "Sales Order Preview" : currentTemplate?.type === "stock-take" ? "Stock Take Preview" : "Delivery Note Preview"}
+                    {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : currentTemplate?.type === "report" ? "Report Template Preview" : currentTemplate?.type === "customer-settlement" ? "Customer Settlement Preview" : currentTemplate?.type === "supplier-settlement" ? "Supplier Settlement Preview" : currentTemplate?.type === "goods-received-note" ? "Goods Received Note Preview" : currentTemplate?.type === "sales-order" ? "Sales Order Preview" : currentTemplate?.type === "stock-take" ? "Stock Take Preview" : currentTemplate?.type === "supplier-purchase-note" ? "Supplier Purchase Note Preview" : "Delivery Note Preview"}
                   </h3>
                   <div className="flex gap-2">
                     {currentTemplate?.type === "order-form" ? (
@@ -13819,6 +14029,157 @@ Verified By (Manager): _________________    Date: [VERIFICATION_DATE]`,
                         </div>
                         </div>
                         )}
+                      </div>
+                    ) : currentTemplate?.type === "supplier-purchase-note" ? (
+                      // Supplier Purchase Note Content
+                      <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center border-b-2 border-indigo-800 pb-2">
+                          <h2 className="text-2xl font-bold text-indigo-900">SUPPLIER PURCHASE NOTE</h2>
+                          <p className="text-sm text-muted-foreground">Purchase made on behalf of supplier - No inventory adjustment</p>
+                        </div>
+
+                        {/* Note Info */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-bold">Note Number</label>
+                            <Input
+                              value={supplierPurchaseNoteData.purchaseNoteNumber}
+                              onChange={(e) => handleSupplierPurchaseNoteChange('purchaseNoteNumber', e.target.value)}
+                              className="p-1 h-8 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold">Date</label>
+                            <Input
+                              type="date"
+                              value={supplierPurchaseNoteData.date}
+                              onChange={(e) => handleSupplierPurchaseNoteChange('date', e.target.value)}
+                              className="p-1 h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Business and Supplier Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50/30">
+                            <h3 className="font-bold text-indigo-900 mb-2">FROM (Business)</h3>
+                            <Input placeholder="Business Name" value={supplierPurchaseNoteData.businessName} onChange={(e) => handleSupplierPurchaseNoteChange('businessName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <Input placeholder="Business Address" value={supplierPurchaseNoteData.businessAddress} onChange={(e) => handleSupplierPurchaseNoteChange('businessAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input placeholder="Phone" value={supplierPurchaseNoteData.businessPhone} onChange={(e) => handleSupplierPurchaseNoteChange('businessPhone', e.target.value)} className="p-1 h-8 text-sm" />
+                              <Input placeholder="Email" value={supplierPurchaseNoteData.businessEmail} onChange={(e) => handleSupplierPurchaseNoteChange('businessEmail', e.target.value)} className="p-1 h-8 text-sm" />
+                            </div>
+                          </div>
+                          <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/30">
+                            <h3 className="font-bold text-amber-900 mb-2">ON BEHALF OF (Supplier)</h3>
+                            <Input placeholder="Supplier Name" value={supplierPurchaseNoteData.supplierName} onChange={(e) => handleSupplierPurchaseNoteChange('supplierName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <Input placeholder="Supplier Address" value={supplierPurchaseNoteData.supplierAddress} onChange={(e) => handleSupplierPurchaseNoteChange('supplierAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input placeholder="Phone" value={supplierPurchaseNoteData.supplierPhone} onChange={(e) => handleSupplierPurchaseNoteChange('supplierPhone', e.target.value)} className="p-1 h-8 text-sm" />
+                              <Input placeholder="Email" value={supplierPurchaseNoteData.supplierEmail} onChange={(e) => handleSupplierPurchaseNoteChange('supplierEmail', e.target.value)} className="p-1 h-8 text-sm" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Items Table */}
+                        <div>
+                          <h3 className="font-bold mb-2">ITEMS PURCHASED</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm border-collapse">
+                              <thead>
+                                <tr className="border-b-2 border-indigo-300 bg-indigo-50">
+                                  <th className="text-left p-2">Description</th>
+                                  <th className="text-center p-2 w-20">Qty</th>
+                                  <th className="text-left p-2 w-20">Unit</th>
+                                  <th className="text-right p-2 w-28">Unit Price</th>
+                                  <th className="text-right p-2 w-28">Total</th>
+                                  <th className="p-2 w-10"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {supplierPurchaseNoteData.items.map((item) => (
+                                  <tr key={item.id} className="border-b">
+                                    <td className="p-2">
+                                      <Input value={item.description || ''} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'description', e.target.value)} className="p-1 h-8 text-sm" placeholder="Item description" />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input type="number" value={item.quantity || 0} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)} className="p-1 h-8 text-sm text-center" />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input value={item.unit || ''} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'unit', e.target.value)} className="p-1 h-8 text-sm" placeholder="Unit" />
+                                    </td>
+                                    <td className="p-2">
+                                      <Input type="number" step="0.01" value={item.unitPrice || 0} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm text-right" />
+                                    </td>
+                                    <td className="p-2 text-right font-medium">{formatCurrency(item.total || 0)}</td>
+                                    <td className="p-2">
+                                      <Button onClick={() => handleRemoveSupplierPurchaseItem(item.id)} variant="outline" size="sm" className="p-1 h-8"><Trash2 className="h-4 w-4" /></Button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-indigo-300">
+                                  <td colSpan={4} className="p-2 text-right font-bold">Subtotal:</td>
+                                  <td className="p-2 text-right font-bold">{formatCurrency(supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0))}</td>
+                                  <td></td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                          <Button onClick={handleAddSupplierPurchaseItem} variant="outline" size="sm" className="mt-2">
+                            <Plus className="h-4 w-4 mr-1" /> Add Item
+                          </Button>
+                        </div>
+
+                        {/* Tax, Discount, Total */}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <label className="text-xs font-bold">Tax</label>
+                            <Input type="number" step="0.01" value={supplierPurchaseNoteData.tax} onChange={(e) => handleSupplierPurchaseNoteChange('tax', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold">Discount</label>
+                            <Input type="number" step="0.01" value={supplierPurchaseNoteData.discount} onChange={(e) => handleSupplierPurchaseNoteChange('discount', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold">Total</label>
+                            <div className="p-1 h-8 text-sm font-bold flex items-center bg-indigo-50 rounded px-2">
+                              {formatCurrency((supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0)) + (supplierPurchaseNoteData.tax || 0) - (supplierPurchaseNoteData.discount || 0))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                          <label className="text-xs font-bold">Notes</label>
+                          <textarea
+                            value={supplierPurchaseNoteData.notes}
+                            onChange={(e) => handleSupplierPurchaseNoteChange('notes', e.target.value)}
+                            className="w-full p-2 border rounded text-sm h-20"
+                            placeholder="Additional notes..."
+                          />
+                        </div>
+
+                        {/* Prepared By */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-bold">Prepared By</label>
+                            <Input value={supplierPurchaseNoteData.preparedBy} onChange={(e) => handleSupplierPurchaseNoteChange('preparedBy', e.target.value)} className="p-1 h-8 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold">Date</label>
+                            <Input type="date" value={supplierPurchaseNoteData.preparedDate} onChange={(e) => handleSupplierPurchaseNoteChange('preparedDate', e.target.value)} className="p-1 h-8 text-sm" />
+                          </div>
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="flex justify-end gap-2">
+                          <Button onClick={handleSaveSupplierPurchaseNote} className="bg-indigo-600 hover:bg-indigo-700">
+                            <Save className="h-4 w-4 mr-2" /> Save Purchase Note
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       // Delivery Note Content
