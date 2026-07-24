@@ -1307,8 +1307,9 @@ No inventory adjustment will be made.`,
   const [spnItemProductSearch, setSpnItemProductSearch] = useState<Record<string, string>>({});
   const [spnItemShowProductDropdown, setSpnItemShowProductDropdown] = useState<Record<string, boolean>>({});
   const [spnShowNewProductDialog, setSpnShowNewProductDialog] = useState<boolean>(false);
-  const [spnNewProductForm, setSpnNewProductForm] = useState({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+  const [spnNewProductForm, setSpnNewProductForm] = useState({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '', quantity: 0 });
   const [spnSavingNewProduct, setSpnSavingNewProduct] = useState<boolean>(false);
+  const [spnNewProductItemId, setSpnNewProductItemId] = useState<string>('');
   const [spnAllProducts, setSpnAllProducts] = useState<Product[]>([]);
   const [spnLoadingAllProducts, setSpnLoadingAllProducts] = useState<boolean>(false);
 
@@ -14933,7 +14934,15 @@ No inventory adjustment will be made.`,
                                               onMouseDown={(e) => {
                                                 e.preventDefault();
                                                 setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
-                                                setSpnNewProductForm({ name: spnItemProductSearch[item.id] || item.description || '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                                                setSpnNewProductItemId(item.id);
+                                                setSpnNewProductForm({
+                                                  name: spnItemProductSearch[item.id] || item.description || '',
+                                                  unit_of_measure: item.unit || '',
+                                                  cost_price: item.unitPrice || 0,
+                                                  selling_price: 0,
+                                                  category_id: '',
+                                                  quantity: item.quantity || 0
+                                                });
                                                 setSpnShowNewProductDialog(true);
                                               }}
                                               className="cursor-pointer py-2 px-3 hover:bg-emerald-50 border-t bg-emerald-100/50 text-emerald-800 font-medium text-sm flex items-center gap-2"
@@ -17626,13 +17635,14 @@ Enter choice (1-3):`);
       {/* Register New Product Dialog */}
       {spnShowNewProductDialog && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Register New Product</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Register New Product & Add to Items</h3>
               <button
                 onClick={() => {
                   setSpnShowNewProductDialog(false);
-                  setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                  setSpnNewProductItemId('');
+                  setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '', quantity: 0 });
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -17640,8 +17650,11 @@ Enter choice (1-3):`);
               </button>
             </div>
             <div className="p-4 space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
+                <p className="text-xs text-blue-700 font-medium">This product will be saved to the database and linked to the current supplier for future use.</p>
+              </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Product Name *</label>
+                <label className="text-sm font-medium text-gray-700">Description (Product Name) *</label>
                 <Input
                   value={spnNewProductForm.name}
                   onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, name: e.target.value }))}
@@ -17649,18 +17662,30 @@ Enter choice (1-3):`);
                   className="mt-1 text-sm"
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Unit of Measure</label>
-                <Input
-                  value={spnNewProductForm.unit_of_measure}
-                  onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, unit_of_measure: e.target.value }))}
-                  placeholder="e.g. kg, pcs, box"
-                  className="mt-1 text-sm"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Quantity</label>
+                  <Input
+                    type="number"
+                    value={spnNewProductForm.quantity}
+                    onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Unit</label>
+                  <Input
+                    value={spnNewProductForm.unit_of_measure}
+                    onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, unit_of_measure: e.target.value }))}
+                    placeholder="e.g. kg, pcs, box"
+                    className="mt-1 text-sm"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Cost Price</label>
+                  <label className="text-sm font-medium text-gray-700">Unit Price</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -17671,16 +17696,22 @@ Enter choice (1-3):`);
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Selling Price</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={spnNewProductForm.selling_price}
-                    onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, selling_price: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
-                    className="mt-1 text-sm"
-                  />
+                  <label className="text-sm font-medium text-gray-700">Total</label>
+                  <div className="mt-1 text-sm font-semibold p-2 bg-gray-100 rounded">
+                    {formatCurrency(spnNewProductForm.quantity * spnNewProductForm.cost_price)}
+                  </div>
                 </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Selling Price (optional)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={spnNewProductForm.selling_price}
+                  onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, selling_price: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0.00"
+                  className="mt-1 text-sm"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
@@ -17688,7 +17719,8 @@ Enter choice (1-3):`);
                 variant="outline"
                 onClick={() => {
                   setSpnShowNewProductDialog(false);
-                  setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                  setSpnNewProductItemId('');
+                  setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '', quantity: 0 });
                 }}
               >
                 Cancel
@@ -17721,9 +17753,18 @@ Enter choice (1-3):`);
                       }
                       // Add to supplier products list
                       setSpnSupplierProducts(prev => [...prev, created]);
+                      // Fill the item row with the new product data
+                      if (spnNewProductItemId) {
+                        handleSupplierPurchaseItemChange(spnNewProductItemId, 'description', created.name);
+                        handleSupplierPurchaseItemChange(spnNewProductItemId, 'unit', created.unit_of_measure || '');
+                        handleSupplierPurchaseItemChange(spnNewProductItemId, 'unitPrice', created.cost_price || 0);
+                        handleSupplierPurchaseItemChange(spnNewProductItemId, 'quantity', spnNewProductForm.quantity);
+                        setSpnItemProductSearch(prev => ({ ...prev, [spnNewProductItemId]: created.name }));
+                      }
                       setSpnShowNewProductDialog(false);
-                      setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
-                      toast({ title: "Success", description: "Product registered successfully" });
+                      setSpnNewProductItemId('');
+                      setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '', quantity: 0 });
+                      toast({ title: "Success", description: "Product registered and added to items" });
                     } else {
                       throw new Error("Failed to create product");
                     }
@@ -17739,7 +17780,7 @@ Enter choice (1-3):`);
                 {spnSavingNewProduct ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
                 ) : (
-                  "Register Product"
+                  "Register & Add to Items"
                 )}
               </Button>
             </div>
