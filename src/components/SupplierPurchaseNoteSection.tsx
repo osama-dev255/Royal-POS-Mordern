@@ -186,7 +186,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username }: Supp
                 >
                   ← Back
                 </button>
-                <h1 className="text-xl font-bold">Supplier Purchase Notes</h1>
+                <h1 className="text-xl font-bold">Purchase Management</h1>
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted-foreground">Welcome, {username}</span>

@@ -116,6 +116,7 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
+      'saved-supplier-purchase-notes',
       'grn-inventory-dashboard',
       'sales-management-report'
     ],
@@ -138,6 +139,7 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
+      'saved-supplier-purchase-notes',
       'grn-inventory-dashboard',
       'sales-management-report'
     ],
@@ -151,6 +153,7 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
+      'saved-supplier-purchase-notes',
       'grn-inventory-dashboard',
       'sales-management-report'
     ],
@@ -161,6 +164,7 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'saved-customer-settlements',
       'saved-grns',
       'saved-supplier-settlements',
+      'saved-supplier-purchase-notes',
       'grn-inventory-dashboard',
       'sales-management-report'
     ],

@@ -10,7 +10,8 @@ import {
   ShoppingCart,
   Package,
   PackageCheck,
-  CreditCard
+  CreditCard,
+  ClipboardList
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -110,6 +111,13 @@ export const PurchaseDashboard = ({ username, onBack, onLogout, onNavigate }: Pu
       title: "Saved Supplier Settlements",
       description: "View and manage saved supplier settlements",
       icon: CreditCard,
+      color: "bg-white border border-gray-200"
+    },
+    {
+      id: "saved-supplier-purchase-notes",
+      title: "Saved Supplier Purchase Notes",
+      description: "View and manage supplier purchase notes created on behalf of suppliers",
+      icon: ClipboardList,
       color: "bg-white border border-gray-200"
     }
   ];
