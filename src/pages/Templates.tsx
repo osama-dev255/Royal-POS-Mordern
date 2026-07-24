@@ -7288,7 +7288,7 @@ No inventory adjustment will be made.`,
     
     /* === HEADER === */
     .dn-header {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      background: #000;
       color: #fff;
       padding: 12px 24px;
       position: relative;
@@ -7558,7 +7558,7 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .payment-header {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      background: #000;
       color: #fff;
       padding: 8px 12px;
       font-size: 12px;
@@ -7609,14 +7609,14 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .notes-header {
-      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      background: #f5f5f5;
       padding: 8px 12px;
       font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #000;
-      border-bottom: 1px solid #fde68a;
+      border-bottom: 1px solid #ddd;
     }
     .notes-body {
       padding: 10px 12px;
@@ -7684,7 +7684,7 @@ No inventory adjustment will be made.`,
     
     /* === FOOTER === */
     .dn-footer {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      background: #000;
       color: #fff;
       padding: 10px 24px;
       margin-top: 12px;
@@ -8010,16 +8010,17 @@ No inventory adjustment will be made.`,
     /* === TOP ACCENT BAR === */
     .accent-bar {
       height: 4px;
-      background: linear-gradient(90deg, #4338ca 0%, #6366f1 50%, #818cf8 100%);
+      background: #000;
     }
     
     /* === HEADER === */
     .spn-header {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-      color: #fff;
+      background: #fff;
+      color: #000;
       padding: 12px 24px;
       position: relative;
       text-align: center;
+      border-bottom: 3px solid #000;
     }
     .spn-header::after {
       content: '';
@@ -8029,7 +8030,7 @@ No inventory adjustment will be made.`,
       transform: translateY(-50%);
       width: 50px;
       height: 50px;
-      border: 2px solid rgba(255,255,255,0.1);
+      border: 2px solid #ccc;
       border-radius: 50%;
     }
     .spn-document-title {
@@ -8038,6 +8039,7 @@ No inventory adjustment will be made.`,
       letter-spacing: 1px;
       margin-bottom: 4px;
       text-transform: uppercase;
+      color: #000;
     }
     .spn-document-number {
       font-size: 13px;
@@ -8049,13 +8051,14 @@ No inventory adjustment will be made.`,
       display: inline-block;
       margin-top: 4px;
       padding: 2px 8px;
-      background: rgba(129, 140, 248, 0.2);
-      border: 1px solid #818cf8;
+      background: #fff;
+      border: 1px solid #000;
       border-radius: 3px;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.5px;
       text-transform: uppercase;
+      color: #000;
     }
     
     /* === META BAR === */
@@ -8109,7 +8112,7 @@ No inventory adjustment will be made.`,
       text-align: right;
     }
     .party-header {
-      background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+      background: #000;
       color: #fff;
       padding: 8px 12px;
       font-size: 11px;
@@ -8180,7 +8183,7 @@ No inventory adjustment will be made.`,
       content: '';
       width: 3px;
       height: 14px;
-      background: #4338ca;
+      background: #000;
       border-radius: 2px;
     }
     .items-table {
@@ -8260,7 +8263,7 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .payment-header {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      background: #000;
       color: #fff;
       padding: 8px 12px;
       font-size: 12px;
@@ -8300,14 +8303,14 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .notes-header {
-      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      background: #f5f5f5;
       padding: 8px 12px;
       font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #000;
-      border-bottom: 1px solid #fde68a;
+      border-bottom: 1px solid #ddd;
     }
     .notes-body {
       padding: 10px 12px;
@@ -8367,10 +8370,11 @@ No inventory adjustment will be made.`,
     
     /* === FOOTER === */
     .spn-footer {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-      color: #fff;
+      background: #fff;
+      color: #000;
       padding: 10px 24px;
       margin-top: 12px;
+      border-top: 3px solid #000;
     }
     .footer-content {
       display: flex;
@@ -8405,7 +8409,7 @@ No inventory adjustment will be made.`,
         transform: translate(-50%, -50%) rotate(-45deg);
         font-size: 80px;
         font-weight: 900;
-        color: rgba(67, 56, 202, 0.05);
+        color: rgba(0, 0, 0, 0.05);
         z-index: -1;
         letter-spacing: 10px;
         text-transform: uppercase;
