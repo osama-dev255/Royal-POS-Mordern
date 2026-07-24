@@ -5168,8 +5168,8 @@ export class PrintUtils {
     .header p { font-size: 10px; color: #666; }
     .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
     .info-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
-    .info-box.business { border-color: #4338ca; background: #f5f3ff; }
-    .info-box.supplier { border-color: #d97706; background: #fffbeb; }
+    .info-box.business { border-color: #4338ca; background: #faf9ff; }
+    .info-box.supplier { border-color: #d97706; background: #fffdf5; }
     .info-box h3 { font-size: 11px; margin-bottom: 6px; }
     .info-box.business h3 { color: #4338ca; }
     .info-box.supplier h3 { color: #d97706; }

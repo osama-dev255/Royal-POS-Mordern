@@ -7559,7 +7559,7 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .payment-header {
-      background: #e5e7eb;
+      background: #f1f3f5;
       color: #000;
       padding: 8px 12px;
       font-size: 12px;
@@ -8264,7 +8264,7 @@ No inventory adjustment will be made.`,
       overflow: hidden;
     }
     .payment-header {
-      background: #e5e7eb;
+      background: #f1f3f5;
       color: #000;
       padding: 8px 12px;
       font-size: 12px;
