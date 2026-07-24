@@ -26,6 +26,7 @@ export const SupplierProductsSection = ({ onBack, onLogout, username }: Supplier
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [linkingProductId, setLinkingProductId] = useState<string>("");
+  const [linkSearchTerms, setLinkSearchTerms] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadData();
@@ -303,37 +304,64 @@ export const SupplierProductsSection = ({ onBack, onLogout, username }: Supplier
                           Link Existing Product
                         </h4>
                         <p className="text-xs text-muted-foreground mb-3">
-                          Link an existing product to this supplier
+                          Search and link an existing product to this supplier
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {getUnlinkedProducts(sp.supplier.id!, sp.products).slice(0, 6).map((product) => (
-                            <Button
-                              key={product.id}
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleLinkProduct(sp.supplier.id!, product.id!, index)}
-                              disabled={linkingProductId === product.id}
-                              className="justify-start"
-                            >
-                              {linkingProductId === product.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                              ) : (
-                                <Link className="h-4 w-4 mr-1" />
-                              )}
-                              {product.name}
-                            </Button>
-                          ))}
-                          {getUnlinkedProducts(sp.supplier.id!, sp.products).length > 6 && (
-                            <p className="text-xs text-muted-foreground col-span-full">
-                              + {getUnlinkedProducts(sp.supplier.id!, sp.products).length - 6} more products available
-                            </p>
-                          )}
-                          {getUnlinkedProducts(sp.supplier.id!, sp.products).length === 0 && (
-                            <p className="text-xs text-muted-foreground col-span-full">
-                              All products are already linked to this supplier
-                            </p>
-                          )}
+                        {/* Search Input */}
+                        <div className="relative mb-3">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search products to link..."
+                            value={linkSearchTerms[sp.supplier.id!] || ""}
+                            onChange={(e) => setLinkSearchTerms(prev => ({ ...prev, [sp.supplier.id!]: e.target.value }))}
+                            className="pl-10 h-9"
+                          />
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                          {getUnlinkedProducts(sp.supplier.id!, sp.products)
+                            .filter(p => {
+                              const search = (linkSearchTerms[sp.supplier.id!] || "").toLowerCase();
+                              return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || "").toLowerCase().includes(search);
+                            })
+                            .map((product) => (
+                              <Button
+                                key={product.id}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleLinkProduct(sp.supplier.id!, product.id!, index)}
+                                disabled={linkingProductId === product.id}
+                                className="justify-start"
+                              >
+                                {linkingProductId === product.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : (
+                                  <Link className="h-4 w-4 mr-1" />
+                                )}
+                                <span className="truncate">{product.name}</span>
+                                {product.unit_of_measure && (
+                                  <span className="text-xs text-muted-foreground ml-auto">({product.unit_of_measure})</span>
+                                )}
+                              </Button>
+                            ))}
+                          {getUnlinkedProducts(sp.supplier.id!, sp.products)
+                            .filter(p => {
+                              const search = (linkSearchTerms[sp.supplier.id!] || "").toLowerCase();
+                              return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || "").toLowerCase().includes(search);
+                            }).length === 0 && (
+                              <p className="text-xs text-muted-foreground col-span-full text-center py-2">
+                                {getUnlinkedProducts(sp.supplier.id!, sp.products).length === 0
+                                  ? "All products are already linked to this supplier"
+                                  : "No products match your search"}
+                              </p>
+                            )}
+                        </div>
+                        {getUnlinkedProducts(sp.supplier.id!, sp.products).length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {getUnlinkedProducts(sp.supplier.id!, sp.products).filter(p => {
+                              const search = (linkSearchTerms[sp.supplier.id!] || "").toLowerCase();
+                              return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || "").toLowerCase().includes(search);
+                            }).length} of {getUnlinkedProducts(sp.supplier.id!, sp.products).length} unlinked products shown
+                          </p>
+                        )}
                       </div>
                     )}
                   </CardContent>
