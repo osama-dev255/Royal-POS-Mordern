@@ -10667,6 +10667,9 @@ No inventory adjustment will be made.`,
                       } else if (currentTemplate?.type === "goods-received-note") {
                         // Use the proper handleSaveGRN function for GRNs
                         await handleSaveGRN();
+                      } else if (currentTemplate?.type === "supplier-purchase-note") {
+                        // Save supplier purchase note
+                        await handleSaveSupplierPurchaseNote();
                       } else {
                         handleSaveDeliveryNote();
                       }
