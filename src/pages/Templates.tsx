@@ -64,7 +64,7 @@ import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
 import { SavedStockTakesSection } from '@/components/SavedStockTakesSection';
 import { SupplierPurchaseNoteSection } from '@/components/SupplierPurchaseNoteSection';
-import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock } from '@/services/databaseService';
+import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock, getProductsBySupplierId, linkProductToSupplier } from '@/services/databaseService';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
@@ -617,6 +617,7 @@ interface SupplierPurchaseNoteItem {
 interface SupplierPurchaseNoteData {
   purchaseNoteNumber: string;
   date: string;
+  supplierId: string;
   supplierName: string;
   supplierPhone: string;
   supplierEmail: string;
@@ -1299,6 +1300,17 @@ No inventory adjustment will be made.`,
   const [spnShowNewSupplierDialog, setSpnShowNewSupplierDialog] = useState<boolean>(false);
   const [spnNewSupplierForm, setSpnNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
   const [spnSavingNewSupplier, setSpnSavingNewSupplier] = useState<boolean>(false);
+
+  // SPN Product dropdown state
+  const [spnSupplierProducts, setSpnSupplierProducts] = useState<Product[]>([]);
+  const [spnLoadingProducts, setSpnLoadingProducts] = useState<boolean>(false);
+  const [spnItemProductSearch, setSpnItemProductSearch] = useState<Record<string, string>>({});
+  const [spnItemShowProductDropdown, setSpnItemShowProductDropdown] = useState<Record<string, boolean>>({});
+  const [spnShowNewProductDialog, setSpnShowNewProductDialog] = useState<boolean>(false);
+  const [spnNewProductForm, setSpnNewProductForm] = useState({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+  const [spnSavingNewProduct, setSpnSavingNewProduct] = useState<boolean>(false);
+  const [spnAllProducts, setSpnAllProducts] = useState<Product[]>([]);
+  const [spnLoadingAllProducts, setSpnLoadingAllProducts] = useState<boolean>(false);
 
   // Map of product name -> Map of godownId -> total quantity available
   const [productGodownMap, setProductGodownMap] = useState<Map<string, Map<string, number>>>(new Map());
@@ -2867,6 +2879,7 @@ No inventory adjustment will be made.`,
   const [supplierPurchaseNoteData, setSupplierPurchaseNoteData] = useState<SupplierPurchaseNoteData>({
     purchaseNoteNumber: generatePurchaseNoteNumber(),
     date: new Date().toISOString().split('T')[0],
+    supplierId: '',
     supplierName: '',
     supplierPhone: '',
     supplierEmail: '',
@@ -2939,9 +2952,13 @@ No inventory adjustment will be made.`,
         toast({ title: 'Success', description: 'Supplier Purchase Note saved successfully' });
         // Reset form
         setSpnSupplierSearch('');
+        setSpnSupplierProducts([]);
+        setSpnItemProductSearch({});
+        setSpnItemShowProductDropdown({});
         setSupplierPurchaseNoteData({
           purchaseNoteNumber: generatePurchaseNoteNumber(),
           date: new Date().toISOString().split('T')[0],
+          supplierId: '',
           supplierName: '',
           supplierPhone: '',
           supplierEmail: '',
@@ -14773,11 +14790,20 @@ No inventory adjustment will be made.`,
                                             e.preventDefault();
                                             // Auto-fill supplier fields
                                             setSpnSupplierSearch(supplier.name);
+                                            handleSupplierPurchaseNoteChange('supplierId', supplier.id || '');
                                             handleSupplierPurchaseNoteChange('supplierName', supplier.name);
                                             handleSupplierPurchaseNoteChange('supplierPhone', supplier.phone || '');
                                             handleSupplierPurchaseNoteChange('supplierEmail', supplier.email || '');
                                             handleSupplierPurchaseNoteChange('supplierAddress', supplier.address || '');
                                             setSpnShowSupplierDropdown(false);
+                                            // Load supplier's products
+                                            if (supplier.id) {
+                                              setSpnLoadingProducts(true);
+                                              getProductsBySupplierId(supplier.id).then(products => {
+                                                setSpnSupplierProducts(products);
+                                                setSpnLoadingProducts(false);
+                                              });
+                                            }
                                           }}
                                           className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
                                         >
@@ -14846,7 +14872,78 @@ No inventory adjustment will be made.`,
                                 {supplierPurchaseNoteData.items.map((item) => (
                                   <tr key={item.id} className="border-b">
                                     <td className="p-2">
-                                      <Input value={item.description || ''} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'description', e.target.value)} className="p-1 h-8 text-sm" placeholder="Item description" />
+                                      <div className="relative">
+                                        <Input
+                                          value={spnItemProductSearch[item.id] ?? item.description ?? ''}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSpnItemProductSearch(prev => ({ ...prev, [item.id]: val }));
+                                            handleSupplierPurchaseItemChange(item.id, 'description', val);
+                                            setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                          }}
+                                          onFocus={() => {
+                                            setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                          }}
+                                          onBlur={() => {
+                                            setTimeout(() => setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false })), 200);
+                                          }}
+                                          className="p-1 h-8 text-sm"
+                                          placeholder="Search product or type description..."
+                                        />
+                                        {spnItemShowProductDropdown[item.id] && (
+                                          <div className="absolute z-50 bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
+                                            {spnLoadingProducts ? (
+                                              <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
+                                            ) : spnSupplierProducts.length > 0 ? (
+                                              <div>
+                                                {spnSupplierProducts
+                                                  .filter(p => {
+                                                    const search = (spnItemProductSearch[item.id] || item.description || '').toLowerCase();
+                                                    return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                                                  })
+                                                  .map((product) => (
+                                                    <div
+                                                      key={product.id}
+                                                      onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        handleSupplierPurchaseItemChange(item.id, 'description', product.name);
+                                                        handleSupplierPurchaseItemChange(item.id, 'unit', product.unit_of_measure || '');
+                                                        handleSupplierPurchaseItemChange(item.id, 'unitPrice', product.cost_price || 0);
+                                                        setSpnItemProductSearch(prev => ({ ...prev, [item.id]: product.name }));
+                                                        setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
+                                                      }}
+                                                      className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                                    >
+                                                      <div className="flex flex-col gap-0.5">
+                                                        <span className="font-semibold text-sm">{product.name}</span>
+                                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                          {product.unit_of_measure && <span>Unit: {product.unit_of_measure}</span>}
+                                                          <span>Cost: {formatCurrency(product.cost_price || 0)}</span>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                              </div>
+                                            ) : (
+                                              <div className="p-3 text-center text-sm text-muted-foreground">
+                                                {supplierPurchaseNoteData.supplierId ? 'No products for this supplier' : 'Select a supplier first'}
+                                              </div>
+                                            )}
+                                            <div
+                                              onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
+                                                setSpnNewProductForm({ name: spnItemProductSearch[item.id] || item.description || '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                                                setSpnShowNewProductDialog(true);
+                                              }}
+                                              className="cursor-pointer py-2 px-3 hover:bg-emerald-50 border-t bg-emerald-100/50 text-emerald-800 font-medium text-sm flex items-center gap-2"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                              Register New Product
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="p-2">
                                       <Input type="number" value={item.quantity || 0} onChange={(e) => handleSupplierPurchaseItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)} className="p-1 h-8 text-sm text-center" />
@@ -17494,12 +17591,14 @@ Enter choice (1-3):`);
                       setFilteredSuppliers(prev => [...prev, newSupplier]);
                       // Auto-fill SPN supplier fields
                       setSpnSupplierSearch(created.name);
+                      handleSupplierPurchaseNoteChange('supplierId', created.id || '');
                       handleSupplierPurchaseNoteChange('supplierName', created.name);
                       handleSupplierPurchaseNoteChange('supplierPhone', created.phone || '');
                       handleSupplierPurchaseNoteChange('supplierEmail', created.email || '');
                       handleSupplierPurchaseNoteChange('supplierAddress', created.address || '');
                       setSpnShowNewSupplierDialog(false);
                       setSpnNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                      setSpnSupplierProducts([]);
                       toast({ title: "Success", description: "Supplier registered and selected successfully" });
                     } else {
                       throw new Error("Failed to create supplier");
@@ -17517,6 +17616,130 @@ Enter choice (1-3):`);
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
                 ) : (
                   "Register & Select"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Register New Product Dialog */}
+      {spnShowNewProductDialog && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Register New Product</h3>
+              <button
+                onClick={() => {
+                  setSpnShowNewProductDialog(false);
+                  setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Product Name *</label>
+                <Input
+                  value={spnNewProductForm.name}
+                  onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter product name"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Unit of Measure</label>
+                <Input
+                  value={spnNewProductForm.unit_of_measure}
+                  onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, unit_of_measure: e.target.value }))}
+                  placeholder="e.g. kg, pcs, box"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Cost Price</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={spnNewProductForm.cost_price}
+                    onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, cost_price: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Selling Price</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={spnNewProductForm.selling_price}
+                    onChange={(e) => setSpnNewProductForm(prev => ({ ...prev, selling_price: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSpnShowNewProductDialog(false);
+                  setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!spnNewProductForm.name) {
+                    toast({ title: "Error", description: "Please enter a product name", variant: "destructive" });
+                    return;
+                  }
+                  setSpnSavingNewProduct(true);
+                  try {
+                    const created = await createProduct({
+                      name: spnNewProductForm.name,
+                      unit_of_measure: spnNewProductForm.unit_of_measure,
+                      cost_price: spnNewProductForm.cost_price,
+                      selling_price: spnNewProductForm.selling_price,
+                      stock_quantity: 0,
+                      is_active: true,
+                      description: '',
+                      barcode: '',
+                      sku: '',
+                      min_stock_level: 0,
+                      max_stock_level: 0,
+                    });
+                    if (created && created.id) {
+                      // Link product to current supplier
+                      if (supplierPurchaseNoteData.supplierId) {
+                        await linkProductToSupplier(created.id, supplierPurchaseNoteData.supplierId);
+                      }
+                      // Add to supplier products list
+                      setSpnSupplierProducts(prev => [...prev, created]);
+                      setSpnShowNewProductDialog(false);
+                      setSpnNewProductForm({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '' });
+                      toast({ title: "Success", description: "Product registered successfully" });
+                    } else {
+                      throw new Error("Failed to create product");
+                    }
+                  } catch (error) {
+                    console.error("Error creating product:", error);
+                    toast({ title: "Error", description: "Failed to register product: " + (error as Error).message, variant: "destructive" });
+                  } finally {
+                    setSpnSavingNewProduct(false);
+                  }
+                }}
+                disabled={spnSavingNewProduct}
+              >
+                {spnSavingNewProduct ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                ) : (
+                  "Register Product"
                 )}
               </Button>
             </div>

@@ -1477,6 +1477,81 @@ export const deleteSupplier = async (id: string): Promise<boolean> => {
   }
 };
 
+// Product-Supplier junction table operations
+export const getProductsBySupplierId = async (supplierId: string): Promise<Product[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_suppliers')
+      .select('product_id')
+      .eq('supplier_id', supplierId);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    const productIds = data.map((row: any) => row.product_id);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('*')
+      .in('id', productIds)
+      .order('name');
+
+    if (productsError) throw productsError;
+    return products || [];
+  } catch (error) {
+    console.error('Error fetching products by supplier:', error);
+    return [];
+  }
+};
+
+export const linkProductToSupplier = async (productId: string, supplierId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('product_suppliers')
+      .insert([{ product_id: productId, supplier_id: supplierId }]);
+
+    if (error) {
+      // Ignore duplicate key errors
+      if (error.code === '23505') return true;
+      throw error;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error linking product to supplier:', error);
+    return false;
+  }
+};
+
+export const unlinkProductFromSupplier = async (productId: string, supplierId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('product_suppliers')
+      .delete()
+      .eq('product_id', productId)
+      .eq('supplier_id', supplierId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error unlinking product from supplier:', error);
+    return false;
+  }
+};
+
+export const getSupplierIdsForProduct = async (productId: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('product_suppliers')
+      .select('supplier_id')
+      .eq('product_id', productId);
+
+    if (error) throw error;
+    return (data || []).map((row: any) => row.supplier_id);
+  } catch (error) {
+    console.error('Error fetching supplier IDs for product:', error);
+    return [];
+  }
+};
+
 // Outlet CRUD operations
 export const getOutlets = async (): Promise<Outlet[]> => {
   try {
