@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil } from "lucide-react";
+import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil, Calendar } from "lucide-react";
 import { SupplierPurchaseNoteCard } from "./SupplierPurchaseNoteCard";
 import { getSavedSupplierPurchaseNotes, deleteSupplierPurchaseNote, SavedSupplierPurchaseNote } from "@/utils/supplierPurchaseNoteUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -22,6 +22,10 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
   const [selectedNote, setSelectedNote] = useState<SavedSupplierPurchaseNote | null>(null);
   const [showSellingPrice, setShowSellingPrice] = useState(false);
   const [showProjectedProfit, setShowProjectedProfit] = useState(false);
+  const [dateRange, setDateRange] = useState({
+    start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
 
   // Load saved supplier purchase notes from database
   useEffect(() => {
@@ -49,12 +53,21 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
     return () => window.removeEventListener('supplierPurchaseNoteSaved', handleNoteSaved as EventListener);
   }, []);
 
-  // Filter notes based on search term
-  const filteredNotes = notes.filter(note => 
-    note.purchaseNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    note.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    note.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter notes based on search term and date range
+  const isInDateRange = (dateString: string) => {
+    const date = new Date(dateString);
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+    return date >= startDate && date <= endDate;
+  };
+
+  const filteredNotes = notes.filter(note => {
+    const matchesDate = isInDateRange(note.date);
+    const matchesSearch = note.purchaseNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         note.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         note.id.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesDate && matchesSearch;
+  });
 
   const handleDeleteNote = async (noteId: string) => {
     try {
@@ -320,7 +333,25 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                     View and manage purchase notes created on behalf of suppliers
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={dateRange.start}
+                      onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                      className="w-40"
+                    />
+                  </div>
+                  <span className="text-muted-foreground">to</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={dateRange.end}
+                      onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                      className="w-40"
+                    />
+                  </div>
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
