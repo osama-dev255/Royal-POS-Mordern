@@ -10079,6 +10079,8 @@ No inventory adjustment will be made.`,
                             window.print();
                           } else if (currentTemplate?.type === "goods-received-note") {
                             window.print();
+                          } else if (currentTemplate?.type === "supplier-purchase-note") {
+                            PrintUtils.printSupplierPurchaseNoteDetails(supplierPurchaseNoteData);
                           } else {
                             handlePrintDeliveryNote();
                           }
