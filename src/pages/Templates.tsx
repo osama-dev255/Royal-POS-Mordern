@@ -624,6 +624,8 @@ interface SupplierPurchaseNoteData {
   supplierPhone: string;
   supplierEmail: string;
   supplierAddress: string;
+  supplierStreetAddress: string;
+  supplierTaxId: string;
   businessName: string;
   businessAddress: string;
   businessPhone: string;
@@ -636,6 +638,10 @@ interface SupplierPurchaseNoteData {
   notes: string;
   preparedBy: string;
   preparedDate: string;
+  deliveredBy: string;
+  deliveredDate: string;
+  approvedBy: string;
+  approvedDate: string;
   status: 'draft' | 'completed' | 'cancelled';
 }
 
@@ -2890,6 +2896,8 @@ No inventory adjustment will be made.`,
     supplierPhone: '',
     supplierEmail: '',
     supplierAddress: '',
+    supplierStreetAddress: '',
+    supplierTaxId: '',
     businessName: 'KILANGO GROUP LTD',
     businessAddress: '64, Muheza - Tanga - Tanzania',
     businessPhone: '0711 299 266',
@@ -2902,6 +2910,10 @@ No inventory adjustment will be made.`,
     notes: '',
     preparedBy: '',
     preparedDate: new Date().toISOString().split('T')[0],
+    deliveredBy: '',
+    deliveredDate: new Date().toISOString().split('T')[0],
+    approvedBy: '',
+    approvedDate: new Date().toISOString().split('T')[0],
     status: 'draft'
   });
 
@@ -2917,6 +2929,8 @@ No inventory adjustment will be made.`,
         supplierPhone: data.supplierPhone || '',
         supplierEmail: data.supplierEmail || '',
         supplierAddress: data.supplierAddress || '',
+        supplierStreetAddress: data.supplierStreetAddress || '',
+        supplierTaxId: data.supplierTaxId || '',
         businessName: data.businessName || '',
         businessAddress: data.businessAddress || '',
         businessPhone: data.businessPhone || '',
@@ -2932,6 +2946,10 @@ No inventory adjustment will be made.`,
         notes: data.notes || '',
         preparedBy: data.preparedBy || '',
         preparedDate: data.preparedDate || '',
+        deliveredBy: data.deliveredBy || '',
+        deliveredDate: data.deliveredDate || '',
+        approvedBy: data.approvedBy || '',
+        approvedDate: data.approvedDate || '',
         status: data.status || 'draft'
       });
       // Store the note ID for update
@@ -2982,6 +3000,10 @@ No inventory adjustment will be made.`,
   };
 
   const handleSaveSupplierPurchaseNote = async () => {
+    if (!supplierPurchaseNoteData.preparedBy.trim()) {
+      toast({ title: 'Validation Error', description: 'Prepared By is required', variant: 'destructive' });
+      return;
+    }
     setIsSavingSPN(true);
     try {
       const subtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
@@ -3032,6 +3054,8 @@ No inventory adjustment will be made.`,
           supplierPhone: '',
           supplierEmail: '',
           supplierAddress: '',
+          supplierStreetAddress: '',
+          supplierTaxId: '',
           businessName: '',
           businessAddress: '',
           businessPhone: '',
@@ -3044,6 +3068,10 @@ No inventory adjustment will be made.`,
           notes: '',
           preparedBy: '',
           preparedDate: new Date().toISOString().split('T')[0],
+          deliveredBy: '',
+          deliveredDate: new Date().toISOString().split('T')[0],
+          approvedBy: '',
+          approvedDate: new Date().toISOString().split('T')[0],
           status: 'draft'
         });
         setActiveTab('manage');
@@ -14878,6 +14906,8 @@ No inventory adjustment will be made.`,
                                             handleSupplierPurchaseNoteChange('supplierPhone', supplier.phone || '');
                                             handleSupplierPurchaseNoteChange('supplierEmail', supplier.email || '');
                                             handleSupplierPurchaseNoteChange('supplierAddress', supplier.address || '');
+                                            handleSupplierPurchaseNoteChange('supplierStreetAddress', supplier.address || '');
+                                            handleSupplierPurchaseNoteChange('supplierTaxId', supplier.tax_id || '');
                                             setSpnShowSupplierDropdown(false);
                                             // Load supplier's products
                                             if (supplier.id) {
@@ -14920,6 +14950,8 @@ No inventory adjustment will be made.`,
                               )}
                             </div>
                             <Input placeholder="Supplier Address" value={supplierPurchaseNoteData.supplierAddress} onChange={(e) => handleSupplierPurchaseNoteChange('supplierAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <Input placeholder="Street Address" value={supplierPurchaseNoteData.supplierStreetAddress} onChange={(e) => handleSupplierPurchaseNoteChange('supplierStreetAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            <Input placeholder="Tax ID / TIN" value={supplierPurchaseNoteData.supplierTaxId} onChange={(e) => handleSupplierPurchaseNoteChange('supplierTaxId', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
                             <div className="grid grid-cols-2 gap-2">
                               <Input placeholder="Phone" value={supplierPurchaseNoteData.supplierPhone} onChange={(e) => handleSupplierPurchaseNoteChange('supplierPhone', e.target.value)} className="p-1 h-8 text-sm" />
                               <Input placeholder="Email" value={supplierPurchaseNoteData.supplierEmail} onChange={(e) => handleSupplierPurchaseNoteChange('supplierEmail', e.target.value)} className="p-1 h-8 text-sm" />
@@ -15096,15 +15128,25 @@ No inventory adjustment will be made.`,
                           />
                         </div>
 
-                        {/* Prepared By */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold">Prepared By</label>
+                        {/* Signatories Row */}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold">Prepared By <span className="text-red-500">*</span></label>
                             <Input value={supplierPurchaseNoteData.preparedBy} onChange={(e) => handleSupplierPurchaseNoteChange('preparedBy', e.target.value)} className="p-1 h-8 text-sm" />
-                          </div>
-                          <div>
                             <label className="text-xs font-bold">Date</label>
                             <Input type="date" value={supplierPurchaseNoteData.preparedDate} onChange={(e) => handleSupplierPurchaseNoteChange('preparedDate', e.target.value)} className="p-1 h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold">Delivered By</label>
+                            <Input value={supplierPurchaseNoteData.deliveredBy} onChange={(e) => handleSupplierPurchaseNoteChange('deliveredBy', e.target.value)} className="p-1 h-8 text-sm" />
+                            <label className="text-xs font-bold">Date</label>
+                            <Input type="date" value={supplierPurchaseNoteData.deliveredDate} onChange={(e) => handleSupplierPurchaseNoteChange('deliveredDate', e.target.value)} className="p-1 h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold">Approved By</label>
+                            <Input value={supplierPurchaseNoteData.approvedBy} onChange={(e) => handleSupplierPurchaseNoteChange('approvedBy', e.target.value)} className="p-1 h-8 text-sm" />
+                            <label className="text-xs font-bold">Date</label>
+                            <Input type="date" value={supplierPurchaseNoteData.approvedDate} onChange={(e) => handleSupplierPurchaseNoteChange('approvedDate', e.target.value)} className="p-1 h-8 text-sm" />
                           </div>
                         </div>
 
