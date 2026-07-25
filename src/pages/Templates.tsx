@@ -15090,25 +15090,7 @@ No inventory adjustment will be made.`,
                           </div>
                         </div>
 
-                        {/* Save and Print Buttons */}
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            onClick={() => {
-                              const printWindow = window.open('', '_blank');
-                              if (printWindow) {
-                                const htmlContent = generateSupplierPurchaseNoteHTML();
-                                printWindow.document.write(htmlContent);
-                                printWindow.document.close();
-                              }
-                            }}
-                            variant="outline"
-                          >
-                            <Printer className="h-4 w-4 mr-2" /> Print
-                          </Button>
-                          <Button onClick={handleSaveSupplierPurchaseNote} className="bg-indigo-600 hover:bg-indigo-700">
-                            <Save className="h-4 w-4 mr-2" /> {editingSPNId ? 'Update Purchase Note' : 'Save Purchase Note'}
-                          </Button>
-                        </div>
+
                       </div>
                     ) : (
                       // Delivery Note Content
