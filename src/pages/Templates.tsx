@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
@@ -2944,6 +2945,8 @@ No inventory adjustment will be made.`,
   }, [editSPNData]);
 
   const [editingSPNId, setEditingSPNId] = useState<string>('');
+    const [spnPostSaveDialogOpen, setSpnPostSaveDialogOpen] = useState(false);
+    const [spnSavedData, setSpnSavedData] = useState<any>(null);
 
   const handleSupplierPurchaseNoteChange = (field: keyof SupplierPurchaseNoteData, value: any) => {
     setSupplierPurchaseNoteData(prev => ({ ...prev, [field]: value }));
@@ -3002,6 +3005,17 @@ No inventory adjustment will be made.`,
 
       if (result.success) {
         toast({ title: 'Success', description: editingSPNId ? 'Supplier Purchase Note updated successfully' : 'Supplier Purchase Note saved successfully' });
+        // Store saved note data for post-save dialog actions
+        const savedNoteData = {
+          ...supplierPurchaseNoteData,
+          subtotal,
+          discount,
+          total,
+          status: 'completed' as const,
+          id: result.id || editingSPNId || Date.now().toString()
+        };
+        setSpnSavedData(savedNoteData);
+        setSpnPostSaveDialogOpen(true);
         // Reset form
         setSpnSupplierSearch('');
         setSpnSupplierProducts([]);
@@ -10810,7 +10824,7 @@ No inventory adjustment will be made.`,
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
                       Back to Templates
                     </Button>
-                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order" && currentTemplate?.type !== "stock-take") && (
+                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order" && currentTemplate?.type !== "stock-take" && currentTemplate?.type !== "supplier-purchase-note") && (
                       <>
                         <Button onClick={() => {
                           if (currentTemplate?.type === "order-form") {
@@ -17838,6 +17852,113 @@ Enter choice (1-3):`);
           </div>
         </div>
       )}
+
+      {/* Post-Save Action Dialog for Supplier Purchase Note */}
+      <Dialog open={spnPostSaveDialogOpen} onOpenChange={setSpnPostSaveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Purchase Note Saved Successfully</DialogTitle>
+            <DialogDescription>Choose an action to perform with your saved Supplier Purchase Note.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={() => {
+                if (spnSavedData) {
+                  PrintUtils.printSupplierPurchaseNoteDetails(spnSavedData, { showSellingPrice: true, showProjectedProfit: true });
+                }
+                setSpnPostSaveDialogOpen(false);
+              }}
+            >
+              <Printer className="h-6 w-6" />
+              <span className="text-sm font-medium">Print</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={() => {
+                if (spnSavedData) {
+                  const items = spnSavedData.items || [];
+                  const exportData = items.map((item: any, idx: number) => ({
+                    '#': idx + 1,
+                    'Description': item.description || '',
+                    'Qty': item.quantity || 0,
+                    'Unit': item.unit || '',
+                    'Cost Price': item.unitPrice || 0,
+                    'Selling Price': item.sellingPrice || 0,
+                    'Total': item.total || 0,
+                    'Proj. Profit': (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0))
+                  }));
+                  ExportUtils.exportToPDF(exportData, `SPN-${spnSavedData.purchaseNoteNumber || spnSavedData.id}`, `Supplier Purchase Note - ${spnSavedData.purchaseNoteNumber || ''}`);
+                }
+                setSpnPostSaveDialogOpen(false);
+              }}
+            >
+              <Download className="h-6 w-6" />
+              <span className="text-sm font-medium">Download PDF</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={() => {
+                if (spnSavedData) {
+                  const items = spnSavedData.items || [];
+                  const exportData = items.map((item: any, idx: number) => ({
+                    '#': idx + 1,
+                    'Description': item.description || '',
+                    'Qty': item.quantity || 0,
+                    'Unit': item.unit || '',
+                    'Cost Price': item.unitPrice || 0,
+                    'Selling Price': item.sellingPrice || 0,
+                    'Total': item.total || 0,
+                    'Proj. Profit': (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0))
+                  }));
+                  ExportUtils.exportToXLS(exportData, `SPN-${spnSavedData.purchaseNoteNumber || spnSavedData.id}`, 'Purchase Note');
+                }
+                setSpnPostSaveDialogOpen(false);
+              }}
+            >
+              <FileSpreadsheet className="h-6 w-6" />
+              <span className="text-sm font-medium">Export XLS</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={async () => {
+                if (spnSavedData) {
+                  const shareData = {
+                    title: `Supplier Purchase Note ${spnSavedData.purchaseNoteNumber || ''}`,
+                    text: `SPN #${spnSavedData.purchaseNoteNumber || ''} for supplier ${spnSavedData.supplierName || ''} - Total: ${formatCurrency(spnSavedData.total || 0)}`,
+                    url: window.location.href
+                  };
+                  if (navigator.share) {
+                    try {
+                      await navigator.share(shareData);
+                    } catch { /* user cancelled */ }
+                  } else {
+                    try {
+                      await navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}`);
+                      toast({ title: 'Copied', description: 'Note details copied to clipboard' });
+                    } catch {
+                      toast({ title: 'Copy failed', description: 'Could not copy to clipboard', variant: 'destructive' });
+                    }
+                  }
+                }
+                setSpnPostSaveDialogOpen(false);
+              }}
+            >
+              <Share className="h-6 w-6" />
+              <span className="text-sm font-medium">Share</span>
+            </Button>
+          </div>
+          <div className="mt-3">
+            <Button variant="ghost" className="w-full text-sm text-muted-foreground" onClick={() => setSpnPostSaveDialogOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
