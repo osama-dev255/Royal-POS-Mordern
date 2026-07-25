@@ -1288,6 +1288,7 @@ No inventory adjustment will be made.`,
   const [sourceZoneId, setSourceZoneId] = useState("");
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
     const [isSavingGRN, setIsSavingGRN] = useState<boolean>(false);
+    const [isSavingSPN, setIsSavingSPN] = useState<boolean>(false);
 
   // Registered suppliers state
   const [registeredSuppliers, setRegisteredSuppliers] = useState<DBSupplier[]>([]);
@@ -2981,6 +2982,7 @@ No inventory adjustment will be made.`,
   };
 
   const handleSaveSupplierPurchaseNote = async () => {
+    setIsSavingSPN(true);
     try {
       const subtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
       const discount = supplierPurchaseNoteData.discount || 0;
@@ -3051,6 +3053,8 @@ No inventory adjustment will be made.`,
     } catch (error) {
       console.error('Error saving supplier purchase note:', error);
       toast({ title: 'Error', description: 'Failed to save supplier purchase note', variant: 'destructive' });
+    } finally {
+      setIsSavingSPN(false);
     }
   };
 
@@ -10779,7 +10783,7 @@ No inventory adjustment will be made.`,
                         handleSaveDeliveryNote();
                       }
                     }}>
-                      {(isSavingDeliveryNote || isSavingGRN) ? (
+                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN) ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processing...
