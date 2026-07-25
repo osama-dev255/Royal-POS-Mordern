@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, MapPin, Search, Layers, Package } from "lucide-react";
+import { Plus, Edit, Trash2, MapPin, Search, Layers, Package, MoreVertical, Printer, Download, FileSpreadsheet, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ExportUtils } from "@/utils/exportUtils";
 import { 
   getZones, 
   createZone, 
@@ -244,6 +246,87 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
     }
   };
 
+  const getFilteredProducts = () => {
+    return zoneProducts.filter(stock => {
+      const name = (stock.products?.name || "").toLowerCase();
+      const sku = (stock.products?.sku || "").toLowerCase();
+      const barcode = (stock.products?.barcode || "").toLowerCase();
+      const term = productSearchTerm.toLowerCase();
+      return name.includes(term) || sku.includes(term) || barcode.includes(term);
+    });
+  };
+
+  const downloadProductsAsPDF = () => {
+    const filtered = getFilteredProducts();
+    if (filtered.length === 0) return;
+    const exportData = filtered.map(s => ({
+      'Product Name': s.products?.name || 'Unknown',
+      'SKU': s.products?.sku || '',
+      'Quantity': s.quantity,
+      'Reserved': s.reserved_quantity || 0,
+      'Available': s.quantity - (s.reserved_quantity || 0),
+    }));
+    const filename = `zone_${(selectedZoneForProducts?.zone_name || 'products').replace(/\s+/g, '_')}`;
+    ExportUtils.exportToPDF(exportData, filename, `${selectedZoneForProducts?.zone_name} - Products`);
+    toast({ title: "Success", description: "Products downloaded as PDF" });
+  };
+
+  const exportProductsAsXLS = () => {
+    const filtered = getFilteredProducts();
+    if (filtered.length === 0) return;
+    const exportData = filtered.map(s => ({
+      'Product Name': s.products?.name || 'Unknown',
+      'SKU': s.products?.sku || '',
+      'Quantity': s.quantity,
+      'Reserved': s.reserved_quantity || 0,
+      'Available': s.quantity - (s.reserved_quantity || 0),
+    }));
+    const filename = `zone_${(selectedZoneForProducts?.zone_name || 'products').replace(/\s+/g, '_')}`;
+    ExportUtils.exportToXLS(exportData, filename, 'Products');
+    toast({ title: "Success", description: "Products exported as XLS" });
+  };
+
+  const printProducts = () => {
+    const printContent = document.getElementById('zone-products-table');
+    if (!printContent) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>${selectedZoneForProducts?.zone_name} - Products</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        p { color: #666; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; font-weight: bold; }
+        .text-right { text-align: right; }
+      </style></head><body>
+      <h1>${selectedZoneForProducts?.zone_name}</h1>
+      <p>Zone Code: ${selectedZoneForProducts?.zone_code} | Godown: ${godowns.find(g => g.id === selectedZoneForProducts?.godown_id)?.name || 'Unknown'} | Printed: ${new Date().toLocaleDateString()}</p>
+      ${printContent.outerHTML}
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
+  };
+
+  const shareProducts = async () => {
+    if (!selectedZoneForProducts) return;
+    const filtered = getFilteredProducts();
+    const totalQty = filtered.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    const godownName = godowns.find(g => g.id === selectedZoneForProducts.godown_id)?.name || 'Unknown';
+    const summary = `${selectedZoneForProducts.zone_name} (${godownName}) - ${filtered.length} products, ${totalQty} total qty`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${selectedZoneForProducts.zone_name} Products`, text: summary });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(summary);
+      toast({ title: "Copied", description: "Summary copied to clipboard" });
+    }
+  };
+
   const closeProductView = () => {
     setShowProducts(false);
     setSelectedZoneForProducts(null);
@@ -268,19 +351,13 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
   // Show products view if viewing zone products
   if (showProducts && selectedZoneForProducts) {
     const selectedGodown = godowns.find(g => g.id === selectedZoneForProducts.godown_id);
-    const filteredZoneProducts = zoneProducts.filter(stock => {
-      const name = (stock.products?.name || "").toLowerCase();
-      const sku = (stock.products?.sku || "").toLowerCase();
-      const barcode = (stock.products?.barcode || "").toLowerCase();
-      const term = productSearchTerm.toLowerCase();
-      return name.includes(term) || sku.includes(term) || barcode.includes(term);
-    });
+    const filteredZoneProducts = getFilteredProducts();
     const totalQty = filteredZoneProducts.reduce((sum, s) => sum + (s.quantity || 0), 0);
     const totalAvailable = filteredZoneProducts.reduce((sum, s) => sum + (s.quantity - (s.reserved_quantity || 0)), 0);
     
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <Package className="h-6 w-6 text-primary" />
             <div>
@@ -290,9 +367,38 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
               </p>
             </div>
           </div>
-          <Button onClick={closeProductView} variant="outline">
-            Back to Zones
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="h-4 w-4 mr-2" />
+                  Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={printProducts}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={downloadProductsAsPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportProductsAsXLS}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export XLS
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={shareProducts}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={closeProductView} variant="outline">
+              Back to Zones
+            </Button>
+          </div>
         </div>
 
         {/* Stats row */}
@@ -380,6 +486,7 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
                 </Button>
               </div>
             ) : (
+              <div id="zone-products-table">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -412,6 +519,7 @@ export const ZoneManagement = ({ godownId, godownName }: { godownId: string; god
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
