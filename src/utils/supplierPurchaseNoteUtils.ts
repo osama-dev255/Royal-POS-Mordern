@@ -18,18 +18,28 @@ export interface SupplierPurchaseNoteData {
   supplierPhone: string;
   supplierEmail: string;
   supplierAddress: string;
+  supplierStreetAddress: string;
+  supplierTaxId: string;
   businessName: string;
   businessAddress: string;
   businessPhone: string;
   businessEmail: string;
+  businessTin: string;
   items: SupplierPurchaseNoteItem[];
   subtotal: number;
   tax: number;
-  discount: number;
   total: number;
   notes: string;
   preparedBy: string;
   preparedDate: string;
+  deliveredBy: string;
+  deliveredDate: string;
+  approvedBy: string;
+  approvedDate: string;
+  modeOfPayment: string;
+  destination: string;
+  stockType: string;
+  receiptIssued: string;
   status: 'draft' | 'completed' | 'cancelled';
   outletId?: string;
   createdAt?: string;
@@ -43,18 +53,28 @@ export interface SavedSupplierPurchaseNote {
   supplierPhone: string;
   supplierEmail: string;
   supplierAddress: string;
+  supplierStreetAddress: string;
+  supplierTaxId: string;
   businessName: string;
   businessAddress: string;
   businessPhone: string;
   businessEmail: string;
+  businessTin: string;
   items: SupplierPurchaseNoteItem[];
   subtotal: number;
   tax: number;
-  discount: number;
   total: number;
   notes: string;
   preparedBy: string;
   preparedDate: string;
+  deliveredBy: string;
+  deliveredDate: string;
+  approvedBy: string;
+  approvedDate: string;
+  modeOfPayment: string;
+  destination: string;
+  stockType: string;
+  receiptIssued: string;
   status: 'draft' | 'completed' | 'cancelled';
   outletId?: string;
   createdAt: string;
@@ -79,18 +99,28 @@ export const saveSupplierPurchaseNote = async (
       supplier_phone: noteData.supplierPhone || '',
       supplier_email: noteData.supplierEmail || '',
       supplier_address: noteData.supplierAddress || '',
+      supplier_street_address: noteData.supplierStreetAddress || '',
+      supplier_tax_id: noteData.supplierTaxId || '',
       business_name: noteData.businessName || '',
       business_address: noteData.businessAddress || '',
       business_phone: noteData.businessPhone || '',
       business_email: noteData.businessEmail || '',
+      business_tin: noteData.businessTin || '172 - 813 - 364',
       items: noteData.items || [],
       subtotal: noteData.subtotal || 0,
       tax: noteData.tax || 0,
-      discount: noteData.discount || 0,
       total: noteData.total || 0,
       notes: noteData.notes || '',
       prepared_by: noteData.preparedBy || '',
       prepared_date: noteData.preparedDate || null,
+      delivered_by: noteData.deliveredBy || '',
+      delivered_date: noteData.deliveredDate || null,
+      approved_by: noteData.approvedBy || '',
+      approved_date: noteData.approvedDate || null,
+      mode_of_payment: noteData.modeOfPayment || '',
+      destination: noteData.destination || '',
+      stock_type: noteData.stockType || '',
+      receipt_issued: noteData.receiptIssued === 'yes',
       status: noteData.status || 'draft',
       outlet_id: noteData.outletId || null,
       updated_at: new Date().toISOString()
@@ -143,18 +173,28 @@ export const getSavedSupplierPurchaseNotes = async (
       supplierPhone: dbNote.supplier_phone || '',
       supplierEmail: dbNote.supplier_email || '',
       supplierAddress: dbNote.supplier_address || '',
+      supplierStreetAddress: dbNote.supplier_street_address || '',
+      supplierTaxId: dbNote.supplier_tax_id || '',
       businessName: dbNote.business_name || '',
       businessAddress: dbNote.business_address || '',
       businessPhone: dbNote.business_phone || '',
       businessEmail: dbNote.business_email || '',
+      businessTin: dbNote.business_tin || '172 - 813 - 364',
       items: dbNote.items || [],
       subtotal: dbNote.subtotal || 0,
       tax: dbNote.tax || 0,
-      discount: dbNote.discount || 0,
       total: dbNote.total || 0,
       notes: dbNote.notes || '',
       preparedBy: dbNote.prepared_by || '',
       preparedDate: dbNote.prepared_date || '',
+      deliveredBy: dbNote.delivered_by || '',
+      deliveredDate: dbNote.delivered_date || '',
+      approvedBy: dbNote.approved_by || '',
+      approvedDate: dbNote.approved_date || '',
+      modeOfPayment: dbNote.mode_of_payment || '',
+      destination: dbNote.destination || '',
+      stockType: dbNote.stock_type || '',
+      receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
       status: dbNote.status || 'draft',
       outletId: dbNote.outlet_id || '',
       createdAt: dbNote.created_at || new Date().toISOString(),
@@ -165,18 +205,28 @@ export const getSavedSupplierPurchaseNotes = async (
         supplierPhone: dbNote.supplier_phone || '',
         supplierEmail: dbNote.supplier_email || '',
         supplierAddress: dbNote.supplier_address || '',
+        supplierStreetAddress: dbNote.supplier_street_address || '',
+        supplierTaxId: dbNote.supplier_tax_id || '',
         businessName: dbNote.business_name || '',
         businessAddress: dbNote.business_address || '',
         businessPhone: dbNote.business_phone || '',
         businessEmail: dbNote.business_email || '',
+        businessTin: dbNote.business_tin || '172 - 813 - 364',
         items: dbNote.items || [],
         subtotal: dbNote.subtotal || 0,
         tax: dbNote.tax || 0,
-        discount: dbNote.discount || 0,
         total: dbNote.total || 0,
         notes: dbNote.notes || '',
         preparedBy: dbNote.prepared_by || '',
         preparedDate: dbNote.prepared_date || '',
+        deliveredBy: dbNote.delivered_by || '',
+        deliveredDate: dbNote.delivered_date || '',
+        approvedBy: dbNote.approved_by || '',
+        approvedDate: dbNote.approved_date || '',
+        modeOfPayment: dbNote.mode_of_payment || '',
+        destination: dbNote.destination || '',
+        stockType: dbNote.stock_type || '',
+        receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
         status: dbNote.status || 'draft',
         outletId: dbNote.outlet_id || ''
       }
@@ -224,17 +274,28 @@ export const updateSupplierPurchaseNote = async (
     if (noteData.supplierPhone !== undefined) updateData.supplier_phone = noteData.supplierPhone;
     if (noteData.supplierEmail !== undefined) updateData.supplier_email = noteData.supplierEmail;
     if (noteData.supplierAddress !== undefined) updateData.supplier_address = noteData.supplierAddress;
+    if (noteData.supplierStreetAddress !== undefined) updateData.supplier_street_address = noteData.supplierStreetAddress;
+    if (noteData.supplierTaxId !== undefined) updateData.supplier_tax_id = noteData.supplierTaxId;
     if (noteData.businessName !== undefined) updateData.business_name = noteData.businessName;
     if (noteData.businessAddress !== undefined) updateData.business_address = noteData.businessAddress;
     if (noteData.businessPhone !== undefined) updateData.business_phone = noteData.businessPhone;
     if (noteData.businessEmail !== undefined) updateData.business_email = noteData.businessEmail;
+    if (noteData.businessTin !== undefined) updateData.business_tin = noteData.businessTin;
     if (noteData.items) updateData.items = noteData.items;
     if (noteData.subtotal !== undefined) updateData.subtotal = noteData.subtotal;
     if (noteData.tax !== undefined) updateData.tax = noteData.tax;
-    if (noteData.discount !== undefined) updateData.discount = noteData.discount;
     if (noteData.total !== undefined) updateData.total = noteData.total;
     if (noteData.notes !== undefined) updateData.notes = noteData.notes;
     if (noteData.preparedBy !== undefined) updateData.prepared_by = noteData.preparedBy;
+    if (noteData.preparedDate !== undefined) updateData.prepared_date = noteData.preparedDate;
+    if (noteData.deliveredBy !== undefined) updateData.delivered_by = noteData.deliveredBy;
+    if (noteData.deliveredDate !== undefined) updateData.delivered_date = noteData.deliveredDate;
+    if (noteData.approvedBy !== undefined) updateData.approved_by = noteData.approvedBy;
+    if (noteData.approvedDate !== undefined) updateData.approved_date = noteData.approvedDate;
+    if (noteData.modeOfPayment !== undefined) updateData.mode_of_payment = noteData.modeOfPayment;
+    if (noteData.destination !== undefined) updateData.destination = noteData.destination;
+    if (noteData.stockType !== undefined) updateData.stock_type = noteData.stockType;
+    if (noteData.receiptIssued !== undefined) updateData.receipt_issued = noteData.receiptIssued === 'yes';
     if (noteData.status) updateData.status = noteData.status;
 
     const { error } = await supabase

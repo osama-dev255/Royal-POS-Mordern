@@ -634,7 +634,6 @@ interface SupplierPurchaseNoteData {
   items: SupplierPurchaseNoteItem[];
   subtotal: number;
   tax: number;
-  discount: number;
   total: number;
   notes: string;
   preparedBy: string;
@@ -645,6 +644,8 @@ interface SupplierPurchaseNoteData {
   approvedDate: string;
   modeOfPayment: string;
   destination: string;
+  stockType: string;
+  receiptIssued: string;
   status: 'draft' | 'completed' | 'cancelled';
 }
 
@@ -3037,6 +3038,8 @@ No inventory adjustment will be made.`,
         ...supplierPurchaseNoteData,
         subtotal,
         total,
+        stockType: spnStockType,
+        receiptIssued: spnReceiptIssued,
         status: 'completed' as const
       };
 
