@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
@@ -628,6 +628,7 @@ interface SupplierPurchaseNoteData {
   supplierTaxId: string;
   businessName: string;
   businessAddress: string;
+  businessTin: string;
   businessPhone: string;
   businessEmail: string;
   items: SupplierPurchaseNoteItem[];
@@ -2900,6 +2901,7 @@ No inventory adjustment will be made.`,
     supplierTaxId: '',
     businessName: 'KILANGO GROUP LTD',
     businessAddress: '64, Muheza - Tanga - Tanzania',
+    businessTin: '172 - 813 - 364',
     businessPhone: '0711 299 266',
     businessEmail: 'kilangogroup1@gmail.com',
     items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, sellingPrice: 0, total: 0 }],
@@ -2933,6 +2935,7 @@ No inventory adjustment will be made.`,
         supplierTaxId: data.supplierTaxId || '',
         businessName: data.businessName || '',
         businessAddress: data.businessAddress || '',
+        businessTin: data.businessTin || '172 - 813 - 364',
         businessPhone: data.businessPhone || '',
         businessEmail: data.businessEmail || '',
         items: (data.items || []).map((item: any) => ({
@@ -2966,6 +2969,9 @@ No inventory adjustment will be made.`,
   const [editingSPNId, setEditingSPNId] = useState<string>('');
     const [spnPostSaveDialogOpen, setSpnPostSaveDialogOpen] = useState(false);
     const [spnSavedData, setSpnSavedData] = useState<any>(null);
+    const [spnShowComplianceDialog, setSpnShowComplianceDialog] = useState(false);
+    const [spnStockType, setSpnStockType] = useState<'exempt' | 'vatable' | ''>('');
+    const [spnReceiptIssued, setSpnReceiptIssued] = useState<'yes' | 'no' | ''>('');
 
   const handleSupplierPurchaseNoteChange = (field: keyof SupplierPurchaseNoteData, value: any) => {
     setSupplierPurchaseNoteData(prev => ({ ...prev, [field]: value }));
@@ -3058,6 +3064,7 @@ No inventory adjustment will be made.`,
           supplierTaxId: '',
           businessName: '',
           businessAddress: '',
+          businessTin: '172 - 813 - 364',
           businessPhone: '',
           businessEmail: '',
           items: [{ id: Date.now().toString(), description: '', quantity: 0, unit: '', unitPrice: 0, sellingPrice: 0, total: 0 }],
@@ -14958,13 +14965,34 @@ No inventory adjustment will be made.`,
                             </div>
                           </div>
                           <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50/30">
-                            <h3 className="font-bold text-indigo-900 mb-2">TO (Business)</h3>
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="font-bold text-indigo-900">TO (Business)</h3>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSpnShowComplianceDialog(true)}
+                                className="h-7 text-xs"
+                              >
+                                <FileCheck className="h-3.5 w-3.5 mr-1" />
+                                Compliance
+                              </Button>
+                            </div>
                             <Input placeholder="Business Name" value={supplierPurchaseNoteData.businessName} onChange={(e) => handleSupplierPurchaseNoteChange('businessName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
                             <Input placeholder="Business Address" value={supplierPurchaseNoteData.businessAddress} onChange={(e) => handleSupplierPurchaseNoteChange('businessAddress', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            {spnReceiptIssued === 'yes' && (
+                              <Input placeholder="TIN" value={supplierPurchaseNoteData.businessTin} onChange={(e) => handleSupplierPurchaseNoteChange('businessTin', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
+                            )}
                             <div className="grid grid-cols-2 gap-2">
                               <Input placeholder="Phone" value={supplierPurchaseNoteData.businessPhone} onChange={(e) => handleSupplierPurchaseNoteChange('businessPhone', e.target.value)} className="p-1 h-8 text-sm" />
                               <Input placeholder="Email" value={supplierPurchaseNoteData.businessEmail} onChange={(e) => handleSupplierPurchaseNoteChange('businessEmail', e.target.value)} className="p-1 h-8 text-sm" />
                             </div>
+                            {(spnStockType || spnReceiptIssued) && (
+                              <div className="mt-2 pt-2 border-t border-indigo-200 text-xs text-indigo-700 flex gap-3">
+                                {spnStockType && <span>Stock: <strong>{spnStockType === 'vatable' ? 'Vatable' : 'Exempt'}</strong></span>}
+                                {spnReceiptIssued && <span>Receipt: <strong>{spnReceiptIssued === 'yes' ? 'Yes' : 'No'}</strong></span>}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -17898,6 +17926,48 @@ Enter choice (1-3):`);
           </div>
         </div>
       )}
+
+      {/* SPN Compliance Dialog */}
+      <Dialog open={spnShowComplianceDialog} onOpenChange={setSpnShowComplianceDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Compliance Settings</DialogTitle>
+            <DialogDescription>Configure stock type and receipt information for this purchase note.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-bold mb-1 block">Stock Type</label>
+              <Select value={spnStockType} onValueChange={(val) => setSpnStockType(val as 'exempt' | 'vatable')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select stock type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exempt">Exempt Stock</SelectItem>
+                  <SelectItem value="vatable">Vatable Stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-bold mb-1 block">Receipt Issued</label>
+              <Select value={spnReceiptIssued} onValueChange={(val) => setSpnReceiptIssued(val as 'yes' | 'no')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select option" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setSpnShowComplianceDialog(false)}>Close</Button>
+            <Button onClick={() => setSpnShowComplianceDialog(false)} className="bg-indigo-600 hover:bg-indigo-700">Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Post-Save Action Dialog for Supplier Purchase Note */}
       <Dialog open={spnPostSaveDialogOpen} onOpenChange={setSpnPostSaveDialogOpen}>
