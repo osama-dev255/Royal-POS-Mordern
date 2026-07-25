@@ -643,6 +643,8 @@ interface SupplierPurchaseNoteData {
   deliveredDate: string;
   approvedBy: string;
   approvedDate: string;
+  modeOfPayment: string;
+  destination: string;
   status: 'draft' | 'completed' | 'cancelled';
 }
 
@@ -2916,6 +2918,8 @@ No inventory adjustment will be made.`,
     deliveredDate: new Date().toISOString().split('T')[0],
     approvedBy: '',
     approvedDate: new Date().toISOString().split('T')[0],
+    modeOfPayment: '',
+    destination: '',
     status: 'draft'
   });
 
@@ -2953,6 +2957,8 @@ No inventory adjustment will be made.`,
         deliveredDate: data.deliveredDate || '',
         approvedBy: data.approvedBy || '',
         approvedDate: data.approvedDate || '',
+        modeOfPayment: data.modeOfPayment || '',
+        destination: data.destination || '',
         status: data.status || 'draft'
       });
       // Store the note ID for update
@@ -3010,16 +3016,26 @@ No inventory adjustment will be made.`,
       toast({ title: 'Validation Error', description: 'Prepared By is required', variant: 'destructive' });
       return;
     }
+    if (!spnStockType || !spnReceiptIssued) {
+      toast({ title: 'Validation Error', description: 'Compliance settings (Stock Type and Receipt Issued) are required. Please click the Compliance button to configure.', variant: 'destructive' });
+      return;
+    }
+    if (!supplierPurchaseNoteData.destination) {
+      toast({ title: 'Validation Error', description: 'Destination is required', variant: 'destructive' });
+      return;
+    }
+    if (!supplierPurchaseNoteData.modeOfPayment) {
+      toast({ title: 'Validation Error', description: 'Mode of Payment is required', variant: 'destructive' });
+      return;
+    }
     setIsSavingSPN(true);
     try {
       const subtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
-      const discount = supplierPurchaseNoteData.discount || 0;
-      const total = subtotal - discount;
+      const total = subtotal;
 
       const noteData = {
         ...supplierPurchaseNoteData,
         subtotal,
-        discount,
         total,
         status: 'completed' as const
       };
@@ -3039,7 +3055,6 @@ No inventory adjustment will be made.`,
         const savedNoteData = {
           ...supplierPurchaseNoteData,
           subtotal,
-          discount,
           total,
           status: 'completed' as const,
           id: result.id || editingSPNId || Date.now().toString()
@@ -3079,6 +3094,8 @@ No inventory adjustment will be made.`,
           deliveredDate: new Date().toISOString().split('T')[0],
           approvedBy: '',
           approvedDate: new Date().toISOString().split('T')[0],
+          modeOfPayment: '',
+          destination: '',
           status: 'draft'
         });
         setActiveTab('manage');
@@ -8754,8 +8771,7 @@ No inventory adjustment will be made.`,
     const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const totalPackages = items.filter(item => item.unit && item.quantity).length;
     const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-    const discount = supplierPurchaseNoteData.discount || 0;
-    const total = subtotal - discount;
+    const total = subtotal;
     
     return buildSupplierPurchaseNotePrintHTML(
       supplierPurchaseNoteData,
@@ -14972,10 +14988,10 @@ No inventory adjustment will be made.`,
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setSpnShowComplianceDialog(true)}
-                                className="h-7 text-xs"
+                                className={`h-7 text-xs ${!spnStockType || !spnReceiptIssued ? 'border-red-300 text-red-700' : 'border-green-300 text-green-700'}`}
                               >
                                 <FileCheck className="h-3.5 w-3.5 mr-1" />
-                                Compliance
+                                Compliance <span className="text-red-500 ml-0.5">*</span>
                               </Button>
                             </div>
                             <Input placeholder="Business Name" value={supplierPurchaseNoteData.businessName} onChange={(e) => handleSupplierPurchaseNoteChange('businessName', e.target.value)} className="mb-2 p-1 h-8 text-sm" />
@@ -15131,16 +15147,40 @@ No inventory adjustment will be made.`,
                           </Button>
                         </div>
 
-                        {/* Discount, Total */}
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* Destination, Mode of Payment, Total */}
+                        <div className="grid grid-cols-3 gap-4">
                           <div>
-                            <label className="text-xs font-bold">Discount</label>
-                            <Input type="number" step="0.01" value={supplierPurchaseNoteData.discount} onChange={(e) => handleSupplierPurchaseNoteChange('discount', parseFloat(e.target.value) || 0)} className="p-1 h-8 text-sm" />
+                            <label className="text-xs font-bold mb-1 block">Destination <span className="text-red-500">*</span></label>
+                            <Select value={supplierPurchaseNoteData.destination} onValueChange={(val) => handleSupplierPurchaseNoteChange('destination', val)}>
+                              <SelectTrigger className="w-full h-8 text-sm">
+                                <SelectValue placeholder="Select destination" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="msikit_mdogo">Msikit Mdogo</SelectItem>
+                                <SelectItem value="mdote_godown">Mdote Godown</SelectItem>
+                                <SelectItem value="shimoni_godown">Shimoni Godown</SelectItem>
+                                <SelectItem value="masuguru_godown">Masuguru Godown</SelectItem>
+                                <SelectItem value="parking_godown">Parking Godown</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold mb-1 block">Mode of Payment <span className="text-red-500">*</span></label>
+                            <Select value={supplierPurchaseNoteData.modeOfPayment} onValueChange={(val) => handleSupplierPurchaseNoteChange('modeOfPayment', val)}>
+                              <SelectTrigger className="w-full h-8 text-sm">
+                                <SelectValue placeholder="Select mode of payment" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="cash_paid">Cash Paid</SelectItem>
+                                <SelectItem value="cash_on_credit">Cash on Credit</SelectItem>
+                                <SelectItem value="cash_at_bank">Cash at Bank</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <label className="text-xs font-bold">Total</label>
                             <div className="p-1 h-8 text-sm font-bold flex items-center bg-indigo-50 rounded px-2">
-                              {formatCurrency((supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0)) - (supplierPurchaseNoteData.discount || 0))}
+                              {formatCurrency(supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0))}
                             </div>
                           </div>
                         </div>
