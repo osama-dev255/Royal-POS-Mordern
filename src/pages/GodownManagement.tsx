@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Building2, Search, Filter, Package, Layers } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, Search, Filter, Package, Layers, MoreVertical, Printer, Download, FileSpreadsheet, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getGodowns, 
@@ -21,6 +21,8 @@ import {
   Godown,
   GodownStock 
 } from "@/services/godownService";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ExportUtils } from "@/utils/exportUtils";
 import { ZoneManagement } from "@/components/ZoneManagement";
 
 const godownTypes = [
@@ -223,6 +225,89 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
     }
   };
 
+  const getFilteredProducts = () => {
+    return godownProducts.filter(stock => {
+      const name = (stock.products?.name || "").toLowerCase();
+      const sku = (stock.products?.sku || "").toLowerCase();
+      const barcode = (stock.products?.barcode || "").toLowerCase();
+      const zoneName = (stock.godown_zones?.zone_name || "").toLowerCase();
+      const term = productSearchTerm.toLowerCase();
+      return name.includes(term) || sku.includes(term) || barcode.includes(term) || zoneName.includes(term);
+    });
+  };
+
+  const downloadProductsAsPDF = () => {
+    const filtered = getFilteredProducts();
+    if (filtered.length === 0) return;
+    const exportData = filtered.map(s => ({
+      'Product Name': s.products?.name || 'Unknown',
+      'SKU': s.products?.sku || '',
+      'Zone': s.godown_zones?.zone_name || 'No Zone',
+      'Quantity': s.quantity,
+      'Reserved': s.reserved_quantity || 0,
+      'Available': s.quantity - (s.reserved_quantity || 0),
+    }));
+    const filename = `${(selectedGodownForProducts?.name || 'godown').replace(/\s+/g, '_')}_products`;
+    ExportUtils.exportToPDF(exportData, filename, `${selectedGodownForProducts?.name} - Products`);
+    toast({ title: "Success", description: "Products downloaded as PDF" });
+  };
+
+  const exportProductsAsXLS = () => {
+    const filtered = getFilteredProducts();
+    if (filtered.length === 0) return;
+    const exportData = filtered.map(s => ({
+      'Product Name': s.products?.name || 'Unknown',
+      'SKU': s.products?.sku || '',
+      'Zone': s.godown_zones?.zone_name || 'No Zone',
+      'Quantity': s.quantity,
+      'Reserved': s.reserved_quantity || 0,
+      'Available': s.quantity - (s.reserved_quantity || 0),
+    }));
+    const filename = `${(selectedGodownForProducts?.name || 'godown').replace(/\s+/g, '_')}_products`;
+    ExportUtils.exportToXLS(exportData, filename, 'Products');
+    toast({ title: "Success", description: "Products exported as XLS" });
+  };
+
+  const printProducts = () => {
+    const printContent = document.getElementById('godown-products-table');
+    if (!printContent) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>${selectedGodownForProducts?.name} - Products</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        p { color: #666; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; font-weight: bold; }
+        .text-right { text-align: right; }
+      </style></head><body>
+      <h1>${selectedGodownForProducts?.name}</h1>
+      <p>Code: ${selectedGodownForProducts?.code} | Printed: ${new Date().toLocaleDateString()}</p>
+      ${printContent.outerHTML}
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
+  };
+
+  const shareProducts = async () => {
+    if (!selectedGodownForProducts) return;
+    const filtered = getFilteredProducts();
+    const totalQty = filtered.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    const summary = `${selectedGodownForProducts.name} - ${filtered.length} products, ${totalQty} total qty`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${selectedGodownForProducts.name} Products`, text: summary });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(summary);
+      toast({ title: "Copied", description: "Summary copied to clipboard" });
+    }
+  };
+
   const closeProductView = () => {
     setShowProducts(false);
     setSelectedGodownForProducts(null);
@@ -281,14 +366,7 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
 
   // Show Products if viewing products for a godown
   if (showProducts && selectedGodownForProducts) {
-    const filteredGodownProducts = godownProducts.filter(stock => {
-      const name = (stock.products?.name || "").toLowerCase();
-      const sku = (stock.products?.sku || "").toLowerCase();
-      const barcode = (stock.products?.barcode || "").toLowerCase();
-      const zoneName = (stock.godown_zones?.zone_name || "").toLowerCase();
-      const term = productSearchTerm.toLowerCase();
-      return name.includes(term) || sku.includes(term) || barcode.includes(term) || zoneName.includes(term);
-    });
+    const filteredGodownProducts = getFilteredProducts();
     const totalQty = filteredGodownProducts.reduce((sum, s) => sum + (s.quantity || 0), 0);
     const totalAvailable = filteredGodownProducts.reduce((sum, s) => sum + (s.quantity - (s.reserved_quantity || 0)), 0);
 
@@ -301,9 +379,38 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
           username={username}
         />
         <main className="container mx-auto p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold">{selectedGodownForProducts.name}</h2>
-            <p className="text-muted-foreground">Code: {selectedGodownForProducts.code}</p>
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">{selectedGodownForProducts.name}</h2>
+              <p className="text-muted-foreground">Code: {selectedGodownForProducts.code}</p>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="h-4 w-4 mr-2" />
+                  Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={printProducts}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={downloadProductsAsPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportProductsAsXLS}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export XLS
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={shareProducts}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Stats row */}
@@ -390,6 +497,7 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
                   </Button>
                 </div>
               ) : (
+                <div id="godown-products-table">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -432,6 +540,7 @@ export const GodownManagement = ({ username, onBack, onLogout }: { username: str
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
