@@ -77,9 +77,44 @@ export const saveExpenseVoucher = async (
 ): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
     const totalAmount = voucherData.totalAmount || voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const voucherNumber = voucherData.voucherNumber || generateVoucherNumber();
+
+    // Upload PDF to Supabase Storage if present
+    let pdfStoragePath: string | null = null;
+    if (voucherData.pdfAttachment && voucherData.pdfAttachment.startsWith('data:')) {
+      try {
+        // Convert base64 to Blob
+        const base64Data = voucherData.pdfAttachment.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+
+        const fileName = `ev_${voucherNumber}_${Date.now()}.pdf`;
+        const filePath = `expense-vouchers/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('expense-voucher-pdfs')
+          .upload(filePath, blob, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.warn('PDF upload failed, saving without attachment:', uploadError);
+        } else {
+          pdfStoragePath = filePath;
+        }
+      } catch (uploadErr) {
+        console.warn('PDF upload failed, saving without attachment:', uploadErr);
+      }
+    }
 
     const insertData = {
-      voucher_number: voucherData.voucherNumber || generateVoucherNumber(),
+      voucher_number: voucherNumber,
       date: voucherData.date || new Date().toISOString().split('T')[0],
       vendor_name: voucherData.submittedBy || '',
       vendor_contact: voucherData.employeeId || '',
@@ -100,7 +135,7 @@ export const saveExpenseVoucher = async (
       approved_date: voucherData.approvedDate || null,
       status: 'completed',
       updated_at: new Date().toISOString(),
-      pdf_attachment: voucherData.pdfAttachment || null,
+      pdf_attachment: pdfStoragePath,
       pdf_attachment_name: voucherData.pdfAttachmentName || null
     };
 
@@ -142,7 +177,17 @@ export const getSavedExpenseVouchers = async (
       return [];
     }
 
-    return (data || []).map((row: any) => ({
+    return (data || []).map((row: any) => {
+      // Generate public URL for PDF attachment if storage path exists
+      let pdfUrl = row.pdf_attachment || '';
+      if (pdfUrl && !pdfUrl.startsWith('http') && !pdfUrl.startsWith('data:')) {
+        const { data: urlData } = supabase.storage
+          .from('expense-voucher-pdfs')
+          .getPublicUrl(pdfUrl);
+        pdfUrl = urlData?.publicUrl || '';
+      }
+
+      return {
       id: row.id,
       voucher_number: row.voucher_number,
       date: row.date,
@@ -162,7 +207,7 @@ export const getSavedExpenseVouchers = async (
       approved_date: row.approved_date,
       status: row.status,
       outlet_id: row.outlet_id,
-      pdf_attachment: row.pdf_attachment,
+      pdf_attachment: pdfUrl,
       pdf_attachment_name: row.pdf_attachment_name,
       created_at: row.created_at,
       updated_at: row.updated_at,
@@ -184,10 +229,10 @@ export const getSavedExpenseVouchers = async (
         signatureDate: row.signature_date || '',
         submittedBySignature: row.submitted_by_signature || '',
         approvedBySignature: row.approved_by_signature || '',
-        pdfAttachment: row.pdf_attachment || '',
+        pdfAttachment: pdfUrl,
         pdfAttachmentName: row.pdf_attachment_name || ''
       }
-    }));
+    };});
   } catch (err) {
     console.error('Error fetching expense vouchers:', err);
     return [];
