@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Wallet, Calendar, Filter, Tag, Download, Printer, FileSpreadsheet, Loader2, Share2, ChevronDown, FileText } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Wallet, Calendar, Filter, Tag, Download, Printer, FileSpreadsheet, Loader2, Share2, ChevronDown, FileText, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { AutomationService } from "@/services/automationService";
@@ -97,6 +97,8 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+    const [viewExpense, setViewExpense] = useState<Expense | null>(null);
+    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [newExpense, setNewExpense] = useState<Omit<Expense, "id">>({
     date: new Date().toISOString().split('T')[0],
     category: expenseCategories[0],
@@ -1133,7 +1135,16 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
                         <TableCell className="text-xs">{expense.expenseType || '-'}</TableCell>
                         <TableCell className="text-xs">{expense.taxDeductible ? 'Yes' : 'No'}</TableCell>
                         <TableCell>
-                          <DropdownMenu>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setViewExpense(expense); setIsViewDialogOpen(true); }}
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
                                 <ChevronDown className="h-4 w-4" />
@@ -1168,6 +1179,7 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1177,6 +1189,72 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
             )}
           </CardContent>
         </Card>
+
+        {/* View Expense Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Expense Details
+              </DialogTitle>
+            </DialogHeader>
+            {viewExpense && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Date</Label>
+                    <p className="text-sm mt-1">{viewExpense.date}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Amount</Label>
+                    <p className="text-sm mt-1 font-semibold">{formatCurrency(viewExpense.amount)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Category</Label>
+                    <p className="text-sm mt-1">{viewExpense.category}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Sub-Category</Label>
+                    <p className="text-sm mt-1">{viewExpense.subCategory || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Vendor</Label>
+                    <p className="text-sm mt-1">{viewExpense.vendorName || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Payment Method</Label>
+                    <p className="text-sm mt-1">{viewExpense.paymentMethod}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Expense Type</Label>
+                    <p className="text-sm mt-1">{viewExpense.expenseType || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Cost Classification</Label>
+                    <p className="text-sm mt-1">{viewExpense.costClassification || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Tax Deductible</Label>
+                    <p className="text-sm mt-1">{viewExpense.taxDeductible ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Prepared By</Label>
+                    <p className="text-sm mt-1">{viewExpense.preparedByName || '-'}</p>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Description</Label>
+                  <p className="text-sm mt-1">{viewExpense.description || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Notes</Label>
+                  <p className="text-sm mt-1">{viewExpense.notes || '-'}</p>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
