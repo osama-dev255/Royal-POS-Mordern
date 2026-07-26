@@ -32,6 +32,8 @@ export interface ExpenseVoucherData {
   preparedByName?: string;
   supplierTin?: string;
   supplierEmail?: string;
+  pdfAttachment?: string;
+  pdfAttachmentName?: string;
 }
 
 export interface SavedExpenseVoucher {
@@ -54,6 +56,8 @@ export interface SavedExpenseVoucher {
   approved_date: string;
   status: string;
   outlet_id: string | null;
+  pdf_attachment: string | null;
+  pdf_attachment_name: string | null;
   created_at: string;
   updated_at: string;
   data?: ExpenseVoucherData;
@@ -95,7 +99,9 @@ export const saveExpenseVoucher = async (
       signature_date: voucherData.signatureDate || null,
       approved_date: voucherData.approvedDate || null,
       status: 'completed',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      pdf_attachment: voucherData.pdfAttachment || null,
+      pdf_attachment_name: voucherData.pdfAttachmentName || null
     };
 
     const { data, error } = await supabase
@@ -156,6 +162,8 @@ export const getSavedExpenseVouchers = async (
       approved_date: row.approved_date,
       status: row.status,
       outlet_id: row.outlet_id,
+      pdf_attachment: row.pdf_attachment,
+      pdf_attachment_name: row.pdf_attachment_name,
       created_at: row.created_at,
       updated_at: row.updated_at,
       data: {
@@ -175,7 +183,9 @@ export const getSavedExpenseVouchers = async (
         approvedDate: row.approved_date || '',
         signatureDate: row.signature_date || '',
         submittedBySignature: row.submitted_by_signature || '',
-        approvedBySignature: row.approved_by_signature || ''
+        approvedBySignature: row.approved_by_signature || '',
+        pdfAttachment: row.pdf_attachment || '',
+        pdfAttachmentName: row.pdf_attachment_name || ''
       }
     }));
   } catch (err) {

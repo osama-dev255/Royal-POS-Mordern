@@ -419,6 +419,8 @@ interface ExpenseVoucherData {
   preparedByName?: string;
   supplierTin?: string;
   supplierEmail?: string;
+  pdfAttachment?: string;
+  pdfAttachmentName?: string;
 }
 
 interface SalarySlipData {
@@ -3287,7 +3289,9 @@ No inventory adjustment will be made.`,
     signatureDate: todayStr,
     preparedByName: "",
     supplierTin: "",
-    supplierEmail: ""
+    supplierEmail: "",
+    pdfAttachment: "",
+    pdfAttachmentName: ""
   });
   
   const [salarySlipData, setSalarySlipData] = useState<SalarySlipData>({
@@ -12366,6 +12370,79 @@ No inventory adjustment will be made.`,
                               className="min-h-[120px]"
                               placeholder="Enter the purpose of this expense voucher..."
                             />
+                            <div className="mt-3">
+                              <label className="text-xs font-medium text-muted-foreground mb-1 block">Attachment (PDF)</label>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (file.type !== 'application/pdf') {
+                                        toast({ title: 'Invalid File', description: 'Only PDF files are allowed', variant: 'destructive' });
+                                        return;
+                                      }
+                                      if (file.size > 10 * 1024 * 1024) {
+                                        toast({ title: 'File Too Large', description: 'PDF must be under 10MB', variant: 'destructive' });
+                                        return;
+                                      }
+                                      const reader = new FileReader();
+                                      reader.onload = () => {
+                                        handleExpenseVoucherChange("pdfAttachment", reader.result as string);
+                                        handleExpenseVoucherChange("pdfAttachmentName", file.name);
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                  className="text-xs"
+                                />
+                              </div>
+                              {expenseVoucherData.pdfAttachment && (
+                                <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                                  <FileText className="h-4 w-4 text-blue-600" />
+                                  <span className="text-xs text-blue-800 flex-1 truncate">{expenseVoucherData.pdfAttachmentName || 'attachment.pdf'}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs px-2"
+                                    onClick={() => {
+                                      const win = window.open('', '_blank');
+                                      if (win) {
+                                        win.document.write(`<iframe src="${expenseVoucherData.pdfAttachment}" style="width:100%;height:100%;border:none;"></iframe>`);
+                                        win.document.close();
+                                      }
+                                    }}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs px-2"
+                                    onClick={() => {
+                                      const link = document.createElement('a');
+                                      link.href = expenseVoucherData.pdfAttachment!;
+                                      link.download = expenseVoucherData.pdfAttachmentName || 'attachment.pdf';
+                                      link.click();
+                                    }}
+                                  >
+                                    Download
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs px-2 text-red-600 hover:text-red-700"
+                                    onClick={() => {
+                                      handleExpenseVoucherChange("pdfAttachment", "");
+                                      handleExpenseVoucherChange("pdfAttachmentName", "");
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         

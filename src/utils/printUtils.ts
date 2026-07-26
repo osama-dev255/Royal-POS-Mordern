@@ -5674,6 +5674,10 @@ export class PrintUtils {
     .sig-name { font-weight: 600; font-size: 11px; }
     .sig-date { font-size: 10px; color: #555; margin-top: 2px; }
     .footer-bar { height: 3px; background: #000; margin-top: 8px; }
+    .attachment-section { padding: 12px 24px; }
+    .attachment-section .attachment-info { display: flex; align-items: center; gap: 8px; background: #f0f4ff; border: 1px solid #b0c4de; border-radius: 4px; padding: 8px 12px; font-size: 11px; margin-bottom: 8px; }
+    .attachment-section .attachment-info .att-icon { font-weight: 700; color: #1a4a8a; }
+    .attachment-section iframe { width: 100%; height: 500px; border: 1px solid #ccc; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -5729,6 +5733,17 @@ export class PrintUtils {
   <div class="total-row">Total: ${fmtCurrency(totalAmount)}</div>
 
   ${data.notes ? `<div class="notes-section no-break"><div class="section-title">Notes</div><div class="notes-content">${data.notes}</div></div>` : ''}
+
+  ${data.pdfAttachment ? `
+  <div class="attachment-section no-break">
+    <div class="section-title">Attachment</div>
+    <div class="attachment-info">
+      <span class="att-icon">📎</span>
+      <span>${data.pdfAttachmentName || 'attachment.pdf'}</span>
+    </div>
+    <iframe src="${data.pdfAttachment}" title="Expense Voucher Attachment"></iframe>
+  </div>
+  ` : ''}
 
   <div class="signatures no-break">
     <div class="sig-block">
