@@ -5601,4 +5601,172 @@ export class PrintUtils {
       printWindow.focus();
     }
   }
+
+  static buildExpenseVoucherPrintHTML(data: any, options: { fontSize?: number; autoPrint?: boolean } = {}) {
+    const { fontSize = 11, autoPrint = true } = options;
+    const items = Array.isArray(data.items) ? data.items : [];
+    const totalAmount = data.totalAmount || items.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
+    const currentDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fmtCurrency = (amount: number) => {
+      const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
+      return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const itemsRows = items.length > 0 ? items.map((item: any, index: number) => `
+      <tr>
+        <td class="c">${index + 1}</td>
+        <td>${item.description || ''}</td>
+        <td>${item.category || ''}</td>
+        <td>${item.subCategory || ''}</td>
+        <td>${item.vendorName || ''}</td>
+        <td>${item.paymentMethod || ''}</td>
+        <td>${item.expenseType || ''}</td>
+        <td>${item.costClassification || ''}</td>
+        <td class="c">${item.taxDeductible ? 'Yes' : 'No'}</td>
+        <td class="r">${fmtCurrency(item.amount || 0)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="10" class="c" style="padding:20px">No items</td></tr>';
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Expense Voucher - ${data.voucherNumber || ''}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media print {
+      @page { margin: 0.3in; size: A4; }
+      body { margin: 0; padding: 0; }
+      .no-break { page-break-inside: avoid; }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      max-width: 850px; margin: 0 auto; padding: 0;
+      font-size: ${fontSize}px; color: #000; line-height: 1.5; background: #fff;
+    }
+    .accent-bar { height: 3px; background: #000; }
+    .ev-header {
+      padding: 12px 24px; border-bottom: 3px solid #000;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .ev-title { font-size: 20px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    .ev-meta { text-align: right; font-size: 11px; }
+    .ev-meta div { margin-bottom: 2px; }
+    .ev-meta strong { font-weight: 700; }
+    .section { padding: 12px 24px; }
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; color: #333; }
+    .vendor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .vendor-info .field { margin-bottom: 4px; font-size: 11px; }
+    .vendor-info .field span { font-weight: 600; display: inline-block; width: 70px; }
+    .purpose-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px; font-size: 11px; min-height: 60px; }
+    table.items-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    table.items-table thead th { background: #1a1a2e; color: #fff; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; font-weight: 600; }
+    table.items-table tbody td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; }
+    table.items-table tbody tr:nth-child(even) { background: #f8f8f8; }
+    .r { text-align: right; }
+    .c { text-align: center; }
+    .total-row { font-size: 12px; font-weight: 700; padding: 10px 24px; text-align: right; border-top: 2px solid #000; }
+    .notes-section { padding: 8px 24px; font-size: 11px; }
+    .notes-section .notes-content { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 8px; min-height: 40px; }
+    .signatures { padding: 16px 24px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .sig-block { text-align: center; }
+    .sig-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 4px; }
+    .sig-name { font-weight: 600; font-size: 11px; }
+    .sig-date { font-size: 10px; color: #555; margin-top: 2px; }
+    .footer-bar { height: 3px; background: #000; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="accent-bar"></div>
+  <div class="ev-header">
+    <div class="ev-title">Expense Voucher</div>
+    <div class="ev-meta">
+      <div><strong>Voucher No:</strong> ${data.voucherNumber || ''}</div>
+      <div><strong>Date:</strong> ${data.date || currentDate}</div>
+    </div>
+  </div>
+
+  <div class="section no-break">
+    <div class="vendor-grid">
+      <div class="vendor-info">
+        <div class="section-title">Vendor:</div>
+        <div class="field"><span>Name:</span> ${data.submittedBy || ''}</div>
+        <div class="field"><span>Contact #:</span> ${data.employeeId || ''}</div>
+        <div class="field"><span>Address:</span> ${data.department || ''}</div>
+        <div class="field"><span>TIN:</span> ${data.supplierTin || ''}</div>
+        <div class="field"><span>Email:</span> ${data.supplierEmail || ''}</div>
+      </div>
+      <div>
+        <div class="section-title">Purpose of Expense</div>
+        <div class="purpose-box">${data.purpose || ''}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section no-break">
+    <div class="section-title">Expense Details</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th class="c">#</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Sub-Category</th>
+          <th>Vendor</th>
+          <th>Payment Method</th>
+          <th>Expense Type</th>
+          <th>Cost Class.</th>
+          <th class="c">Tax Ded.</th>
+          <th class="r">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="total-row">Total: ${fmtCurrency(totalAmount)}</div>
+
+  ${data.notes ? `<div class="notes-section no-break"><div class="section-title">Notes</div><div class="notes-content">${data.notes}</div></div>` : ''}
+
+  <div class="signatures no-break">
+    <div class="sig-block">
+      <div class="sig-line">
+        <div class="sig-name">${data.preparedByName || ''}</div>
+        <div class="sig-date">Prepared By</div>
+        <div class="sig-date">${data.signatureDate || ''}</div>
+      </div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line">
+        <div class="sig-name">${data.submittedBy || ''}</div>
+        <div class="sig-date">Submitted By</div>
+        <div class="sig-date">${data.signatureDate || ''}</div>
+      </div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line">
+        <div class="sig-name">${data.approvedBy || ''}</div>
+        <div class="sig-date">Approved By</div>
+        <div class="sig-date">${data.approvedDate || ''}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar"></div>
+  ${autoPrint ? '<script>window.onload = function() { window.print(); }</script>' : ''}
+</body>
+</html>`;
+  }
+
+  static printExpenseVoucher(data: any, options: { fontSize?: number } = {}) {
+    const html = PrintUtils.buildExpenseVoucherPrintHTML(data, options);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+  }
 }

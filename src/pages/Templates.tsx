@@ -18184,7 +18184,9 @@ Enter choice (1-3):`);
               variant="outline"
               className="flex flex-col items-center gap-2 py-6"
               onClick={() => {
-                window.print();
+                if (evSavedData) {
+                  PrintUtils.printExpenseVoucher(evSavedData);
+                }
                 setEvPostSaveDialogOpen(false);
               }}
             >
@@ -18201,8 +18203,13 @@ Enter choice (1-3):`);
                     '#': idx + 1,
                     'Description': item.description || '',
                     'Category': item.category || '',
-                    'Amount': item.amount || 0,
-                    'Date': item.date || ''
+                    'Sub-Category': item.subCategory || '',
+                    'Vendor': item.vendorName || '',
+                    'Payment Method': item.paymentMethod || '',
+                    'Expense Type': item.expenseType || '',
+                    'Cost Classification': item.costClassification || '',
+                    'Tax Deductible': item.taxDeductible ? 'Yes' : 'No',
+                    'Amount': item.amount || 0
                   }));
                   ExportUtils.exportToPDF(exportData, `EV-${evSavedData.voucherNumber || evSavedData.date}`, `Expense Voucher - ${evSavedData.voucherNumber || ''}`);
                 }
@@ -18222,8 +18229,13 @@ Enter choice (1-3):`);
                     '#': idx + 1,
                     'Description': item.description || '',
                     'Category': item.category || '',
-                    'Amount': item.amount || 0,
-                    'Date': item.date || ''
+                    'Sub-Category': item.subCategory || '',
+                    'Vendor': item.vendorName || '',
+                    'Payment Method': item.paymentMethod || '',
+                    'Expense Type': item.expenseType || '',
+                    'Cost Classification': item.costClassification || '',
+                    'Tax Deductible': item.taxDeductible ? 'Yes' : 'No',
+                    'Amount': item.amount || 0
                   }));
                   ExportUtils.exportToXLS(exportData, `EV-${evSavedData.voucherNumber || evSavedData.date}`, 'Expense Voucher');
                 }
@@ -18238,19 +18250,33 @@ Enter choice (1-3):`);
               className="flex flex-col items-center gap-2 py-6"
               onClick={async () => {
                 if (evSavedData) {
-                  const totalAmount = evSavedData.items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-                  const shareData = {
-                    title: `Expense Voucher ${evSavedData.voucherNumber || ''}`,
-                    text: `Expense Voucher #${evSavedData.voucherNumber || ''} - Department: ${evSavedData.department || 'N/A'} - Total: ${formatCurrency(totalAmount)}`,
-                    url: window.location.href
-                  };
+                  const items = evSavedData.items || [];
+                  const totalAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+                  const pad = (s: string, w: number) => s.padEnd(w, ' ').slice(0, w);
+                  const header = `${pad('#', 3)}${pad('Description', 25)}${pad('Category', 15)}${pad('Amount', 12)}`;
+                  const separator = '-'.repeat(55);
+                  const rows = items.map((item, idx) =>
+                    `${pad(String(idx + 1), 3)}${pad((item.description || '').slice(0, 24), 25)}${pad((item.category || '').slice(0, 14), 15)}${pad(formatCurrency(item.amount || 0), 12)}`
+                  ).join('\n');
+                  const shareText = [
+                    `EXPENSE VOUCHER #${evSavedData.voucherNumber || ''}`,
+                    `Date: ${evSavedData.date || ''}`,
+                    `Vendor: ${evSavedData.submittedBy || 'N/A'}`,
+                    `Purpose: ${evSavedData.purpose || 'N/A'}`,
+                    '',
+                    header,
+                    separator,
+                    rows,
+                    separator,
+                    `TOTAL: ${formatCurrency(totalAmount)}`,
+                  ].join('\n');
                   if (navigator.share) {
                     try {
-                      await navigator.share(shareData);
+                      await navigator.share({ title: `Expense Voucher ${evSavedData.voucherNumber || ''}`, text: shareText });
                     } catch { /* user cancelled */ }
                   } else {
                     try {
-                      await navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}`);
+                      await navigator.clipboard.writeText(shareText);
                       toast({ title: 'Copied', description: 'Voucher details copied to clipboard' });
                     } catch {
                       toast({ title: 'Copy failed', description: 'Could not copy to clipboard', variant: 'destructive' });
