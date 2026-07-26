@@ -1308,6 +1308,7 @@ No inventory adjustment will be made.`,
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
     const [isSavingGRN, setIsSavingGRN] = useState<boolean>(false);
     const [isSavingSPN, setIsSavingSPN] = useState<boolean>(false);
+      const [isSavingEV, setIsSavingEV] = useState<boolean>(false);
 
   // Registered suppliers state
   const [registeredSuppliers, setRegisteredSuppliers] = useState<DBSupplier[]>([]);
@@ -3270,25 +3271,21 @@ No inventory adjustment will be made.`,
     "Miscellaneous": ["Bank Fees", "Miscellaneous Expenses", "Donations", "Subscriptions", "Memberships"]
   };
   const [expenseVoucherData, setExpenseVoucherData] = useState<ExpenseVoucherData>({
-    voucherNumber: "EV-2024-001",
+    voucherNumber: "",
     date: todayStr,
-    submittedBy: "John Smith",
-    employeeId: "EMP-00123",
-    department: "Marketing",
-    items: [
-      { id: "1", description: "Office Supplies", category: "Office Expenses", subCategory: "Stationery", amount: 150.00, date: todayStr, vendorName: "Office Depot", paymentMethod: "Cash", expenseType: "operating", costClassification: "indirect", taxDeductible: true },
-      { id: "2", description: "Travel Expenses", category: "Transportation", subCategory: "Fuel", amount: 320.50, date: todayStr, vendorName: "Shell Petroleum", paymentMethod: "Mobile Payment", expenseType: "operating", costClassification: "direct", taxDeductible: true },
-      { id: "3", description: "Client Dinner", category: "Meals & Entertainment", subCategory: "Client Meals", amount: 85.75, date: todayStr, vendorName: "Ocean Restaurant", paymentMethod: "Credit Card", expenseType: "operating", costClassification: "indirect", taxDeductible: false }
-    ],
-    totalAmount: 556.25,
-    purpose: "Monthly marketing expenses for Q4 campaign",
-    approvedBy: "Jane Manager",
+    submittedBy: "",
+    employeeId: "",
+    department: "",
+    items: [],
+    totalAmount: 0,
+    purpose: "",
+    approvedBy: "",
     approvedDate: todayStr,
-    notes: "All receipts attached.",
+    notes: "",
     submittedBySignature: "",
     approvedBySignature: "",
     signatureDate: todayStr,
-    preparedByName: "John Smith",
+    preparedByName: "",
     supplierTin: "",
     supplierEmail: ""
   });
@@ -10930,8 +10927,52 @@ No inventory adjustment will be made.`,
                         // Use the proper handleSaveGRN function for GRNs
                         await handleSaveGRN();
                       } else if (currentTemplate?.type === "expense-voucher") {
-                        // Save expense voucher and show post-save dialog
-                        alert(`Expense Voucher ${expenseVoucherData.voucherNumber} saved successfully!`);
+                        // Validate required fields
+                        const preparedBy = expenseVoucherData.preparedByName || expenseVoucherData.submittedBy;
+                        if (!preparedBy?.trim()) {
+                          toast({ title: 'Validation Error', description: 'Prepared By is required', variant: 'destructive' });
+                          return;
+                        }
+                        // Save expense voucher to database and show post-save dialog
+                        setIsSavingEV(true);
+                        try {
+                          const { saveExpenseVoucher } = await import('@/utils/expenseVoucherUtils');
+                          const result = await saveExpenseVoucher(expenseVoucherData);
+                          if (result.success) {
+                            // Also insert each item as an expense record in Expense Management
+                            const { createOutletExpense } = await import('@/services/databaseService');
+                            const items = expenseVoucherData.items || [];
+                            for (const item of items) {
+                              if (item.description || item.amount) {
+                                await createOutletExpense({
+                                  category: item.category || '',
+                                  sub_category: item.subCategory || '',
+                                  description: item.description || '',
+                                  amount: item.amount || 0,
+                                  payment_method: item.paymentMethod || 'cash',
+                                  expense_date: expenseVoucherData.date || new Date().toISOString().split('T')[0],
+                                  vendor_name: item.vendorName || expenseVoucherData.submittedBy || '',
+                                  vendor_contact: expenseVoucherData.employeeId || '',
+                                  tax_deductible: item.taxDeductible || false,
+                                  expense_type: item.expenseType || 'operating',
+                                  cost_classification: item.costClassification || 'indirect',
+                                  department: expenseVoucherData.department || '',
+                                  notes: expenseVoucherData.notes || '',
+                                  prepared_by_name: expenseVoucherData.preparedByName || expenseVoucherData.submittedBy || '',
+                                  approval_status: 'pending'
+                                });
+                              }
+                            }
+                            toast({ title: 'Success', description: `Expense Voucher ${expenseVoucherData.voucherNumber} saved successfully` });
+                          } else {
+                            toast({ title: 'Warning', description: `Saved locally but database save failed: ${result.error}`, variant: 'destructive' });
+                          }
+                        } catch (err) {
+                          console.error('Error saving expense voucher:', err);
+                          toast({ title: 'Warning', description: 'Saved locally but database save failed', variant: 'destructive' });
+                        } finally {
+                          setIsSavingEV(false);
+                        }
                         setEvSavedData({ ...expenseVoucherData });
                         setEvPostSaveDialogOpen(true);
                       } else if (currentTemplate?.type === "supplier-purchase-note") {
@@ -10941,7 +10982,7 @@ No inventory adjustment will be made.`,
                         handleSaveDeliveryNote();
                       }
                     }}>
-                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN) ? (
+                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN || isSavingEV) ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processing...
@@ -12455,7 +12496,7 @@ No inventory adjustment will be made.`,
                         {/* Signatures */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-4 border-t">
                           <div>
-                            <div className="font-bold mb-2 text-xs uppercase tracking-wide text-muted-foreground">Prepared By</div>
+                            <div className="font-bold mb-2 text-xs uppercase tracking-wide text-muted-foreground">Prepared By <span className="text-red-500">*</span></div>
                             <div className="text-sm space-y-2">
                               <div className="pt-1 mt-8">
                                 <Input
