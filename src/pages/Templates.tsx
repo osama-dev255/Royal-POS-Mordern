@@ -8450,8 +8450,31 @@ No inventory adjustment will be made.`,
     }
     .payment-row.discount-row .payment-value { color: #000; }
     
-    .notes-box {
+    .left-column {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .destination-box {
+      overflow: hidden;
+    }
+    .destination-header {
+      background: #f1f3f5;
+      color: #000;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .destination-body {
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #000;
+      font-weight: 600;
+    }
+    .notes-box {
       overflow: hidden;
     }
     .notes-header {
@@ -8611,29 +8634,23 @@ No inventory adjustment will be made.`,
       <div class="party-header">From (Supplier)</div>
       <div class="party-body">
         <div class="party-name">${data.supplierName || 'N/A'}</div>
-        <div class="party-detail">
-          <span>${data.supplierAddress || ''}</span>
-        </div>
-        <div class="party-detail">
-          <span>${data.supplierPhone || ''}</span>
-        </div>
-        ${data.supplierEmail ? `<div class="party-detail">
-          <span>${data.supplierEmail}</span>
-        </div>` : ''}
+        <div class="party-detail"><span>${data.supplierAddress || ''}</span></div>
+        ${data.supplierStreetAddress ? `<div class="party-detail"><span>${data.supplierStreetAddress}</span></div>` : ''}
+        <div class="party-detail"><span>${data.supplierPhone || ''}</span></div>
+        ${data.supplierEmail ? `<div class="party-detail"><span>${data.supplierEmail}</span></div>` : ''}
+        ${data.supplierTaxId ? `<div class="party-detail"><span>TIN: ${data.supplierTaxId}</span></div>` : ''}
       </div>
     </div>
     <div class="party-box to-box">
       <div class="party-header">To (Business)</div>
       <div class="party-body">
         <div class="party-name">${data.businessName}</div>
-        <div class="party-detail">
-          <span>${data.businessAddress}</span>
-        </div>
-        <div class="party-detail">
-          <span>${data.businessPhone}</span>
-        </div>
-        ${data.businessEmail ? `<div class="party-detail">
-          <span>${data.businessEmail}</span>
+        <div class="party-detail"><span>${data.businessAddress}</span></div>
+        <div class="party-detail"><span>${data.businessPhone}</span></div>
+        ${data.businessEmail ? `<div class="party-detail"><span>${data.businessEmail}</span></div>` : ''}
+        ${data.businessTin ? `<div class="party-detail"><span>TIN: ${data.businessTin}</span></div>` : ''}
+        ${(data.stockType || data.receiptIssued) ? `<div class="party-detail" style="margin-top:4px; padding-top:4px; border-top:1px solid #e2e8f0;">
+          <span style="font-size:9px;">${data.stockType ? 'Stock: ' + (data.stockType === 'vatable' ? 'Vatable' : 'Exempt') : ''}${data.stockType && data.receiptIssued ? ' | ' : ''}${data.receiptIssued ? 'Receipt: ' + (data.receiptIssued === 'yes' ? 'Yes' : 'No') : ''}</span>
         </div>` : ''}
       </div>
     </div>
@@ -8705,9 +8722,15 @@ No inventory adjustment will be made.`,
 
   <!-- PAYMENT + NOTES -->
   <div class="bottom-section">
-    <div class="notes-box">
-      <div class="notes-header">Notes</div>
-      <div class="notes-body">${data.notes ? data.notes.replace(/\n/g, '<br>') : '<span style="color:#000;">No additional notes.</span>'}</div>
+    <div class="left-column">
+      <div class="notes-box">
+        <div class="notes-header">Notes</div>
+        <div class="notes-body">${data.notes ? data.notes.replace(/\n/g, '<br>') : '<span style="color:#000;">No additional notes.</span>'}</div>
+      </div>
+      ${data.destination ? `<div class="destination-box">
+        <div class="destination-header">Destination</div>
+        <div class="destination-body">${data.destination.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+      </div>` : ''}
     </div>
     <div class="payment-box">
       <div class="payment-header">Payment Summary</div>
@@ -8716,14 +8739,14 @@ No inventory adjustment will be made.`,
           <div class="payment-label">Subtotal</div>
           <div class="payment-value">${formatCurrency(noteTotals.subtotal)}</div>
         </div>
-        ${Number(data.discount || 0) !== 0 ? `<div class="payment-row discount-row">
-          <div class="payment-label">Discount</div>
-          <div class="payment-value">-${formatCurrency(data.discount || 0)}</div>
-        </div>` : ''}
         <div class="payment-row total-row">
           <div class="payment-label">Total</div>
           <div class="payment-value">${formatCurrency(noteTotals.total)}</div>
         </div>
+        ${data.modeOfPayment ? `<div class="payment-row">
+          <div class="payment-label">Mode of Payment</div>
+          <div class="payment-value">${data.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+        </div>` : ''}
         <div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
           <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
           <div class="payment-value" style="color: #16a34a; font-weight: 800;">${formatCurrency(data.items.reduce((sum, item) => sum + ((item.sellingPrice || 0) - (item.unitPrice || 0)), 0))}</div>
@@ -8735,16 +8758,40 @@ No inventory adjustment will be made.`,
   <!-- SIGNATURES -->
   <div class="sig-section no-break">
     <div class="section-title">Authorization & Signatures</div>
-    <div class="sig-grid">
+    <div class="sig-grid" style="grid-template-columns: 1fr 1fr 1fr; max-width: 100%;">
       <div class="sig-box">
         <div class="sig-title">Prepared By</div>
         <div class="sig-field">
           <div class="sig-label">Name</div>
-          <div class="sig-value">${data.preparedBy || '—'}</div>
+          <div class="sig-value">${data.preparedBy || '\u2014'}</div>
         </div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
-          <div class="sig-value">${data.preparedDate || '—'}</div>
+          <div class="sig-value">${data.preparedDate || '\u2014'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Delivered By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.deliveredBy || '\u2014'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.deliveredDate || '\u2014'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Approved By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.approvedBy || '\u2014'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.approvedDate || '\u2014'}</div>
         </div>
         <div class="sig-line">Signature</div>
       </div>

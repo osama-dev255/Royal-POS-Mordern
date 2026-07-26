@@ -5142,8 +5142,7 @@ export class PrintUtils {
     const data = note.data || note;
     const items = Array.isArray(data.items) ? data.items : [];
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
-    const discount = data.discount || 0;
-    const total = subtotal - discount;
+    const total = subtotal;
     const totalItems = items.length;
     const totalQuantity = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
     const totalPackages = items.filter((item: any) => item.unit && item.quantity).length;
@@ -5313,7 +5312,19 @@ export class PrintUtils {
     .payment-row.total-row .payment-value {
       font-size: ${fontSize}px; font-weight: 800; color: #000;
     }
-    .notes-box { flex: 1; overflow: hidden; }
+    .left-column {
+      flex: 1; display: flex; flex-direction: column; gap: 12px;
+    }
+    .destination-box { overflow: hidden; }
+    .destination-header {
+      background: #f1f3f5; color: #000; padding: 8px 12px;
+      font-size: ${fontSize}px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .destination-body {
+      padding: 10px 12px; font-size: ${fontSize}px; color: #000; font-weight: 600;
+    }
+    .notes-box { overflow: hidden; }
     .notes-header {
       background: #f5f5f5; padding: 8px 12px; font-size: ${fontSize}px;
       font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
@@ -5325,7 +5336,7 @@ export class PrintUtils {
     }
     .sig-section { padding: 0 24px 12px; }
     .sig-grid {
-      display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 300px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; max-width: 100%;
     }
     .sig-box { padding: 10px; text-align: center; background: #fff; }
     .sig-title {
@@ -5398,7 +5409,9 @@ export class PrintUtils {
       <div class="party-header">From (Supplier)</div>
       <div class="party-body">
         <div class="party-name">${data.supplierName || 'N/A'}</div>
-        <div class="party-detail"><span>${data.supplierAddress || ''}</span></div>
+        ${data.supplierStreetAddress ? `<div class="party-detail"><span>${data.supplierStreetAddress}</span></div>` : ''}
+        ${data.supplierAddress ? `<div class="party-detail"><span>${data.supplierAddress}</span></div>` : ''}
+        ${data.supplierTaxId ? `<div class="party-detail"><span>TIN: ${data.supplierTaxId}</span></div>` : ''}
         <div class="party-detail"><span>${data.supplierPhone || ''}</span></div>
         ${data.supplierEmail ? `<div class="party-detail"><span>${data.supplierEmail}</span></div>` : ''}
       </div>
@@ -5407,9 +5420,17 @@ export class PrintUtils {
       <div class="party-header">To (Business)</div>
       <div class="party-body">
         <div class="party-name">${data.businessName || 'N/A'}</div>
-        <div class="party-detail"><span>${data.businessAddress || ''}</span></div>
+        ${data.businessAddress ? `<div class="party-detail"><span>${data.businessAddress}</span></div>` : ''}
+        ${data.businessTin ? `<div class="party-detail"><span>TIN: ${data.businessTin}</span></div>` : ''}
         <div class="party-detail"><span>${data.businessPhone || ''}</span></div>
         ${data.businessEmail ? `<div class="party-detail"><span>${data.businessEmail}</span></div>` : ''}
+        ${data.stockType || data.receiptIssued ? `
+        <div class="party-detail" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
+          <span style="font-weight: 600;">Compliance:</span>
+        </div>
+        ${data.stockType ? `<div class="party-detail"><span>Stock Type: ${data.stockType}</span></div>` : ''}
+        ${data.receiptIssued ? `<div class="party-detail"><span>Receipt Issued: ${data.receiptIssued}</span></div>` : ''}
+        ` : ''}
       </div>
     </div>
   </div>
@@ -5467,9 +5488,15 @@ export class PrintUtils {
 
   <!-- PAYMENT + NOTES -->
   <div class="bottom-section">
-    <div class="notes-box">
-      <div class="notes-header">Notes</div>
-      <div class="notes-body">${data.notes ? data.notes.replace(/\n/g, '<br>') : '<span style="color:#000;">No additional notes.</span>'}</div>
+    <div class="left-column">
+      <div class="notes-box">
+        <div class="notes-header">Notes</div>
+        <div class="notes-body">${data.notes ? data.notes.replace(/\n/g, '<br>') : '<span style="color:#000;">No additional notes.</span>'}</div>
+      </div>
+      ${data.destination ? `<div class="destination-box">
+        <div class="destination-header">Destination</div>
+        <div class="destination-body">${data.destination}</div>
+      </div>` : ''}
     </div>
     <div class="payment-box">
       <div class="payment-header">Payment Summary</div>
@@ -5478,14 +5505,14 @@ export class PrintUtils {
           <div class="payment-label">Subtotal</div>
           <div class="payment-value">${fmtCurrency(subtotal)}</div>
         </div>
-        ${discount > 0 ? `<div class="payment-row discount-row">
-          <div class="payment-label">Discount</div>
-          <div class="payment-value">-${fmtCurrency(discount)}</div>
-        </div>` : ''}
         <div class="payment-row total-row">
           <div class="payment-label">Total</div>
           <div class="payment-value">${fmtCurrency(total)}</div>
         </div>
+        ${data.modeOfPayment ? `<div class="payment-row">
+          <div class="payment-label">Mode of Payment</div>
+          <div class="payment-value">${data.modeOfPayment}</div>
+        </div>` : ''}
         ${showProjectedProfit ? `<div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
           <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
           <div class="payment-value" style="color: #16a34a; font-weight: 800;">${fmtCurrency(totalProjectedProfit)}</div>
@@ -5507,6 +5534,30 @@ export class PrintUtils {
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.preparedDate ? new Date(data.preparedDate).toLocaleDateString() : '\u2014'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Delivered By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.deliveredBy || '\u2014'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.deliveredDate ? new Date(data.deliveredDate).toLocaleDateString() : '\u2014'}</div>
+        </div>
+        <div class="sig-line">Signature</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Approved By</div>
+        <div class="sig-field">
+          <div class="sig-label">Name</div>
+          <div class="sig-value">${data.approvedBy || '\u2014'}</div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-value">${data.approvedDate ? new Date(data.approvedDate).toLocaleDateString() : '\u2014'}</div>
         </div>
         <div class="sig-line">Signature</div>
       </div>
