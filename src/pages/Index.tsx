@@ -2651,7 +2651,7 @@ export const Index = () => {
                   onLogout={handleLogout}
                   onEditNote={(note) => {
                     setEditingSPNData(note);
-                    setCurrentView("comprehensive");
+                    setCurrentView("templates");
                     window.location.hash = '#templates';
                   }}
                 />
