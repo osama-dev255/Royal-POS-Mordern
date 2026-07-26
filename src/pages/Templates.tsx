@@ -10963,7 +10963,8 @@ No inventory adjustment will be made.`,
                                   department: expenseVoucherData.department || '',
                                   notes: expenseVoucherData.notes || '',
                                   prepared_by_name: expenseVoucherData.preparedByName || expenseVoucherData.submittedBy || '',
-                                  approval_status: 'pending'
+                                  approval_status: 'pending',
+                                  voucher_number: result.id || expenseVoucherData.voucherNumber || ''
                                 });
                               }
                             }

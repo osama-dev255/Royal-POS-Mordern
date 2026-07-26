@@ -287,6 +287,7 @@ export interface Expense {
   cost_center?: string;
   expense_type?: string; // operating, capital, personal
   cost_classification?: string; // direct, indirect
+  voucher_number?: string; // Link to saved_expense_vouchers for PDF attachment lookup
   // Recurring expense fields
   is_recurring?: boolean;
   recurring_frequency?: string; // daily, weekly, bi-weekly, monthly, quarterly, semi-annually, annually
