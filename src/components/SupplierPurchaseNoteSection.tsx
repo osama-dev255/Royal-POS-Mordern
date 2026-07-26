@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil, Calendar } from "lucide-react";
+import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil, Calendar, Share2 } from "lucide-react";
 import { SupplierPurchaseNoteCard } from "./SupplierPurchaseNoteCard";
 import { getSavedSupplierPurchaseNotes, deleteSupplierPurchaseNote, SavedSupplierPurchaseNote } from "@/utils/supplierPurchaseNoteUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { formatCurrency } from "@/lib/currency";
+import { toast } from "@/components/ui/use-toast";
 
 interface SupplierPurchaseNoteSectionProps {
   onBack: () => void;
@@ -94,6 +95,189 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
     handlePrintNote(note);
   };
 
+  const handleShareNote = async (note: SavedSupplierPurchaseNote) => {
+    try {
+      const data = note;
+      const items = Array.isArray(data.items) ? data.items : [];
+      const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+      const total = subtotal;
+      const fmtCurrency = (amount: number) => {
+        const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
+        return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+
+      // Build formatted text message
+      const lines: string[] = [];
+      lines.push('═══════════════════════════════════');
+      lines.push('   SUPPLIER PURCHASE NOTE');
+      lines.push(`   #${data.purchaseNoteNumber}`);
+      lines.push('═══════════════════════════════════');
+      lines.push('');
+      lines.push(`Date: ${new Date(data.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`);
+      lines.push(`Status: ${(data.status || 'completed').toUpperCase()}`);
+      lines.push('');
+      lines.push('─── FROM (Supplier) ───');
+      lines.push(`  ${data.supplierName || 'N/A'}`);
+      if (data.supplierStreetAddress) lines.push(`  ${data.supplierStreetAddress}`);
+      if (data.supplierAddress) lines.push(`  ${data.supplierAddress}`);
+      if (data.supplierTaxId) lines.push(`  TIN: ${data.supplierTaxId}`);
+      if (data.supplierPhone) lines.push(`  Phone: ${data.supplierPhone}`);
+      if (data.supplierEmail) lines.push(`  Email: ${data.supplierEmail}`);
+      lines.push('');
+      lines.push('─── TO (Business) ───');
+      lines.push(`  ${data.businessName || 'N/A'}`);
+      if (data.businessAddress) lines.push(`  ${data.businessAddress}`);
+      if (data.businessTin) lines.push(`  TIN: ${data.businessTin}`);
+      if (data.businessPhone) lines.push(`  Phone: ${data.businessPhone}`);
+      if (data.businessEmail) lines.push(`  Email: ${data.businessEmail}`);
+      if (data.stockType || data.receiptIssued) {
+        lines.push('  Compliance:');
+        if (data.stockType) lines.push(`    Stock Type: ${data.stockType}`);
+        if (data.receiptIssued) lines.push(`    Receipt Issued: ${data.receiptIssued}`);
+      }
+      lines.push('');
+      lines.push('─── ITEMS ───');
+      // Build items table with dynamic columns
+      const colHeaders: string[] = ['#', 'Description', 'Qty', 'Unit', 'Cost Price'];
+      const colWidths: number[] = [4, 22, 6, 7, 16];
+      const colAligns: ('left' | 'right' | 'center')[] = ['center', 'left', 'right', 'center', 'right'];
+      if (showSellingPrice) {
+        colHeaders.push('Selling Price');
+        colWidths.push(16);
+        colAligns.push('right');
+      }
+      colHeaders.push('Total');
+      colWidths.push(16);
+      colAligns.push('right');
+      if (showProjectedProfit) {
+        colHeaders.push('Proj. Profit');
+        colWidths.push(16);
+        colAligns.push('right');
+      }
+      const pad = (str: string, width: number, align: 'left' | 'right' | 'center' = 'left') => {
+        const s = String(str);
+        if (align === 'right') return s.padStart(width).slice(-width);
+        if (align === 'center') {
+          const padL = Math.floor((width - s.length) / 2);
+          const padR = width - s.length - padL;
+          return ' '.repeat(Math.max(0, padL)) + s + ' '.repeat(Math.max(0, padR));
+        }
+        return s.padEnd(width).slice(0, width);
+      };
+      const separator = '  +' + colWidths.map(w => '-'.repeat(w + 2)).join('+') + '+';
+      lines.push(separator);
+      lines.push('  | ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' | ') + ' |');
+      lines.push(separator);
+      items.forEach((item: any, index: number) => {
+        const num = String(index + 1).padStart(2, '0');
+        const desc = (item.description || 'Item').length > 20 ? (item.description || 'Item').substring(0, 19) + '…' : (item.description || 'Item');
+        const row: string[] = [
+          pad(num, colWidths[0], 'center'),
+          pad(desc, colWidths[1], 'left'),
+          pad(String(item.quantity || 0), colWidths[2], 'right'),
+          pad(item.unit || '-', colWidths[3], 'center'),
+          pad(fmtCurrency(item.unitPrice || 0), colWidths[4], 'right')
+        ];
+        let colIdx = 5;
+        if (showSellingPrice) {
+          row.push(pad(fmtCurrency(item.sellingPrice || 0), colWidths[colIdx], 'right'));
+          colIdx++;
+        }
+        row.push(pad(fmtCurrency(item.total || 0), colWidths[colIdx], 'right'));
+        colIdx++;
+        if (showProjectedProfit) {
+          const profit = (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0));
+          row.push(pad(fmtCurrency(profit), colWidths[colIdx], 'right'));
+        }
+        lines.push('  | ' + row.join(' | ') + ' |');
+      });
+      lines.push(separator);
+      // Totals row
+      const totalQty = items.reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+      const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0);
+      const totalsRow: string[] = [
+        pad('', colWidths[0], 'center'),
+        pad('TOTALS', colWidths[1], 'left'),
+        pad(String(totalQty), colWidths[2], 'right'),
+        pad('', colWidths[3], 'center'),
+        pad('', colWidths[4], 'right')
+      ];
+      let tColIdx = 5;
+      if (showSellingPrice) {
+        totalsRow.push(pad('', colWidths[tColIdx], 'right'));
+        tColIdx++;
+      }
+      totalsRow.push(pad(fmtCurrency(total), colWidths[tColIdx], 'right'));
+      tColIdx++;
+      if (showProjectedProfit) {
+        totalsRow.push(pad(fmtCurrency(totalProjectedProfit), colWidths[tColIdx], 'right'));
+      }
+      lines.push('  | ' + totalsRow.join(' | ') + ' |');
+      lines.push(separator);
+      lines.push('');
+      lines.push('─── PAYMENT SUMMARY ───');
+      lines.push(`  Subtotal:  ${fmtCurrency(subtotal)}`);
+      lines.push(`  TOTAL:     ${fmtCurrency(total)}`);
+      if (showProjectedProfit) {
+        lines.push(`  Projected Profit: ${fmtCurrency(totalProjectedProfit)}`);
+      }
+      if (data.destination) {
+        lines.push(`  Destination: ${data.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+      }
+      if (data.modeOfPayment) {
+        lines.push(`  Mode of Payment: ${data.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+      }
+      lines.push('');
+      lines.push('─── AUTHORIZATION ───');
+      lines.push(`  Prepared By: ${data.preparedBy || '—'}${data.preparedDate ? ` (${new Date(data.preparedDate).toLocaleDateString()})` : ''}`);
+      lines.push(`  Delivered By: ${data.deliveredBy || '—'}${data.deliveredDate ? ` (${new Date(data.deliveredDate).toLocaleDateString()})` : ''}`);
+      lines.push(`  Approved By: ${data.approvedBy || '—'}${data.approvedDate ? ` (${new Date(data.approvedDate).toLocaleDateString()})` : ''}`);
+      if (data.notes) {
+        lines.push('');
+        lines.push('─── NOTES ───');
+        lines.push(`  ${data.notes}`);
+      }
+      lines.push('');
+      lines.push('───────────────────────────────────');
+      lines.push(`${data.businessName || ''} ${data.businessPhone ? '| ' + data.businessPhone : ''}`);
+
+      const messageText = lines.join('\n');
+
+      const shareData: { title: string; text: string } = {
+        title: `Supplier Purchase Note #${data.purchaseNoteNumber}`,
+        text: messageText
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          toast({ title: "Shared", description: "Supplier Purchase Note shared successfully" });
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            // Fallback: copy to clipboard
+            try {
+              await navigator.clipboard.writeText(messageText);
+              toast({ title: "Copied", description: "Note details copied to clipboard" });
+            } catch {
+              toast({ title: "Error", description: "Failed to share the note", variant: "destructive" });
+            }
+          }
+        }
+      } else {
+        // Fallback: copy to clipboard
+        try {
+          await navigator.clipboard.writeText(messageText);
+          toast({ title: "Copied", description: "Note details copied to clipboard" });
+        } catch {
+          toast({ title: "Info", description: "Sharing not supported on this device" });
+        }
+      }
+    } catch (error) {
+      console.error('Error sharing supplier purchase note:', error);
+      toast({ title: "Error", description: "Failed to share the note. Please try again.", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {selectedNote ? (
@@ -156,6 +340,10 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                 <Button onClick={() => handleDownloadNote(selectedNote)} size="sm" variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Download PDF
+                </Button>
+                <Button onClick={() => handleShareNote(selectedNote)} size="sm" variant="outline">
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
                 </Button>
               </div>
             </div>
@@ -418,6 +606,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                     onViewDetails={() => handleViewNote(note)}
                     onPrint={() => handlePrintNote(note)}
                     onDownload={() => handleDownloadNote(note)}
+                    onShare={() => handleShareNote(note)}
                     onDelete={() => handleDeleteNote(note.id)}
                   />
                 ))}

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { FileText, Calendar, User, Eye, Download, Trash2, Printer } from "lucide-react";
+import { FileText, Calendar, User, Eye, Download, Trash2, Printer, Share2 } from "lucide-react";
 
 interface SupplierPurchaseNote {
   id: string;
@@ -19,6 +19,7 @@ interface SupplierPurchaseNoteCardProps {
   onViewDetails: () => void;
   onPrint: () => void;
   onDownload: () => void;
+  onShare: () => void;
   onDelete: () => void;
   className?: string;
 }
@@ -28,6 +29,7 @@ export const SupplierPurchaseNoteCard = ({
   onViewDetails,
   onPrint,
   onDownload,
+  onShare,
   onDelete,
   className 
 }: SupplierPurchaseNoteCardProps) => {
@@ -106,10 +108,10 @@ export const SupplierPurchaseNoteCard = ({
               variant="outline" 
               size="sm" 
               className="flex-1"
-              onClick={onDownload}
+              onClick={onShare}
             >
-              <Download className="h-4 w-4 mr-1" />
-              Download
+              <Share2 className="h-4 w-4 mr-1" />
+              Share
             </Button>
             <Button 
               variant="outline" 

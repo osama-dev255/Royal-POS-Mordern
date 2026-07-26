@@ -5137,8 +5137,8 @@ export class PrintUtils {
     }
   }
 
-  static printSupplierPurchaseNoteDetails(note: any, options: { showSellingPrice?: boolean; showProjectedProfit?: boolean; fontSize?: number } = {}) {
-    const { showSellingPrice = true, showProjectedProfit = true, fontSize = 11 } = options;
+  static buildSupplierPurchaseNotePrintHTML(note: any, options: { showSellingPrice?: boolean; showProjectedProfit?: boolean; fontSize?: number; autoPrint?: boolean } = {}) {
+    const { showSellingPrice = true, showProjectedProfit = true, fontSize = 11, autoPrint = true } = options;
     const data = note.data || note;
     const items = Array.isArray(data.items) ? data.items : [];
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
@@ -5585,8 +5585,14 @@ export class PrintUtils {
     </div>
   </div>
 
-  <script>window.onload = function() { window.print(); }</script>
+  ${autoPrint ? '<script>window.onload = function() { window.print(); }</script>' : ''}
 </body></html>`;
+
+    return html;
+  }
+
+  static printSupplierPurchaseNoteDetails(note: any, options: { showSellingPrice?: boolean; showProjectedProfit?: boolean; fontSize?: number } = {}) {
+    const html = PrintUtils.buildSupplierPurchaseNotePrintHTML(note, options);
 
     const printWindow = window.open('', '_blank');
     if (printWindow) {
