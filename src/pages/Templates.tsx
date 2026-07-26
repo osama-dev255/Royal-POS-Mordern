@@ -8159,19 +8159,12 @@ No inventory adjustment will be made.`,
       background: #fff;
     }
     
-    /* === TOP ACCENT BAR === */
-    .accent-bar {
-      height: 3px;
-      background: #000;
-    }
-    
     /* === HEADER === */
     .spn-header {
       background: #fff;
       color: #000;
       padding: 8px 24px;
       position: relative;
-      text-align: center;
       border-bottom: 3px solid #000;
     }
     .spn-header::after {
@@ -8184,6 +8177,22 @@ No inventory adjustment will be made.`,
       height: 40px;
       border: 2px solid #ccc;
       border-radius: 50%;
+    }
+    .spn-header-content {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .spn-qr-code {
+      width: 70px;
+      height: 70px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .spn-header-text {
+      flex: 1;
+      text-align: center;
     }
     .spn-document-title {
       font-size: 20px;
@@ -8595,15 +8604,17 @@ No inventory adjustment will be made.`,
 <body>
   ${options.autoPrint ? '<div class="watermark">ORIGINAL</div>' : ''}
   
-  <!-- ACCENT BAR -->
-  <div class="accent-bar"></div>
-  
   <!-- HEADER -->
   <div class="spn-header">
-    <div class="spn-document-title">SUPPLIER PURCHASE NOTE</div>
-    <div class="spn-document-number">Cash Purchase</div>
-    <div class="spn-document-number">#${data.purchaseNoteNumber}</div>
-    <div class="spn-copy-indicator">Original Copy</div>
+    <div class="spn-header-content">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent('SPN#' + data.purchaseNoteNumber + '|' + data.supplierName + '|' + data.date)}&size=80x80&ecc=M" alt="QR Code" class="spn-qr-code" />
+      <div class="spn-header-text">
+        <div class="spn-document-title">SUPPLIER PURCHASE NOTE</div>
+        <div class="spn-document-number">Cash Purchase</div>
+        <div class="spn-document-number">#${data.purchaseNoteNumber}</div>
+        <div class="spn-copy-indicator">Original Copy</div>
+      </div>
+    </div>
   </div>
   
   <!-- META BAR -->
