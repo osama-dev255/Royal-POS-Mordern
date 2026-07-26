@@ -68,6 +68,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -822,6 +823,56 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       title: "Exported",
       description: `CSV: ${filename}.csv`
     });
+  };
+
+  const handleExportExpenseXLS = (expense: Expense) => {
+    const exportData = [{
+      'ID': expense.id?.slice(0, 8) || '',
+      'Date': new Date(expense.expense_date).toLocaleDateString(),
+      'Category': expense.category || '',
+      'Sub-Category': expense.sub_category || '',
+      'Description': expense.description || '',
+      'Amount': expense.amount || 0,
+      'Payment Method': expense.payment_method?.replace('_', ' ') || '',
+      'Expense Type': expense.expense_type || '',
+      'Cost Classification': expense.cost_classification || '',
+      'Tax Deductible': expense.tax_deductible ? 'Yes' : 'No',
+      'Vendor': expense.vendor_name || '',
+      'Status': expense.approval_status || 'pending',
+      'Prepared By': expense.prepared_by_name || '',
+      'Approved By': expense.approved_by_name || '',
+      'Notes': expense.notes || ''
+    }];
+    const filename = `expense_${expense.category}_${new Date(expense.expense_date).toISOString().split('T')[0]}`;
+    ExcelUtils.exportToExcel(exportData, filename);
+    toast({ title: "Exported", description: `XLS: ${filename}.xlsx` });
+  };
+
+  const handleShareExpense = async (expense: Expense) => {
+    const shareText = [
+      `EXPENSE RECORD`,
+      `Date: ${new Date(expense.expense_date).toLocaleDateString()}`,
+      `Category: ${expense.category}${expense.sub_category ? ` > ${expense.sub_category}` : ''}`,
+      `Description: ${expense.description || 'N/A'}`,
+      `Amount: ${formatTZS(expense.amount)}`,
+      `Vendor: ${expense.vendor_name || 'N/A'}`,
+      `Payment: ${expense.payment_method?.replace('_', ' ') || 'N/A'}`,
+      `Type: ${expense.expense_type || 'N/A'}`,
+      `Status: ${(expense.approval_status || 'pending').toUpperCase()}`,
+      `Prepared By: ${expense.prepared_by_name || 'N/A'}`,
+    ].join('\n');
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Expense - ${expense.category}`, text: shareText });
+      } catch { /* user cancelled */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast({ title: 'Copied', description: 'Expense details copied to clipboard' });
+      } catch {
+        toast({ title: 'Copy failed', description: 'Could not copy to clipboard', variant: 'destructive' });
+      }
+    }
   };
 
   const handleDeleteExpense = async (id: string) => {
@@ -2751,6 +2802,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handlePrintExpense(expense)}>
                               <Printer className="h-4 w-4 mr-2" />
                               Print
@@ -2762,6 +2814,14 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                             <DropdownMenuItem onClick={() => handleDownloadExpensePDF(expense)}>
                               <Download className="h-4 w-4 mr-2" />
                               Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExportExpenseXLS(expense)}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Export XLS
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleShareExpense(expense)}>
+                              <Share2 className="h-4 w-4 mr-2" />
+                              Share
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

@@ -17,7 +17,7 @@ import { ExportUtils } from "@/utils/exportUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExcelUtils } from "@/utils/excelUtils";
 import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/services/databaseService";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -247,6 +247,63 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
   const openEditDialog = (expense: Expense) => {
     setEditingExpense(expense);
     setIsDialogOpen(true);
+  };
+
+  // Per-row action handlers
+  const handlePrintExpense = (expense: Expense) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const html = `<!DOCTYPE html><html><head><title>Expense - ${expense.category}</title>
+    <style>@media print{@page{margin:0.3in;size:A4}}*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;font-size:12px;color:#000}.header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.title{font-size:18px;font-weight:800;text-transform:uppercase}.field{margin-bottom:6px}.field span{font-weight:600;display:inline-block;width:120px}</style></head><body>
+    <div class="header"><div class="title">Expense Record</div></div>
+    <div class="field"><span>Date:</span> ${expense.date}</div>
+    <div class="field"><span>Category:</span> ${expense.category}</div>
+    <div class="field"><span>Description:</span> ${expense.description}</div>
+    <div class="field"><span>Amount:</span> ${formatCurrency(expense.amount)}</div>
+    <div class="field"><span>Payment Method:</span> ${expense.paymentMethod}</div>
+    <script>window.onload=function(){window.print()}</script></body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+  };
+
+  const handleDownloadExpensePDF = (expense: Expense) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Expense Record', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    const rows = [
+      ['Date', expense.date],
+      ['Category', expense.category],
+      ['Description', expense.description],
+      ['Amount', formatCurrency(expense.amount)],
+      ['Payment Method', expense.paymentMethod]
+    ];
+    autoTable(doc, { startY: 36, head: [['Field', 'Value']], body: rows, theme: 'grid' });
+    doc.save(`expense_${expense.category}_${expense.date}.pdf`);
+    toast({ title: "Downloaded", description: "Expense PDF saved" });
+  };
+
+  const handleExportExpenseXLS = (expense: Expense) => {
+    const data = [{ 'Date': expense.date, 'Category': expense.category, 'Description': expense.description, 'Amount': expense.amount, 'Payment Method': expense.paymentMethod }];
+    const filename = `expense_${expense.category}_${expense.date}`;
+    ExcelUtils.exportToExcel(data, filename);
+    toast({ title: "Exported", description: `XLS: ${filename}.xlsx` });
+  };
+
+  const handleShareExpense = async (expense: Expense) => {
+    const text = `EXPENSE RECORD\nDate: ${expense.date}\nCategory: ${expense.category}\nDescription: ${expense.description}\nAmount: ${formatCurrency(expense.amount)}\nPayment: ${expense.paymentMethod}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: `Expense - ${expense.category}`, text }); } catch { /* cancelled */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast({ title: 'Copied', description: 'Expense details copied to clipboard' });
+      } catch {
+        toast({ title: 'Copy failed', description: 'Could not copy to clipboard', variant: 'destructive' });
+      }
+    }
   };
 
   const openAddDialog = () => {
@@ -786,22 +843,41 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
                         <TableCell className="font-medium">{formatCurrency(expense.amount)}</TableCell>
                         <TableCell>{expense.paymentMethod}</TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openEditDialog(expense)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="destructive" 
-                              size="sm"
-                              onClick={() => expense.id && handleDeleteExpense(expense.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditDialog(expense)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handlePrintExpense(expense)}>
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownloadExpensePDF(expense)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportExpenseXLS(expense)}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Export XLS
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShareExpense(expense)}>
+                                <Share2 className="h-4 w-4 mr-2" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => expense.id && handleDeleteExpense(expense.id)} className="text-red-600">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
