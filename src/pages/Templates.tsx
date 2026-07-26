@@ -7506,7 +7506,7 @@ No inventory adjustment will be made.`,
     /* === META BAR === */
     .meta-bar {
       background: #f8fafc;
-      padding: 6px 24px;
+      padding: 4px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -7532,7 +7532,7 @@ No inventory adjustment will be made.`,
     
     /* === PARTY SECTION === */
     .party-section {
-      padding: 12px 24px;
+      padding: 8px 24px;
       display: flex;
       gap: 16px;
     }
@@ -7579,7 +7579,7 @@ No inventory adjustment will be made.`,
     
     /* === INFO GRID === */
     .info-grid-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
     }
     .info-grid {
       display: grid;
@@ -7607,7 +7607,7 @@ No inventory adjustment will be made.`,
     
     /* === ITEMS TABLE === */
     .items-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
     }
     .section-title {
       font-size: 12px;
@@ -7700,7 +7700,7 @@ No inventory adjustment will be made.`,
     
     /* === PAYMENT + NOTES === */
     .bottom-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
       display: flex;
       gap: 16px;
     }
@@ -7780,7 +7780,7 @@ No inventory adjustment will be made.`,
     
     /* === SIGNATURES === */
     .sig-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
     }
     .sig-grid {
       display: grid;
@@ -8161,7 +8161,7 @@ No inventory adjustment will be made.`,
     
     /* === TOP ACCENT BAR === */
     .accent-bar {
-      height: 4px;
+      height: 3px;
       background: #000;
     }
     
@@ -8169,7 +8169,7 @@ No inventory adjustment will be made.`,
     .spn-header {
       background: #fff;
       color: #000;
-      padding: 12px 24px;
+      padding: 8px 24px;
       position: relative;
       text-align: center;
       border-bottom: 3px solid #000;
@@ -8180,16 +8180,16 @@ No inventory adjustment will be made.`,
       right: 24px;
       top: 50%;
       transform: translateY(-50%);
-      width: 50px;
-      height: 50px;
+      width: 40px;
+      height: 40px;
       border: 2px solid #ccc;
       border-radius: 50%;
     }
     .spn-document-title {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 800;
       letter-spacing: 1px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       text-transform: uppercase;
       color: #000;
     }
@@ -8216,7 +8216,7 @@ No inventory adjustment will be made.`,
     /* === META BAR === */
     .meta-bar {
       background: #f8fafc;
-      padding: 6px 24px;
+      padding: 4px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -8242,7 +8242,7 @@ No inventory adjustment will be made.`,
     
     /* === PARTY SECTION === */
     .party-section {
-      padding: 12px 24px;
+      padding: 8px 24px;
       display: flex;
       gap: 16px;
     }
@@ -8289,7 +8289,7 @@ No inventory adjustment will be made.`,
     
     /* === INFO GRID === */
     .info-grid-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
     }
     .info-grid {
       display: grid;
@@ -8317,7 +8317,7 @@ No inventory adjustment will be made.`,
     
     /* === ITEMS TABLE === */
     .items-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
     }
     .section-title {
       font-size: 12px;
@@ -8405,7 +8405,7 @@ No inventory adjustment will be made.`,
     
     /* === PAYMENT + NOTES === */
     .bottom-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
       display: flex;
       gap: 16px;
     }
@@ -8497,7 +8497,7 @@ No inventory adjustment will be made.`,
     
     /* === SIGNATURES === */
     .sig-section {
-      padding: 0 24px 12px;
+      padding: 0 24px 8px;
     }
     .sig-grid {
       display: grid;
@@ -8547,8 +8547,8 @@ No inventory adjustment will be made.`,
     .spn-footer {
       background: #fff;
       color: #000;
-      padding: 10px 24px;
-      margin-top: 12px;
+      padding: 6px 24px;
+      margin-top: 8px;
       border-top: 3px solid #000;
     }
     .footer-content {
@@ -8765,11 +8765,11 @@ No inventory adjustment will be made.`,
           <div class="sig-label">Name</div>
           <div class="sig-value">${data.preparedBy || '\u2014'}</div>
         </div>
+        <div class="sig-line">Signature</div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.preparedDate || '\u2014'}</div>
         </div>
-        <div class="sig-line">Signature</div>
       </div>
       <div class="sig-box">
         <div class="sig-title">Delivered By</div>
@@ -8777,11 +8777,11 @@ No inventory adjustment will be made.`,
           <div class="sig-label">Name</div>
           <div class="sig-value">${data.deliveredBy || '\u2014'}</div>
         </div>
+        <div class="sig-line">Signature</div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.deliveredDate || '\u2014'}</div>
         </div>
-        <div class="sig-line">Signature</div>
       </div>
       <div class="sig-box">
         <div class="sig-title">Approved By</div>
@@ -8789,11 +8789,11 @@ No inventory adjustment will be made.`,
           <div class="sig-label">Name</div>
           <div class="sig-value">${data.approvedBy || '\u2014'}</div>
         </div>
+        <div class="sig-line">Signature</div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.approvedDate || '\u2014'}</div>
         </div>
-        <div class="sig-line">Signature</div>
       </div>
     </div>
   </div>

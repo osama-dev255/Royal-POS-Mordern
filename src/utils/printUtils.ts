@@ -5177,7 +5177,7 @@ export class PrintUtils {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     @media print {
-      @page { margin: 0.3in; size: A4; }
+      @page { margin: 0.2in; size: A4; }
       body { margin: 0; padding: 0; }
       .no-break { page-break-inside: avoid; }
     }
@@ -5187,14 +5187,14 @@ export class PrintUtils {
       max-width: 850px; margin: 0 auto; padding: 0;
       font-size: ${fontSize}px; color: #000; line-height: 1.5; background: #fff;
     }
-    .accent-bar { height: 4px; background: #000; }
+    .accent-bar { height: 3px; background: #000; }
     .spn-header {
-      background: #fff; color: #000; padding: 12px 24px;
+      background: #fff; color: #000; padding: 8px 24px;
       position: relative; text-align: center; border-bottom: 3px solid #000;
     }
     .spn-header::after {
       content: ''; position: absolute; right: 24px; top: 50%;
-      transform: translateY(-50%); width: 50px; height: 50px;
+      transform: translateY(-50%); width: 40px; height: 40px;
       border: 2px solid #ccc; border-radius: 50%;
     }
     .spn-document-title {
@@ -5211,7 +5211,7 @@ export class PrintUtils {
       text-transform: uppercase; color: #000;
     }
     .meta-bar {
-      background: #f8fafc; padding: 6px 24px; display: flex;
+      background: #f8fafc; padding: 4px 24px; display: flex;
       justify-content: space-between; align-items: center;
       border-bottom: 2px solid #e2e8f0;
     }
@@ -5222,7 +5222,7 @@ export class PrintUtils {
       color: #000; letter-spacing: 0.3px;
     }
     .meta-bar-value { font-size: ${fontSize}px; font-weight: 700; color: #000; }
-    .party-section { padding: 12px 24px; display: flex; gap: 16px; }
+    .party-section { padding: 8px 24px; display: flex; gap: 16px; }
     .party-box { flex: 1; background: #fff; overflow: hidden; }
     .party-box.from-box { flex: 0 0 45%; }
     .party-box.to-box { margin-left: auto; }
@@ -5240,7 +5240,7 @@ export class PrintUtils {
       border-bottom: 2px solid #e2e8f0;
     }
     .party-detail { font-size: ${fontSize}px; color: #000; margin: 2px 0; }
-    .info-grid-section { padding: 0 24px 12px; }
+    .info-grid-section { padding: 0 24px 8px; }
     .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .info-card { background: #f8fafc; padding: 8px 10px; text-align: center; }
     .info-card-label {
@@ -5248,7 +5248,7 @@ export class PrintUtils {
       color: #000; letter-spacing: 0.3px; margin-bottom: 2px;
     }
     .info-card-value { font-size: ${fontSize}px; font-weight: 800; color: #000; }
-    .items-section { padding: 0 24px 12px; }
+    .items-section { padding: 0 24px 8px; }
     .section-title {
       font-size: ${fontSize}px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.5px; color: #000; margin-bottom: 6px;
@@ -5290,7 +5290,7 @@ export class PrintUtils {
       text-align: right; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
     }
     .items-table tfoot .total-value { color: #000; font-size: ${fontSize}px; }
-    .bottom-section { padding: 0 24px 12px; display: flex; gap: 16px; }
+    .bottom-section { padding: 0 24px 8px; display: flex; gap: 16px; }
     .payment-box { width: 400px; flex-shrink: 0; overflow: hidden; }
     .payment-header {
       background: #f1f3f5; color: #000; padding: 8px 12px;
@@ -5334,7 +5334,7 @@ export class PrintUtils {
       padding: 10px 12px; font-size: ${fontSize}px; color: #000;
       min-height: 50px; line-height: 1.4,
     }
-    .sig-section { padding: 0 24px 12px; }
+    .sig-section { padding: 0 24px 8px; }
     .sig-grid {
       display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; max-width: 100%;
     }
@@ -5355,7 +5355,7 @@ export class PrintUtils {
       font-size: ${fontSize}px; color: #000; text-transform: uppercase; letter-spacing: 0.3px;
     }
     .spn-footer {
-      background: #fff; color: #000; padding: 10px 24px; margin-top: 12px;
+      background: #fff; color: #000; padding: 6px 24px; margin-top: 8px;
       border-top: 3px solid #000;
     }
     .footer-content {
@@ -5531,11 +5531,11 @@ export class PrintUtils {
           <div class="sig-label">Name</div>
           <div class="sig-value">${data.preparedBy || '\u2014'}</div>
         </div>
+        <div class="sig-line">Signature</div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.preparedDate ? new Date(data.preparedDate).toLocaleDateString() : '\u2014'}</div>
         </div>
-        <div class="sig-line">Signature</div>
       </div>
       <div class="sig-box">
         <div class="sig-title">Delivered By</div>
@@ -5543,11 +5543,11 @@ export class PrintUtils {
           <div class="sig-label">Name</div>
           <div class="sig-value">${data.deliveredBy || '\u2014'}</div>
         </div>
+        <div class="sig-line">Signature</div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.deliveredDate ? new Date(data.deliveredDate).toLocaleDateString() : '\u2014'}</div>
         </div>
-        <div class="sig-line">Signature</div>
       </div>
       <div class="sig-box">
         <div class="sig-title">Approved By</div>
@@ -5555,11 +5555,11 @@ export class PrintUtils {
           <div class="sig-label">Name</div>
           <div class="sig-value">${data.approvedBy || '\u2014'}</div>
         </div>
+        <div class="sig-line">Signature</div>
         <div class="sig-field">
           <div class="sig-label">Date</div>
           <div class="sig-value">${data.approvedDate ? new Date(data.approvedDate).toLocaleDateString() : '\u2014'}</div>
         </div>
-        <div class="sig-line">Signature</div>
       </div>
     </div>
   </div>
