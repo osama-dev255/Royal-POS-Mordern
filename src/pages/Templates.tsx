@@ -5817,10 +5817,11 @@ No inventory adjustment will be made.`,
     console.log('   preparedByName:', deliveryNoteData.preparedByName);
     console.log('   items with description:', deliveryNoteData.items.filter(i => i.description).length);
     
-    // Check if customer name (TO field) is filled
-    if (!deliveryNoteData.customerName || deliveryNoteData.customerName.trim() === '') {
-      console.log('   ❌ Customer name is empty - showing toast');
-      toast({ title: 'Validation Error', description: 'Customer Name (TO) is required', variant: 'destructive' });
+    // Check if customer name (TO field) is filled (not empty and not placeholder)
+    const customerName = deliveryNoteData.customerName?.trim() || '';
+    if (!customerName || customerName === 'Customer Name' || customerName.toLowerCase() === 'customer name') {
+      console.log('   ❌ Customer name is empty or placeholder - showing toast');
+      toast({ title: 'Validation Error', description: 'Customer Name (TO) is required. Please select or enter a customer name.', variant: 'destructive' });
       return false;
     }
     
