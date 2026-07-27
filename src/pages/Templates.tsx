@@ -5808,7 +5808,25 @@ No inventory adjustment will be made.`,
 
   // Validate required delivery note fields
   const validateDeliveryNoteRequiredFields = (): boolean => {
-    // Validation disabled - allow saving without required fields
+    // Check if customer name (TO field) is filled
+    if (!deliveryNoteData.customerName || deliveryNoteData.customerName.trim() === '') {
+      toast({ title: 'Validation Error', description: 'Customer Name (TO) is required', variant: 'destructive' });
+      return false;
+    }
+    
+    // Check if at least one item has a description
+    const hasValidItem = deliveryNoteData.items.some(item => item.description && item.description.trim() !== '');
+    if (!hasValidItem) {
+      toast({ title: 'Validation Error', description: 'At least one item with description is required', variant: 'destructive' });
+      return false;
+    }
+    
+    // Check if prepared by is filled
+    if (!deliveryNoteData.preparedByName || deliveryNoteData.preparedByName.trim() === '') {
+      toast({ title: 'Validation Error', description: 'Prepared By is required', variant: 'destructive' });
+      return false;
+    }
+    
     return true;
   };
 
