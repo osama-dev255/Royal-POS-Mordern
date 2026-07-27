@@ -603,7 +603,7 @@ export const Index = () => {
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
     "saved-supplier-purchase-notes", "supplier-products",
     "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses",
-    "godowns", "stock-transfers"
+    "godowns", "stock-transfers", "stock-movements"
   ];
 
   // Check if view is authorized, but allow outlet-specific patterns
