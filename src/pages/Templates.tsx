@@ -5998,7 +5998,7 @@ No inventory adjustment will be made.`,
               return {
                 product_id: product?.id,
                 product_name: item.description,
-                outlet_id: deliveryNoteData.outletId || undefined,
+                outlet_id: outletId || undefined,
                 movement_type: 'OUT' as const,
                 quantity: item.quantity || 0,
                 reference_type: 'DELIVERY_NOTE' as const,
