@@ -5651,21 +5651,21 @@ No inventory adjustment will be made.`,
           const availableStock = productData.stockQuantity;
           const requestedQuantity = Number(value);
           
-          // Show warning if requested quantity exceeds available stock
+          // BLOCK if requested quantity exceeds available stock
           if (requestedQuantity > availableStock) {
             const toastMessage = availableStock === 0 
-              ? `⚠️ "${item.description}" is OUT OF STOCK. Available: 0`
-              : `⚠️ Insufficient stock for "${item.description}". Requested: ${requestedQuantity}, Available: ${availableStock}`;
+              ? `"${item.description}" is OUT OF STOCK. Available: 0. Cannot add this quantity.`
+              : `Insufficient stock for "${item.description}". Requested: ${requestedQuantity}, Available: ${availableStock}. Please reduce quantity.`;
             
-            // Show toast notification
+            // Show toast notification and BLOCK the input
             toast({
-              title: "Stock Warning",
+              title: "Stock Exceeded",
               description: toastMessage,
               variant: "destructive",
             });
             
-            // Don't prevent the user from entering the quantity, just warn them
-            // They can still proceed if they want to create a backorder
+            // Prevent the user from entering the quantity - BLOCK the action
+            return;
           }
         }
       }
