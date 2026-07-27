@@ -92,6 +92,7 @@ export const recordStockMovements = async (movements: StockMovement[]): Promise<
       product_name: m.product_name,
       outlet_id: m.outlet_id || null,
       godown_id: m.godown_id || null,
+      zone_id: m.zone_id || null,
       movement_type: m.movement_type,
       quantity: Math.abs(m.quantity),
       reference_type: m.reference_type || null,
