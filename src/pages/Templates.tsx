@@ -5812,8 +5812,14 @@ No inventory adjustment will be made.`,
 
   // Validate required delivery note fields
   const validateDeliveryNoteRequiredFields = (): boolean => {
+    console.log('🔍 DEBUG: Validating delivery note required fields...');
+    console.log('   customerName:', deliveryNoteData.customerName);
+    console.log('   preparedByName:', deliveryNoteData.preparedByName);
+    console.log('   items with description:', deliveryNoteData.items.filter(i => i.description).length);
+    
     // Check if customer name (TO field) is filled
     if (!deliveryNoteData.customerName || deliveryNoteData.customerName.trim() === '') {
+      console.log('   ❌ Customer name is empty - showing toast');
       toast({ title: 'Validation Error', description: 'Customer Name (TO) is required', variant: 'destructive' });
       return false;
     }
