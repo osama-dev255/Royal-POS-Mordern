@@ -5645,11 +5645,15 @@ No inventory adjustment will be made.`,
     // Validate quantity against available stock when quantity field is changed
     if (field === 'quantity') {
       const item = deliveryNoteData.items.find(item => item.id === itemId);
+      console.log('🔍 DEBUG: Quantity changed for item:', item?.description, 'value:', value);
+      console.log('   deliveryNoteProductItemsMap size:', deliveryNoteProductItemsMap.size);
       if (item && item.description) {
         const productData = deliveryNoteProductItemsMap.get(item.description);
+        console.log('   productData:', productData);
         if (productData) {
           const availableStock = productData.stockQuantity;
           const requestedQuantity = Number(value);
+          console.log('   availableStock:', availableStock, 'requestedQuantity:', requestedQuantity);
           
           // BLOCK if requested quantity exceeds available stock
           if (requestedQuantity > availableStock) {
