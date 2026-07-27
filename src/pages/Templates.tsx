@@ -3441,6 +3441,10 @@ No inventory adjustment will be made.`,
         alert('Error saving invoice. Please try again.');
       }
     } else if (currentTemplate?.type === "delivery-note") {
+      // Validate required fields before saving
+      if (!validateDeliveryNoteRequiredFields()) {
+        return;
+      }
       // For delivery note templates, automatically save to saved deliveries
       try {
         // Calculate total items
