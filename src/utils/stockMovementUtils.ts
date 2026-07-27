@@ -6,6 +6,7 @@ export interface StockMovement {
   product_name: string;
   outlet_id?: string;
   godown_id?: string;
+  zone_id?: string;
   movement_type: 'IN' | 'OUT' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'SOLD' | 'ADJUSTMENT' | 'RETURN' | 'DAMAGE';
   quantity: number;
   reference_type?: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN';
@@ -22,6 +23,7 @@ export interface StockMovement {
 export interface StockMovementWithDetails extends StockMovement {
   outlet_name?: string;
   godown_name?: string;
+  zone_name?: string;
 }
 
 export interface StockMovementSummary {
@@ -47,6 +49,7 @@ export const recordStockMovement = async (movement: StockMovement): Promise<{ su
       product_name: movement.product_name,
       outlet_id: movement.outlet_id || null,
       godown_id: movement.godown_id || null,
+      zone_id: movement.zone_id || null,
       movement_type: movement.movement_type,
       quantity: Math.abs(movement.quantity),
       reference_type: movement.reference_type || null,
@@ -136,7 +139,8 @@ export const getStockMovements = async (filters?: {
       .select(`
         *,
         outlets!stock_movements_outlet_id_fkey(name),
-        godowns!stock_movements_godown_id_fkey(name)
+        godowns!stock_movements_godown_id_fkey(name),
+        godown_zones!stock_movements_zone_id_fkey(name)
       `)
       .order('created_at', { ascending: false });
 
@@ -187,7 +191,8 @@ export const getStockMovements = async (filters?: {
       created_by: row.created_by,
       created_at: row.created_at,
       outlet_name: row.outlets?.name || '',
-      godown_name: row.godowns?.name || ''
+      godown_name: row.godowns?.name || '',
+      zone_name: row.godown_zones?.name || ''
     }));
   } catch (err) {
     console.error('Error fetching stock movements:', err);

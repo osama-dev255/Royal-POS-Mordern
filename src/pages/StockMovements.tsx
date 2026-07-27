@@ -268,13 +268,15 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                         <TableHead className="text-xs text-right">Unit Cost</TableHead>
                         <TableHead className="text-xs">Reference</TableHead>
                         <TableHead className="text-xs">Outlet</TableHead>
+                        <TableHead className="text-xs">Godown</TableHead>
+                        <TableHead className="text-xs">Zone</TableHead>
                         <TableHead className="text-xs">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredMovements.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                             No stock movements found
                           </TableCell>
                         </TableRow>
@@ -304,6 +306,8 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                                 <span className="font-mono text-[10px]">{movement.reference_number || '-'}</span>
                               </TableCell>
                               <TableCell className="text-xs">{movement.outlet_name || '-'}</TableCell>
+                              <TableCell className="text-xs">{movement.godown_name || '-'}</TableCell>
+                              <TableCell className="text-xs">{movement.zone_name || '-'}</TableCell>
                               <TableCell className="text-xs max-w-[150px] truncate" title={movement.notes || ''}>
                                 {movement.notes || '-'}
                               </TableCell>

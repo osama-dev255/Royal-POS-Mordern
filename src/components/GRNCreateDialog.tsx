@@ -323,6 +323,7 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
               product_id: product?.id,
               product_name: item.description,
               godown_id: grnData.destinationGodownId || undefined,
+              zone_id: grnData.destinationZoneId || destinationZoneId || undefined,
               movement_type: 'IN' as const,
               quantity: item.delivered || item.receivedQuantity || 0,
               reference_type: 'GRN' as const,
