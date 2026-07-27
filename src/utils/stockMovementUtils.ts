@@ -140,7 +140,7 @@ export const getStockMovements = async (filters?: {
         *,
         outlets!stock_movements_outlet_id_fkey(name),
         godowns!stock_movements_godown_id_fkey(name),
-        godown_zones!stock_movements_zone_id_fkey(name)
+        godown_zones!stock_movements_zone_id_fkey(zone_name)
       `)
       .order('created_at', { ascending: false });
 
@@ -192,7 +192,7 @@ export const getStockMovements = async (filters?: {
       created_at: row.created_at,
       outlet_name: row.outlets?.name || '',
       godown_name: row.godowns?.name || '',
-      zone_name: row.godown_zones?.name || ''
+      zone_name: row.godown_zones?.zone_name || ''
     }));
   } catch (err) {
     console.error('Error fetching stock movements:', err);
