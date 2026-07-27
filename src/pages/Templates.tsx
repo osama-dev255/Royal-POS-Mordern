@@ -5987,6 +5987,10 @@ No inventory adjustment will be made.`,
         
         // Record stock movements in the ledger (OUT from Delivery Note)
         try {
+          console.log('📊 DEBUG: Recording delivery note stock movements...');
+          console.log('   Items count:', deliveryNoteData.items.length);
+          console.log('   Items:', deliveryNoteData.items.map(i => ({ desc: i.description, qty: i.quantity, delivered: i.delivered })));
+          
           const { recordStockMovements } = await import('@/utils/stockMovementUtils');
           const allProducts = await getProducts();
           const deliveryMovements = deliveryNoteData.items
@@ -6007,9 +6011,12 @@ No inventory adjustment will be made.`,
                 notes: `Delivery to ${deliveryNoteData.customerName || 'Unknown'}`
               };
             });
+          console.log('   Filtered movements count:', deliveryMovements.length);
           if (deliveryMovements.length > 0) {
             await recordStockMovements(deliveryMovements);
             console.log(`✅ Recorded ${deliveryMovements.length} stock OUT movements for Delivery ${deliveryNoteData.deliveryNoteNumber}`);
+          } else {
+            console.warn('⚠️ No movements to record - all items filtered out');
           }
         } catch (movementError) {
           console.warn('Error recording stock movements (non-critical):', movementError);
