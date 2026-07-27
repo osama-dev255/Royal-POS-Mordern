@@ -6004,7 +6004,7 @@ No inventory adjustment will be made.`,
                 reference_type: 'DELIVERY_NOTE' as const,
                 reference_number: deliveryNoteData.deliveryNoteNumber,
                 unit_cost: product?.cost_price || 0,
-                notes: `Delivery to ${deliveryNoteData.customer}`
+                notes: `Delivery to ${deliveryNoteData.customerName || 'Unknown'}`
               };
             });
           if (deliveryMovements.length > 0) {
