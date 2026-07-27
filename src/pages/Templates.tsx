@@ -5985,6 +5985,36 @@ No inventory adjustment will be made.`,
         // NOTE: Outlet inventory update is handled by saveDelivery() in deliveryUtils.ts
         // No need to update it here to avoid double-updating
         
+        // Record stock movements in the ledger (OUT from Delivery Note)
+        try {
+          const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+          const allProducts = await getProducts();
+          const deliveryMovements = deliveryNoteData.items
+            .filter(item => item.description && (item.quantity || 0) > 0)
+            .map(item => {
+              const product = allProducts.find(p => 
+                p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+              );
+              return {
+                product_id: product?.id,
+                product_name: item.description,
+                outlet_id: deliveryNoteData.outletId || undefined,
+                movement_type: 'OUT' as const,
+                quantity: item.quantity || 0,
+                reference_type: 'DELIVERY_NOTE' as const,
+                reference_number: deliveryNoteData.deliveryNoteNumber,
+                unit_cost: product?.cost_price || 0,
+                notes: `Delivery to ${deliveryNoteData.customer}`
+              };
+            });
+          if (deliveryMovements.length > 0) {
+            await recordStockMovements(deliveryMovements);
+            console.log(`✅ Recorded ${deliveryMovements.length} stock OUT movements for Delivery ${deliveryNoteData.deliveryNoteNumber}`);
+          }
+        } catch (movementError) {
+          console.warn('Error recording stock movements (non-critical):', movementError);
+        }
+        
         // CRITICAL: Invalidate godown stock cache so next delivery note shows fresh quantities
         console.log('🔄 Invalidating godown stock cache for next delivery...');
         setLoadedGodownProducts(new Set());

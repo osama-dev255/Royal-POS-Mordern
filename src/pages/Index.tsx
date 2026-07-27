@@ -29,6 +29,7 @@ import { CustomerSettlements } from "@/pages/CustomerSettlements";
 import { SupplierSettlements } from "@/pages/SupplierSettlements";
 import { DiscountManagement } from "@/pages/DiscountManagement";
 import { InventoryAudit } from "@/pages/InventoryAudit";
+import { StockMovements } from "@/pages/StockMovements";
 import { AccessLogs } from "@/pages/AccessLogs";
 import { ComprehensiveDashboard } from "@/pages/ComprehensiveDashboard";
 import { Reports } from "@/pages/Reports";
@@ -1495,6 +1496,15 @@ export const Index = () => {
               console.log("Rendering InventoryAudit");
               return (
                 <InventoryAudit
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "stock-movements":
+              console.log("Rendering StockMovements");
+              return (
+                <StockMovements
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}

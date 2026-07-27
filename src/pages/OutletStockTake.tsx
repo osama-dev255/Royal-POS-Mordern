@@ -216,6 +216,35 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           .eq('outlet_id', outletId)
           .eq('name', item.name);
       }
+
+      // Record stock movements in the ledger (ADJUSTMENT from Stock Take)
+      try {
+        const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+        const adjustmentMovements = stockItems
+          .filter(item => {
+            const diff = item.stockRemain - item.physicalCount;
+            return diff !== 0;
+          })
+          .map(item => {
+            const diff = item.stockRemain - item.physicalCount;
+            return {
+              product_name: item.name,
+              outlet_id: outletId,
+              movement_type: 'ADJUSTMENT' as const,
+              quantity: Math.abs(diff),
+              reference_type: 'STOCK_TAKE' as const,
+              reference_number: stockTakeNumber,
+              unit_cost: item.unitCost || 0,
+              notes: `Stock Take: expected=${item.stockRemain}, physical=${item.physicalCount}, diff=${diff}`
+            };
+          });
+        if (adjustmentMovements.length > 0) {
+          await recordStockMovements(adjustmentMovements);
+          console.log(`✅ Recorded ${adjustmentMovements.length} stock ADJUSTMENT movements for Stock Take ${stockTakeNumber}`);
+        }
+      } catch (movementError) {
+        console.warn('Error recording stock movements (non-critical):', movementError);
+      }
   
       // Calculate totals for saving
       const totalCalculatedSold = stockItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);

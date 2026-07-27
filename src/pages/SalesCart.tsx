@@ -1122,6 +1122,29 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       
       // Execute all stock updates in parallel
       await Promise.all(stockUpdatePromises);
+
+      // Record stock movements in the ledger (SOLD via POS)
+      try {
+        const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+        const saleMovements = itemsWithQuantity.map(item => {
+          const product = products.find(p => p.id === item.id);
+          return {
+            product_id: item.id,
+            product_name: product?.name || item.name || '',
+            outlet_id: outletId || undefined,
+            movement_type: 'SOLD' as const,
+            quantity: item.quantity,
+            reference_type: 'SALE' as const,
+            unit_cost: product?.cost_price || 0,
+            notes: `POS Sale`
+          };
+        });
+        if (saleMovements.length > 0) {
+          await recordStockMovements(saleMovements);
+        }
+      } catch (movementError) {
+        console.warn('Error recording stock movements (non-critical):', movementError);
+      }
       
       // Reload products to get updated stock quantities
       if (outletId) {

@@ -309,6 +309,36 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
         console.error('Error updating product inventory after GRN save:', inventoryError);
       }
 
+      // Record stock movements in the ledger (IN from GRN)
+      try {
+        const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+        const allProducts = await getProducts();
+        const movements = grnData.items
+          .filter(item => item.description && (item.delivered || item.receivedQuantity || 0) > 0)
+          .map(item => {
+            const product = allProducts.find(p => 
+              p.name.toLowerCase().trim() === item.description.toLowerCase().trim()
+            );
+            return {
+              product_id: product?.id,
+              product_name: item.description,
+              godown_id: grnData.destinationGodownId || undefined,
+              movement_type: 'IN' as const,
+              quantity: item.delivered || item.receivedQuantity || 0,
+              reference_type: 'GRN' as const,
+              reference_number: grnToSave.grnNumber,
+              unit_cost: item.unitCost || 0,
+              notes: `GRN from ${grnData.supplierName}`
+            };
+          });
+        if (movements.length > 0) {
+          await recordStockMovements(movements);
+          console.log(`✅ Recorded ${movements.length} stock IN movements for GRN ${grnToSave.grnNumber}`);
+        }
+      } catch (movementError) {
+        console.warn('Error recording stock movements (non-critical):', movementError);
+      }
+
       toast({
         title: "Success",
         description: "GRN saved successfully"

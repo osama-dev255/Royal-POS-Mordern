@@ -18,7 +18,8 @@ import {
   Building,
   PiggyBank,
   LayoutTemplate,
-  Warehouse
+  Warehouse,
+  ArrowUpDown
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -75,6 +76,13 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
       title: "Godown Management",
       description: "Manage warehouses, zones, and stock transfers",
       icon: Warehouse,
+      color: "bg-white border border-gray-200"
+    },
+    {
+      id: "stock-movements",
+      title: "Stock Movements",
+      description: "Track and audit all stock movements across the system",
+      icon: ArrowUpDown,
       color: "bg-white border border-gray-200"
     },
     {
@@ -252,6 +260,10 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
       case "godowns":
         console.log("Navigating to godowns");
         onNavigate("godowns");
+        break;
+      case "stock-movements":
+        console.log("Navigating to stock-movements");
+        onNavigate("stock-movements");
         break;
       case "sales":
         console.log("Navigating to sales");
