@@ -5989,7 +5989,14 @@ No inventory adjustment will be made.`,
         try {
           console.log('📊 DEBUG: Recording delivery note stock movements...');
           console.log('   Items count:', deliveryNoteData.items.length);
-          console.log('   Items:', deliveryNoteData.items.map(i => ({ desc: i.description, qty: i.quantity, delivered: i.delivered })));
+          console.log('   Items:', deliveryNoteData.items.map(i => ({ 
+            desc: i.description, 
+            qty: i.quantity, 
+            godownId: i.godownId, 
+            zoneId: i.zoneId,
+            godownName: i.godownName,
+            zoneName: i.zoneName
+          })));
           
           const { recordStockMovements } = await import('@/utils/stockMovementUtils');
           const allProducts = await getProducts();
