@@ -15950,10 +15950,12 @@ No inventory adjustment will be made.`,
                                       <Select
                                         value={item.zoneId || ''}
                                         onValueChange={(val) => {
+                                          console.log('🔍 DEBUG: Zone selected for item:', { itemId: item.id, description: item.description, zoneVal: val });
                                           const zoneVal = val === '__no_zone__' ? '' : val;
                                           const zone = deliveryZones.find(z => z.id === val);
                                           handleItemChange(item.id, 'zoneId', zoneVal);
                                           handleItemChange(item.id, 'zoneName', val === '__no_zone__' ? 'No Zone' : (zone?.zone_name || ''));
+                                          console.log('   Zone stored:', { zoneId: zoneVal, zoneName: val === '__no_zone__' ? 'No Zone' : (zone?.zone_name || '') });
                                         }}
                                         disabled={!item.godownId}
                                       >
