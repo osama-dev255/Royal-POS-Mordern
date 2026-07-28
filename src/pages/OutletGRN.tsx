@@ -577,42 +577,6 @@ export const OutletGRN = ({ onBack, outletId }: OutletGRNProps) => {
         console.log('✅ Inventory price sync complete');
       }
       
-      // Update stock movements in the ledger to reflect the edit
-      try {
-        const { updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
-        const newMovements: any[] = [];
-        
-        for (const item of editForm.itemsList) {
-          const itemName = item.description || item.name;
-          const itemQuantity = item.quantity || item.delivered || 0;
-          
-          if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
-          
-          // For GRN: TRANSFER_IN to outlet
-          newMovements.push({
-            product_name: itemName,
-            outlet_id: outletId || undefined,
-            movement_type: 'TRANSFER_IN' as const,
-            quantity: itemQuantity,
-            reference_type: 'GRN' as const,
-            reference_number: editForm.deliveryNoteNumber,
-            notes: `GRN from ${editForm.customer || 'Supplier'}`
-          });
-        }
-        
-        if (newMovements.length > 0) {
-          await updateStockMovementsForTransaction(
-            'GRN',
-            editForm.deliveryNoteNumber,
-            newMovements
-          );
-          console.log('✅ Stock movements updated for GRN:', editForm.deliveryNoteNumber);
-        }
-      } catch (movementError) {
-        console.error('Error updating stock movements:', movementError);
-        // Don't block the save - just log the error
-      }
-      
       // Refresh the deliveries list
       await loadDeliveries();
       
