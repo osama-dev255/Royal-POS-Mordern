@@ -2284,44 +2284,48 @@ No inventory adjustment will be made.`,
         console.log('✅ GRN saved');
       }
       
-      // Update stock movements in the ledger to reflect the edit (if editing)
-      if (editingGRNId) {
-        try {
-          const { updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
-          const newMovements: any[] = [];
+      // Update stock movements in the ledger
+      try {
+        const { recordStockMovements, updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
+        const grnMovements: any[] = [];
+        
+        for (const item of newGRN.data.items) {
+          const itemName = item.description;
+          const itemQuantity = item.delivered || item.quantity || 0;
           
-          for (const item of newGRN.data.items) {
-            const itemName = item.description || item.name;
-            const itemQuantity = item.delivered || item.quantity || 0;
-            
-            if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
-            
-            // For GRN: TRANSFER_IN to outlet/godown
-            newMovements.push({
-              product_name: itemName,
-              outlet_id: undefined,
-              godown_id: item.destinationGodownId || undefined,
-              zone_id: item.destinationZoneId || undefined,
-              movement_type: 'IN' as const,
-              quantity: itemQuantity,
-              reference_type: 'GRN' as const,
-              reference_number: newGRN.data.grnNumber,
-              notes: `GRN from ${newGRN.data.supplierName || 'Supplier'}`
-            });
-          }
+          if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
           
-          if (newMovements.length > 0) {
+          // For GRN: IN movement to godown/zone
+          grnMovements.push({
+            product_name: itemName,
+            godown_id: item.destinationGodownId || undefined,
+            zone_id: item.destinationZoneId || undefined,
+            movement_type: 'IN' as const,
+            quantity: itemQuantity,
+            reference_type: 'GRN' as const,
+            reference_number: newGRN.data.grnNumber,
+            notes: `GRN from ${newGRN.data.supplierName || 'Supplier'}`
+          });
+        }
+        
+        if (grnMovements.length > 0) {
+          if (editingGRNId) {
+            // Update existing movements (delete old + create new)
             await updateStockMovementsForTransaction(
               'GRN',
               newGRN.data.grnNumber,
-              newMovements
+              grnMovements
             );
             console.log('✅ Stock movements updated for GRN:', newGRN.data.grnNumber);
+          } else {
+            // Record new movements
+            await recordStockMovements(grnMovements);
+            console.log(`✅ Recorded ${grnMovements.length} stock IN movements for GRN ${newGRN.data.grnNumber}`);
           }
-        } catch (movementError) {
-          console.error('Error updating stock movements:', movementError);
-          // Don't block the save - just log the error
         }
+      } catch (movementError) {
+        console.error('Error recording stock movements:', movementError);
+        // Don't block the save - just log the error
       }
       
       // Clear editing state
