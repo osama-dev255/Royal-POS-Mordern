@@ -1332,42 +1332,6 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           }
         }
 
-        // Record stock movements in the ledger (TRANSFER_OUT from source, TRANSFER_IN to destination)
-        try {
-          const { recordStockMovements } = await import('@/utils/stockMovementUtils');
-          const transferMovements: any[] = [];
-          for (const item of deliveryItems) {
-            // TRANSFER_OUT from source
-            transferMovements.push({
-              product_name: item.description,
-              outlet_id: outletId,
-              movement_type: 'TRANSFER_OUT' as const,
-              quantity: item.quantity,
-              reference_type: 'TRANSFER' as const,
-              reference_number: newDeliveryForm.deliveryNoteNumber,
-              unit_cost: item.rate || 0,
-              notes: `Transfer to ${newDeliveryForm.destinationOutlet}`
-            });
-            // TRANSFER_IN to destination
-            transferMovements.push({
-              product_name: item.description,
-              outlet_id: destinationOutletData.id,
-              movement_type: 'TRANSFER_IN' as const,
-              quantity: item.quantity,
-              reference_type: 'TRANSFER' as const,
-              reference_number: newDeliveryForm.deliveryNoteNumber,
-              unit_cost: item.rate || 0,
-              notes: `Transfer from ${outlets.find(o => o.id === outletId)?.name || 'Unknown'}`
-            });
-          }
-          if (transferMovements.length > 0) {
-            await recordStockMovements(transferMovements);
-            console.log(`✅ Recorded ${transferMovements.length} stock TRANSFER movements`);
-          }
-        } catch (movementError) {
-          console.warn('Error recording stock movements (non-critical):', movementError);
-        }
-
         // Also save to saved_delivery_notes for destination outlet (Deliveries In)
         const deliveryItemsList = deliveryItems.map(item => ({
           description: item.description,
