@@ -1334,7 +1334,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
         // Record stock movements in the ledger (TRANSFER_OUT from source, TRANSFER_IN to destination)
         try {
-          const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+          const { recordStockMovements, updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
           const transferMovements: any[] = [];
           for (const item of deliveryItems) {
             // TRANSFER_OUT from source
@@ -2734,6 +2734,44 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                     description: "Editing incoming deliveries not yet implemented"
                   });
                   return;
+                }
+
+                // Update stock movements in the ledger to reflect the edit
+                try {
+                  const { updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
+                  const newMovements: any[] = [];
+                  
+                  for (const item of editingItems) {
+                    const itemName = item.description || item.name;
+                    const itemQuantity = item.quantity || item.delivered || 0;
+                    
+                    if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
+                    
+                    // For delivery OUT: TRANSFER_OUT from source outlet
+                    if (editingDelivery.deliveryType === 'out') {
+                      newMovements.push({
+                        product_name: itemName,
+                        outlet_id: outletId || undefined,
+                        movement_type: 'TRANSFER_OUT' as const,
+                        quantity: itemQuantity,
+                        reference_type: 'DELIVERY_NOTE' as const,
+                        reference_number: editingDelivery.deliveryNoteNumber,
+                        notes: `Delivery to ${editingDelivery.customer}`
+                      });
+                    }
+                  }
+                  
+                  if (newMovements.length > 0) {
+                    await updateStockMovementsForTransaction(
+                      'DELIVERY_NOTE',
+                      editingDelivery.deliveryNoteNumber,
+                      newMovements
+                    );
+                    console.log('✅ Stock movements updated for delivery note:', editingDelivery.deliveryNoteNumber);
+                  }
+                } catch (movementError) {
+                  console.error('Error updating stock movements:', movementError);
+                  // Don't block the save - just log the error
                 }
 
                 toast({

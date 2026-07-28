@@ -322,3 +322,64 @@ export const getMovedProductNames = async (): Promise<string[]> => {
     return [];
   }
 };
+
+/**
+ * Delete stock movements by reference type and reference number
+ * Used when editing a transaction to remove old movements before creating new ones
+ */
+export const deleteStockMovementsByReference = async (
+  referenceType: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN',
+  referenceNumber: string
+): Promise<{ success: boolean; count?: number; error?: string }> => {
+  try {
+    const { data, error, count } = await supabase
+      .from('stock_movements')
+      .delete()
+      .eq('reference_type', referenceType)
+      .eq('reference_number', referenceNumber)
+      .select();
+
+    if (error) {
+      console.error('Error deleting stock movements:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`🗑️ Deleted ${count || data?.length || 0} stock movements for ${referenceType} ${referenceNumber}`);
+    return { success: true, count: count || data?.length || 0 };
+  } catch (err) {
+    console.error('Error deleting stock movements:', err);
+    return { success: false, error: 'Failed to delete stock movements' };
+  }
+};
+
+/**
+ * Update stock movements for a transaction (delete old + create new)
+ * Used when editing a transaction to reflect changes in the Movement Ledger
+ */
+export const updateStockMovementsForTransaction = async (
+  referenceType: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN',
+  referenceNumber: string,
+  newMovements: StockMovement[]
+): Promise<{ success: boolean; count?: number; error?: string }> => {
+  try {
+    // Step 1: Delete existing movements for this reference
+    const deleteResult = await deleteStockMovementsByReference(referenceType, referenceNumber);
+    if (!deleteResult.success) {
+      return deleteResult;
+    }
+
+    // Step 2: Create new movements
+    if (newMovements.length > 0) {
+      const createResult = await recordStockMovements(newMovements);
+      if (!createResult.success) {
+        return createResult;
+      }
+      return { success: true, count: createResult.count };
+    }
+
+    return { success: true, count: 0 };
+  } catch (err) {
+    console.error('Error updating stock movements:', err);
+    return { success: false, error: 'Failed to update stock movements' };
+  }
+};
