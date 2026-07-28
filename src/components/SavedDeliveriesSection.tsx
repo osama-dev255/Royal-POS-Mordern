@@ -317,6 +317,42 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
       
       await updateDelivery(updatedDelivery);
       
+      // Update stock movements in the ledger to reflect the edit
+      try {
+        const { updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
+        const newMovements: any[] = [];
+        
+        for (const item of editableItems) {
+          const itemName = item.description || item.name;
+          const itemQuantity = item.quantity || 0;
+          
+          if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
+          
+          // For delivery: OUT movement
+          newMovements.push({
+            product_name: itemName,
+            outlet_id: editingDelivery.outletId || undefined,
+            movement_type: 'OUT' as const,
+            quantity: itemQuantity,
+            reference_type: 'DELIVERY_NOTE' as const,
+            reference_number: editingDelivery.deliveryNoteNumber,
+            notes: `Delivery to ${editingDelivery.customer || 'Unknown'}`
+          });
+        }
+        
+        if (newMovements.length > 0) {
+          await updateStockMovementsForTransaction(
+            'DELIVERY_NOTE',
+            editingDelivery.deliveryNoteNumber,
+            newMovements
+          );
+          console.log('✅ Stock movements updated for delivery note:', editingDelivery.deliveryNoteNumber);
+        }
+      } catch (movementError) {
+        console.error('Error updating stock movements:', movementError);
+        // Don't block the save - just log the error
+      }
+      
       // Update the state to reflect the changes
       setDeliveries(prev => prev.map(d => d.id === updatedDelivery.id ? updatedDelivery : d));
       
