@@ -1309,6 +1309,7 @@ No inventory adjustment will be made.`,
   const [sourceZoneId, setSourceZoneId] = useState("");
   const [isSavingDeliveryNote, setIsSavingDeliveryNote] = useState<boolean>(false);
     const [isSavingGRN, setIsSavingGRN] = useState<boolean>(false);
+    const [editingGRNId, setEditingGRNId] = useState<string | null>(null);
     const [isSavingSPN, setIsSavingSPN] = useState<boolean>(false);
       const [isSavingEV, setIsSavingEV] = useState<boolean>(false);
 
@@ -2084,6 +2085,7 @@ No inventory adjustment will be made.`,
         receivingCosts: grn.data.receivingCosts || [],
         status: grn.data.status || "completed"
       });
+      setEditingGRNId(grnId); // Track the GRN being edited
       setActiveTab('preview');
       alert('GRN loaded for editing');
     }
@@ -2262,7 +2264,7 @@ No inventory adjustment will be made.`,
     };
     
     const newGRN: UtilsSavedGRN = {
-      id: Date.now().toString(),
+      id: editingGRNId || Date.now().toString(), // Use existing ID if editing
       name: `GRN-${grnData.grnNumber}`,
       data: convertedGRNData as any,
       total: totalAmount,
@@ -2270,9 +2272,60 @@ No inventory adjustment will be made.`,
       updatedAt: new Date().toISOString()
     };
     
-    console.log('About to call saveGRN with:', newGRN);
-      // Use the proper saveGRN utility function
-      await saveGRN(newGRN);
+    console.log('About to save GRN:', newGRN, 'editing:', !!editingGRNId);
+      
+      // Use updateGRN if editing, otherwise saveGRN
+      if (editingGRNId) {
+        const { updateGRN } = await import('@/utils/grnUtils');
+        await updateGRN(newGRN);
+        console.log('✅ GRN updated:', editingGRNId);
+      } else {
+        await saveGRN(newGRN);
+        console.log('✅ GRN saved');
+      }
+      
+      // Update stock movements in the ledger to reflect the edit (if editing)
+      if (editingGRNId) {
+        try {
+          const { updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
+          const newMovements: any[] = [];
+          
+          for (const item of newGRN.data.items) {
+            const itemName = item.description || item.name;
+            const itemQuantity = item.delivered || item.quantity || 0;
+            
+            if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
+            
+            // For GRN: TRANSFER_IN to outlet/godown
+            newMovements.push({
+              product_name: itemName,
+              outlet_id: undefined,
+              godown_id: item.destinationGodownId || undefined,
+              zone_id: item.destinationZoneId || undefined,
+              movement_type: 'IN' as const,
+              quantity: itemQuantity,
+              reference_type: 'GRN' as const,
+              reference_number: newGRN.data.grnNumber,
+              notes: `GRN from ${newGRN.data.supplierName || 'Supplier'}`
+            });
+          }
+          
+          if (newMovements.length > 0) {
+            await updateStockMovementsForTransaction(
+              'GRN',
+              newGRN.data.grnNumber,
+              newMovements
+            );
+            console.log('✅ Stock movements updated for GRN:', newGRN.data.grnNumber);
+          }
+        } catch (movementError) {
+          console.error('Error updating stock movements:', movementError);
+          // Don't block the save - just log the error
+        }
+      }
+      
+      // Clear editing state
+      setEditingGRNId(null);
       
       // Always update general products inventory (products.stock_quantity)
       // regardless of whether a destination godown is set.
