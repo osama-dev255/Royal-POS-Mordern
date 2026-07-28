@@ -143,6 +143,7 @@ export const getStockMovements = async (filters?: {
         godowns!stock_movements_godown_id_fkey(name),
         godown_zones!stock_movements_zone_id_fkey(zone_name)
       `)
+      .not('movement_type', 'in', '(TRANSFER_IN,TRANSFER_OUT)')
       .order('created_at', { ascending: false });
 
     if (filters?.productId) {
