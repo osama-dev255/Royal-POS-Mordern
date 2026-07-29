@@ -58,6 +58,7 @@ import { Templates } from "@/pages/Templates";
 import { SavedGRNsSection } from "@/components/SavedGRNsSection";
 import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettlementsSection";
 import { SupplierPurchaseNoteSection } from "@/components/SupplierPurchaseNoteSection";
+import { PurchaseOrderSection } from "@/components/PurchaseOrderSection";
 import { SupplierProductsSection } from "@/components/SupplierProductsSection";
 import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
@@ -544,6 +545,9 @@ export const Index = () => {
       case "saved-supplier-purchase-notes":
         setCurrentView("purchase");
         break;
+      case "saved-purchase-orders":
+        setCurrentView("purchase");
+        break;
       case "supplier-products":
         setCurrentView("purchase");
         break;
@@ -601,7 +605,7 @@ export const Index = () => {
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
-    "saved-supplier-purchase-notes", "supplier-products",
+    "saved-supplier-purchase-notes", "supplier-products", "saved-purchase-orders",
     "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses",
     "godowns", "stock-transfers", "stock-movements"
   ];
@@ -2664,6 +2668,15 @@ export const Index = () => {
                     setCurrentView("templates");
                     window.location.hash = '#templates';
                   }}
+                />
+              );
+            case "saved-purchase-orders":
+              console.log("Rendering PurchaseOrderSection");
+              return (
+                <PurchaseOrderSection
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
                 />
               );
             case "supplier-products":

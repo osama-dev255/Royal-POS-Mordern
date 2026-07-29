@@ -65,6 +65,8 @@ import { SavedGRNsSection } from '@/components/SavedGRNsSection';
 import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
 import { SavedStockTakesSection } from '@/components/SavedStockTakesSection';
 import { SupplierPurchaseNoteSection } from '@/components/SupplierPurchaseNoteSection';
+import { PurchaseOrderSection } from '@/components/PurchaseOrderSection';
+import { savePurchaseOrder } from '@/utils/purchaseOrderUtils';
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock, getProductsBySupplierId, linkProductToSupplier } from '@/services/databaseService';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -668,7 +670,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack, editSPNData, onEditSPNLoaded }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
@@ -3605,60 +3607,44 @@ No inventory adjustment will be made.`,
         alert('Error saving delivery. Please try again.');
       }
     } else if (currentTemplate?.type === "purchase-order") {
-      // For purchase order templates, automatically save to saved purchase orders
+      // Save purchase order to Supabase
       try {
-        // Calculate total items
-        const totalItems = purchaseOrderData.items.reduce((sum, item) => sum + item.quantity, 0);
-        
-        // Create purchase order data for saving
-        const purchaseOrderToSave: SavedPurchaseOrderData = {
-          id: purchaseOrderData.poNumber, // Use PO number as ID
+        const result = await savePurchaseOrder({
           poNumber: purchaseOrderData.poNumber,
           date: purchaseOrderData.date,
-          supplier: purchaseOrderData.supplierName,
-          items: totalItems, // Total number of items
-          total: purchaseOrderData.total,
-          paymentMethod: 'N/A', // Templates don't have payment method
-          status: 'completed', // For templates, mark as completed
-          itemsList: purchaseOrderData.items.map(item => ({
-            name: item.description,
-            quantity: item.quantity,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            total: item.total
-          })),
+          supplierName: purchaseOrderData.supplierName,
+          supplierAddress: purchaseOrderData.supplierAddress,
+          supplierPhone: purchaseOrderData.supplierPhone,
+          supplierEmail: purchaseOrderData.supplierEmail,
+          businessName: purchaseOrderData.businessName,
+          businessAddress: purchaseOrderData.businessAddress,
+          businessPhone: purchaseOrderData.businessPhone,
+          businessEmail: purchaseOrderData.businessEmail,
+          expectedDelivery: purchaseOrderData.expectedDelivery,
+          items: purchaseOrderData.items,
           subtotal: purchaseOrderData.subtotal,
           tax: purchaseOrderData.tax,
           discount: purchaseOrderData.discount,
           shipping: purchaseOrderData.shipping,
+          total: purchaseOrderData.total,
           paymentTerms: purchaseOrderData.paymentTerms,
           deliveryInstructions: purchaseOrderData.deliveryInstructions,
           notes: purchaseOrderData.notes,
+          requestedBy: purchaseOrderData.requestedBy,
+          approvedBy: purchaseOrderData.approvedBy,
+          authorizationDate: purchaseOrderData.authorizationDate,
           authorizedByName: purchaseOrderData.authorizedByName,
           authorizedBySignature: purchaseOrderData.authorizedBySignature,
-          authorizationDate: purchaseOrderData.authorizationDate
-        };
-        
-        // Save to localStorage
-        const savedPurchaseOrders = JSON.parse(localStorage.getItem('savedPurchaseOrders') || '[]');
-        savedPurchaseOrders.push(purchaseOrderToSave);
-        localStorage.setItem('savedPurchaseOrders', JSON.stringify(savedPurchaseOrders));
-        
-        // Update state
-        setSavedPurchaseOrders(savedPurchaseOrders);
-        
-        // Show the purchase order options dialog after saving
-        setShowPurchaseOrderOptions(true);
-        
-        // Don't reset here - let the user choose an option first
-        
-        // Trigger storage event to notify other components
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: 'savedPurchaseOrders',
-          newValue: JSON.stringify(savedPurchaseOrders)
-        }));
-        
-        alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
+          status: 'completed'
+        });
+
+        if (result.success) {
+          // Show the purchase order options dialog after saving
+          setShowPurchaseOrderOptions(true);
+          alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
+        } else {
+          alert(`Error saving purchase order: ${result.error}`);
+        }
       } catch (error) {
         console.error('Error saving purchase order:', error);
         alert('Error saving purchase order. Please try again.');
@@ -10441,6 +10427,14 @@ No inventory adjustment will be made.`,
                       <FileText className="h-4 w-4" />
                       Supplier Purchase Notes
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedPurchaseOrders')}
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Purchase Orders
+                    </Button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -10633,6 +10627,27 @@ No inventory adjustment will be made.`,
                   </Button>
                 </div>
                 <SupplierPurchaseNoteSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
+            ) : activeTab === "savedPurchaseOrders" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Purchase Orders</h3>
+                    <p className="text-sm text-muted-foreground">View and manage purchase orders placed to suppliers</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <PurchaseOrderSection 
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User" 

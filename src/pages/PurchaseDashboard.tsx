@@ -122,6 +122,13 @@ export const PurchaseDashboard = ({ username, onBack, onLogout, onNavigate }: Pu
       color: "bg-white border border-gray-200"
     },
     {
+      id: "saved-purchase-orders",
+      title: "Saved Purchase Orders",
+      description: "View and manage purchase orders placed to suppliers",
+      icon: FileText,
+      color: "bg-white border border-gray-200"
+    },
+    {
       id: "supplier-products",
       title: "Supplier Products",
       description: "View and manage products linked to suppliers",
