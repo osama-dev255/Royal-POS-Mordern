@@ -3045,6 +3045,8 @@ No inventory adjustment will be made.`,
   const [editingSPNId, setEditingSPNId] = useState<string>('');
     const [spnPostSaveDialogOpen, setSpnPostSaveDialogOpen] = useState(false);
     const [spnSavedData, setSpnSavedData] = useState<any>(null);
+    const [spnShareText, setSpnShareText] = useState<string>('');
+    const [spnShareDialogOpen, setSpnShareDialogOpen] = useState(false);
     const [spnShowComplianceDialog, setSpnShowComplianceDialog] = useState(false);
     const [spnStockType, setSpnStockType] = useState<'exempt' | 'vatable' | ''>('');
     const [spnReceiptIssued, setSpnReceiptIssued] = useState<'yes' | 'no' | ''>('');
@@ -18629,25 +18631,151 @@ Enter choice (1-3):`);
               className="flex flex-col items-center gap-2 py-6"
               onClick={async () => {
                 if (spnSavedData) {
-                  const shareData = {
-                    title: `Supplier Purchase Note ${spnSavedData.purchaseNoteNumber || ''}`,
-                    text: `SPN #${spnSavedData.purchaseNoteNumber || ''} for supplier ${spnSavedData.supplierName || ''} - Total: ${formatCurrency(spnSavedData.total || 0)}`,
-                    url: window.location.href
+                  const data = spnSavedData;
+                  const items = Array.isArray(data.items) ? data.items : [];
+                  const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+                  const total = subtotal;
+                  const fmtCurrency = (amount: number) => {
+                    const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
+                    return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                   };
+
+                  // Build formatted text message
+                  const lines: string[] = [];
+                  lines.push('═══════════════════════════════════');
+                  lines.push('   SUPPLIER PURCHASE NOTE');
+                  lines.push(`   #${data.purchaseNoteNumber || ''}`);
+                  lines.push('═══════════════════════════════════');
+                  lines.push('');
+                  lines.push(`Date: ${data.date ? new Date(data.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}`);
+                  lines.push(`Status: ${(data.status || 'completed').toUpperCase()}`);
+                  if (data.preparedBy) lines.push(`Prepared By: ${data.preparedBy}`);
+                  lines.push('');
+                  lines.push('─── FROM (Supplier) ───');
+                  lines.push(`  ${data.supplierName || 'N/A'}`);
+                  if (data.supplierStreetAddress) lines.push(`  ${data.supplierStreetAddress}`);
+                  if (data.supplierAddress) lines.push(`  ${data.supplierAddress}`);
+                  if (data.supplierTaxId) lines.push(`  TIN: ${data.supplierTaxId}`);
+                  if (data.supplierPhone) lines.push(`  Phone: ${data.supplierPhone}`);
+                  if (data.supplierEmail) lines.push(`  Email: ${data.supplierEmail}`);
+                  lines.push('');
+                  lines.push('─── TO (Business) ───');
+                  lines.push(`  ${data.businessName || 'N/A'}`);
+                  if (data.businessAddress) lines.push(`  ${data.businessAddress}`);
+                  if (data.businessTin) lines.push(`  TIN: ${data.businessTin}`);
+                  if (data.businessPhone) lines.push(`  Phone: ${data.businessPhone}`);
+                  if (data.businessEmail) lines.push(`  Email: ${data.businessEmail}`);
+                  if (data.stockType || data.receiptIssued) {
+                    lines.push('  Compliance:');
+                    if (data.stockType) lines.push(`    Stock Type: ${data.stockType}`);
+                    if (data.receiptIssued) lines.push(`    Receipt Issued: ${data.receiptIssued}`);
+                  }
+                  lines.push('');
+                  lines.push('─── ITEMS ───');
+                  const colHeaders = ['#', 'Description', 'Qty', 'Unit', 'Cost Price', 'Total'];
+                  const colWidths = [4, 22, 6, 7, 16, 16];
+                  const colAligns: ('left' | 'right' | 'center')[] = ['center', 'left', 'right', 'center', 'right', 'right'];
+                  const pad = (str: string, width: number, align: 'left' | 'right' | 'center' = 'left') => {
+                    const s = String(str);
+                    if (align === 'right') return s.padStart(width).slice(-width);
+                    if (align === 'center') {
+                      const padL = Math.floor((width - s.length) / 2);
+                      const padR = width - s.length - padL;
+                      return ' '.repeat(Math.max(0, padL)) + s + ' '.repeat(Math.max(0, padR));
+                    }
+                    return s.padEnd(width).slice(0, width);
+                  };
+                  const separator = '  +' + colWidths.map(w => '-'.repeat(w + 2)).join('+') + '+';
+                  lines.push(separator);
+                  lines.push('  | ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' | ') + ' |');
+                  lines.push(separator);
+                  items.forEach((item: any, index: number) => {
+                    const num = String(index + 1).padStart(2, '0');
+                    const desc = (item.description || 'Item').length > 20 ? (item.description || 'Item').substring(0, 19) + '…' : (item.description || 'Item');
+                    const row = [
+                      pad(num, colWidths[0], 'center'),
+                      pad(desc, colWidths[1], 'left'),
+                      pad(String(item.quantity || 0), colWidths[2], 'right'),
+                      pad(item.unit || '-', colWidths[3], 'center'),
+                      pad(fmtCurrency(item.unitPrice || 0), colWidths[4], 'right'),
+                      pad(fmtCurrency(item.total || 0), colWidths[5], 'right')
+                    ];
+                    lines.push('  | ' + row.join(' | ') + ' |');
+                  });
+                  lines.push(separator);
+                  const totalQty = items.reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+                  const totalsRow = [
+                    pad('', colWidths[0], 'center'),
+                    pad('TOTALS', colWidths[1], 'left'),
+                    pad(String(totalQty), colWidths[2], 'right'),
+                    pad('', colWidths[3], 'center'),
+                    pad('', colWidths[4], 'right'),
+                    pad(fmtCurrency(total), colWidths[5], 'right')
+                  ];
+                  lines.push('  | ' + totalsRow.join(' | ') + ' |');
+                  lines.push(separator);
+                  lines.push('');
+                  lines.push(`Total Items: ${items.length}`);
+                  lines.push(`Total Quantity: ${totalQty}`);
+                  lines.push(`Grand Total: ${fmtCurrency(total)}`);
+                  if (data.deliveredDate) lines.push(`Delivered Date: ${new Date(data.deliveredDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`);
+                  if (data.approvedBy) lines.push(`Approved By: ${data.approvedBy}`);
+                  lines.push('');
+                  lines.push('═══════════════════════════════════');
+
+                  const messageText = lines.join('\n');
+
+                  // Close the dialog FIRST to release Radix focus trap
+                  setSpnPostSaveDialogOpen(false);
+
+                  // Wait for dialog to unmount and release focus trap
+                  await new Promise(resolve => setTimeout(resolve, 300));
+
+                  // Step 1: Try native share if available (mobile devices)
                   if (navigator.share) {
                     try {
-                      await navigator.share(shareData);
-                    } catch { /* user cancelled */ }
-                  } else {
-                    try {
-                      await navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}`);
-                      toast({ title: 'Copied', description: 'Note details copied to clipboard' });
-                    } catch {
-                      toast({ title: 'Copy failed', description: 'Could not copy to clipboard', variant: 'destructive' });
+                      await navigator.share({ title: `SPN #${data.purchaseNoteNumber || ''}`, text: messageText });
+                      toast({ title: 'Shared', description: 'SPN shared successfully' });
+                      return;
+                    } catch (err: any) {
+                      if (err?.name === 'AbortError') return;
                     }
                   }
+
+                  // Step 2: Try clipboard API (works on HTTPS)
+                  let copied = false;
+                  try {
+                    await navigator.clipboard.writeText(messageText);
+                    copied = true;
+                  } catch {
+                    // clipboard API not available
+                  }
+
+                  // Step 3: Try execCommand fallback (now works since dialog is closed)
+                  if (!copied) {
+                    try {
+                      const textarea = document.createElement('textarea');
+                      textarea.value = messageText;
+                      textarea.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;padding:0;border:none;outline:none;boxShadow:none;background:transparent;opacity:0.1;';
+                      document.body.appendChild(textarea);
+                      textarea.focus();
+                      textarea.select();
+                      textarea.setSelectionRange(0, messageText.length);
+                      copied = document.execCommand('copy');
+                      document.body.removeChild(textarea);
+                    } catch {
+                      copied = false;
+                    }
+                  }
+
+                  if (copied) {
+                    toast({ title: 'Copied', description: 'SPN details copied to clipboard' });
+                  } else {
+                    // All auto-copy methods failed - show manual copy dialog
+                    setSpnShareText(messageText);
+                    setSpnShareDialogOpen(true);
+                  }
                 }
-                setSpnPostSaveDialogOpen(false);
               }}
             >
               <Share className="h-6 w-6" />
@@ -18656,6 +18784,29 @@ Enter choice (1-3):`);
           </div>
           <div className="mt-3">
             <Button variant="ghost" className="w-full text-sm text-muted-foreground" onClick={() => setSpnPostSaveDialogOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fallback Share Dialog - shown when auto-copy fails */}
+      <Dialog open={spnShareDialogOpen} onOpenChange={setSpnShareDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Share Supplier Purchase Note</DialogTitle>
+            <DialogDescription>Automatic copy was not available. Please select all text below and copy it manually (Ctrl+C).</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <textarea
+              readOnly
+              value={spnShareText}
+              className="w-full h-64 p-3 text-xs font-mono border rounded-md bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            />
+          </div>
+          <div className="mt-3">
+            <Button variant="ghost" className="w-full text-sm" onClick={() => setSpnShareDialogOpen(false)}>
               Close
             </Button>
           </div>
