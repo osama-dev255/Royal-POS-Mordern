@@ -5530,7 +5530,7 @@ export class PrintUtils {
             <div class="payment-value" style="font-size:10px;">${fmtCurrency(p.amount)}</div>
           </div>`).join('')}
           <div class="payment-row" style="padding:2px 0;border-top:1px solid #e5e7eb;font-weight:700;">
-            <div class="payment-label" style="font-size:10px;">Total Paid</div>
+            <div class="payment-label" style="font-size:10px;">Total Amount</div>
             <div class="payment-value" style="font-size:10px;">${fmtCurrency(data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0))}</div>
           </div>
         </div>` : ''}

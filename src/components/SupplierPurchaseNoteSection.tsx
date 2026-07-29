@@ -233,7 +233,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
           lines.push(`    - ${p.method.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}: ${fmtCurrency(p.amount)}`);
         });
         const totalPaid = data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0);
-        lines.push(`  Total Paid: ${fmtCurrency(totalPaid)}`);
+        lines.push(`  Total Amount: ${fmtCurrency(totalPaid)}`);
       }
       lines.push('');
       lines.push('─── AUTHORIZATION ───');
@@ -366,6 +366,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
             <div className="text-center py-3 px-6 border-b-[3px] border-black relative">
               <h1 className="text-2xl font-extrabold uppercase tracking-wide">Supplier Purchase Note</h1>
               <p className="text-sm font-semibold">#{selectedNote.purchaseNoteNumber}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide mt-1 border border-black inline-block px-2 py-0.5 rounded">Original Copy</p>
             </div>
 
             {/* Meta Bar */}
@@ -392,18 +393,28 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                 <div className="bg-gray-100 px-3 py-2 text-xs font-bold uppercase tracking-wide">From (Supplier)</div>
                 <div className="p-3">
                   <p className="font-bold text-sm border-b-2 border-gray-200 pb-1 mb-1">{selectedNote.supplierName || 'N/A'}</p>
+                  {selectedNote.supplierStreetAddress && <p className="text-xs text-gray-700">{selectedNote.supplierStreetAddress}</p>}
+                  {selectedNote.supplierAddress && <p className="text-xs text-gray-700">{selectedNote.supplierAddress}</p>}
+                  {selectedNote.supplierTaxId && <p className="text-xs text-gray-700">TIN: {selectedNote.supplierTaxId}</p>}
                   {selectedNote.supplierPhone && <p className="text-xs text-gray-700">Phone: {selectedNote.supplierPhone}</p>}
                   {selectedNote.supplierEmail && <p className="text-xs text-gray-700">Email: {selectedNote.supplierEmail}</p>}
-                  {selectedNote.supplierAddress && <p className="text-xs text-gray-700">Address: {selectedNote.supplierAddress}</p>}
                 </div>
               </div>
               <div className="flex-1 border rounded overflow-hidden">
                 <div className="bg-gray-100 px-3 py-2 text-xs font-bold uppercase tracking-wide">To (Business)</div>
                 <div className="p-3">
                   <p className="font-bold text-sm border-b-2 border-gray-200 pb-1 mb-1">{selectedNote.businessName || 'N/A'}</p>
+                  {selectedNote.businessAddress && <p className="text-xs text-gray-700">{selectedNote.businessAddress}</p>}
+                  {selectedNote.businessTin && <p className="text-xs text-gray-700">TIN: {selectedNote.businessTin}</p>}
                   {selectedNote.businessPhone && <p className="text-xs text-gray-700">Phone: {selectedNote.businessPhone}</p>}
                   {selectedNote.businessEmail && <p className="text-xs text-gray-700">Email: {selectedNote.businessEmail}</p>}
-                  {selectedNote.businessAddress && <p className="text-xs text-gray-700">Address: {selectedNote.businessAddress}</p>}
+                  {(selectedNote.stockType || selectedNote.receiptIssued) && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <p className="text-xs font-semibold text-gray-700">Compliance:</p>
+                      {selectedNote.stockType && <p className="text-xs text-gray-700">Stock Type: <strong>{selectedNote.stockType}</strong></p>}
+                      {selectedNote.receiptIssued && <p className="text-xs text-gray-700">Receipt Issued: <strong>{selectedNote.receiptIssued}</strong></p>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -494,16 +505,117 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
               </div>
             </div>
 
-            {/* Notes */}
-            {selectedNote.notes && (
-              <div className="px-6 pb-3">
-                <h3 className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center gap-2">
-                  <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
-                  Notes
-                </h3>
-                <p className="text-xs whitespace-pre-line bg-gray-50 p-3 rounded border text-gray-700">{selectedNote.notes}</p>
+            {/* Notes + Destination + Payment Summary */}
+            <div className="px-6 pb-3 flex gap-4">
+              {/* Left column: Notes + Destination */}
+              <div className="flex-1 space-y-3">
+                {selectedNote.notes && (
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center gap-2">
+                      <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
+                      Notes
+                    </h3>
+                    <p className="text-xs whitespace-pre-line bg-gray-50 p-3 rounded border text-gray-700">{selectedNote.notes}</p>
+                  </div>
+                )}
+                {selectedNote.destination && (
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center gap-2">
+                      <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
+                      Destination
+                    </h3>
+                    <p className="text-xs font-semibold bg-gray-50 p-3 rounded border text-gray-700">
+                      {selectedNote.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Right column: Payment Summary */}
+              <div className="w-[400px] flex-shrink-0 border rounded overflow-hidden">
+                <div className="bg-gray-100 px-3 py-2 text-xs font-bold uppercase tracking-wide">Payment Summary</div>
+                <div className="p-0">
+                  <div className="flex justify-between px-3 py-1.5 text-xs border-b border-gray-100">
+                    <span>Subtotal</span>
+                    <span className="font-semibold">{formatCurrency(selectedNote.subtotal || selectedNote.total)}</span>
+                  </div>
+                  <div className="flex justify-between px-3 py-2 text-xs font-bold bg-gray-50 border-b-2 border-black">
+                    <span>Total</span>
+                    <span>{formatCurrency(selectedNote.total)}</span>
+                  </div>
+                  {selectedNote.modeOfPayment && (
+                    <div className="flex justify-between px-3 py-1.5 text-xs border-b border-gray-100">
+                      <span>Mode of Payment</span>
+                      <span className="font-semibold">{selectedNote.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</span>
+                    </div>
+                  )}
+                  {selectedNote.paymentBreakdown && selectedNote.paymentBreakdown.length > 0 && (
+                    <div className="px-3 py-2 border-t border-dashed border-gray-300">
+                      <div className="text-[10px] font-bold mb-1">Payment Breakdown</div>
+                      {selectedNote.paymentBreakdown.filter((p: any) => p.method && p.amount > 0).map((p: any, idx: number) => (
+                        <div key={idx} className="flex justify-between text-[10px] py-0.5">
+                          <span>{p.method.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</span>
+                          <span className="font-semibold">{formatCurrency(p.amount)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-[10px] font-bold pt-1 border-t border-gray-200 mt-1">
+                        <span>Total Amount</span>
+                        <span>{formatCurrency(selectedNote.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0))}</span>
+                      </div>
+                    </div>
+                  )}
+                  {showProjectedProfit && (
+                    <div className="flex justify-between px-3 py-2 text-xs font-bold border-t-2 border-gray-200 mt-1 pt-2">
+                      <span className="text-green-700">Projected Profit</span>
+                      <span className="text-green-700">{formatCurrency(selectedNote.items.reduce((sum, item) => sum + ((item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0))), 0))}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Authorization & Signatures */}
+            <div className="px-6 pb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-2">
+                <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
+                Authorization & Signatures
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="border rounded p-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wide border-b-2 border-gray-200 pb-1 mb-2">Prepared By</div>
+                  <div className="text-xs">
+                    <div className="text-gray-500 uppercase text-[9px]">Name</div>
+                    <div className="font-semibold">{selectedNote.preparedBy || '—'}</div>
+                  </div>
+                  <div className="mt-2 pt-1 border-t-2 border-dashed border-gray-300">
+                    <div className="text-gray-500 uppercase text-[9px]">Date</div>
+                    <div className="text-xs font-semibold">{selectedNote.preparedDate ? new Date(selectedNote.preparedDate).toLocaleDateString() : '—'}</div>
+                  </div>
+                </div>
+                <div className="border rounded p-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wide border-b-2 border-gray-200 pb-1 mb-2">Delivered By</div>
+                  <div className="text-xs">
+                    <div className="text-gray-500 uppercase text-[9px]">Name</div>
+                    <div className="font-semibold">{selectedNote.deliveredBy || '—'}</div>
+                  </div>
+                  <div className="mt-2 pt-1 border-t-2 border-dashed border-gray-300">
+                    <div className="text-gray-500 uppercase text-[9px]">Date</div>
+                    <div className="text-xs font-semibold">{selectedNote.deliveredDate ? new Date(selectedNote.deliveredDate).toLocaleDateString() : '—'}</div>
+                  </div>
+                </div>
+                <div className="border rounded p-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wide border-b-2 border-gray-200 pb-1 mb-2">Approved By</div>
+                  <div className="text-xs">
+                    <div className="text-gray-500 uppercase text-[9px]">Name</div>
+                    <div className="font-semibold">{selectedNote.approvedBy || '—'}</div>
+                  </div>
+                  <div className="mt-2 pt-1 border-t-2 border-dashed border-gray-300">
+                    <div className="text-gray-500 uppercase text-[9px]">Date</div>
+                    <div className="text-xs font-semibold">{selectedNote.approvedDate ? new Date(selectedNote.approvedDate).toLocaleDateString() : '—'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Footer */}
             <div className="px-6 pb-6 mt-4">

@@ -8945,7 +8945,7 @@ No inventory adjustment will be made.`,
             <div class="payment-value" style="font-size:10px;">${formatCurrency(p.amount)}</div>
           </div>`).join('')}
           <div class="payment-row" style="padding:2px 0;border-top:1px solid #e5e7eb;font-weight:700;">
-            <div class="payment-label" style="font-size:10px;">Total Paid</div>
+            <div class="payment-label" style="font-size:10px;">Total Amount</div>
             <div class="payment-value" style="font-size:10px;">${formatCurrency(data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0))}</div>
           </div>
         </div>` : ''}
@@ -15673,7 +15673,7 @@ No inventory adjustment will be made.`,
                             </Button>
                             {supplierPurchaseNoteData.paymentBreakdown.length > 0 && (
                               <div className="flex justify-between items-center pt-2 border-t text-xs">
-                                <span className="font-semibold">Total Paid:</span>
+                                <span className="font-semibold">Total Amount:</span>
                                 <span className="font-bold">{formatCurrency(supplierPurchaseNoteData.paymentBreakdown.reduce((s, p) => s + (p.amount || 0), 0))}</span>
                               </div>
                             )}
