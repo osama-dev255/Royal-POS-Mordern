@@ -654,6 +654,7 @@ interface SupplierPurchaseNoteData {
   approvedBy: string;
   approvedDate: string;
   modeOfPayment: string;
+  paymentBreakdown: { method: string; amount: number }[];
   destination: string;
   stockType: string;
   receiptIssued: string;
@@ -2989,6 +2990,7 @@ No inventory adjustment will be made.`,
     approvedBy: '',
     approvedDate: new Date().toISOString().split('T')[0],
     modeOfPayment: '',
+    paymentBreakdown: [],
     destination: '',
     status: 'draft'
   });
@@ -3028,6 +3030,7 @@ No inventory adjustment will be made.`,
         approvedBy: data.approvedBy || '',
         approvedDate: data.approvedDate || '',
         modeOfPayment: data.modeOfPayment || '',
+        paymentBreakdown: data.paymentBreakdown || [],
         destination: data.destination || '',
         status: data.status || 'draft'
       });
@@ -3098,8 +3101,9 @@ No inventory adjustment will be made.`,
       toast({ title: 'Validation Error', description: 'Destination is required', variant: 'destructive' });
       return;
     }
-    if (!supplierPurchaseNoteData.modeOfPayment) {
-      toast({ title: 'Validation Error', description: 'Mode of Payment is required', variant: 'destructive' });
+    const totalPaid = supplierPurchaseNoteData.paymentBreakdown.reduce((s, p) => s + (p.amount || 0), 0);
+    if (supplierPurchaseNoteData.paymentBreakdown.length === 0 || totalPaid === 0) {
+      toast({ title: 'Validation Error', description: 'At least one payment method with an amount is required', variant: 'destructive' });
       return;
     }
     setIsSavingSPN(true);
@@ -3111,6 +3115,7 @@ No inventory adjustment will be made.`,
         ...supplierPurchaseNoteData,
         subtotal,
         total,
+        modeOfPayment: supplierPurchaseNoteData.paymentBreakdown.map(p => p.method).join(', '),
         stockType: spnStockType,
         receiptIssued: spnReceiptIssued,
         status: 'completed' as const
@@ -3171,6 +3176,7 @@ No inventory adjustment will be made.`,
           approvedBy: '',
           approvedDate: new Date().toISOString().split('T')[0],
           modeOfPayment: '',
+          paymentBreakdown: [],
           destination: '',
           status: 'draft'
         });
@@ -8931,6 +8937,17 @@ No inventory adjustment will be made.`,
         ${data.modeOfPayment ? `<div class="payment-row">
           <div class="payment-label">Mode of Payment</div>
           <div class="payment-value">${data.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+        </div>` : ''}
+        ${(data.paymentBreakdown && data.paymentBreakdown.length > 0) ? `<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #d1d5db;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:4px;">Payment Breakdown</div>
+          ${data.paymentBreakdown.filter((p: any) => p.method && p.amount > 0).map((p: any) => `<div class="payment-row" style="padding:1px 0;">
+            <div class="payment-label" style="font-size:10px;">${p.method.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</div>
+            <div class="payment-value" style="font-size:10px;">${formatCurrency(p.amount)}</div>
+          </div>`).join('')}
+          <div class="payment-row" style="padding:2px 0;border-top:1px solid #e5e7eb;font-weight:700;">
+            <div class="payment-label" style="font-size:10px;">Total Paid</div>
+            <div class="payment-value" style="font-size:10px;">${formatCurrency(data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0))}</div>
+          </div>
         </div>` : ''}
         <div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
           <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
@@ -15567,8 +15584,8 @@ No inventory adjustment will be made.`,
                           </Button>
                         </div>
 
-                        {/* Destination, Mode of Payment, Total */}
-                        <div className="grid grid-cols-3 gap-4">
+                        {/* Destination, Total */}
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="text-xs font-bold mb-1 block">Destination <span className="text-red-500">*</span></label>
                             <Select value={supplierPurchaseNoteData.destination} onValueChange={(val) => handleSupplierPurchaseNoteChange('destination', val)}>
@@ -15585,23 +15602,92 @@ No inventory adjustment will be made.`,
                             </Select>
                           </div>
                           <div>
-                            <label className="text-xs font-bold mb-1 block">Mode of Payment <span className="text-red-500">*</span></label>
-                            <Select value={supplierPurchaseNoteData.modeOfPayment} onValueChange={(val) => handleSupplierPurchaseNoteChange('modeOfPayment', val)}>
-                              <SelectTrigger className="w-full h-8 text-sm">
-                                <SelectValue placeholder="Select mode of payment" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="cash_paid">Cash Paid</SelectItem>
-                                <SelectItem value="cash_on_credit">Cash on Credit</SelectItem>
-                                <SelectItem value="cash_at_bank">Cash at Bank</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
                             <label className="text-xs font-bold">Total</label>
                             <div className="p-1 h-8 text-sm font-bold flex items-center bg-indigo-50 rounded px-2">
                               {formatCurrency(supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0))}
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Mode of Payment - Split Payment */}
+                        <div className="mt-3">
+                          <label className="text-xs font-bold mb-2 block">Mode of Payment <span className="text-red-500">*</span></label>
+                          <div className="border rounded-md p-3 space-y-2">
+                            {supplierPurchaseNoteData.paymentBreakdown.map((entry, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <Select value={entry.method} onValueChange={(val) => {
+                                  const updated = [...supplierPurchaseNoteData.paymentBreakdown];
+                                  updated[idx] = { ...updated[idx], method: val };
+                                  handleSupplierPurchaseNoteChange('paymentBreakdown', updated);
+                                }}>
+                                  <SelectTrigger className="w-[180px] h-8 text-sm">
+                                    <SelectValue placeholder="Select method" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="cash_in_hand">Cash in Hand</SelectItem>
+                                    <SelectItem value="cash_at_bank">Cash at Bank</SelectItem>
+                                    <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                                    <SelectItem value="cash_on_credit">Cash on Credit</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <div className="relative flex-1">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">TSh</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={entry.amount || ''}
+                                    onChange={(e) => {
+                                      const updated = [...supplierPurchaseNoteData.paymentBreakdown];
+                                      updated[idx] = { ...updated[idx], amount: parseFloat(e.target.value) || 0 };
+                                      handleSupplierPurchaseNoteChange('paymentBreakdown', updated);
+                                    }}
+                                    className="w-full h-8 text-sm border rounded pl-10 pr-2"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    const updated = supplierPurchaseNoteData.paymentBreakdown.filter((_, i) => i !== idx);
+                                    handleSupplierPurchaseNoteChange('paymentBreakdown', updated);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-xs"
+                              onClick={() => {
+                                const updated = [...supplierPurchaseNoteData.paymentBreakdown, { method: '', amount: 0 }];
+                                handleSupplierPurchaseNoteChange('paymentBreakdown', updated);
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Payment Method
+                            </Button>
+                            {supplierPurchaseNoteData.paymentBreakdown.length > 0 && (
+                              <div className="flex justify-between items-center pt-2 border-t text-xs">
+                                <span className="font-semibold">Total Paid:</span>
+                                <span className="font-bold">{formatCurrency(supplierPurchaseNoteData.paymentBreakdown.reduce((s, p) => s + (p.amount || 0), 0))}</span>
+                              </div>
+                            )}
+                            {supplierPurchaseNoteData.paymentBreakdown.length > 0 && (() => {
+                              const grandTotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+                              const totalPaid = supplierPurchaseNoteData.paymentBreakdown.reduce((s, p) => s + (p.amount || 0), 0);
+                              const balance = grandTotal - totalPaid;
+                              return balance !== 0 ? (
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-semibold">Balance Due:</span>
+                                  <span className={`font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(balance)}</span>
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
 

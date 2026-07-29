@@ -5523,6 +5523,17 @@ export class PrintUtils {
           <div class="payment-label">Mode of Payment</div>
           <div class="payment-value">${data.modeOfPayment}</div>
         </div>` : ''}
+        ${(data.paymentBreakdown && data.paymentBreakdown.length > 0) ? `<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #d1d5db;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:4px;">Payment Breakdown</div>
+          ${data.paymentBreakdown.filter((p: any) => p.method && p.amount > 0).map((p: any) => `<div class="payment-row" style="padding:1px 0;">
+            <div class="payment-label" style="font-size:10px;">${p.method.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</div>
+            <div class="payment-value" style="font-size:10px;">${fmtCurrency(p.amount)}</div>
+          </div>`).join('')}
+          <div class="payment-row" style="padding:2px 0;border-top:1px solid #e5e7eb;font-weight:700;">
+            <div class="payment-label" style="font-size:10px;">Total Paid</div>
+            <div class="payment-value" style="font-size:10px;">${fmtCurrency(data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0))}</div>
+          </div>
+        </div>` : ''}
         ${showProjectedProfit ? `<div class="payment-row" style="border-top: 2px solid #e5e7eb; margin-top: 4px; padding-top: 8px;">
           <div class="payment-label" style="font-weight: 700; color: #16a34a;">Projected Profit</div>
           <div class="payment-value" style="color: #16a34a; font-weight: 800;">${fmtCurrency(totalProjectedProfit)}</div>

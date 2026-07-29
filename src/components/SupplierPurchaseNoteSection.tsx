@@ -227,6 +227,14 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       if (data.modeOfPayment) {
         lines.push(`  Mode of Payment: ${data.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
       }
+      if (data.paymentBreakdown && data.paymentBreakdown.length > 0) {
+        lines.push('  Payment Breakdown:');
+        data.paymentBreakdown.filter((p: any) => p.method && p.amount > 0).forEach((p: any) => {
+          lines.push(`    - ${p.method.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}: ${fmtCurrency(p.amount)}`);
+        });
+        const totalPaid = data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+        lines.push(`  Total Paid: ${fmtCurrency(totalPaid)}`);
+      }
       lines.push('');
       lines.push('─── AUTHORIZATION ───');
       lines.push(`  Prepared By: ${data.preparedBy || '—'}${data.preparedDate ? ` (${new Date(data.preparedDate).toLocaleDateString()})` : ''}`);

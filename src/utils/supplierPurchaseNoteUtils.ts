@@ -10,6 +10,11 @@ export interface SupplierPurchaseNoteItem {
   total: number;
 }
 
+export interface PaymentBreakdownEntry {
+  method: string;
+  amount: number;
+}
+
 export interface SupplierPurchaseNoteData {
   id?: string;
   purchaseNoteNumber: string;
@@ -37,6 +42,7 @@ export interface SupplierPurchaseNoteData {
   approvedBy: string;
   approvedDate: string;
   modeOfPayment: string;
+  paymentBreakdown: PaymentBreakdownEntry[];
   destination: string;
   stockType: string;
   receiptIssued: string;
@@ -72,6 +78,7 @@ export interface SavedSupplierPurchaseNote {
   approvedBy: string;
   approvedDate: string;
   modeOfPayment: string;
+  paymentBreakdown: PaymentBreakdownEntry[];
   destination: string;
   stockType: string;
   receiptIssued: string;
@@ -118,6 +125,7 @@ export const saveSupplierPurchaseNote = async (
       approved_by: noteData.approvedBy || '',
       approved_date: noteData.approvedDate || null,
       mode_of_payment: noteData.modeOfPayment || '',
+      payment_breakdown: noteData.paymentBreakdown || [],
       destination: noteData.destination || '',
       stock_type: noteData.stockType || '',
       receipt_issued: noteData.receiptIssued === 'yes',
@@ -192,6 +200,7 @@ export const getSavedSupplierPurchaseNotes = async (
       approvedBy: dbNote.approved_by || '',
       approvedDate: dbNote.approved_date || '',
       modeOfPayment: dbNote.mode_of_payment || '',
+      paymentBreakdown: dbNote.payment_breakdown || [],
       destination: dbNote.destination || '',
       stockType: dbNote.stock_type || '',
       receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
@@ -224,6 +233,7 @@ export const getSavedSupplierPurchaseNotes = async (
         approvedBy: dbNote.approved_by || '',
         approvedDate: dbNote.approved_date || '',
         modeOfPayment: dbNote.mode_of_payment || '',
+        paymentBreakdown: dbNote.payment_breakdown || [],
         destination: dbNote.destination || '',
         stockType: dbNote.stock_type || '',
         receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
@@ -293,6 +303,7 @@ export const updateSupplierPurchaseNote = async (
     if (noteData.approvedBy !== undefined) updateData.approved_by = noteData.approvedBy;
     if (noteData.approvedDate !== undefined) updateData.approved_date = noteData.approvedDate;
     if (noteData.modeOfPayment !== undefined) updateData.mode_of_payment = noteData.modeOfPayment;
+    if (noteData.paymentBreakdown !== undefined) updateData.payment_breakdown = noteData.paymentBreakdown;
     if (noteData.destination !== undefined) updateData.destination = noteData.destination;
     if (noteData.stockType !== undefined) updateData.stock_type = noteData.stockType;
     if (noteData.receiptIssued !== undefined) updateData.receipt_issued = noteData.receiptIssued === 'yes';
