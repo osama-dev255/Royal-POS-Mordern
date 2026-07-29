@@ -3274,6 +3274,11 @@ No inventory adjustment will be made.`,
   const [showSupplierSettlementOptions, setShowSupplierSettlementOptions] = useState(false);
   const [showGRNOptions, setShowGRNOptions] = useState(false);
   const [showPurchaseOrderOptions, setShowPurchaseOrderOptions] = useState(false);
+    const [isSavingPO, setIsSavingPO] = useState(false);
+    const [poPostSaveDialogOpen, setPoPostSaveDialogOpen] = useState(false);
+    const [poSavedData, setPoSavedData] = useState<any>(null);
+    const [poShareText, setPoShareText] = useState<string>('');
+    const [poShareDialogOpen, setPoShareDialogOpen] = useState(false);
   const [showSalesOrderOptions, setShowSalesOrderOptions] = useState(false);
   const [showStockTakeOptions, setShowStockTakeOptions] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
@@ -3608,6 +3613,7 @@ No inventory adjustment will be made.`,
       }
     } else if (currentTemplate?.type === "purchase-order") {
       // Save purchase order to Supabase
+      setIsSavingPO(true);
       try {
         const result = await savePurchaseOrder({
           poNumber: purchaseOrderData.poNumber,
@@ -3639,15 +3645,43 @@ No inventory adjustment will be made.`,
         });
 
         if (result.success) {
-          // Show the purchase order options dialog after saving
-          setShowPurchaseOrderOptions(true);
-          alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
+          // Store saved data for post-save dialog
+          setPoSavedData({
+            poNumber: purchaseOrderData.poNumber,
+            date: purchaseOrderData.date,
+            supplierName: purchaseOrderData.supplierName,
+            supplierAddress: purchaseOrderData.supplierAddress,
+            supplierPhone: purchaseOrderData.supplierPhone,
+            supplierEmail: purchaseOrderData.supplierEmail,
+            businessName: purchaseOrderData.businessName,
+            businessAddress: purchaseOrderData.businessAddress,
+            businessPhone: purchaseOrderData.businessPhone,
+            businessEmail: purchaseOrderData.businessEmail,
+            expectedDelivery: purchaseOrderData.expectedDelivery,
+            items: purchaseOrderData.items,
+            subtotal: purchaseOrderData.subtotal,
+            tax: purchaseOrderData.tax,
+            discount: purchaseOrderData.discount,
+            shipping: purchaseOrderData.shipping,
+            total: purchaseOrderData.total,
+            paymentTerms: purchaseOrderData.paymentTerms,
+            deliveryInstructions: purchaseOrderData.deliveryInstructions,
+            notes: purchaseOrderData.notes,
+            requestedBy: purchaseOrderData.requestedBy,
+            approvedBy: purchaseOrderData.approvedBy,
+            authorizationDate: purchaseOrderData.authorizationDate,
+            status: 'completed'
+          });
+          toast({ title: 'Success', description: `Purchase Order ${purchaseOrderData.poNumber} saved successfully` });
+          setPoPostSaveDialogOpen(true);
         } else {
-          alert(`Error saving purchase order: ${result.error}`);
+          toast({ title: 'Error', description: `Failed to save: ${result.error}`, variant: 'destructive' });
         }
       } catch (error) {
         console.error('Error saving purchase order:', error);
-        alert('Error saving purchase order. Please try again.');
+        toast({ title: 'Error', description: 'Failed to save purchase order', variant: 'destructive' });
+      } finally {
+        setIsSavingPO(false);
       }
     } else {
       // For other templates, just log the save action
@@ -10742,15 +10776,84 @@ No inventory adjustment will be made.`,
                       />
                     ) : null}
                     <Button 
-                      disabled={isSavingDeliveryNote || isSavingGRN}
+                      disabled={isSavingDeliveryNote || isSavingGRN || isSavingPO}
                       onClick={async () => {
-                        if (isSavingDeliveryNote || isSavingGRN) {
+                        if (isSavingDeliveryNote || isSavingGRN || isSavingPO) {
                           console.warn('⚠️ Save already in progress...');
                           return;
                         }
                         
                         if (currentTemplate?.type === "order-form") {
-                        alert(`Purchase Order ${purchaseOrderData.poNumber} saved successfully!`);
+                        // Save purchase order to Supabase
+                        setIsSavingPO(true);
+                        try {
+                          const result = await savePurchaseOrder({
+                            poNumber: purchaseOrderData.poNumber,
+                            date: purchaseOrderData.date,
+                            supplierName: purchaseOrderData.supplierName,
+                            supplierAddress: purchaseOrderData.supplierAddress,
+                            supplierPhone: purchaseOrderData.supplierPhone,
+                            supplierEmail: purchaseOrderData.supplierEmail,
+                            businessName: purchaseOrderData.businessName,
+                            businessAddress: purchaseOrderData.businessAddress,
+                            businessPhone: purchaseOrderData.businessPhone,
+                            businessEmail: purchaseOrderData.businessEmail,
+                            expectedDelivery: purchaseOrderData.expectedDelivery,
+                            items: purchaseOrderData.items,
+                            subtotal: purchaseOrderData.subtotal,
+                            tax: purchaseOrderData.tax,
+                            discount: purchaseOrderData.discount,
+                            shipping: purchaseOrderData.shipping,
+                            total: purchaseOrderData.total,
+                            paymentTerms: purchaseOrderData.paymentTerms,
+                            deliveryInstructions: purchaseOrderData.deliveryInstructions,
+                            notes: purchaseOrderData.notes,
+                            requestedBy: purchaseOrderData.requestedBy,
+                            approvedBy: purchaseOrderData.approvedBy,
+                            authorizationDate: purchaseOrderData.authorizationDate,
+                            authorizedByName: purchaseOrderData.authorizedByName,
+                            authorizedBySignature: purchaseOrderData.authorizedBySignature,
+                            status: 'completed'
+                          });
+
+                          if (result.success) {
+                            setPoSavedData({
+                              poNumber: purchaseOrderData.poNumber,
+                              date: purchaseOrderData.date,
+                              supplierName: purchaseOrderData.supplierName,
+                              supplierAddress: purchaseOrderData.supplierAddress,
+                              supplierPhone: purchaseOrderData.supplierPhone,
+                              supplierEmail: purchaseOrderData.supplierEmail,
+                              businessName: purchaseOrderData.businessName,
+                              businessAddress: purchaseOrderData.businessAddress,
+                              businessPhone: purchaseOrderData.businessPhone,
+                              businessEmail: purchaseOrderData.businessEmail,
+                              expectedDelivery: purchaseOrderData.expectedDelivery,
+                              items: purchaseOrderData.items,
+                              subtotal: purchaseOrderData.subtotal,
+                              tax: purchaseOrderData.tax,
+                              discount: purchaseOrderData.discount,
+                              shipping: purchaseOrderData.shipping,
+                              total: purchaseOrderData.total,
+                              paymentTerms: purchaseOrderData.paymentTerms,
+                              deliveryInstructions: purchaseOrderData.deliveryInstructions,
+                              notes: purchaseOrderData.notes,
+                              requestedBy: purchaseOrderData.requestedBy,
+                              approvedBy: purchaseOrderData.approvedBy,
+                              authorizationDate: purchaseOrderData.authorizationDate,
+                              status: 'completed'
+                            });
+                            toast({ title: 'Success', description: `Purchase Order ${purchaseOrderData.poNumber} saved successfully` });
+                            setPoPostSaveDialogOpen(true);
+                          } else {
+                            toast({ title: 'Error', description: `Failed to save: ${result.error}`, variant: 'destructive' });
+                          }
+                        } catch (error) {
+                          console.error('Error saving purchase order:', error);
+                          toast({ title: 'Error', description: 'Failed to save purchase order', variant: 'destructive' });
+                        } finally {
+                          setIsSavingPO(false);
+                        }
                       } else if (currentTemplate?.type === "invoice") {
                         // Automatically save invoice to saved invoices
                         try {
@@ -11157,7 +11260,7 @@ No inventory adjustment will be made.`,
                         handleSaveDeliveryNote();
                       }
                     }}>
-                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN || isSavingEV) ? (
+                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN || isSavingEV || isSavingPO) ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processing...
@@ -11202,7 +11305,7 @@ No inventory adjustment will be made.`,
                     <Button variant="outline" onClick={() => setActiveTab("manage")}>
                       Back to Templates
                     </Button>
-                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order" && currentTemplate?.type !== "stock-take" && currentTemplate?.type !== "supplier-purchase-note" && currentTemplate?.type !== "expense-voucher") && (
+                    {(currentTemplate?.type !== "invoice" && currentTemplate?.type !== "delivery-note" && currentTemplate?.type !== "customer-settlement" && currentTemplate?.type !== "goods-received-note" && currentTemplate?.type !== "supplier-settlement" && currentTemplate?.type !== "sales-order" && currentTemplate?.type !== "stock-take" && currentTemplate?.type !== "supplier-purchase-note" && currentTemplate?.type !== "expense-voucher" && currentTemplate?.type !== "order-form") && (
                       <>
                         <Button onClick={() => {
                           if (currentTemplate?.type === "order-form") {
@@ -17807,250 +17910,285 @@ Enter choice (1-3):`);
         </div>
       )}
       
-      {/* Purchase Order Options Dialog */}
-      {showPurchaseOrderOptions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-bold mb-4">Purchase Order Options</h3>
-            <p className="mb-4">Choose an action for your purchase order:</p>
-            
-            <div className="space-y-2">
-              <Button 
-                onClick={() => {
-                  // Print functionality for purchase order
-                  // Create a print-friendly version of the purchase order
-                  const purchaseOrderContent = generateCleanPurchaseOrderHTML();
-                  
-                  // Create a temporary window for printing
-                  const printWindow = window.open('', '_blank', 'width=800,height=600');
+      {/* Post-Save Action Dialog for Purchase Order */}
+      <Dialog open={poPostSaveDialogOpen} onOpenChange={setPoPostSaveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Purchase Order Saved Successfully</DialogTitle>
+            <DialogDescription>Choose an action to perform with your saved Purchase Order.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={() => {
+                if (poSavedData) {
+                  const data = poSavedData;
+                  const items = Array.isArray(data.items) ? data.items : [];
+                  const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+                  const total = data.total || subtotal + (data.tax || 0) + (data.shipping || 0) - (data.discount || 0);
+                  const fmtCurrency = (amount: number) => {
+                    const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
+                    return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  };
+
+                  const itemsRows = items.map((item: any, index: number) => `
+                    <tr>
+                      <td style="text-align:center;padding:6px 8px;border:1px solid #d1d5db;font-weight:700;">${String(index + 1).padStart(2, '0')}</td>
+                      <td style="padding:6px 8px;border:1px solid #d1d5db;font-weight:600;">${item.description || ''}</td>
+                      <td style="text-align:center;padding:6px 8px;border:1px solid #d1d5db;">${item.quantity || 0}</td>
+                      <td style="text-align:center;padding:6px 8px;border:1px solid #d1d5db;">${item.unit || '-'}</td>
+                      <td style="text-align:right;padding:6px 8px;border:1px solid #d1d5db;">${fmtCurrency(item.unitPrice || 0)}</td>
+                      <td style="text-align:right;padding:6px 8px;border:1px solid #d1d5db;font-weight:700;">${fmtCurrency(item.total || 0)}</td>
+                    </tr>
+                  `).join('');
+
+                  const html = `<!DOCTYPE html>
+<html><head><title>Purchase Order - ${data.poNumber || ''}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>@media print { @page { margin: 0.2in; size: A4; } body { margin: 0; padding: 0; } } * { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 850px; margin: 0 auto; padding: 0; font-size: 11px; color: #000; line-height: 1.5; background: #fff; }</style></head><body>
+<div style="text-align:center;padding:12px 24px;border-bottom:3px solid #000;"><h1 style="font-size:19px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">PURCHASE ORDER</h1><p style="font-size:11px;font-weight:600;">#${data.poNumber || ''}</p></div>
+<div style="padding:12px 24px;display:flex;gap:16px;">
+  <div style="flex:1;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;"><div style="background:#e5e7eb;padding:8px 12px;font-weight:700;text-transform:uppercase;font-size:11px;">FROM (Business)</div><div style="padding:10px 12px;"><div style="font-weight:700;font-size:11px;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:4px;">${data.businessName || 'N/A'}</div>${data.businessAddress ? `<div style="font-size:11px;margin:2px 0;">${data.businessAddress}</div>` : ''}${data.businessPhone ? `<div style="font-size:11px;margin:2px 0;">Phone: ${data.businessPhone}</div>` : ''}</div></div>
+  <div style="flex:1;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;"><div style="background:#e5e7eb;padding:8px 12px;font-weight:700;text-transform:uppercase;font-size:11px;">TO (Supplier)</div><div style="padding:10px 12px;"><div style="font-weight:700;font-size:11px;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:4px;">${data.supplierName || 'N/A'}</div>${data.supplierAddress ? `<div style="font-size:11px;margin:2px 0;">${data.supplierAddress}</div>` : ''}${data.supplierPhone ? `<div style="font-size:11px;margin:2px 0;">Phone: ${data.supplierPhone}</div>` : ''}</div></div>
+</div>
+<div style="padding:0 24px 8px;"><table style="width:100%;border-collapse:collapse;font-size:11px;border:1px solid #d1d5db;"><thead><tr style="background:#f9fafb;"><th style="padding:8px;border:1px solid #d1d5db;text-align:center;font-weight:700;">#</th><th style="padding:8px;border:1px solid #d1d5db;text-align:left;font-weight:700;">Description</th><th style="padding:8px;border:1px solid #d1d5db;text-align:center;font-weight:700;">Qty</th><th style="padding:8px;border:1px solid #d1d5db;text-align:center;font-weight:700;">Unit</th><th style="padding:8px;border:1px solid #d1d5db;text-align:right;font-weight:700;">Unit Price</th><th style="padding:8px;border:1px solid #d1d5db;text-align:right;font-weight:700;">Total</th></tr></thead><tbody>${itemsRows}</tbody></table></div>
+<div style="padding:0 24px 8px;text-align:right;font-weight:800;font-size:13px;">TOTAL: ${fmtCurrency(total)}</div>
+${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;text-transform:uppercase;margin-bottom:4px;">Notes</div><div style="background:#f8fafc;padding:10px;border:1px solid #d1d5db;border-radius:4px;white-space:pre-line;">${data.notes}</div></div>` : ''}
+<div style="padding:0 24px 8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+  <div style="border:1px solid #d1d5db;border-radius:4px;padding:10px;text-align:center;"><div style="font-weight:700;text-transform:uppercase;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:8px;">Requested By</div><div style="font-weight:600;">${data.requestedBy || '\u2014'}</div></div>
+  <div style="border:1px solid #d1d5db;border-radius:4px;padding:10px;text-align:center;"><div style="font-weight:700;text-transform:uppercase;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:8px;">Approved By</div><div style="font-weight:600;">${data.approvedBy || '\u2014'}</div></div>
+  <div style="border:1px solid #d1d5db;border-radius:4px;padding:10px;text-align:center;"><div style="font-weight:700;text-transform:uppercase;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:8px;">Date</div><div style="font-weight:600;">${data.authorizationDate ? new Date(data.authorizationDate).toLocaleDateString() : '\u2014'}</div></div>
+</div>
+<script>window.onload = function() { window.print(); }</script>
+</body></html>`;
+
+                  const printWindow = window.open('', '_blank');
                   if (printWindow) {
-                    printWindow.document.write(`
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Purchase Order</title>
-                        <style>
-                          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-                          .po-container { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; }
-                          .text-center { text-align: center; }
-                          .border-b-2 { border-bottom: 2px solid #000; }
-                          .pb-2 { padding-bottom: 0.5rem; }
-                          .font-bold { font-weight: bold; }
-                          .text-2xl { font-size: 1.5rem; }
-                          .text-sm { font-size: 0.875rem; }
-                          .mb-1 { margin-bottom: 0.25rem; }
-                          .mb-2 { margin-bottom: 0.5rem; }
-                          .mt-4 { margin-top: 1rem; }
-                          .mt-8 { margin-top: 2rem; }
-                          .pt-4 { padding-top: 1rem; }
-                          .border-t { border-top: 1px solid #ccc; }
-                          .grid { display: grid; }
-                          .gap-8 { gap: 2rem; }
-                          .gap-4 { gap: 1rem; }
-                          .grid-cols-1 { grid-template-columns: 1fr; }
-                          .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-                          .grid-cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-                          .border { border: 1px solid #e5e7eb; }
-                          .p-3 { padding: 0.75rem; }
-                          .rounded { border-radius: 0.25rem; }
-                          .font-medium { font-weight: 500; }
-                        </style>
-                      </head>
-                      <body>
-                        ${purchaseOrderContent}
-                      </body>
-                      </html>
-                    `);
+                    printWindow.document.write(html);
                     printWindow.document.close();
-                    
-                    // Wait a bit for content to render before printing
-                    setTimeout(() => {
-                      printWindow.focus();
-                      printWindow.print();
-                      printWindow.close();
-                    }, 500);
-                  } else {
-                    // Fallback: Alert user to allow popups
-                    alert('Please enable popups for this site to print the purchase order');
                   }
-                  closePurchaseOrderOptionsDialog();
-                }}
-                className="w-full flex items-center justify-start"
-                variant="outline"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print Purchase Order
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  // Download functionality for purchase order
-                  // Generate the purchase order as a PDF
-                  import('html2pdf.js').then((html2pdfModule) => {
-                    const purchaseOrderContent = generateCleanPurchaseOrderHTML();
-                    
-                    // Create a temporary container to hold the purchase order content
-                    const tempContainer = document.createElement('div');
-                    tempContainer.innerHTML = purchaseOrderContent;
-                    tempContainer.style.position = 'absolute';
-                    tempContainer.style.left = '-9999px';
-                    document.body.appendChild(tempContainer);
-                    
-                    // Configure PDF options
-                    const opt = {
-                      margin: 5,
-                      filename: `Purchase_Order_${purchaseOrderData.poNumber}.pdf`,
-                      image: { type: 'jpeg' as const, quality: 0.98 },
-                      html2canvas: { scale: 2, useCORS: true },
-                      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
-                    };
-                    
-                    // Generate PDF
-                    html2pdfModule.default(tempContainer, opt).then(() => {
-                      // Remove temporary container after PDF generation
-                      setTimeout(() => {
-                        document.body.removeChild(tempContainer);
-                      }, 1000);
-                    });
-                  });
-                  closePurchaseOrderOptionsDialog();
-                }}
-                className="w-full flex items-center justify-start"
-                variant="outline"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download Purchase Order
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  // Share functionality for purchase order
-                  try {
-                    // Generate a shareable URL for the purchase order
-                    const shareData = {
-                      title: `Purchase Order ${purchaseOrderData.poNumber}`,
-                      text: `Purchase Order #${purchaseOrderData.poNumber} for supplier ${purchaseOrderData.supplierName}`,
-                      url: window.location.href // In a real app, this would be a specific purchase order URL
-                    };
-                    
-                    // Use the Web Share API if available
-                    if (navigator.share) {
-                      navigator.share(shareData)
-                        .then(() => console.log('Shared successfully'))
-                        .catch((error) => {
-                          console.log('Sharing failed:', error);
-                          // Fallback to copying to clipboard
-                          try {
-                            // Try to copy the URL to clipboard
-                            navigator.clipboard.writeText(shareData.url || window.location.href)
-                              .then(() => {
-                                alert('Purchase order link copied to clipboard! You can now share it with others.');
-                              })
-                              .catch(err => {
-                                console.error('Failed to copy: ', err);
-                                // If clipboard fails, show the URL to the user
-                                const url = prompt('Copy this link to share the purchase order:', shareData.url || window.location.href);
-                              });
-                          } catch (err) {
-                            console.error('Fallback sharing failed: ', err);
-                            alert('Could not share the purchase order. Please copy the URL manually.');
-                          }
-                        });
-                    } else {
-                      // Fallback to copying to clipboard
-                      try {
-                        // Try to copy the URL to clipboard
-                        navigator.clipboard.writeText(shareData.url || window.location.href)
-                          .then(() => {
-                            alert('Purchase order link copied to clipboard! You can now share it with others.');
-                          })
-                          .catch(err => {
-                            console.error('Failed to copy: ', err);
-                            // If clipboard fails, show the URL to the user
-                            const url = prompt('Copy this link to share the purchase order:', shareData.url || window.location.href);
-                          });
-                      } catch (err) {
-                        console.error('Fallback sharing failed: ', err);
-                        alert('Could not share the purchase order. Please copy the URL manually.');
-                      }
+                }
+                setPoPostSaveDialogOpen(false);
+              }}
+            >
+              <Printer className="h-6 w-6" />
+              <span className="text-sm font-medium">Print</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={() => {
+                if (poSavedData) {
+                  const items = poSavedData.items || [];
+                  const exportData = items.map((item: any, idx: number) => ({
+                    '#': idx + 1,
+                    'Description': item.description || '',
+                    'Qty': item.quantity || 0,
+                    'Unit': item.unit || '',
+                    'Unit Price': item.unitPrice || 0,
+                    'Total': item.total || 0
+                  }));
+                  ExportUtils.exportToPDF(exportData, `PO-${poSavedData.poNumber || poSavedData.id}`, `Purchase Order - ${poSavedData.poNumber || ''}`);
+                }
+                setPoPostSaveDialogOpen(false);
+              }}
+            >
+              <Download className="h-6 w-6" />
+              <span className="text-sm font-medium">Download PDF</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={() => {
+                if (poSavedData) {
+                  const items = poSavedData.items || [];
+                  const exportData = items.map((item: any, idx: number) => ({
+                    '#': idx + 1,
+                    'Description': item.description || '',
+                    'Qty': item.quantity || 0,
+                    'Unit': item.unit || '',
+                    'Unit Price': item.unitPrice || 0,
+                    'Total': item.total || 0
+                  }));
+                  ExportUtils.exportToXLS(exportData, `PO-${poSavedData.poNumber || poSavedData.id}`, 'Purchase Order');
+                }
+                setPoPostSaveDialogOpen(false);
+              }}
+            >
+              <FileSpreadsheet className="h-6 w-6" />
+              <span className="text-sm font-medium">Export XLS</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 py-6"
+              onClick={async () => {
+                if (poSavedData) {
+                  const data = poSavedData;
+                  const items = Array.isArray(data.items) ? data.items : [];
+                  const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+                  const total = data.total || subtotal + (data.tax || 0) + (data.shipping || 0) - (data.discount || 0);
+                  const fmtCurrency = (amount: number) => {
+                    const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
+                    return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  };
+
+                  const lines: string[] = [];
+                  lines.push('═══════════════════════════════════');
+                  lines.push('   PURCHASE ORDER');
+                  lines.push(`   #${data.poNumber || ''}`);
+                  lines.push('═══════════════════════════════════');
+                  lines.push('');
+                  lines.push(`Date: ${data.date ? new Date(data.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}`);
+                  lines.push(`Status: ${(data.status || 'completed').toUpperCase()}`);
+                  lines.push('');
+                  lines.push('─── FROM (Business) ───');
+                  lines.push(`  ${data.businessName || 'N/A'}`);
+                  if (data.businessAddress) lines.push(`  ${data.businessAddress}`);
+                  if (data.businessPhone) lines.push(`  Phone: ${data.businessPhone}`);
+                  if (data.businessEmail) lines.push(`  Email: ${data.businessEmail}`);
+                  lines.push('');
+                  lines.push('─── TO (Supplier) ───');
+                  lines.push(`  ${data.supplierName || 'N/A'}`);
+                  if (data.supplierAddress) lines.push(`  ${data.supplierAddress}`);
+                  if (data.supplierPhone) lines.push(`  Phone: ${data.supplierPhone}`);
+                  if (data.supplierEmail) lines.push(`  Email: ${data.supplierEmail}`);
+                  lines.push('');
+                  if (data.paymentTerms || data.deliveryInstructions) {
+                    lines.push('─── DETAILS ───');
+                    if (data.paymentTerms) lines.push(`  Payment Terms: ${data.paymentTerms}`);
+                    if (data.deliveryInstructions) lines.push(`  Ship Via: ${data.deliveryInstructions}`);
+                    if (data.expectedDelivery) lines.push(`  Required By: ${data.expectedDelivery}`);
+                    lines.push('');
+                  }
+                  lines.push('─── ITEMS ───');
+                  const colHeaders = ['#', 'Description', 'Qty', 'Unit', 'Unit Price', 'Total'];
+                  const colWidths = [4, 22, 6, 7, 16, 16];
+                  const colAligns: ('left' | 'right' | 'center')[] = ['center', 'left', 'right', 'center', 'right', 'right'];
+                  const pad = (str: string, width: number, align: 'left' | 'right' | 'center' = 'left') => {
+                    const s = String(str);
+                    if (align === 'right') return s.padStart(width).slice(-width);
+                    if (align === 'center') {
+                      const padL = Math.floor((width - s.length) / 2);
+                      const padR = width - s.length - padL;
+                      return ' '.repeat(Math.max(0, padL)) + s + ' '.repeat(Math.max(0, padR));
                     }
-                  } catch (error) {
-                    console.error('Error sharing purchase order:', error);
-                    alert('Error sharing purchase order. Please try again.');
-                  }
-                  closePurchaseOrderOptionsDialog();
-                }}
-                className="w-full flex items-center justify-start"
-                variant="outline"
-              >
-                <Share className="h-4 w-4 mr-2" />
-                Share Purchase Order
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  // Export functionality for purchase order
-                  // Allow user to export in different formats
-                  const exportOptions = [
-                    { name: 'PDF', action: () => {
-                        // Placeholder for PDF export
-                        alert('PDF export functionality coming soon');
-                      } 
-                    },
-                    { name: 'CSV', action: () => {
-                        // Placeholder for CSV export
-                        alert('CSV export functionality coming soon');
-                      } 
-                    },
-                    { name: 'JSON', action: () => {
-                        // Placeholder for JSON export
-                        alert('JSON export functionality coming soon');
-                      } 
-                    },
+                    return s.padEnd(width).slice(0, width);
+                  };
+                  const separator = '  +' + colWidths.map(w => '-'.repeat(w + 2)).join('+') + '+';
+                  lines.push(separator);
+                  lines.push('  | ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' | ') + ' |');
+                  lines.push(separator);
+                  items.forEach((item: any, index: number) => {
+                    const num = String(index + 1).padStart(2, '0');
+                    const desc = (item.description || 'Item').length > 20 ? (item.description || 'Item').substring(0, 19) + '\u2026' : (item.description || 'Item');
+                    const row = [
+                      pad(num, colWidths[0], 'center'),
+                      pad(desc, colWidths[1], 'left'),
+                      pad(String(item.quantity || 0), colWidths[2], 'right'),
+                      pad(item.unit || '-', colWidths[3], 'center'),
+                      pad(fmtCurrency(item.unitPrice || 0), colWidths[4], 'right'),
+                      pad(fmtCurrency(item.total || 0), colWidths[5], 'right')
+                    ];
+                    lines.push('  | ' + row.join(' | ') + ' |');
+                  });
+                  lines.push(separator);
+                  const totalsRow = [
+                    pad('', colWidths[0], 'center'),
+                    pad('TOTALS', colWidths[1], 'left'),
+                    pad('', colWidths[2], 'right'),
+                    pad('', colWidths[3], 'center'),
+                    pad('', colWidths[4], 'right'),
+                    pad(fmtCurrency(total), colWidths[5], 'right')
                   ];
-                  
-                  // Show export options to user
-                  const exportChoice = prompt(`Choose export format:
-1. PDF
-2. CSV
-3. JSON
-Enter choice (1-3):`);
-                  
-                  closePurchaseOrderOptionsDialog();
-                }}
-                className="w-full flex items-center justify-start"
-                variant="outline"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Export Purchase Order
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  // Reset functionality for purchase order
-                  resetPurchaseOrderData();
-                  closePurchaseOrderOptionsDialog();
-                  alert('Purchase order form has been reset to default layout');
-                }}
-                className="w-full flex items-center justify-start"
-                variant="outline"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset Form
-              </Button>
-            </div>
-            
-            <div className="mt-4 flex justify-end">
-              <Button 
-                onClick={closePurchaseOrderOptionsDialog}
-                variant="outline"
-              >
-                Cancel
-              </Button>
-            </div>
+                  lines.push('  | ' + totalsRow.join(' | ') + ' |');
+                  lines.push(separator);
+                  lines.push('');
+                  lines.push(`Total Items: ${items.length}`);
+                  lines.push(`Grand Total: ${fmtCurrency(total)}`);
+                  if (data.requestedBy) lines.push(`Requested By: ${data.requestedBy}`);
+                  if (data.approvedBy) lines.push(`Approved By: ${data.approvedBy}`);
+                  lines.push('');
+                  lines.push('═══════════════════════════════════');
+
+                  const messageText = lines.join('\n');
+
+                  setPoPostSaveDialogOpen(false);
+                  await new Promise(resolve => setTimeout(resolve, 300));
+
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({ title: `PO #${data.poNumber || ''}`, text: messageText });
+                      toast({ title: 'Shared', description: 'Purchase Order shared successfully' });
+                      return;
+                    } catch (err: any) {
+                      if (err?.name === 'AbortError') return;
+                    }
+                  }
+
+                  let copied = false;
+                  try {
+                    await navigator.clipboard.writeText(messageText);
+                    copied = true;
+                  } catch {}
+
+                  if (!copied) {
+                    try {
+                      const textarea = document.createElement('textarea');
+                      textarea.value = messageText;
+                      textarea.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;padding:0;border:none;outline:none;boxShadow:none;background:transparent;opacity:0.1;';
+                      document.body.appendChild(textarea);
+                      textarea.focus();
+                      textarea.select();
+                      textarea.setSelectionRange(0, messageText.length);
+                      copied = document.execCommand('copy');
+                      document.body.removeChild(textarea);
+                    } catch {}
+                  }
+
+                  if (copied) {
+                    toast({ title: 'Copied', description: 'Purchase Order details copied to clipboard' });
+                  } else {
+                    setPoShareText(messageText);
+                    setPoShareDialogOpen(true);
+                  }
+                }
+              }}
+            >
+              <Share className="h-6 w-6" />
+              <span className="text-sm font-medium">Share</span>
+            </Button>
           </div>
-        </div>
-      )}
+          <div className="mt-3">
+            <Button variant="ghost" className="w-full text-sm text-muted-foreground" onClick={() => { setPoPostSaveDialogOpen(false); resetPurchaseOrderData(); }}>
+              Close & Reset
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fallback Share Dialog for Purchase Order */}
+      <Dialog open={poShareDialogOpen} onOpenChange={setPoShareDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Share Purchase Order</DialogTitle>
+            <DialogDescription>Automatic copy was not available. Please select all text below and copy it manually (Ctrl+C).</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <textarea
+              readOnly
+              value={poShareText}
+              className="w-full h-64 p-3 text-xs font-mono border rounded-md bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            />
+          </div>
+          <div className="mt-3">
+            <Button variant="ghost" className="w-full text-sm" onClick={() => setPoShareDialogOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* New Supplier Registration Dialog */}
       {showNewSupplierDialog && (
