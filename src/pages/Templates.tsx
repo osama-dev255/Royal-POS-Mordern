@@ -3218,7 +3218,7 @@ No inventory adjustment will be made.`,
     supplierPhone: "(555) 123-4567",
     supplierEmail: "supplier@example.com",
     poNumber: "PO-2024-001",
-    date: "12/3/2025",
+    date: new Date().toISOString().split('T')[0],
     expectedDelivery: "",
     items: [
       { id: "1", description: "", quantity: 1, unit: "EA", unitPrice: 0, total: 0 }
