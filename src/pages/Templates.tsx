@@ -1336,6 +1336,12 @@ No inventory adjustment will be made.`,
   const [poSupplierSearch, setPoSupplierSearch] = useState<string>('');
   const [poShowSupplierDropdown, setPoShowSupplierDropdown] = useState<boolean>(false);
 
+  // PO Product dropdown state
+  const [poSupplierProducts, setPoSupplierProducts] = useState<Product[]>([]);
+  const [poLoadingProducts, setPoLoadingProducts] = useState<boolean>(false);
+  const [poItemProductSearch, setPoItemProductSearch] = useState<Record<string, string>>({});
+  const [poItemShowProductDropdown, setPoItemShowProductDropdown] = useState<Record<string, boolean>>({});
+
   // SPN Product dropdown state
   const [spnSupplierProducts, setSpnSupplierProducts] = useState<Product[]>([]);
   const [spnLoadingProducts, setSpnLoadingProducts] = useState<boolean>(false);
@@ -11535,6 +11541,8 @@ No inventory adjustment will be made.`,
                                     handlePurchaseOrderChange('supplierPhone', '');
                                     handlePurchaseOrderChange('supplierEmail', '');
                                     handlePurchaseOrderChange('supplierAddress', '');
+                                    setPoSupplierProducts([]);
+                                    setPoItemProductSearch({});
                                   }
                                 }}
                                 onFocus={() => {
@@ -11554,6 +11562,8 @@ No inventory adjustment will be made.`,
                                     handlePurchaseOrderChange('supplierPhone', '');
                                     handlePurchaseOrderChange('supplierEmail', '');
                                     handlePurchaseOrderChange('supplierAddress', '');
+                                    setPoSupplierProducts([]);
+                                    setPoItemProductSearch({});
                                   }}
                                   className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-100 p-1 rounded z-10"
                                 >
@@ -11577,6 +11587,14 @@ No inventory adjustment will be made.`,
                                             handlePurchaseOrderChange('supplierEmail', supplier.email || '');
                                             handlePurchaseOrderChange('supplierAddress', supplier.address || '');
                                             setPoShowSupplierDropdown(false);
+                                            // Load supplier's products
+                                            if (supplier.id) {
+                                              setPoLoadingProducts(true);
+                                              getProductsBySupplierId(supplier.id).then(products => {
+                                                setPoSupplierProducts(products);
+                                                setPoLoadingProducts(false);
+                                              });
+                                            }
                                           }}
                                           className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
                                         >
@@ -11667,11 +11685,65 @@ No inventory adjustment will be made.`,
                                       ITM-{String(index + 1).padStart(3, '0')}
                                     </td>
                                     <td className="border border-gray-300 p-2">
-                                      <Input
-                                        value={item.description}
-                                        onChange={(e) => handlePurchaseOrderItemChange(item.id, 'description', e.target.value)}
-                                        className="p-1 h-8 text-sm"
-                                      />
+                                      <div className="relative">
+                                        <Input
+                                          value={poItemProductSearch[item.id] ?? item.description ?? ''}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setPoItemProductSearch(prev => ({ ...prev, [item.id]: val }));
+                                            handlePurchaseOrderItemChange(item.id, 'description', val);
+                                            setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                          }}
+                                          onFocus={() => {
+                                            setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                          }}
+                                          onBlur={() => {
+                                            setTimeout(() => setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: false })), 200);
+                                          }}
+                                          className="p-1 h-8 text-sm"
+                                          placeholder="Search product..."
+                                        />
+                                        {poItemShowProductDropdown[item.id] && (
+                                          <div className="absolute z-50 bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
+                                            {poLoadingProducts ? (
+                                              <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
+                                            ) : poSupplierProducts.length > 0 ? (
+                                              <div>
+                                                {poSupplierProducts
+                                                  .filter(p => {
+                                                    const search = (poItemProductSearch[item.id] || item.description || '').toLowerCase();
+                                                    return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                                                  })
+                                                  .map((product) => (
+                                                    <div
+                                                      key={product.id}
+                                                      onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        handlePurchaseOrderItemChange(item.id, 'description', product.name);
+                                                        handlePurchaseOrderItemChange(item.id, 'unit', product.unit_of_measure || '');
+                                                        setPoItemProductSearch(prev => ({ ...prev, [item.id]: product.name }));
+                                                        setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
+                                                      }}
+                                                      className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                                    >
+                                                      <div className="flex flex-col gap-0.5">
+                                                        <span className="font-semibold text-sm">{product.name}</span>
+                                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                          {product.unit_of_measure && <span>Unit: {product.unit_of_measure}</span>}
+                                                          <span>Cost: {formatCurrency(product.cost_price || 0)}</span>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                              </div>
+                                            ) : (
+                                              <div className="p-3 text-center text-sm text-muted-foreground">
+                                                {purchaseOrderData.supplierName ? 'No products for this supplier' : 'Select a supplier first'}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Input
