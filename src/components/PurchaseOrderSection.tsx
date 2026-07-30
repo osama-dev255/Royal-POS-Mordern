@@ -20,8 +20,8 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
   const [selectedOrder, setSelectedOrder] = useState<SavedPurchaseOrder | null>(null);
   const [printFontSize, setPrintFontSize] = useState(11);
   const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+    start: '2020-01-01',
+    end: '2099-12-31'
   });
 
   useEffect(() => {
@@ -29,6 +29,7 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
       try {
         setLoading(true);
         const savedOrders = await getSavedPurchaseOrders();
+        console.log('[PO Load] Loaded orders:', savedOrders.length, savedOrders.map((o: any) => ({ id: o.id, poNumber: o.poNumber, date: o.date })));
         setOrders(savedOrders);
       } catch (error) {
         console.error("Error loading purchase orders:", error);
@@ -47,9 +48,12 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
   }, []);
 
   const isInDateRange = (dateString: string) => {
+    // Handle multiple date formats: ISO (YYYY-MM-DD), US (MM/DD/YYYY), etc.
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return true; // If date can't be parsed, include it
     const startDate = new Date(dateRange.start);
     const endDate = new Date(dateRange.end);
+    endDate.setHours(23, 59, 59, 999); // Include the entire end date
     return date >= startDate && date <= endDate;
   };
 
