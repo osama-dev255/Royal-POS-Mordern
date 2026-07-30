@@ -11728,18 +11728,8 @@ No inventory adjustment will be made.`,
                             <span>{formatCurrency(calculatePurchaseOrderTotals().subtotal)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="font-bold">TAX (8.5%)</span>
-                            <span>{formatCurrency(calculatePurchaseOrderTotals().tax)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="font-bold">SHIPPING</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={purchaseOrderData.shipping}
-                              onChange={(e) => handlePurchaseOrderChange("shipping", parseFloat(e.target.value) || 0)}
-                              className="w-24 inline-block p-1 h-8 text-right text-sm"
-                            />
+                            <span className="font-bold">TOTAL QUANTITY</span>
+                            <span>{purchaseOrderData.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)}</span>
                           </div>
                           <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
                             <span className="font-bold">TOTAL</span>
