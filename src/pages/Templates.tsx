@@ -1332,6 +1332,10 @@ No inventory adjustment will be made.`,
   const [spnNewSupplierForm, setSpnNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
   const [spnSavingNewSupplier, setSpnSavingNewSupplier] = useState<boolean>(false);
 
+  // PO Supplier dropdown state
+  const [poSupplierSearch, setPoSupplierSearch] = useState<string>('');
+  const [poShowSupplierDropdown, setPoShowSupplierDropdown] = useState<boolean>(false);
+
   // SPN Product dropdown state
   const [spnSupplierProducts, setSpnSupplierProducts] = useState<Product[]>([]);
   const [spnLoadingProducts, setSpnLoadingProducts] = useState<boolean>(false);
@@ -11513,15 +11517,104 @@ No inventory adjustment will be made.`,
                             <div className="h-8 mb-4"></div>
                             
                             <div className="font-bold mb-1">TO (Supplier):</div>
-                            <Input
-                              value={purchaseOrderData.supplierName}
-                              onChange={(e) => handlePurchaseOrderChange("supplierName", e.target.value)}
-                              className="text-sm mb-1 p-1 h-8"
-                            />
+                            {/* Supplier Searchable Dropdown */}
+                            <div className="relative mb-1">
+                              <Input
+                                placeholder="Search supplier..."
+                                value={poSupplierSearch || purchaseOrderData.supplierName}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setPoSupplierSearch(value);
+                                  const filtered = registeredSuppliers.filter(s =>
+                                    s.name.toLowerCase().includes(value.toLowerCase()) ||
+                                    (s.contact_person && s.contact_person.toLowerCase().includes(value.toLowerCase())) ||
+                                    (s.phone && s.phone.includes(value))
+                                  );
+                                  setFilteredSuppliers(filtered);
+                                  setPoShowSupplierDropdown(true);
+                                  if (!value) {
+                                    handlePurchaseOrderChange('supplierName', '');
+                                    handlePurchaseOrderChange('supplierPhone', '');
+                                    handlePurchaseOrderChange('supplierEmail', '');
+                                    handlePurchaseOrderChange('supplierAddress', '');
+                                  }
+                                }}
+                                onFocus={() => {
+                                  setFilteredSuppliers(registeredSuppliers);
+                                  setPoShowSupplierDropdown(true);
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => setPoShowSupplierDropdown(false), 200);
+                                }}
+                                className="text-sm mb-1 p-1 h-8"
+                              />
+                              {purchaseOrderData.supplierName && (
+                                <button
+                                  onClick={() => {
+                                    setPoSupplierSearch('');
+                                    handlePurchaseOrderChange('supplierName', '');
+                                    handlePurchaseOrderChange('supplierPhone', '');
+                                    handlePurchaseOrderChange('supplierEmail', '');
+                                    handlePurchaseOrderChange('supplierAddress', '');
+                                  }}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-100 p-1 rounded z-10"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                </button>
+                              )}
+                              {poShowSupplierDropdown && (
+                                <div className="max-h-48 overflow-auto absolute z-50 bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                  {loadingSuppliers ? (
+                                    <div className="p-3 text-center text-sm text-muted-foreground">Loading suppliers...</div>
+                                  ) : filteredSuppliers.length > 0 ? (
+                                    <div>
+                                      {filteredSuppliers.map((supplier) => (
+                                        <div
+                                          key={supplier.id}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            setPoSupplierSearch(supplier.name);
+                                            handlePurchaseOrderChange('supplierName', supplier.name);
+                                            handlePurchaseOrderChange('supplierPhone', supplier.phone || '');
+                                            handlePurchaseOrderChange('supplierEmail', supplier.email || '');
+                                            handlePurchaseOrderChange('supplierAddress', supplier.address || '');
+                                            setPoShowSupplierDropdown(false);
+                                          }}
+                                          className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                        >
+                                          <div className="flex flex-col gap-0.5 w-full">
+                                            <span className="font-semibold text-sm">{supplier.name}</span>
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                              {supplier.contact_person && <span>Contact: {supplier.contact_person}</span>}
+                                              {supplier.phone && <span>Phone: {supplier.phone}</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="p-3 text-center text-sm text-muted-foreground">No suppliers found</div>
+                                  )}
+                                  <div
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      setPoShowSupplierDropdown(false);
+                                      setSpnShowNewSupplierDialog(true);
+                                      setSpnNewSupplierForm({ name: poSupplierSearch || '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                                    }}
+                                    className="cursor-pointer py-2 px-3 hover:bg-blue-50 border-t bg-blue-100/50 text-blue-800 font-medium text-sm flex items-center gap-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                    Register New Supplier
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                             <Input
                               value={purchaseOrderData.supplierAddress}
                               onChange={(e) => handlePurchaseOrderChange("supplierAddress", e.target.value)}
                               className="text-sm mb-1 p-1 h-8"
+                              placeholder="Supplier Address"
                             />
                             <div className="flex items-center gap-2 text-sm mt-1">
                               <span>Phone:</span>
@@ -18408,6 +18501,12 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                       handleSupplierPurchaseNoteChange('supplierPhone', created.phone || '');
                       handleSupplierPurchaseNoteChange('supplierEmail', created.email || '');
                       handleSupplierPurchaseNoteChange('supplierAddress', created.address || '');
+                      // Auto-fill PO supplier fields
+                      setPoSupplierSearch(created.name);
+                      handlePurchaseOrderChange('supplierName', created.name);
+                      handlePurchaseOrderChange('supplierPhone', created.phone || '');
+                      handlePurchaseOrderChange('supplierEmail', created.email || '');
+                      handlePurchaseOrderChange('supplierAddress', created.address || '');
                       setSpnShowNewSupplierDialog(false);
                       setSpnNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
                       setSpnSupplierProducts([]);
