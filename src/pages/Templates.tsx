@@ -3198,10 +3198,10 @@ No inventory adjustment will be made.`,
   const [settlementToPrint, setSettlementToPrint] = useState<CustomerSettlementData | null>(null);
     
   const [purchaseOrderData, setPurchaseOrderData] = useState<PurchaseOrderData>({
-    businessName: "Your Business Name",
-    businessAddress: "123 Business Street",
-    businessPhone: "(555) 987-6543",
-    businessEmail: "info@yourbusiness.com",
+    businessName: "Kilango Group Ltd",
+    businessAddress: "64, Muheza - Tanga",
+    businessPhone: "(+255) 711 299 266",
+    businessEmail: "kilangogroup1@gmail.com",
     numberOfSuppliers: 1,
     supplierName: "Supplier Company Name",
     supplierAddress: "123 Supplier Street",
