@@ -3102,8 +3102,8 @@ No inventory adjustment will be made.`,
       setEditingPOId(editPOData.id || '');
       // Set supplier search text
       setPoSupplierSearch(data.supplierName || '');
-      // Navigate to PO preview
-      setViewingTemplate('order-form');
+      // Navigate to PO preview (template ID 2)
+      setViewingTemplate('2');
       setSelectedTemplate(null);
       setActiveTab('preview');
       // Clear the edit data
