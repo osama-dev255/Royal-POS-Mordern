@@ -11659,8 +11659,6 @@ No inventory adjustment will be made.`,
                                   <th className="border border-gray-300 p-2 text-left">Description</th>
                                   <th className="border border-gray-300 p-2 text-left">Qty</th>
                                   <th className="border border-gray-300 p-2 text-left">Unit</th>
-                                  <th className="border border-gray-300 p-2 text-left">Unit Price</th>
-                                  <th className="border border-gray-300 p-2 text-left">Total</th>
                                   <th className="border border-gray-300 p-2 text-left">Actions</th>
                                 </tr>
                               </thead>
@@ -11696,23 +11694,6 @@ No inventory adjustment will be made.`,
                                         onChange={(e) => handlePurchaseOrderItemChange(item.id, 'unit', e.target.value)}
                                         className="p-1 h-8 text-sm"
                                       />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={item.unitPrice}
-                                        onChange={(e) => {
-                                          const newPrice = parseFloat(e.target.value);
-                                          handlePurchaseOrderItemChange(item.id, 'unitPrice', newPrice);
-                                          // Update total when unit price changes
-                                          handlePurchaseOrderItemChange(item.id, 'total', item.quantity * newPrice);
-                                        }}
-                                        className="p-1 h-8 text-sm"
-                                      />
-                                    </td>
-                                    <td className="border border-gray-300 p-2">
-                                      {formatCurrency(item.total)}
                                     </td>
                                     <td className="border border-gray-300 p-2">
                                       <Button
