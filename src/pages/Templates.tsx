@@ -11737,29 +11737,6 @@ No inventory adjustment will be made.`,
                           </div>
                         </div>
                         
-                        {/* Instructions and Approval */}
-                        <div className="space-y-4">
-                          <div>
-                            <div className="font-bold mb-2">SPECIAL INSTRUCTIONS:</div>
-                            <Textarea
-                              value={purchaseOrderData.notes}
-                              onChange={(e) => handlePurchaseOrderChange("notes", e.target.value)}
-                              className="min-h-[80px] text-sm"
-                              placeholder="Special instructions or requirements..."
-                            />
-                          </div>
-                          
-                          <div>
-                            <div className="font-bold mb-2">APPROVAL:</div>
-                            <Textarea
-                              value={purchaseOrderData.authorizedBySignature}
-                              onChange={(e) => handlePurchaseOrderChange("authorizedBySignature", e.target.value)}
-                              className="min-h-[80px] text-sm"
-                              placeholder="Authorization details..."
-                            />
-                          </div>
-                        </div>
-                        
                         {/* Signatures */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                           <div>
