@@ -11553,33 +11553,6 @@ No inventory adjustment will be made.`,
                               className="text-sm p-1 h-8"
                             />
                           </div>
-                          <div>
-                            <div className="text-sm font-medium">REQUIRED BY</div>
-                            <Input
-                              value={purchaseOrderData.expectedDelivery}
-                              onChange={(e) => handlePurchaseOrderChange("expectedDelivery", e.target.value)}
-                              className="text-sm p-1 h-8"
-                              placeholder="Expected delivery date"
-                            />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">PAYMENT TERMS</div>
-                            <Input
-                              value={purchaseOrderData.paymentTerms}
-                              onChange={(e) => handlePurchaseOrderChange("paymentTerms", e.target.value)}
-                              className="text-sm p-1 h-8"
-                              placeholder="Net 30, etc."
-                            />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">SHIP VIA</div>
-                            <Input
-                              value={purchaseOrderData.deliveryInstructions}
-                              onChange={(e) => handlePurchaseOrderChange("deliveryInstructions", e.target.value)}
-                              className="text-sm p-1 h-8"
-                              placeholder="Shipping method"
-                            />
-                          </div>
                         </div>
                         
                         {/* Items Table */}
