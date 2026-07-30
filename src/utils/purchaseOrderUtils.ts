@@ -85,6 +85,8 @@ export const savePurchaseOrder = async (
   orderData: PurchaseOrderData
 ): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
+    console.log('[PO Save] Starting save...', { poNumber: orderData.poNumber, itemsCount: orderData.items?.length });
+
     const insertData = {
       po_number: orderData.poNumber || generatePoNumber(),
       date: orderData.date || new Date().toISOString().split('T')[0],
@@ -116,6 +118,8 @@ export const savePurchaseOrder = async (
       updated_at: new Date().toISOString()
     };
 
+    console.log('[PO Save] Insert data:', insertData);
+
     const { data, error } = await supabase
       .from('purchase_orders')
       .insert([insertData])
@@ -123,13 +127,14 @@ export const savePurchaseOrder = async (
       .single();
 
     if (error) {
-      console.error('Error saving purchase order:', error);
+      console.error('[PO Save] Supabase error:', error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, id: data.id };
+    console.log('[PO Save] Success! ID:', data?.id);
+    return { success: true, id: data?.id };
   } catch (err) {
-    console.error('Error saving purchase order:', err);
+    console.error('[PO Save] Exception:', err);
     return { success: false, error: 'Failed to save purchase order' };
   }
 };
