@@ -3215,9 +3215,7 @@ No inventory adjustment will be made.`,
     date: "12/3/2025",
     expectedDelivery: "",
     items: [
-      { id: "1", description: "Office Chairs", quantity: 10, unit: "EA", unitPrice: 89.99, total: 899.90 },
-      { id: "2", description: "Desk Lamps", quantity: 15, unit: "EA", unitPrice: 24.50, total: 367.50 },
-      { id: "3", description: "Filing Cabinets", quantity: 3, unit: "EA", unitPrice: 149.99, total: 449.97 }
+      { id: "1", description: "", quantity: 1, unit: "EA", unitPrice: 0, total: 0 }
     ],
     subtotal: 1717.37,
     tax: 145.98,
