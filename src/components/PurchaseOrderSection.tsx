@@ -28,12 +28,10 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
     const loadOrders = async () => {
       try {
         setLoading(true);
-        console.log('[PO Section] Loading purchase orders from Supabase...');
         const savedOrders = await getSavedPurchaseOrders();
-        console.log('[PO Section] Loaded orders:', savedOrders.length, savedOrders);
         setOrders(savedOrders);
       } catch (error) {
-        console.error('[PO Section] Error loading purchase orders:', error);
+        console.error("Error loading purchase orders:", error);
       } finally {
         setLoading(false);
       }

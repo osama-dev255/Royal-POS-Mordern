@@ -10778,14 +10778,12 @@ No inventory adjustment will be made.`,
                     <Button 
                       disabled={isSavingDeliveryNote || isSavingGRN || isSavingPO}
                       onClick={async () => {
-                        console.log('[PO Save Button] Clicked. currentTemplate type:', currentTemplate?.type);
                         if (isSavingDeliveryNote || isSavingGRN || isSavingPO) {
                           console.warn('⚠️ Save already in progress...');
                           return;
                         }
                         
                         if (currentTemplate?.type === "order-form") {
-                        console.log('[PO Save Button] Entering PO save branch');
                         // Save purchase order to Supabase
                         setIsSavingPO(true);
                         try {
@@ -10818,7 +10816,6 @@ No inventory adjustment will be made.`,
                             status: 'completed'
                           });
 
-                          console.log('[PO Save Button] Save result:', result);
                           if (result.success) {
                             setPoSavedData({
                               poNumber: purchaseOrderData.poNumber,
