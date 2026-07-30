@@ -11513,16 +11513,6 @@ No inventory adjustment will be made.`,
                             <div className="h-8 mb-4"></div>
                             
                             <div className="font-bold mb-1">TO (Supplier):</div>
-                            <div className="text-sm mb-1">
-                              <span className="font-medium">Number of Suppliers:</span>
-                              <Input 
-                                type="number"
-                                min="1"
-                                value={purchaseOrderData.numberOfSuppliers}
-                                onChange={(e) => handlePurchaseOrderChange("numberOfSuppliers", parseInt(e.target.value) || 1)}
-                                className="w-full p-1 text-sm mt-1"
-                              />
-                            </div>
                             <Input
                               value={purchaseOrderData.supplierName}
                               onChange={(e) => handlePurchaseOrderChange("supplierName", e.target.value)}
