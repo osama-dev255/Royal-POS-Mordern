@@ -105,6 +105,7 @@ export const Index = () => {
   const [loadingAssets, setLoadingAssets] = useState(false);
   const { user, login, logout, isLoading: authLoading } = useAuth();
   const [editingSPNData, setEditingSPNData] = useState<any>(null);
+  const [editingPOData, setEditingPOData] = useState<any>(null);
 
   // Show splash screen for 2 seconds
   useEffect(() => {
@@ -2619,7 +2620,7 @@ export const Index = () => {
 
             case "templates":
               console.log("Rendering Templates");
-              return <Templates onBack={handleBack} editSPNData={editingSPNData} onEditSPNLoaded={() => setEditingSPNData(null)} />;
+              return <Templates onBack={handleBack} editSPNData={editingSPNData} onEditSPNLoaded={() => setEditingSPNData(null)} editPOData={editingPOData} onEditPOLoaded={() => setEditingPOData(null)} />;
             case "saved-grns":
               console.log("Rendering SavedGRNsSection");
               return (
@@ -2677,6 +2678,11 @@ export const Index = () => {
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
+                  onEditOrder={(order) => {
+                    setEditingPOData(order);
+                    setCurrentView("templates");
+                    window.location.hash = '#templates';
+                  }}
                 />
               );
             case "supplier-products":

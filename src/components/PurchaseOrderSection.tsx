@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Download, Printer, Eye, EyeOff, Calendar, Share2, Trash2 } from "lucide-react";
+import { Search, FileText, Download, Printer, Eye, EyeOff, Calendar, Share2, Trash2, Pencil } from "lucide-react";
 import { PurchaseOrderCard } from "./PurchaseOrderCard";
 import { getSavedPurchaseOrders, deletePurchaseOrder, SavedPurchaseOrder } from "@/utils/purchaseOrderUtils";
 import { formatCurrency } from "@/lib/currency";
@@ -11,9 +11,10 @@ interface PurchaseOrderSectionProps {
   onBack: () => void;
   onLogout: () => void;
   username: string;
+  onEditOrder?: (order: SavedPurchaseOrder) => void;
 }
 
-export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrderSectionProps) => {
+export const PurchaseOrderSection = ({ onBack, onLogout, username, onEditOrder }: PurchaseOrderSectionProps) => {
   const [orders, setOrders] = useState<SavedPurchaseOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -293,6 +294,12 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
                 ← Back to Saved Orders
               </Button>
               <div className="flex gap-2 items-center">
+                {onEditOrder && (
+                  <Button onClick={() => onEditOrder(selectedOrder)} size="sm" variant="outline">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs font-medium">Font:</label>
                   <select

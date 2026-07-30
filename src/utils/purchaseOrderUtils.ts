@@ -139,6 +139,63 @@ export const savePurchaseOrder = async (
   }
 };
 
+// Update existing purchase order in database
+export const updatePurchaseOrder = async (
+  id: string,
+  orderData: PurchaseOrderData
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    console.log('[PO Update] Starting update...', { id, poNumber: orderData.poNumber });
+
+    const updateData = {
+      po_number: orderData.poNumber || generatePoNumber(),
+      date: orderData.date || new Date().toISOString().split('T')[0],
+      supplier_name: orderData.supplierName || '',
+      supplier_address: orderData.supplierAddress || '',
+      supplier_phone: orderData.supplierPhone || '',
+      supplier_email: orderData.supplierEmail || '',
+      business_name: orderData.businessName || '',
+      business_address: orderData.businessAddress || '',
+      business_phone: orderData.businessPhone || '',
+      business_email: orderData.businessEmail || '',
+      expected_delivery: orderData.expectedDelivery || null,
+      items: orderData.items || [],
+      subtotal: orderData.subtotal || 0,
+      tax: orderData.tax || 0,
+      discount: orderData.discount || 0,
+      shipping: orderData.shipping || 0,
+      total: orderData.total || 0,
+      payment_terms: orderData.paymentTerms || '',
+      delivery_instructions: orderData.deliveryInstructions || '',
+      notes: orderData.notes || '',
+      requested_by: orderData.requestedBy || '',
+      approved_by: orderData.approvedBy || '',
+      authorization_date: orderData.authorizationDate || null,
+      authorized_by_name: orderData.authorizedByName || '',
+      authorized_by_signature: orderData.authorizedBySignature || '',
+      status: orderData.status || 'draft',
+      outlet_id: orderData.outletId || null,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      console.error('[PO Update] Supabase error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('[PO Update] Success! ID:', id);
+    return { success: true };
+  } catch (err) {
+    console.error('[PO Update] Exception:', err);
+    return { success: false, error: 'Failed to update purchase order' };
+  }
+};
+
 // Get all saved purchase orders
 export const getSavedPurchaseOrders = async (
   outletId?: string

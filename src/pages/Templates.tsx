@@ -66,7 +66,7 @@ import { SavedSalesOrdersSection } from '@/components/SavedSalesOrdersSection';
 import { SavedStockTakesSection } from '@/components/SavedStockTakesSection';
 import { SupplierPurchaseNoteSection } from '@/components/SupplierPurchaseNoteSection';
 import { PurchaseOrderSection } from '@/components/PurchaseOrderSection';
-import { savePurchaseOrder } from '@/utils/purchaseOrderUtils';
+import { savePurchaseOrder, updatePurchaseOrder } from '@/utils/purchaseOrderUtils';
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock, getProductsBySupplierId, linkProductToSupplier } from '@/services/databaseService';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -667,9 +667,11 @@ interface TemplatesProps {
   onBack?: () => void;
   editSPNData?: any;
   onEditSPNLoaded?: () => void;
+  editPOData?: any;
+  onEditPOLoaded?: () => void;
 }
 
-export const Templates = ({ onBack, editSPNData, onEditSPNLoaded }: TemplatesProps) => {
+export const Templates = ({ onBack, editSPNData, onEditSPNLoaded, editPOData, onEditPOLoaded }: TemplatesProps) => {
   const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
@@ -3057,7 +3059,60 @@ No inventory adjustment will be made.`,
     }
   }, [editSPNData]);
 
+  // Load edit data when provided from saved purchase orders
+  useEffect(() => {
+    if (editPOData) {
+      const data = editPOData.data || editPOData;
+      setPurchaseOrderData({
+        businessName: data.businessName || '',
+        businessAddress: data.businessAddress || '',
+        businessPhone: data.businessPhone || '',
+        businessEmail: data.businessEmail || '',
+        numberOfSuppliers: 1,
+        supplierName: data.supplierName || '',
+        supplierAddress: data.supplierAddress || '',
+        supplierPhone: data.supplierPhone || '',
+        supplierEmail: data.supplierEmail || '',
+        poNumber: data.poNumber || editPOData.poNumber || '',
+        date: data.date || '',
+        expectedDelivery: data.expectedDelivery || '',
+        items: Array.isArray(data.items) ? data.items.map((item: any) => ({
+          id: item.id || Date.now().toString() + Math.random(),
+          description: item.description || '',
+          quantity: item.quantity || 0,
+          unit: item.unit || '',
+          unitPrice: item.unitPrice || 0,
+          total: item.total || 0
+        })) : [{ id: "1", description: "", quantity: 1, unit: "EA", unitPrice: 0, total: 0 }],
+        subtotal: data.subtotal || 0,
+        tax: data.tax || 0,
+        discount: data.discount || 0,
+        shipping: data.shipping || 0,
+        total: data.total || 0,
+        paymentTerms: data.paymentTerms || '',
+        deliveryInstructions: data.deliveryInstructions || '',
+        notes: data.notes || '',
+        authorizedByName: data.authorizedByName || '',
+        authorizedBySignature: data.authorizedBySignature || '',
+        authorizationDate: data.authorizationDate || '',
+        requestedBy: data.requestedBy || '',
+        approvedBy: data.approvedBy || ''
+      });
+      // Store the order ID for update
+      setEditingPOId(editPOData.id || '');
+      // Set supplier search text
+      setPoSupplierSearch(data.supplierName || '');
+      // Navigate to PO preview
+      setViewingTemplate('order-form');
+      setSelectedTemplate(null);
+      setActiveTab('preview');
+      // Clear the edit data
+      onEditPOLoaded?.();
+    }
+  }, [editPOData]);
+
   const [editingSPNId, setEditingSPNId] = useState<string>('');
+  const [editingPOId, setEditingPOId] = useState<string>('');
     const [spnPostSaveDialogOpen, setSpnPostSaveDialogOpen] = useState(false);
     const [spnSavedData, setSpnSavedData] = useState<any>(null);
     const [spnShareText, setSpnShareText] = useState<string>('');
@@ -10792,10 +10847,10 @@ No inventory adjustment will be made.`,
                         }
                         
                         if (currentTemplate?.type === "order-form") {
-                        // Save purchase order to Supabase
+                        // Save or update purchase order to Supabase
                         setIsSavingPO(true);
                         try {
-                          const result = await savePurchaseOrder({
+                          const poData = {
                             poNumber: purchaseOrderData.poNumber,
                             date: purchaseOrderData.date,
                             supplierName: purchaseOrderData.supplierName,
@@ -10821,8 +10876,15 @@ No inventory adjustment will be made.`,
                             authorizationDate: purchaseOrderData.authorizationDate,
                             authorizedByName: purchaseOrderData.authorizedByName,
                             authorizedBySignature: purchaseOrderData.authorizedBySignature,
-                            status: 'completed'
-                          });
+                            status: 'completed' as const
+                          };
+
+                          let result: { success: boolean; id?: string; error?: string };
+                          if (editingPOId) {
+                            result = await updatePurchaseOrder(editingPOId, poData);
+                          } else {
+                            result = await savePurchaseOrder(poData);
+                          }
 
                           if (result.success) {
                             setPoSavedData({
@@ -10851,7 +10913,8 @@ No inventory adjustment will be made.`,
                               authorizationDate: purchaseOrderData.authorizationDate,
                               status: 'completed'
                             });
-                            toast({ title: 'Success', description: `Purchase Order ${purchaseOrderData.poNumber} saved successfully` });
+                            toast({ title: 'Success', description: `Purchase Order ${purchaseOrderData.poNumber} ${editingPOId ? 'updated' : 'saved'} successfully` });
+                            setEditingPOId(''); // Clear editing state after save
                             setPoPostSaveDialogOpen(true);
                           } else {
                             toast({ title: 'Error', description: `Failed to save: ${result.error}`, variant: 'destructive' });
