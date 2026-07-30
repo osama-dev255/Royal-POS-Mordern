@@ -18035,11 +18035,13 @@ Enter choice (1-3):`);
                     </tr>
                   `).join('');
 
+                  const printTimestamp = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
                   const html = `<!DOCTYPE html>
 <html><head><title>Purchase Order - ${data.poNumber || ''}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>@media print { @page { margin: 0.2in; size: A4; } body { margin: 0; padding: 0; } } * { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 850px; margin: 0 auto; padding: 0; font-size: 11px; color: #000; line-height: 1.5; background: #fff; }</style></head><body>
-<div style="text-align:center;padding:12px 24px;border-bottom:3px solid #000;"><h1 style="font-size:19px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">PURCHASE ORDER</h1><p style="font-size:11px;font-weight:600;">#${data.poNumber || ''}</p></div>
+<div style="text-align:center;padding:12px 24px;border-bottom:3px solid #000;"><h1 style="font-size:19px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">PURCHASE ORDER</h1><p style="font-size:11px;font-weight:600;">#${data.poNumber || ''}</p><p style="font-size:9px;color:#666;margin-top:4px;">Printed: ${printTimestamp}</p></div>
 <div style="padding:12px 24px;display:flex;gap:16px;">
   <div style="flex:1;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;"><div style="background:#e5e7eb;padding:8px 12px;font-weight:700;text-transform:uppercase;font-size:11px;">FROM (Business)</div><div style="padding:10px 12px;"><div style="font-weight:700;font-size:11px;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:4px;">${data.businessName || 'N/A'}</div>${data.businessAddress ? `<div style="font-size:11px;margin:2px 0;">${data.businessAddress}</div>` : ''}${data.businessPhone ? `<div style="font-size:11px;margin:2px 0;">Phone: ${data.businessPhone}</div>` : ''}</div></div>
   <div style="flex:1;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;"><div style="background:#e5e7eb;padding:8px 12px;font-weight:700;text-transform:uppercase;font-size:11px;">TO (Supplier)</div><div style="padding:10px 12px;"><div style="font-weight:700;font-size:11px;border-bottom:2px solid #e2e8f0;padding-bottom:4px;margin-bottom:4px;">${data.supplierName || 'N/A'}</div>${data.supplierAddress ? `<div style="font-size:11px;margin:2px 0;">${data.supplierAddress}</div>` : ''}${data.supplierPhone ? `<div style="font-size:11px;margin:2px 0;">Phone: ${data.supplierPhone}</div>` : ''}</div></div>

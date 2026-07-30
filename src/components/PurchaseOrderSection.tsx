@@ -99,6 +99,7 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
     `).join('');
 
     const totalQty = items.reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+    const printTimestamp = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     const html = `<!DOCTYPE html>
 <html><head><title>Purchase Order - ${data.poNumber || ''}</title>
@@ -112,6 +113,7 @@ export const PurchaseOrderSection = ({ onBack, onLogout, username }: PurchaseOrd
     <h1 style="font-size:${printFontSize + 8}px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">PURCHASE ORDER</h1>
     <p style="font-size:${printFontSize}px;font-weight:600;">#${data.poNumber || ''}</p>
     <p style="font-size:${printFontSize - 2}px;font-weight:700;text-transform:uppercase;border:1px solid #000;display:inline-block;padding:2px 8px;margin-top:4px;">Original Copy</p>
+    <p style="font-size:9px;color:#666;margin-top:4px;">Printed: ${printTimestamp}</p>
   </div>
   <div style="background:#f8fafc;padding:8px 24px;display:flex;justify-content:space-between;border-bottom:2px solid #e2e8f0;font-size:${printFontSize}px;">
     <div><span style="font-weight:600;text-transform:uppercase;font-size:${printFontSize - 2}px;">Date:</span> <strong>${new Date(data.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></div>
