@@ -11571,7 +11571,7 @@ No inventory adjustment will be made.`,
                                 </button>
                               )}
                               {poShowSupplierDropdown && (
-                                <div className="max-h-48 overflow-auto absolute z-50 bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                <div className="max-h-48 overflow-auto absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
                                   {loadingSuppliers ? (
                                     <div className="p-3 text-center text-sm text-muted-foreground">Loading suppliers...</div>
                                   ) : filteredSuppliers.length > 0 ? (
@@ -11667,7 +11667,7 @@ No inventory adjustment will be made.`,
                         {/* Items Table */}
                         <div>
                           <div className="font-bold mb-2">ITEMS ORDERED:</div>
-                          <div className="overflow-x-auto">
+                          <div className="overflow-visible">
                             <table className="w-full border-collapse border border-gray-300 text-sm">
                               <thead>
                                 <tr className="bg-gray-100">
@@ -11704,7 +11704,7 @@ No inventory adjustment will be made.`,
                                           placeholder="Search product..."
                                         />
                                         {poItemShowProductDropdown[item.id] && (
-                                          <div className="absolute z-50 bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
+                                          <div className="absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
                                             {poLoadingProducts ? (
                                               <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
                                             ) : poSupplierProducts.length > 0 ? (
@@ -15541,7 +15541,7 @@ No inventory adjustment will be made.`,
                                 </button>
                               )}
                               {spnShowSupplierDropdown && (
-                                <div className="max-h-48 overflow-auto absolute z-50 bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                <div className="max-h-48 overflow-auto absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
                                   {loadingSuppliers ? (
                                     <div className="p-3 text-center text-sm text-muted-foreground">Loading suppliers...</div>
                                   ) : filteredSuppliers.length > 0 ? (
@@ -15644,7 +15644,7 @@ No inventory adjustment will be made.`,
                         {/* Items Table */}
                         <div>
                           <h3 className="font-bold mb-2">ITEMS PURCHASED</h3>
-                          <div className="overflow-x-auto">
+                          <div className="overflow-visible">
                             <table className="w-full text-sm border-collapse">
                               <thead>
                                 <tr className="border-b-2 border-indigo-300 bg-indigo-50">
@@ -15680,7 +15680,7 @@ No inventory adjustment will be made.`,
                                           placeholder="Search product or type description..."
                                         />
                                         {spnItemShowProductDropdown[item.id] && (
-                                          <div className="absolute z-50 bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
+                                          <div className="absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
                                             {spnLoadingProducts ? (
                                               <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
                                             ) : spnSupplierProducts.length > 0 ? (
