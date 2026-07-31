@@ -109,7 +109,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       // Build formatted text message in Swahili
       const lines: string[] = [];
       lines.push('═══════════════════════════════════');
-      lines.push('   NOTI YA UNUNUZI WA MSAMBAILI');
+      lines.push('   NOTI YA UNUNUZI');
       lines.push(`   #${data.purchaseNoteNumber}`);
       lines.push('═══════════════════════════════════');
       lines.push('');
@@ -136,89 +136,33 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         if (data.receiptIssued) lines.push(`    Risiti Imetolewa: ${data.receiptIssued}`);
       }
       lines.push('');
-      lines.push('─── BIDHAARI ───');
-      // Build items table with dynamic columns
-      const colHeaders: string[] = ['#', 'Maelezo', 'Idadi', 'Kipimo', 'Bei Gharama'];
-      const colWidths: number[] = [4, 22, 6, 7, 16];
-      const colAligns: ('left' | 'right' | 'center')[] = ['center', 'left', 'right', 'center', 'right'];
-      if (showSellingPrice) {
-        colHeaders.push('Bei Kuuz');
-        colWidths.push(16);
-        colAligns.push('right');
-      }
-      colHeaders.push('Jumla');
-      colWidths.push(16);
-      colAligns.push('right');
-      if (showProjectedProfit) {
-        colHeaders.push('Faida Itarajiwa');
-        colWidths.push(16);
-        colAligns.push('right');
-      }
-      const pad = (str: string, width: number, align: 'left' | 'right' | 'center' = 'left') => {
-        const s = String(str);
-        if (align === 'right') return s.padStart(width).slice(-width);
-        if (align === 'center') {
-          const padL = Math.floor((width - s.length) / 2);
-          const padR = width - s.length - padL;
-          return ' '.repeat(Math.max(0, padL)) + s + ' '.repeat(Math.max(0, padR));
-        }
-        return s.padEnd(width).slice(0, width);
-      };
-      const hLine = '─';
-      const vLine = '│';
-      const cross = '┼';
-      const topLine = '┌' + colWidths.map(w => hLine.repeat(w + 2)).join('┬') + '┐';
-      const headerSep = '├' + colWidths.map(w => hLine.repeat(w + 2)).join(cross) + '┤';
-      const bottomLine = '└' + colWidths.map(w => hLine.repeat(w + 2)).join('┴') + '┘';
-      lines.push('  ' + topLine);
-      lines.push('  ' + vLine + ' ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' ' + vLine + ' ') + ' ' + vLine);
-      lines.push('  ' + headerSep);
+      lines.push('─── BIDHAA ───');
+      // Build items as comma-separated lines
+      const headers = ['#', 'Maelezo', 'Idadi', 'Kipimo', 'Bei Gharama'];
+      if (showSellingPrice) headers.push('Bei Kuuz');
+      headers.push('Jumla');
+      if (showProjectedProfit) headers.push('Faida Itarajiwa');
+      lines.push('  ' + headers.join(', '));
       items.forEach((item: any, index: number) => {
         const num = String(index + 1).padStart(2, '0');
-        const desc = (item.description || 'Item').length > 20 ? (item.description || 'Item').substring(0, 19) + '…' : (item.description || 'Item');
-        const row: string[] = [
-          pad(num, colWidths[0], 'center'),
-          pad(desc, colWidths[1], 'left'),
-          pad(String(item.quantity || 0), colWidths[2], 'right'),
-          pad(item.unit || '-', colWidths[3], 'center'),
-          pad(fmtCurrency(item.unitPrice || 0), colWidths[4], 'right')
-        ];
-        let colIdx = 5;
-        if (showSellingPrice) {
-          row.push(pad(fmtCurrency(item.sellingPrice || 0), colWidths[colIdx], 'right'));
-          colIdx++;
-        }
-        row.push(pad(fmtCurrency(item.total || 0), colWidths[colIdx], 'right'));
-        colIdx++;
+        const desc = item.description || 'Item';
+        const row: string[] = [num, desc, String(item.quantity || 0), item.unit || '-', fmtCurrency(item.unitPrice || 0)];
+        if (showSellingPrice) row.push(fmtCurrency(item.sellingPrice || 0));
+        row.push(fmtCurrency(item.total || 0));
         if (showProjectedProfit) {
           const profit = (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0));
-          row.push(pad(fmtCurrency(profit), colWidths[colIdx], 'right'));
+          row.push(fmtCurrency(profit));
         }
-        lines.push('  ' + vLine + ' ' + row.join(' ' + vLine + ' ') + ' ' + vLine);
+        lines.push('  ' + row.join(', '));
       });
-      lines.push('  ' + headerSep);
-      // Totals row
+      // Totals
       const totalQty = items.reduce((s: number, i: any) => s + (i.quantity || 0), 0);
       const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0);
-      const totalsRow: string[] = [
-        pad('', colWidths[0], 'center'),
-        pad('JUMLA', colWidths[1], 'left'),
-        pad(String(totalQty), colWidths[2], 'right'),
-        pad('', colWidths[3], 'center'),
-        pad('', colWidths[4], 'right')
-      ];
-      let tColIdx = 5;
-      if (showSellingPrice) {
-        totalsRow.push(pad('', colWidths[tColIdx], 'right'));
-        tColIdx++;
-      }
-      totalsRow.push(pad(fmtCurrency(total), colWidths[tColIdx], 'right'));
-      tColIdx++;
-      if (showProjectedProfit) {
-        totalsRow.push(pad(fmtCurrency(totalProjectedProfit), colWidths[tColIdx], 'right'));
-      }
-      lines.push('  ' + vLine + ' ' + totalsRow.join(' ' + vLine + ' ') + ' ' + vLine);
-      lines.push('  ' + bottomLine);
+      const totalsLine: string[] = ['', 'JUMLA', String(totalQty), '', ''];
+      if (showSellingPrice) totalsLine.push('');
+      totalsLine.push(fmtCurrency(total));
+      if (showProjectedProfit) totalsLine.push(fmtCurrency(totalProjectedProfit));
+      lines.push('  ' + totalsLine.join(', '));
       lines.push('');
       lines.push('─── MUHTASARI WA MALIPO ───');
       lines.push(`  Jumla Ndogo:  ${fmtCurrency(subtotal)}`);
