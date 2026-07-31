@@ -106,51 +106,51 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       };
 
-      // Build formatted text message
+      // Build formatted text message in Swahili
       const lines: string[] = [];
       lines.push('═══════════════════════════════════');
-      lines.push('   SUPPLIER PURCHASE NOTE');
+      lines.push('   NOTI YA UNUNUZI WA MSAMBAILI');
       lines.push(`   #${data.purchaseNoteNumber}`);
       lines.push('═══════════════════════════════════');
       lines.push('');
-      lines.push(`Date: ${new Date(data.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`);
-      lines.push(`Status: ${(data.status || 'completed').toUpperCase()}`);
+      lines.push(`Tarehe: ${new Date(data.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`);
+      lines.push(`Hali: ${(data.status || 'completed').toUpperCase()}`);
       lines.push('');
-      lines.push('─── FROM (Supplier) ───');
+      lines.push('─── KUTOKA (Msambaili) ───');
       lines.push(`  ${data.supplierName || 'N/A'}`);
       if (data.supplierStreetAddress) lines.push(`  ${data.supplierStreetAddress}`);
       if (data.supplierAddress) lines.push(`  ${data.supplierAddress}`);
       if (data.supplierTaxId) lines.push(`  TIN: ${data.supplierTaxId}`);
-      if (data.supplierPhone) lines.push(`  Phone: ${data.supplierPhone}`);
-      if (data.supplierEmail) lines.push(`  Email: ${data.supplierEmail}`);
+      if (data.supplierPhone) lines.push(`  Simu: ${data.supplierPhone}`);
+      if (data.supplierEmail) lines.push(`  Barua Pepe: ${data.supplierEmail}`);
       lines.push('');
-      lines.push('─── TO (Business) ───');
+      lines.push('─── KWENDA (Biashara) ───');
       lines.push(`  ${data.businessName || 'N/A'}`);
       if (data.businessAddress) lines.push(`  ${data.businessAddress}`);
       if (data.businessTin) lines.push(`  TIN: ${data.businessTin}`);
-      if (data.businessPhone) lines.push(`  Phone: ${data.businessPhone}`);
-      if (data.businessEmail) lines.push(`  Email: ${data.businessEmail}`);
+      if (data.businessPhone) lines.push(`  Simu: ${data.businessPhone}`);
+      if (data.businessEmail) lines.push(`  Barua Pepe: ${data.businessEmail}`);
       if (data.stockType || data.receiptIssued) {
-        lines.push('  Compliance:');
-        if (data.stockType) lines.push(`    Stock Type: ${data.stockType}`);
-        if (data.receiptIssued) lines.push(`    Receipt Issued: ${data.receiptIssued}`);
+        lines.push('  Uzingatiafu:');
+        if (data.stockType) lines.push(`    Aina ya Bidhaa: ${data.stockType}`);
+        if (data.receiptIssued) lines.push(`    Risiti Imetolewa: ${data.receiptIssued}`);
       }
       lines.push('');
-      lines.push('─── ITEMS ───');
+      lines.push('─── BIDHAARI ───');
       // Build items table with dynamic columns
-      const colHeaders: string[] = ['#', 'Description', 'Qty', 'Unit', 'Cost Price'];
+      const colHeaders: string[] = ['#', 'Maelezo', 'Idadi', 'Kipimo', 'Bei Gharama'];
       const colWidths: number[] = [4, 22, 6, 7, 16];
       const colAligns: ('left' | 'right' | 'center')[] = ['center', 'left', 'right', 'center', 'right'];
       if (showSellingPrice) {
-        colHeaders.push('Selling Price');
+        colHeaders.push('Bei Kuuz');
         colWidths.push(16);
         colAligns.push('right');
       }
-      colHeaders.push('Total');
+      colHeaders.push('Jumla');
       colWidths.push(16);
       colAligns.push('right');
       if (showProjectedProfit) {
-        colHeaders.push('Proj. Profit');
+        colHeaders.push('Faida Itarajiwa');
         colWidths.push(16);
         colAligns.push('right');
       }
@@ -197,7 +197,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0);
       const totalsRow: string[] = [
         pad('', colWidths[0], 'center'),
-        pad('TOTALS', colWidths[1], 'left'),
+        pad('JUMLA', colWidths[1], 'left'),
         pad(String(totalQty), colWidths[2], 'right'),
         pad('', colWidths[3], 'center'),
         pad('', colWidths[4], 'right')
@@ -215,34 +215,34 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       lines.push('  | ' + totalsRow.join(' | ') + ' |');
       lines.push(separator);
       lines.push('');
-      lines.push('─── PAYMENT SUMMARY ───');
-      lines.push(`  Subtotal:  ${fmtCurrency(subtotal)}`);
-      lines.push(`  TOTAL:     ${fmtCurrency(total)}`);
+      lines.push('─── MUHTASARI WA MALIPO ───');
+      lines.push(`  Jumla Ndogo:  ${fmtCurrency(subtotal)}`);
+      lines.push(`  JUMLA:     ${fmtCurrency(total)}`);
       if (showProjectedProfit) {
-        lines.push(`  Projected Profit: ${fmtCurrency(totalProjectedProfit)}`);
+        lines.push(`  Faida Inayotarajiwa: ${fmtCurrency(totalProjectedProfit)}`);
       }
       if (data.destination) {
-        lines.push(`  Destination: ${data.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+        lines.push(`  Mahali: ${data.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
       }
       if (data.modeOfPayment) {
-        lines.push(`  Mode of Payment: ${data.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+        lines.push(`  Njia ya Malipo: ${data.modeOfPayment.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
       }
       if (data.paymentBreakdown && data.paymentBreakdown.length > 0) {
-        lines.push('  Payment Breakdown:');
+        lines.push('  Mgawanyo wa Malipo:');
         data.paymentBreakdown.filter((p: any) => p.method && p.amount > 0).forEach((p: any) => {
           lines.push(`    - ${p.method.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}: ${fmtCurrency(p.amount)}`);
         });
         const totalPaid = data.paymentBreakdown.reduce((s: number, p: any) => s + (p.amount || 0), 0);
-        lines.push(`  Total Amount: ${fmtCurrency(totalPaid)}`);
+        lines.push(`  Kiasi Chote: ${fmtCurrency(totalPaid)}`);
       }
       lines.push('');
-      lines.push('─── AUTHORIZATION ───');
-      lines.push(`  Prepared By: ${data.preparedBy || '—'}${data.preparedDate ? ` (${new Date(data.preparedDate).toLocaleDateString()})` : ''}`);
-      lines.push(`  Delivered By: ${data.deliveredBy || '—'}${data.deliveredDate ? ` (${new Date(data.deliveredDate).toLocaleDateString()})` : ''}`);
-      lines.push(`  Approved By: ${data.approvedBy || '—'}${data.approvedDate ? ` (${new Date(data.approvedDate).toLocaleDateString()})` : ''}`);
+      lines.push('─── IDHINI ───');
+      lines.push(`  Imetayarishwa Na: ${data.preparedBy || '—'}${data.preparedDate ? ` (${new Date(data.preparedDate).toLocaleDateString()})` : ''}`);
+      lines.push(`  Imewasilishwa Na: ${data.deliveredBy || '—'}${data.deliveredDate ? ` (${new Date(data.deliveredDate).toLocaleDateString()})` : ''}`);
+      lines.push(`  Imeidhinishwa Na: ${data.approvedBy || '—'}${data.approvedDate ? ` (${new Date(data.approvedDate).toLocaleDateString()})` : ''}`);
       if (data.notes) {
         lines.push('');
-        lines.push('─── NOTES ───');
+        lines.push('─── MAANDIKI ───');
         lines.push(`  ${data.notes}`);
       }
       lines.push('');
@@ -252,22 +252,22 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       const messageText = lines.join('\n');
 
       const shareData: { title: string; text: string } = {
-        title: `Supplier Purchase Note #${data.purchaseNoteNumber}`,
+        title: `Noti ya Ununuzi #${data.purchaseNoteNumber}`,
         text: messageText
       };
 
       if (navigator.share) {
         try {
           await navigator.share(shareData);
-          toast({ title: "Shared", description: "Supplier Purchase Note shared successfully" });
+          toast({ title: "Imeshirikiwa", description: "Noti ya ununuzi imeshirikiwa kikamilifu" });
         } catch (error: any) {
           if (error.name !== 'AbortError') {
             // Fallback: copy to clipboard
             try {
               await navigator.clipboard.writeText(messageText);
-              toast({ title: "Copied", description: "Note details copied to clipboard" });
+              toast({ title: "Imenakiliwa", description: "Maelezo ya noti yamenakiliwa kwenye clipboard" });
             } catch {
-              toast({ title: "Error", description: "Failed to share the note", variant: "destructive" });
+              toast({ title: "Hitilafu", description: "Imeshindwa kushiriki noti", variant: "destructive" });
             }
           }
         }
@@ -275,14 +275,14 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         // Fallback: copy to clipboard
         try {
           await navigator.clipboard.writeText(messageText);
-          toast({ title: "Copied", description: "Note details copied to clipboard" });
+          toast({ title: "Imenakiliwa", description: "Maelezo ya noti yamenakiliwa kwenye clipboard" });
         } catch {
-          toast({ title: "Info", description: "Sharing not supported on this device" });
+          toast({ title: "Taarifa", description: "Kushiriki hakuna uwezo kwenye kifaa hiki" });
         }
       }
     } catch (error) {
       console.error('Error sharing supplier purchase note:', error);
-      toast({ title: "Error", description: "Failed to share the note. Please try again.", variant: "destructive" });
+      toast({ title: "Hitilafu", description: "Imeshindwa kushiriki noti. Tafadhali jaribu tena.", variant: "destructive" });
     }
   };
 
