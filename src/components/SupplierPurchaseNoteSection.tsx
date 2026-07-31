@@ -164,9 +164,10 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         }
         return s.padEnd(width).slice(0, width);
       };
-      const separator = '  +' + colWidths.map(w => '-'.repeat(w + 2)).join('+') + '+';
+      const totalWidth = colWidths.reduce((a, b) => a + b, 0) + colWidths.length - 1;
+      const separator = '  ' + '─'.repeat(totalWidth);
       lines.push(separator);
-      lines.push('  | ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' | ') + ' |');
+      lines.push('  ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' '));
       lines.push(separator);
       items.forEach((item: any, index: number) => {
         const num = String(index + 1).padStart(2, '0');
@@ -189,7 +190,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
           const profit = (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0));
           row.push(pad(fmtCurrency(profit), colWidths[colIdx], 'right'));
         }
-        lines.push('  | ' + row.join(' | ') + ' |');
+        lines.push('  ' + row.join(' '));
       });
       lines.push(separator);
       // Totals row
@@ -212,7 +213,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       if (showProjectedProfit) {
         totalsRow.push(pad(fmtCurrency(totalProjectedProfit), colWidths[tColIdx], 'right'));
       }
-      lines.push('  | ' + totalsRow.join(' | ') + ' |');
+      lines.push('  ' + totalsRow.join(' '));
       lines.push(separator);
       lines.push('');
       lines.push('─── MUHTASARI WA MALIPO ───');
