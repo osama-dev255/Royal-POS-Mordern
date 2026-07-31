@@ -164,7 +164,7 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'sales-management-report'
     ],
     'staff': [
-      'inventory', 'customers', 'products', 'capital',
+      'inventory', 'customers', 'products', 'capital', 'suppliers',
       'assets', 'templates',
       'saved-deliveries',
       'saved-customer-settlements',

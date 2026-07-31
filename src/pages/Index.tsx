@@ -459,7 +459,7 @@ export const Index = () => {
         setCurrentView("purchase");
         break;
       case "suppliers":
-        setCurrentView("comprehensive");
+        setCurrentView("suppliers");
         break;
       case "purchase-orders":
         setCurrentView("purchase");
