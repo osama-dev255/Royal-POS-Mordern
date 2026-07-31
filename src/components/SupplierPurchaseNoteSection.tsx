@@ -164,11 +164,15 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         }
         return s.padEnd(width).slice(0, width);
       };
-      const totalWidth = colWidths.reduce((a, b) => a + b, 0) + colWidths.length - 1;
-      const separator = '  ' + '─'.repeat(totalWidth);
-      lines.push(separator);
-      lines.push('  ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' '));
-      lines.push(separator);
+      const hLine = '─';
+      const vLine = '│';
+      const cross = '┼';
+      const topLine = '┌' + colWidths.map(w => hLine.repeat(w + 2)).join('┬') + '┐';
+      const headerSep = '├' + colWidths.map(w => hLine.repeat(w + 2)).join(cross) + '┤';
+      const bottomLine = '└' + colWidths.map(w => hLine.repeat(w + 2)).join('┴') + '┘';
+      lines.push('  ' + topLine);
+      lines.push('  ' + vLine + ' ' + colHeaders.map((h, i) => pad(h, colWidths[i], colAligns[i])).join(' ' + vLine + ' ') + ' ' + vLine);
+      lines.push('  ' + headerSep);
       items.forEach((item: any, index: number) => {
         const num = String(index + 1).padStart(2, '0');
         const desc = (item.description || 'Item').length > 20 ? (item.description || 'Item').substring(0, 19) + '…' : (item.description || 'Item');
@@ -190,9 +194,9 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
           const profit = (item.quantity || 0) * ((item.sellingPrice || 0) - (item.unitPrice || 0));
           row.push(pad(fmtCurrency(profit), colWidths[colIdx], 'right'));
         }
-        lines.push('  ' + row.join(' '));
+        lines.push('  ' + vLine + ' ' + row.join(' ' + vLine + ' ') + ' ' + vLine);
       });
-      lines.push(separator);
+      lines.push('  ' + headerSep);
       // Totals row
       const totalQty = items.reduce((s: number, i: any) => s + (i.quantity || 0), 0);
       const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0);
@@ -213,8 +217,8 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       if (showProjectedProfit) {
         totalsRow.push(pad(fmtCurrency(totalProjectedProfit), colWidths[tColIdx], 'right'));
       }
-      lines.push('  ' + totalsRow.join(' '));
-      lines.push(separator);
+      lines.push('  ' + vLine + ' ' + totalsRow.join(' ' + vLine + ' ') + ' ' + vLine);
+      lines.push('  ' + bottomLine);
       lines.push('');
       lines.push('─── MUHTASARI WA MALIPO ───');
       lines.push(`  Jumla Ndogo:  ${fmtCurrency(subtotal)}`);
