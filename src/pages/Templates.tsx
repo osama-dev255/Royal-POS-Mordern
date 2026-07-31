@@ -669,9 +669,11 @@ interface TemplatesProps {
   onEditSPNLoaded?: () => void;
   editPOData?: any;
   onEditPOLoaded?: () => void;
+  editGRNData?: any;
+  onEditGRNLoaded?: () => void;
 }
 
-export const Templates = ({ onBack, editSPNData, onEditSPNLoaded, editPOData, onEditPOLoaded }: TemplatesProps) => {
+export const Templates = ({ onBack, editSPNData, onEditSPNLoaded, editPOData, onEditPOLoaded, editGRNData, onEditGRNLoaded }: TemplatesProps) => {
   const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
@@ -3110,6 +3112,38 @@ No inventory adjustment will be made.`,
       onEditPOLoaded?.();
     }
   }, [editPOData]);
+
+  // Load edit data when provided from saved GRNs (external navigation)
+  useEffect(() => {
+    if (editGRNData) {
+      const data = editGRNData.data || editGRNData;
+      setGrnData({
+        ...data,
+        numberOfSuppliers: data.numberOfSuppliers || 1,
+        suppliers: data.suppliers || [{
+          id: "supplier-1",
+          name: data.supplierName || "",
+          supplierId: data.supplierId || "",
+          phone: data.supplierPhone || "",
+          email: data.supplierEmail || "",
+          address: data.supplierAddress || "",
+          tinNumber: data.supplierTinNumber || "",
+          businessTin: data.businessTin || "",
+          stockType: data.businessStockType || ""
+        }],
+        businessStockType: data.businessStockType || "",
+        isVatable: data.isVatable ?? false,
+        supplierTinNumber: data.supplierTinNumber || "",
+        receivingCosts: data.receivingCosts || [],
+        status: data.status || "completed"
+      });
+      setEditingGRNId(editGRNData.id || '');
+      setViewingTemplate('14');
+      setSelectedTemplate(null);
+      setActiveTab('preview');
+      onEditGRNLoaded?.();
+    }
+  }, [editGRNData]);
 
   const [editingSPNId, setEditingSPNId] = useState<string>('');
   const [editingPOId, setEditingPOId] = useState<string>('');
@@ -10661,6 +10695,7 @@ No inventory adjustment will be made.`,
                       receivingCosts: grn.data.receivingCosts || [],
                       status: grn.data.status || "completed"
                     });
+                    setEditingGRNId(grn.id || '');
                     setViewingTemplate('14');
                     setActiveTab('preview');
                   }}

@@ -106,6 +106,7 @@ export const Index = () => {
   const { user, login, logout, isLoading: authLoading } = useAuth();
   const [editingSPNData, setEditingSPNData] = useState<any>(null);
   const [editingPOData, setEditingPOData] = useState<any>(null);
+  const [editingGRNData, setEditingGRNData] = useState<any>(null);
 
   // Show splash screen for 2 seconds
   useEffect(() => {
@@ -2620,7 +2621,7 @@ export const Index = () => {
 
             case "templates":
               console.log("Rendering Templates");
-              return <Templates onBack={handleBack} editSPNData={editingSPNData} onEditSPNLoaded={() => setEditingSPNData(null)} editPOData={editingPOData} onEditPOLoaded={() => setEditingPOData(null)} />;
+              return <Templates onBack={handleBack} editSPNData={editingSPNData} onEditSPNLoaded={() => setEditingSPNData(null)} editPOData={editingPOData} onEditPOLoaded={() => setEditingPOData(null)} editGRNData={editingGRNData} onEditGRNLoaded={() => setEditingGRNData(null)} />;
             case "saved-grns":
               console.log("Rendering SavedGRNsSection");
               return (
@@ -2628,6 +2629,11 @@ export const Index = () => {
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
+                  onEditGRN={(grn) => {
+                    setEditingGRNData(grn);
+                    setCurrentView("templates");
+                    window.location.hash = '#templates';
+                  }}
                 />
               );
             case "grn-inventory-dashboard":
