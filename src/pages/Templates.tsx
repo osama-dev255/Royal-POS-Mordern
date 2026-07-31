@@ -15639,7 +15639,7 @@ No inventory adjustment will be made.`,
                                             handleSupplierPurchaseNoteChange('supplierPhone', supplier.phone || '');
                                             handleSupplierPurchaseNoteChange('supplierEmail', supplier.email || '');
                                             handleSupplierPurchaseNoteChange('supplierAddress', supplier.address || '');
-                                            handleSupplierPurchaseNoteChange('supplierStreetAddress', supplier.address || '');
+                                            handleSupplierPurchaseNoteChange('supplierStreetAddress', '');
                                             handleSupplierPurchaseNoteChange('supplierTaxId', supplier.tax_id || '');
                                             setSpnShowSupplierDropdown(false);
                                             // Load supplier's products
