@@ -2,12 +2,19 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Package, Download, Printer, Eye, Pencil } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, Package, Download, Printer, Eye, Pencil, Calendar, FileSpreadsheet, Share2, ChevronDown, FileText, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SavedGRNsCard } from "./SavedGRNsCard";
 import { getSavedGRNs, deleteGRN, SavedGRN as SavedGRNType } from "@/utils/grnUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
+import { ExcelUtils } from "@/utils/excelUtils";
 import { formatCurrency } from "@/lib/currency";
+import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface SavedGRNsSectionProps {
   onBack: () => void;
@@ -21,6 +28,11 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedGRN, setSelectedGRN] = useState<SavedGRNType | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "history">("list");
+  const [historyDateRange, setHistoryDateRange] = useState({ start: '2020-01-01', end: '2099-12-31' });
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("all");
+  const { toast } = useToast();
 
   // Function to distribute receiving costs among items based on quantity
   const distributeReceivingCosts = (items: any[], receivingCosts: Array<{ description: string; amount: number }>) => {
@@ -110,6 +122,186 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
 
   const handleDownloadGRN = (grn: SavedGRNType) => {
     ExportUtils.exportGRNDetailsAsPDF(grn, `GRN-${grn.data.grnNumber || grn.id}`);
+  };
+
+  // History filtered GRNs
+  const historyFilteredGRNs = grns.filter(grn => {
+    let matchesSearch = true;
+    if (historySearch) {
+      const term = historySearch.toLowerCase();
+      matchesSearch = grn.data.grnNumber.toLowerCase().includes(term) ||
+        grn.data.supplierName.toLowerCase().includes(term) ||
+        grn.data.poNumber.toLowerCase().includes(term);
+    }
+    let matchesStatus = true;
+    if (historyStatus !== "all") {
+      matchesStatus = (grn.data.status || "completed") === historyStatus;
+    }
+    let matchesDate = true;
+    if (historyDateRange.start || historyDateRange.end) {
+      const gDate = new Date(grn.data.date);
+      if (historyDateRange.start && gDate < new Date(historyDateRange.start)) matchesDate = false;
+      if (historyDateRange.end && gDate > new Date(historyDateRange.end + 'T23:59:59')) matchesDate = false;
+    }
+    return matchesSearch && matchesStatus && matchesDate;
+  });
+
+  const getGRNTotal = (grn: SavedGRNType) => {
+    return grn.total || grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || item.total || 0), 0);
+  };
+
+  // History export handlers
+  const handleHistoryPrint = () => {
+    if (historyFilteredGRNs.length === 0) {
+      toast({ title: "No Data", description: "No GRNs to print", variant: "destructive" });
+      return;
+    }
+    const totalAmount = historyFilteredGRNs.reduce((sum, grn) => sum + getGRNTotal(grn), 0);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html><html><head><title>GRN History Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { font-size: 18px; margin-bottom: 4px; }
+          .subtitle { color: #666; font-size: 12px; margin-bottom: 16px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th { background: #f5f5f5; border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-weight: bold; }
+          td { border: 1px solid #ddd; padding: 5px 8px; }
+          .summary { margin-top: 16px; font-size: 13px; }
+          .summary span { font-weight: bold; }
+          @media print { body { margin: 0; } }
+        </style></head><body>
+        <h1>GRN History Report</h1>
+        <div class="subtitle">Generated: ${new Date().toLocaleString()}</div>
+        <table>
+          <thead><tr>
+            <th>GRN #</th><th>Date</th><th>Supplier</th><th>Phone</th><th>Email</th><th>TIN</th><th>PO #</th><th>Delivery Note #</th><th>Status</th><th>Total EXCL.</th>
+          </tr></thead>
+          <tbody>
+            ${historyFilteredGRNs.map(grn => `<tr>
+              <td>${grn.data.grnNumber}</td>
+              <td>${grn.data.date}</td>
+              <td>${grn.data.supplierName}</td>
+              <td>${grn.data.supplierPhone || '-'}</td>
+              <td>${grn.data.supplierEmail || '-'}</td>
+              <td>${grn.data.supplierTinNumber || grn.data.businessTin || '-'}</td>
+              <td>${grn.data.poNumber || '-'}</td>
+              <td>${grn.data.deliveryNoteNumber || '-'}</td>
+              <td>${grn.data.status || 'completed'}</td>
+              <td style="text-align:right">${formatCurrency(getGRNTotal(grn))}</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr>
+            <td colspan="9" style="text-align:right;font-weight:bold">TOTAL:</td>
+            <td style="text-align:right;font-weight:bold">${formatCurrency(totalAmount)}</td>
+          </tr></tfoot>
+        </table>
+        <div class="summary">
+          <div>Total GRNs: <span>${historyFilteredGRNs.length}</span></div>
+          <div>Total Amount: <span>${formatCurrency(totalAmount)}</span></div>
+        </div>
+        </body></html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+    toast({ title: "Print", description: "Print dialog opened" });
+  };
+
+  const handleHistoryPDF = () => {
+    if (historyFilteredGRNs.length === 0) {
+      toast({ title: "No Data", description: "No GRNs to export", variant: "destructive" });
+      return;
+    }
+    const totalAmount = historyFilteredGRNs.reduce((sum, grn) => sum + getGRNTotal(grn), 0);
+    const data = historyFilteredGRNs.map(grn => ({
+      'GRN #': grn.data.grnNumber,
+      'Date': grn.data.date,
+      'Supplier': grn.data.supplierName,
+      'Phone': grn.data.supplierPhone || '-',
+      'Email': grn.data.supplierEmail || '-',
+      'TIN': grn.data.supplierTinNumber || grn.data.businessTin || '-',
+      'PO #': grn.data.poNumber || '-',
+      'Delivery Note #': grn.data.deliveryNoteNumber || '-',
+      'Status': grn.data.status || 'completed',
+      'Total EXCL.': formatCurrency(getGRNTotal(grn))
+    }));
+    data.push({ 'GRN #': '', 'Date': '', 'Supplier': '', 'Phone': '', 'Email': '', 'TIN': '', 'PO #': '', 'Delivery Note #': '', 'Status': 'TOTAL' as any, 'Total EXCL.': formatCurrency(totalAmount) });
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text('GRN History Report', 14, 20);
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    autoTable(doc, {
+      startY: 34,
+      head: [Object.keys(data[0])],
+      body: data.map(row => Object.values(row)),
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [50, 50, 50] },
+      alternateRowStyles: { fillColor: [245, 245, 245] }
+    });
+    doc.save(`GRN_History_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast({ title: "Downloaded", description: `PDF: GRN_History_${new Date().toISOString().split('T')[0]}.pdf` });
+  };
+
+  const handleHistoryXLS = () => {
+    if (historyFilteredGRNs.length === 0) {
+      toast({ title: "No Data", description: "No GRNs to export", variant: "destructive" });
+      return;
+    }
+    const data = historyFilteredGRNs.map(grn => ({
+      'GRN #': grn.data.grnNumber,
+      'Date': grn.data.date,
+      'Supplier': grn.data.supplierName,
+      'Phone': grn.data.supplierPhone || '-',
+      'Email': grn.data.supplierEmail || '-',
+      'TIN': grn.data.supplierTinNumber || grn.data.businessTin || '-',
+      'PO #': grn.data.poNumber || '-',
+      'Delivery Note #': grn.data.deliveryNoteNumber || '-',
+      'Status': grn.data.status || 'completed',
+      'Total EXCL.': getGRNTotal(grn)
+    }));
+    const filename = `GRN_History_${new Date().toISOString().split('T')[0]}`;
+    ExcelUtils.exportToExcel(data, filename);
+    toast({ title: "Exported", description: `XLS: ${filename}.xlsx` });
+  };
+
+  const handleHistoryShare = async () => {
+    if (historyFilteredGRNs.length === 0) {
+      toast({ title: "No Data", description: "No GRNs to share", variant: "destructive" });
+      return;
+    }
+    const totalAmount = historyFilteredGRNs.reduce((sum, grn) => sum + getGRNTotal(grn), 0);
+    const lines: string[] = [];
+    lines.push('═══════════════════════════════════');
+    lines.push('   RIPOTI YA GRN');
+    lines.push(`   Tarehe: ${new Date().toLocaleDateString()}`);
+    lines.push('═══════════════════════════════════');
+    lines.push('');
+    lines.push('#, GRN #, Tarehe, Msambaili, Simu, TIN, PO #, Delivery Note #, Hali, Jumla');
+    lines.push('───────────────────────────────────');
+    historyFilteredGRNs.forEach((grn, i) => {
+      lines.push(`${String(i + 1).padStart(2, '0')}, ${grn.data.grnNumber}, ${grn.data.date}, ${grn.data.supplierName}, ${grn.data.supplierPhone || '-'}, ${grn.data.supplierTinNumber || grn.data.businessTin || '-'}, ${grn.data.poNumber || '-'}, ${grn.data.deliveryNoteNumber || '-'}, ${grn.data.status || 'completed'}, ${formatCurrency(getGRNTotal(grn))}`);
+    });
+    lines.push('───────────────────────────────────');
+    lines.push(`JUMLA: ${formatCurrency(totalAmount)} (${historyFilteredGRNs.length} GRN)`);
+    lines.push('');
+    lines.push(`${grns[0]?.data.businessName || ''}`);
+    const shareText = lines.join('\n');
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Ripoti ya GRN', text: shareText });
+        toast({ title: "Imeshirikiwa", description: "Ripoti ya GRN imeshirikiwa" });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          try { await navigator.clipboard.writeText(shareText); toast({ title: "Imenakiliwa", description: "Ripoti yamenakiliwa kwenye clipboard" }); } catch { toast({ title: "Hitilafu", description: "Imeshindwa kushiriki", variant: "destructive" }); }
+        }
+      }
+    } else {
+      try { await navigator.clipboard.writeText(shareText); toast({ title: "Imenakiliwa", description: "Ripoti yamenakiliwa kwenye clipboard" }); } catch { toast({ title: "Taarifa", description: "Kushiriki hakuna uwezo kwenye kifaa hiki" }); }
+    }
   };
 
   return (
@@ -277,7 +469,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                     View and manage your saved Goods Received Notes from completed transactions
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -287,11 +479,139 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
+                  <Button variant="outline" size="sm" onClick={() => setViewMode(viewMode === "list" ? "history" : "list")}>
+                    {viewMode === "list" ? <FileText className="h-4 w-4 mr-2" /> : <Package className="h-4 w-4 mr-2" />}
+                    {viewMode === "list" ? "History View" : "Card View"}
+                  </Button>
                 </div>
               </div>
             </div>
 
-            {loading ? (
+            {viewMode === "history" ? (
+              <>
+                {/* Filters Bar */}
+                <div className="flex flex-wrap gap-3 items-center mb-6">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Input type="date" value={historyDateRange.start} onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))} className="w-40" />
+                  </div>
+                  <span className="text-muted-foreground">to</span>
+                  <div className="flex items-center gap-2">
+                    <Input type="date" value={historyDateRange.end} onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))} className="w-40" />
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search GRN #, supplier, PO..." className="pl-8 w-56" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} />
+                  </div>
+                  <Select value={historyStatus} onValueChange={setHistoryStatus}>
+                    <SelectTrigger className="w-32"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 gap-2">
+                        <span>Actions</span>
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={handleHistoryPrint}><Printer className="h-4 w-4 mr-2" />Print Report</DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleHistoryPDF}><Download className="h-4 w-4 mr-2" />Download PDF</DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleHistoryXLS}><FileSpreadsheet className="h-4 w-4 mr-2" />Export XLS</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleHistoryShare}><Share2 className="h-4 w-4 mr-2" />Share</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total GRNs</CardTitle>
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent><div className="text-2xl font-bold">{historyFilteredGRNs.length}</div></CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total EXCL. Amount</CardTitle>
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent><div className="text-2xl font-bold">{formatCurrency(historyFilteredGRNs.reduce((s, g) => s + getGRNTotal(g), 0))}</div></CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Suppliers</CardTitle>
+                      <Search className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent><div className="text-2xl font-bold">{new Set(historyFilteredGRNs.map(g => g.data.supplierName)).size}</div></CardContent>
+                  </Card>
+                </div>
+
+                {/* History Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />GRN History</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : historyFilteredGRNs.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">No GRNs found</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-2 font-medium">GRN #</th>
+                              <th className="text-left p-2 font-medium">Date</th>
+                              <th className="text-left p-2 font-medium">Supplier Name</th>
+                              <th className="text-left p-2 font-medium">Phone</th>
+                              <th className="text-left p-2 font-medium">Email</th>
+                              <th className="text-left p-2 font-medium">TIN</th>
+                              <th className="text-left p-2 font-medium">PO #</th>
+                              <th className="text-left p-2 font-medium">Delivery Note #</th>
+                              <th className="text-left p-2 font-medium">Status</th>
+                              <th className="text-right p-2 font-medium">Total EXCL.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historyFilteredGRNs.map((grn) => (
+                              <tr key={grn.id} className="border-b hover:bg-muted/30">
+                                <td className="p-2 font-medium">{grn.data.grnNumber}</td>
+                                <td className="p-2">{grn.data.date}</td>
+                                <td className="p-2">{grn.data.supplierName}</td>
+                                <td className="p-2">{grn.data.supplierPhone || '-'}</td>
+                                <td className="p-2">{grn.data.supplierEmail || '-'}</td>
+                                <td className="p-2">{grn.data.supplierTinNumber || grn.data.businessTin || '-'}</td>
+                                <td className="p-2">{grn.data.poNumber || '-'}</td>
+                                <td className="p-2">{grn.data.deliveryNoteNumber || '-'}</td>
+                                <td className="p-2">
+                                  <Badge variant={grn.data.status === "completed" ? "default" : grn.data.status === "cancelled" ? "destructive" : "secondary"}>
+                                    {grn.data.status || "completed"}
+                                  </Badge>
+                                </td>
+                                <td className="p-2 text-right font-medium">{formatCurrency(getGRNTotal(grn))}</td>
+                              </tr>
+                            ))}
+                            <tr className="bg-muted/50 font-bold">
+                              <td colSpan={9} className="p-2 text-right">TOTAL:</td>
+                              <td className="p-2 text-right">{formatCurrency(historyFilteredGRNs.reduce((s, g) => s + getGRNTotal(g), 0))}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : loading ? (
               <div className="flex justify-center items-center h-64">
                 <p>Loading saved Goods Received Notes...</p>
               </div>

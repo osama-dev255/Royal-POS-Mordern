@@ -52,6 +52,10 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState({
+    start: '2020-01-01',
+    end: '2099-12-31'
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [newSettlement, setNewSettlement] = useState<Omit<Settlement, "id">>({
@@ -154,8 +158,16 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       (settlement.poNumber && settlement.poNumber.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === "all" || settlement.status === statusFilter;
+
+    // Date range filter
+    let matchesDate = true;
+    if (dateRange.start || dateRange.end) {
+      const sDate = new Date(settlement.date);
+      if (dateRange.start && sDate < new Date(dateRange.start)) matchesDate = false;
+      if (dateRange.end && sDate > new Date(dateRange.end + 'T23:59:59')) matchesDate = false;
+    }
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   return (
@@ -174,7 +186,25 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
             <p className="text-muted-foreground">Manage supplier payments and settlements</p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                className="w-40"
+              />
+            </div>
+            <span className="text-muted-foreground">to</span>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                className="w-40"
+              />
+            </div>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -407,7 +437,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                   <TableHead>Reference</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Supplier</TableHead>
-                  <TableHead>PO Number</TableHead>
+                  <TableHead>GRN #</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Payment Method</TableHead>
                   <TableHead>Status</TableHead>

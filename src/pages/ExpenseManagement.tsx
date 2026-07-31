@@ -95,6 +95,10 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dateRange, setDateRange] = useState({
+    start: '2020-01-01',
+    end: '2099-12-31'
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [viewExpense, setViewExpense] = useState<Expense | null>(null);
@@ -450,9 +454,16 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
       expense.category.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
-    // Removed status filter since the status field doesn't exist in the database
+
+    // Date range filter
+    let matchesDate = true;
+    if (dateRange.start || dateRange.end) {
+      const expDate = new Date(expense.date);
+      if (dateRange.start && expDate < new Date(dateRange.start)) matchesDate = false;
+      if (dateRange.end && expDate > new Date(dateRange.end + 'T23:59:59')) matchesDate = false;
+    }
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesDate;
   });
 
   // Action button handlers
@@ -761,7 +772,25 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
             <p className="text-muted-foreground">Track and manage business expenses</p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                className="w-40"
+              />
+            </div>
+            <span className="text-muted-foreground">to</span>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                className="w-40"
+              />
+            </div>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
