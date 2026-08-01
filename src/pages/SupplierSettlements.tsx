@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,22 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Truck, Wallet, Calendar, CreditCard } from "lucide-react";
+import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
-
-interface Settlement {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  date: string;
-  amount: number;
-  paymentMethod: string;
-  reference: string;
-  poNumber?: string;
-  notes?: string;
-  status: "completed" | "pending" | "cancelled";
-}
+import {
+  getSupplierLedgerByDateRange,
+  getSupplierLedgerSummary,
+  getUniqueSuppliers,
+  recordSupplierLedgerEntry,
+  type SupplierLedgerEntry,
+  type SupplierLedgerSummary,
+} from "@/utils/supplierLedgerUtils";
 
 const paymentMethods = [
   "Cash",
@@ -34,299 +29,282 @@ const paymentMethods = [
   "Other"
 ];
 
+const transactionTypeLabels: Record<string, string> = {
+  grn_received: "GRN Received",
+  inventory_payment: "Inventory Payment",
+  settlement: "Settlement",
+  adjustment: "Adjustment",
+  refund: "Refund",
+};
+
+const transactionTypeBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  grn_received: "default",
+  inventory_payment: "destructive",
+  settlement: "secondary",
+  adjustment: "outline",
+  refund: "default",
+};
+
 export const SupplierSettlements = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
-  const [settlements, setSettlements] = useState<Settlement[]>([
-    {
-      id: "1",
-      supplierId: "2",
-      supplierName: "Global Home Goods",
-      date: "2023-05-10",
-      amount: 500.00,
-      paymentMethod: "Bank Transfer",
-      reference: "SUP-001",
-      poNumber: "PO-002",
-      notes: "Payment for purchase order",
-      status: "completed"
-    }
-  ]);
-  
+  const [ledgerEntries, setLedgerEntries] = useState<SupplierLedgerEntry[]>([]);
+  const [supplierSummaries, setSupplierSummaries] = useState<SupplierLedgerSummary[]>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [dateRange, setDateRange] = useState({
     start: '2020-01-01',
     end: '2099-12-31'
   });
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
-  const [newSettlement, setNewSettlement] = useState<Omit<Settlement, "id">>({
-    supplierId: "",
-    supplierName: "",
-    date: new Date().toISOString().split('T')[0],
+  const [newEntry, setNewEntry] = useState<{
+    supplier_name: string;
+    supplier_id: string;
+    amount: number;
+    paymentMethod: string;
+    reference_number: string;
+    notes: string;
+    date: string;
+    transaction_type: 'settlement' | 'inventory_payment' | 'adjustment' | 'refund';
+  }>({
+    supplier_name: "",
+    supplier_id: "",
     amount: 0,
     paymentMethod: paymentMethods[0],
-    reference: "",
-    status: "completed"
+    reference_number: "",
+    notes: "",
+    date: new Date().toISOString().split('T')[0],
+    transaction_type: "settlement",
   });
+
   const { toast } = useToast();
 
-  const handleAddSettlement = () => {
-    if (!newSettlement.supplierName || newSettlement.amount <= 0) {
-      toast({
-        title: "Error",
-        description: "Please fill in required fields",
-        variant: "destructive"
-      });
-      return;
+  // ── Data Fetching ──────────────────────────────────────────────────────────
+
+  const fetchLedger = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [entries, summaries, uniqueSuppliers] = await Promise.all([
+        getSupplierLedgerByDateRange(dateRange.start, dateRange.end, supplierFilter !== "all" ? supplierFilter : undefined),
+        getSupplierLedgerSummary(),
+        getUniqueSuppliers(),
+      ]);
+      setLedgerEntries(entries);
+      setSupplierSummaries(summaries);
+      setSuppliers(uniqueSuppliers);
+    } catch (error) {
+      console.error('Error fetching ledger data:', error);
+    } finally {
+      setLoading(false);
     }
+  }, [dateRange.start, dateRange.end, supplierFilter]);
 
-    // Generate reference number if not provided
-    const reference = newSettlement.reference || `SUP-${String(settlements.length + 1).padStart(3, '0')}`;
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger]);
 
-    const settlement: Settlement = {
-      ...newSettlement,
-      id: Date.now().toString(),
-      reference
+  // Listen for supplier ledger updates from other components (GRN save, expense save)
+  useEffect(() => {
+    const handleLedgerUpdate = () => {
+      fetchLedger();
     };
+    window.addEventListener('supplierLedgerUpdated', handleLedgerUpdate);
+    return () => window.removeEventListener('supplierLedgerUpdated', handleLedgerUpdate);
+  }, [fetchLedger]);
 
-    setSettlements([...settlements, settlement]);
-    resetForm();
-    setIsDialogOpen(false);
-    
-    toast({
-      title: "Success",
-      description: "Supplier settlement recorded successfully"
-    });
-  };
+  // ── Filtered Entries ───────────────────────────────────────────────────────
 
-  const handleUpdateSettlement = () => {
-    if (!editingSettlement || !editingSettlement.supplierName || editingSettlement.amount <= 0) {
+  const filteredEntries = ledgerEntries.filter(entry => {
+    const matchesSearch = !searchTerm ||
+      (entry.reference_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (entry.supplier_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesType = typeFilter === "all" || entry.transaction_type === typeFilter;
+
+    return matchesSearch && matchesType;
+  });
+
+  // ── Totals ─────────────────────────────────────────────────────────────────
+
+  const totalCredit = filteredEntries.reduce((sum, e) => sum + (Number(e.credit_amount) || 0), 0);
+  const totalDebit = filteredEntries.reduce((sum, e) => sum + (Number(e.debit_amount) || 0), 0);
+  const outstandingBalance = totalCredit - totalDebit;
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  const handleRecordSettlement = async () => {
+    if (!newEntry.supplier_name || newEntry.amount <= 0) {
       toast({
         title: "Error",
-        description: "Please fill in required fields",
+        description: "Please fill in supplier name and amount",
         variant: "destructive"
       });
       return;
     }
 
-    setSettlements(settlements.map(s => s.id === editingSettlement.id ? editingSettlement : s));
-    resetForm();
-    setIsDialogOpen(false);
-    
-    toast({
-      title: "Success",
-      description: "Supplier settlement updated successfully"
+    const result = await recordSupplierLedgerEntry({
+      supplier_id: newEntry.supplier_id || newEntry.supplier_name,
+      supplier_name: newEntry.supplier_name,
+      transaction_type: newEntry.transaction_type,
+      reference_number: newEntry.reference_number || `STL-${Date.now()}`,
+      debit_amount: newEntry.transaction_type === 'settlement' || newEntry.transaction_type === 'inventory_payment' ? newEntry.amount : 0,
+      credit_amount: newEntry.transaction_type === 'adjustment' || newEntry.transaction_type === 'refund' ? newEntry.amount : 0,
+      transaction_date: new Date(newEntry.date).toISOString(),
+      description: `${transactionTypeLabels[newEntry.transaction_type]} - ${newEntry.supplier_name}`,
+      payment_method: newEntry.paymentMethod,
+      notes: newEntry.notes,
     });
-  };
 
-  const handleDeleteSettlement = (id: string) => {
-    setSettlements(settlements.filter(s => s.id !== id));
-    toast({
-      title: "Success",
-      description: "Supplier settlement deleted successfully"
-    });
+    if (result) {
+      toast({
+        title: "Success",
+        description: "Supplier ledger entry recorded successfully"
+      });
+      resetForm();
+      setIsDialogOpen(false);
+      fetchLedger();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to record ledger entry. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const resetForm = () => {
-    setNewSettlement({
-      supplierId: "",
-      supplierName: "",
-      date: new Date().toISOString().split('T')[0],
+    setNewEntry({
+      supplier_name: "",
+      supplier_id: "",
       amount: 0,
       paymentMethod: paymentMethods[0],
-      reference: "",
-      status: "completed"
+      reference_number: "",
+      notes: "",
+      date: new Date().toISOString().split('T')[0],
+      transaction_type: "settlement",
     });
-    setEditingSettlement(null);
   };
-
-  const openEditDialog = (settlement: Settlement) => {
-    setEditingSettlement(settlement);
-    setIsDialogOpen(true);
-  };
-
-  const openAddDialog = () => {
-    resetForm();
-    setIsDialogOpen(true);
-  };
-
-  const totalSettled = settlements.reduce((sum, settlement) => sum + settlement.amount, 0);
-
-  const filteredSettlements = settlements.filter(settlement => {
-    const matchesSearch = 
-      settlement.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      settlement.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (settlement.poNumber && settlement.poNumber.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = statusFilter === "all" || settlement.status === statusFilter;
-
-    // Date range filter
-    let matchesDate = true;
-    if (dateRange.start || dateRange.end) {
-      const sDate = new Date(settlement.date);
-      if (dateRange.start && sDate < new Date(dateRange.start)) matchesDate = false;
-      if (dateRange.end && sDate > new Date(dateRange.end + 'T23:59:59')) matchesDate = false;
-    }
-    
-    return matchesSearch && matchesStatus && matchesDate;
-  });
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation 
-        title="Supplier Settlements" 
+      <Navigation
+        title="Supplier Settlements"
         onBack={onBack}
-        onLogout={onLogout} 
+        onLogout={onLogout}
         username={username}
       />
-      
+
       <main className="container mx-auto p-6">
+        {/* Header */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-3xl font-bold">Supplier Settlements</h2>
-            <p className="text-muted-foreground">Manage supplier payments and settlements</p>
+            <h2 className="text-3xl font-bold">Supplier Ledger (DR / CR)</h2>
+            <p className="text-muted-foreground">Track supplier payables: GRN received (CR) and inventory payments (DR)</p>
           </div>
-          
+
           <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                className="w-40"
-              />
-            </div>
-            <span className="text-muted-foreground">to</span>
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                className="w-40"
-              />
-            </div>
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search settlements..."
-                className="pl-8 w-full sm:w-64"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Button variant="outline" size="sm" onClick={fetchLedger}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Refresh
+            </Button>
+
+            <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (open) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button onClick={openAddDialog}>
+                <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  New Settlement
+                  Record Entry
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>
-                    {editingSettlement ? "Edit Settlement" : "Record New Settlement"}
-                  </DialogTitle>
+                  <DialogTitle>Record Supplier Ledger Entry</DialogTitle>
                 </DialogHeader>
-                
+
                 <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="transaction_type">Transaction Type *</Label>
+                    <Select
+                      value={newEntry.transaction_type}
+                      onValueChange={(value: any) => setNewEntry({ ...newEntry, transaction_type: value })}
+                    >
+                      <SelectTrigger id="transaction_type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="settlement">Settlement (DR - Pay Supplier)</SelectItem>
+                        <SelectItem value="inventory_payment">Inventory Payment (DR)</SelectItem>
+                        <SelectItem value="adjustment">Adjustment (DR or CR)</SelectItem>
+                        <SelectItem value="refund">Refund (CR)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="supplier_name">Supplier Name *</Label>
+                    <Input
+                      id="supplier_name"
+                      value={newEntry.supplier_name}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        const match = suppliers.find(s => s.name === name);
+                        setNewEntry({ ...newEntry, supplier_name: name, supplier_id: match?.id || name });
+                      }}
+                      placeholder="Type supplier name..."
+                      list="supplier-names"
+                    />
+                    <datalist id="supplier-names">
+                      {suppliers.map(s => <option key={s.id} value={s.name} />)}
+                    </datalist>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="date">Date *</Label>
                       <Input
                         id="date"
                         type="date"
-                        value={editingSettlement ? editingSettlement.date : newSettlement.date}
-                        onChange={(e) => 
-                          editingSettlement 
-                            ? setEditingSettlement({...editingSettlement, date: e.target.value}) 
-                            : setNewSettlement({...newSettlement, date: e.target.value})
-                        }
+                        value={newEntry.date}
+                        onChange={(e) => setNewEntry({ ...newEntry, date: e.target.value })}
                       />
                     </div>
-                    
+
                     <div className="grid gap-2">
                       <Label htmlFor="amount">Amount *</Label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground">TZS</span>
+                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">TZS</span>
                         <Input
                           id="amount"
                           type="number"
                           step="0.01"
                           className="pl-8"
-                          value={editingSettlement ? editingSettlement.amount : newSettlement.amount}
-                          onChange={(e) => 
-                            editingSettlement 
-                              ? setEditingSettlement({...editingSettlement, amount: parseFloat(e.target.value) || 0}) 
-                              : setNewSettlement({...newSettlement, amount: parseFloat(e.target.value) || 0})
-                          }
+                          value={newEntry.amount}
+                          onChange={(e) => setNewEntry({ ...newEntry, amount: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid gap-2">
-                    <Label htmlFor="supplierName">Supplier Name *</Label>
+                    <Label htmlFor="reference_number">Reference Number</Label>
                     <Input
-                      id="supplierName"
-                      value={editingSettlement ? editingSettlement.supplierName : newSettlement.supplierName}
-                      onChange={(e) => 
-                        editingSettlement 
-                          ? setEditingSettlement({...editingSettlement, supplierName: e.target.value}) 
-                          : setNewSettlement({...newSettlement, supplierName: e.target.value})
-                      }
+                      id="reference_number"
+                      value={newEntry.reference_number}
+                      onChange={(e) => setNewEntry({ ...newEntry, reference_number: e.target.value })}
+                      placeholder="e.g. GRN-001, EXP-V001"
                     />
                   </div>
-                  
+
                   <div className="grid gap-2">
-                    <Label htmlFor="poNumber">PO Number</Label>
-                    <Input
-                      id="poNumber"
-                      value={editingSettlement ? editingSettlement.poNumber || "" : newSettlement.poNumber || ""}
-                      onChange={(e) => 
-                        editingSettlement 
-                          ? setEditingSettlement({...editingSettlement, poNumber: e.target.value}) 
-                          : setNewSettlement({...newSettlement, poNumber: e.target.value})
-                      }
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="reference">Reference</Label>
-                    <Input
-                      id="reference"
-                      value={editingSettlement ? editingSettlement.reference : newSettlement.reference}
-                      onChange={(e) => 
-                        editingSettlement 
-                          ? setEditingSettlement({...editingSettlement, reference: e.target.value}) 
-                          : setNewSettlement({...newSettlement, reference: e.target.value})
-                      }
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                    <Label htmlFor="payment_method">Payment Method</Label>
                     <Select
-                      value={editingSettlement ? editingSettlement.paymentMethod : newSettlement.paymentMethod}
-                      onValueChange={(value) => 
-                        editingSettlement 
-                          ? setEditingSettlement({...editingSettlement, paymentMethod: value}) 
-                          : setNewSettlement({...newSettlement, paymentMethod: value})
-                      }
+                      value={newEntry.paymentMethod}
+                      onValueChange={(value) => setNewEntry({ ...newEntry, paymentMethod: value })}
                     >
-                      <SelectTrigger id="paymentMethod">
+                      <SelectTrigger id="payment_method">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -336,164 +314,254 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={editingSettlement ? editingSettlement.status : newSettlement.status}
-                      onValueChange={(value: "completed" | "pending" | "cancelled") => 
-                        editingSettlement 
-                          ? setEditingSettlement({...editingSettlement, status: value}) 
-                          : setNewSettlement({...newSettlement, status: value})
-                      }
-                    >
-                      <SelectTrigger id="status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="notes">Notes</Label>
                     <Input
                       id="notes"
-                      value={editingSettlement ? editingSettlement.notes || "" : newSettlement.notes || ""}
-                      onChange={(e) => 
-                        editingSettlement 
-                          ? setEditingSettlement({...editingSettlement, notes: e.target.value}) 
-                          : setNewSettlement({...newSettlement, notes: e.target.value})
-                      }
+                      value={newEntry.notes}
+                      onChange={(e) => setNewEntry({ ...newEntry, notes: e.target.value })}
+                      placeholder="Optional notes..."
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={editingSettlement ? handleUpdateSettlement : handleAddSettlement}>
-                    {editingSettlement ? "Update" : "Record"} Settlement
+                  <Button onClick={handleRecordSettlement}>
+                    Record Entry
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
         </div>
-        
+
+        {/* Filters Bar */}
+        <Card className="mb-6">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                  className="w-40"
+                />
+              </div>
+              <span className="text-muted-foreground">to</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                  className="w-40"
+                />
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search reference, description..."
+                  className="pl-8 w-full sm:w-64"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Suppliers</SelectItem>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="grn_received">GRN Received</SelectItem>
+                  <SelectItem value="inventory_payment">Inventory Payment</SelectItem>
+                  <SelectItem value="settlement">Settlement</SelectItem>
+                  <SelectItem value="adjustment">Adjustment</SelectItem>
+                  <SelectItem value="refund">Refund</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Payable (CR)</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalSettled)}</div>
-              <p className="text-xs text-muted-foreground">To suppliers</p>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(totalCredit)}</div>
+              <p className="text-xs text-muted-foreground">Goods received from suppliers</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Paid (DR)</CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{settlements.length}</div>
-              <p className="text-xs text-muted-foreground">Settlement records</p>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(totalDebit)}</div>
+              <p className="text-xs text-muted-foreground">Payments to suppliers</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
+              <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {settlements.filter(s => new Date(s.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
+              <div className={`text-2xl font-bold ${outstandingBalance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                {formatCurrency(Math.abs(outstandingBalance))}
               </div>
-              <p className="text-xs text-muted-foreground">In last 7 days</p>
+              <p className="text-xs text-muted-foreground">
+                {outstandingBalance >= 0 ? 'We owe suppliers' : 'Suppliers owe us'}
+              </p>
             </CardContent>
           </Card>
         </div>
-        
+
+        {/* Supplier Summary Breakdown */}
+        {supplierSummaries.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Supplier Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead className="text-right">Total CR (Owed)</TableHead>
+                    <TableHead className="text-right">Total DR (Paid)</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="text-center">Entries</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplierSummaries.map((s, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{s.supplier_name}</TableCell>
+                      <TableCell className="text-right text-green-600 font-medium">{formatCurrency(s.total_credit)}</TableCell>
+                      <TableCell className="text-right text-red-600 font-medium">{formatCurrency(s.total_debit)}</TableCell>
+                      <TableCell className={`text-right font-bold ${s.balance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {formatCurrency(Math.abs(s.balance))}
+                        {s.balance >= 0 ? ' CR' : ' DR'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary">{s.entry_count}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* DR/CR Ledger Table */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Settlement Records
+              <Wallet className="h-5 w-5" />
+              Supplier Ledger Entries
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Reference</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Supplier</TableHead>
-                  <TableHead>GRN #</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Debit (DR)</TableHead>
+                  <TableHead className="text-right">Credit (CR)</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSettlements.length === 0 ? (
+                {loading ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No settlement records found
+                      Loading ledger entries...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredEntries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No ledger entries found. GRN receipts and inventory payments will appear here automatically.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSettlements.map((settlement) => (
-                    <TableRow key={settlement.id}>
-                      <TableCell className="font-medium">{settlement.reference}</TableCell>
-                      <TableCell>{settlement.date}</TableCell>
-                      <TableCell>{settlement.supplierName}</TableCell>
-                      <TableCell>{settlement.poNumber || "N/A"}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(settlement.amount)}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{settlement.paymentMethod}</Badge>
+                  filteredEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {new Date(entry.transaction_date).toLocaleDateString()}
                       </TableCell>
+                      <TableCell className="font-medium">{entry.reference_number || '-'}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={entry.description || ''}>
+                        {entry.description || '-'}
+                      </TableCell>
+                      <TableCell>{entry.supplier_name}</TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={
-                            settlement.status === "completed" ? "default" : 
-                            settlement.status === "pending" ? "secondary" : "destructive"
-                          }
-                        >
-                          {settlement.status}
+                        <Badge variant={transactionTypeBadgeVariant[entry.transaction_type] || "outline"}>
+                          {transactionTypeLabels[entry.transaction_type] || entry.transaction_type}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => openEditDialog(settlement)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => handleDeleteSettlement(settlement.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <TableCell className={`text-right font-medium ${Number(entry.debit_amount) > 0 ? 'text-red-600' : ''}`}>
+                        {Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-'}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${Number(entry.credit_amount) > 0 ? 'text-green-600' : ''}`}>
+                        {Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-'}
+                      </TableCell>
+                      <TableCell className={`text-right font-bold ${Number(entry.running_balance) >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {formatCurrency(Math.abs(Number(entry.running_balance) || 0))}
+                        {Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
+
+              {/* Totals Row */}
+              {filteredEntries.length > 0 && (
+                <tfoot>
+                  <TableRow className="border-t-2 font-bold bg-muted/50">
+                    <TableCell colSpan={5}>TOTALS</TableCell>
+                    <TableCell className="text-right text-red-600">{formatCurrency(totalDebit)}</TableCell>
+                    <TableCell className="text-right text-green-600">{formatCurrency(totalCredit)}</TableCell>
+                    <TableCell className={`text-right ${outstandingBalance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                      {formatCurrency(Math.abs(outstandingBalance))}
+                      {outstandingBalance >= 0 ? ' CR' : ' DR'}
+                    </TableCell>
+                  </TableRow>
+                </tfoot>
+              )}
             </Table>
           </CardContent>
         </Card>

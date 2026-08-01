@@ -191,6 +191,13 @@ export const ExpenseManagement = ({ username, onBack, onLogout }: { username: st
         resetForm();
         setIsDialogOpen(false);
         
+        // Notify supplier ledger to refresh (DB trigger creates DR entry for Inventory expenses)
+        if (expenseData.category === 'Inventory' || expenseData.category === 'Raw Materials') {
+          window.dispatchEvent(new CustomEvent('supplierLedgerUpdated', {
+            detail: { type: 'inventory_payment', vendorName: expenseData.vendor_name, amount: expenseData.amount }
+          }));
+        }
+        
         toast({
           title: "Success",
           description: "Expense added successfully"

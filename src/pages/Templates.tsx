@@ -2386,6 +2386,11 @@ No inventory adjustment will be made.`,
         detail: { grns: updatedGRNs }
       }));
       
+      // Notify supplier ledger to refresh (DB trigger creates CR entry automatically)
+      window.dispatchEvent(new CustomEvent('supplierLedgerUpdated', {
+        detail: { type: 'grn_received', grnNumber: newGRN.data.grnNumber, supplierName: effectiveSupplierName, totalAmount }
+      }));
+      
       // Show GRN options dialog immediately after saving
       showGRNOptionsDialog();
       
