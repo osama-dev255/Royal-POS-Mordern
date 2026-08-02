@@ -82,6 +82,7 @@ interface SavedSale {
   truck?: string;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   approvedBy?: string;
+  approvedByName?: string;
   approvalDate?: string;
   approvalNotes?: string;
   reviewStatus?: 'pending' | 'reviewed' | 'needs_changes';
@@ -944,6 +945,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             truck: debt.truck,
             approvalStatus: debt.approval_status || 'pending',
             approvedBy: debt.approved_by,
+            approvedByName: (debt as any).approved_by_name,
             approvalDate: debt.approval_date,
             approvalNotes: debt.approval_notes,
             reviewStatus: (debt as any).review_status || 'pending',
@@ -1612,6 +1614,15 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     if (!approvingSale) return;
 
     try {
+      if (!approvedByName.trim()) {
+        toast({
+          title: "Approver Required",
+          description: "Please enter the approver's name",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -1627,7 +1638,8 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         approvingSale.id,
         approvalStatus,
         user.id,
-        approvalNotes || undefined
+        approvalNotes || undefined,
+        approvedByName
       );
 
       if (success) {
@@ -1637,6 +1649,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 ...s, 
                 approvalStatus: approvalStatus,
                 approvedBy: user.id,
+                approvedByName: approvedByName,
                 approvalDate: new Date().toISOString(),
                 approvalNotes: approvalNotes || undefined
               }

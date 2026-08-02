@@ -5665,7 +5665,8 @@ export const approveOutletDebt = async (
   id: string, 
   status: 'approved' | 'rejected', 
   approvedBy: string,
-  notes?: string
+  notes?: string,
+  approvedByName?: string
 ): Promise<boolean> => {
   try {
     const { error } = await supabase
@@ -5675,6 +5676,7 @@ export const approveOutletDebt = async (
         approved_by: approvedBy,
         approval_date: new Date().toISOString(),
         approval_notes: notes || null,
+        approved_by_name: approvedByName || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', id);
