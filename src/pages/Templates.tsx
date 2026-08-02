@@ -68,12 +68,13 @@ import { SupplierPurchaseNoteSection } from '@/components/SupplierPurchaseNoteSe
 import { PurchaseOrderSection } from '@/components/PurchaseOrderSection';
 import { savePurchaseOrder, updatePurchaseOrder } from '@/utils/purchaseOrderUtils';
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock, getProductsBySupplierId, linkProductToSupplier } from '@/services/databaseService';
+import { SupplierPaymentVoucherSection } from '@/components/SupplierPaymentVoucherSection';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
   id: string;
   name: string;
-  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note";
+  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note" | "supplier-payment-voucher";
   description: string;
   content: string;
   lastModified: string;
@@ -674,7 +675,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack, editSPNData, onEditSPNLoaded, editPOData, onEditPOLoaded, editGRNData, onEditGRNLoaded }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders" | "savedSupplierPaymentVouchers">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1258,6 +1259,40 @@ Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
 
 This document records a purchase made on behalf of the supplier.
 No inventory adjustment will be made.`,
+      lastModified: new Date().toISOString().split('T')[0],
+      isActive: true
+    },
+    {
+      id: "18",
+      name: "Supplier Payment Voucher",
+      type: "supplier-payment-voucher",
+      description: "Professional template for recording supplier payment collection events",
+      content: `SUPPLIER PAYMENT VOUCHER
+Voucher #[VOUCHER_NUMBER]
+Date: [DATE]
+
+SUPPLIER:
+[SUPPLIER_NAME]
+[SUPPLIER_ADDRESS]
+Phone: [SUPPLIER_PHONE]
+TIN: [SUPPLIER_TIN]
+
+BUSINESS:
+[BUSINESS_NAME]
+[BUSINESS_ADDRESS]
+TIN: [BUSINESS_TIN]
+
+BALANCE SUMMARY:
+Previous Balance: [PREVIOUS_BALANCE]
+Amount Paid: [TOTAL_AMOUNT]
+New Balance: [NEW_BALANCE]
+
+PAYMENT BREAKDOWN:
+[PAYMENT_BREAKDOWN]
+
+Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
+Received By: [RECEIVED_BY]    Date: [RECEIVED_DATE]
+Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       lastModified: new Date().toISOString().split('T')[0],
       isActive: true
     }
@@ -3562,6 +3597,10 @@ No inventory adjustment will be made.`,
 
   const handlePreviewTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
+    if (template?.type === "supplier-payment-voucher") {
+      setActiveTab("savedSupplierPaymentVouchers");
+      return;
+    }
     if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take" || template.type === "supplier-purchase-note")) {
       setSelectedTemplate(null); // Clear any previously selected template
       setViewingTemplate(templateId);
@@ -10450,6 +10489,7 @@ No inventory adjustment will be made.`,
       case "supplier-settlement": return <Truck className="h-5 w-5" />;
       case "sales-order": return <ShoppingCart className="h-5 w-5" />;
       case "stock-take": return <ClipboardCheck className="h-5 w-5" />;
+      case "supplier-payment-voucher": return <CreditCard className="h-5 w-5" />;
       default: return <FileText className="h-5 w-5" />;
     }
   };
@@ -10570,6 +10610,14 @@ No inventory adjustment will be made.`,
                     >
                       <FileText className="h-4 w-4" />
                       Purchase Orders
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedSupplierPaymentVouchers')}
+                      className="flex items-center gap-2"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Payment Vouchers
                     </Button>
                   </div>
                 </div>
@@ -10785,6 +10833,27 @@ No inventory adjustment will be made.`,
                   </Button>
                 </div>
                 <PurchaseOrderSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
+            ) : activeTab === "savedSupplierPaymentVouchers" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Supplier Payment Vouchers</h3>
+                    <p className="text-sm text-muted-foreground">Record supplier payment collection events</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <SupplierPaymentVoucherSection 
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User" 

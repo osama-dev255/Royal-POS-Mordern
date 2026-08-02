@@ -5795,4 +5795,165 @@ export class PrintUtils {
       printWindow.focus();
     }
   }
+
+  // ── Supplier Payment Voucher Print ──────────────────────────────────────────
+
+  static printSupplierPaymentVoucher(voucher: any) {
+    const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const v = voucher;
+
+    const linkedRows = (v.linkedReferences || []).map((r: any) =>
+      `<tr>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;">${(r.type || '').toUpperCase()}</td>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;">${r.number || ''}</td>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;text-align:right;">${fmt(r.amount || 0)}</td>
+      </tr>`
+    ).join('');
+
+    const paymentRows = (v.paymentBreakdown || []).map((p: any) =>
+      `<tr>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;">${p.method || ''}</td>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;text-align:right;">${fmt(p.amount || 0)}</td>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;">${p.reference || '-'}</td>
+      </tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html><head><title>Supplier Payment Voucher - ${v.voucherNumber || ''}</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; }
+  .header { text-align: center; border-bottom: 3px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 16px; }
+  .header h1 { font-size: 18px; letter-spacing: 1px; margin-bottom: 2px; }
+  .header .sub { font-size: 10px; color: #555; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .info-block h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 6px; }
+  .info-block p { font-size: 11px; line-height: 1.6; }
+  .balance-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .balance-box { border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 12px; text-align: center; }
+  .balance-box .label { font-size: 9px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; }
+  .balance-box .value { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .balance-box .value.red { color: #dc2626; }
+  .balance-box .value.green { color: #16a34a; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px; border-left: 3px solid #1a1a1a; padding-left: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  table th { background: #f3f4f6; padding: 6px 8px; border: 1px solid #d1d5db; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; text-align: left; }
+  table td { padding: 6px 8px; border: 1px solid #d1d5db; font-size: 11px; }
+  .notes-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; font-size: 11px; white-space: pre-line; margin-bottom: 16px; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; padding-top: 16px; border-top: 1px solid #d1d5db; }
+  .sig-block .sig-label { font-size: 9px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; }
+  .sig-block .sig-name { font-size: 12px; font-weight: 600; margin-top: 4px; min-height: 30px; border-bottom: 1px solid #999; padding-bottom: 20px; }
+  .sig-block .sig-date { font-size: 10px; color: #6b7280; margin-top: 2px; }
+  .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
+  }
+</style></head><body>
+
+  <div class="header">
+    <h1>SUPPLIER PAYMENT VOUCHER</h1>
+    <div class="sub">${v.voucherNumber || ''} &nbsp;|&nbsp; Date: ${v.date || ''}</div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-block">
+      <h3>Supplier Information</h3>
+      <p><strong>Name:</strong> ${v.supplierName || ''}</p>
+      ${v.supplierPhone ? '<p><strong>Phone:</strong> ' + v.supplierPhone + '</p>' : ''}
+      ${v.supplierEmail ? '<p><strong>Email:</strong> ' + v.supplierEmail + '</p>' : ''}
+      ${v.supplierAddress ? '<p><strong>Address:</strong> ' + v.supplierAddress + '</p>' : ''}
+      ${v.supplierTin ? '<p><strong>TIN:</strong> ' + v.supplierTin + '</p>' : ''}
+    </div>
+    <div class="info-block">
+      <h3>Business Information</h3>
+      <p><strong>Name:</strong> ${v.businessName || ''}</p>
+      ${v.businessAddress ? '<p><strong>Address:</strong> ' + v.businessAddress + '</p>' : ''}
+      ${v.businessPhone ? '<p><strong>Phone:</strong> ' + v.businessPhone + '</p>' : ''}
+      ${v.businessTin ? '<p><strong>TIN:</strong> ' + v.businessTin + '</p>' : ''}
+    </div>
+  </div>
+
+  <div class="balance-row">
+    <div class="balance-box">
+      <div class="label">Previous Balance</div>
+      <div class="value red">${fmt(v.previousBalance || 0)}</div>
+    </div>
+    <div class="balance-box" style="border-color:#16a34a;">
+      <div class="label">Amount Paid</div>
+      <div class="value green">${fmt(v.totalAmount || 0)}</div>
+    </div>
+    <div class="balance-box">
+      <div class="label">New Balance</div>
+      <div class="value ${((v.newBalance || 0) > 0) ? 'red' : 'green'}">${fmt(v.newBalance || 0)}</div>
+    </div>
+  </div>
+
+  <div class="section-title">Payment Breakdown</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:35%;">Method</th>
+        <th style="width:30%;text-align:right;">Amount</th>
+        <th style="width:35%;">Reference</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${paymentRows || '<tr><td colspan="3" style="text-align:center;padding:12px;color:#9ca3af;">No payment breakdown</td></tr>'}
+    </tbody>
+    <tfoot>
+      <tr style="font-weight:700;background:#f3f4f6;">
+        <td style="padding:6px 8px;border:1px solid #d1d5db;">Total</td>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;text-align:right;">${fmt(v.totalAmount || 0)}</td>
+        <td style="padding:6px 8px;border:1px solid #d1d5db;"></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  ${v.linkageMode === 'linked' && (v.linkedReferences || []).length > 0 ? `
+  <div class="section-title">Linked References</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20%;">Type</th>
+        <th style="width:45%;">Reference Number</th>
+        <th style="width:35%;text-align:right;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${linkedRows}</tbody>
+  </table>
+  ` : ''}
+
+  ${v.notes ? '<div class="section-title">Notes</div><div class="notes-box">' + (v.notes || '') + '</div>' : ''}
+
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-label">Prepared By</div>
+      <div class="sig-name">${v.preparedBy || ''}</div>
+      <div class="sig-date">${v.preparedDate || ''}</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Received By</div>
+      <div class="sig-name">${v.receivedBy || ''}</div>
+      <div class="sig-date">${v.receivedDate || ''}</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Approved By</div>
+      <div class="sig-name">${v.approvedBy || ''}</div>
+      <div class="sig-date">${v.approvedDate || ''}</div>
+    </div>
+  </div>
+
+  <div class="footer">Generated on ${new Date().toLocaleDateString()} | ${v.businessName || ''}</div>
+
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+  }
 }
