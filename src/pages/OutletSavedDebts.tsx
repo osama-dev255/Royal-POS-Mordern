@@ -2005,6 +2005,25 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         </>
                       )}
                     </div>
+                    {/* Review & Approval Info */}
+                    {(sale.reviewedBy || sale.approvedByName) && (
+                      <div className="text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        {sale.reviewedBy && (
+                          <span className="text-blue-700">
+                            <ClipboardCheck className="h-3 w-3 inline mr-0.5" />
+                            Reviewed by <span className="font-medium">{sale.reviewedBy}</span>
+                            {sale.reviewDate && <span className="text-muted-foreground"> ({new Date(sale.reviewDate).toLocaleDateString()})</span>}
+                          </span>
+                        )}
+                        {sale.approvedByName && (
+                          <span className={sale.approvalStatus === 'rejected' ? 'text-red-700' : 'text-green-700'}>
+                            <CheckCircle className="h-3 w-3 inline mr-0.5" />
+                            {sale.approvalStatus === 'rejected' ? 'Rejected' : 'Approved'} by <span className="font-medium">{sale.approvedByName}</span>
+                            {sale.approvalDate && <span className="text-muted-foreground"> ({new Date(sale.approvalDate).toLocaleDateString()})</span>}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="md:text-right flex-shrink-0">
                     <p className="text-base md:text-lg font-bold text-red-600 mb-2">{formatCurrency(sale.total)}</p>
