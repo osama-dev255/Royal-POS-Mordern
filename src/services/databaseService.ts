@@ -5633,6 +5633,33 @@ export const deleteOutletDebt = async (id: string): Promise<boolean> => {
   }
 };
 
+// Review an outlet debt (pre-approval step)
+export const reviewOutletDebt = async (
+  id: string,
+  status: 'reviewed' | 'needs_changes',
+  reviewedBy: string,
+  notes?: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('outlet_debts')
+      .update({
+        review_status: status,
+        reviewed_by: reviewedBy,
+        review_date: new Date().toISOString(),
+        review_notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error reviewing outlet debt:', error);
+    return false;
+  }
+};
+
 // Approve or reject an outlet debt
 export const approveOutletDebt = async (
   id: string, 

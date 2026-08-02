@@ -35,10 +35,12 @@ import {
   Share2,
   ChevronDown,
   CheckCircle,
-  XCircle
+  XCircle,
+  ClipboardCheck,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getOutletDebtPaymentsByDebtId, updateOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance, recalculateCustomerLedgerBalance } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, reviewOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getOutletDebtPaymentsByDebtId, updateOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance, recalculateCustomerLedgerBalance } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
@@ -82,6 +84,10 @@ interface SavedSale {
   approvedBy?: string;
   approvalDate?: string;
   approvalNotes?: string;
+  reviewStatus?: 'pending' | 'reviewed' | 'needs_changes';
+  reviewedBy?: string;
+  reviewDate?: string;
+  reviewNotes?: string;
   customerBalance?: number;
 }
 
@@ -107,7 +113,17 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
   
   // Approval status filter
   const [approvalFilter, setApprovalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+  // Review status filter
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'pending' | 'reviewed' | 'needs_changes'>('all');
   
+  // Review dialog
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<'reviewed' | 'needs_changes'>('reviewed');
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [reviewedByName, setReviewedByName] = useState('');
+  const [reviewingSale, setReviewingSale] = useState<SavedSale | null>(null);
+
   // Approval dialog
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
@@ -127,6 +143,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       // Approval status filter
       const saleStatus = sale.approvalStatus || 'pending';
       if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
+      // Review status filter
+      const saleReviewStatus = sale.reviewStatus || 'pending';
+      if (reviewFilter !== 'all' && saleReviewStatus !== reviewFilter) return false;
       
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
@@ -390,6 +410,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       const saleStatus = sale.approvalStatus || 'pending';
       if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
       
+      // Review status filter
+      const saleReviewStatus = sale.reviewStatus || 'pending';
+      if (reviewFilter !== 'all' && saleReviewStatus !== reviewFilter) return false;
+      
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
         if (startDate && saleDate < new Date(startDate)) return false;
@@ -487,6 +511,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       // Approval status filter
       const saleStatus = sale.approvalStatus || 'pending';
       if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
+      // Review status filter
+      const saleReviewStatus = sale.reviewStatus || 'pending';
+      if (reviewFilter !== 'all' && saleReviewStatus !== reviewFilter) return false;
       
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
@@ -682,6 +710,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       // Approval status filter
       const saleStatus = sale.approvalStatus || 'pending';
       if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+      
+      // Review status filter
+      const saleReviewStatus = sale.reviewStatus || 'pending';
+      if (reviewFilter !== 'all' && saleReviewStatus !== reviewFilter) return false;
       
       if (startDate || endDate) {
         const saleDate = new Date(sale.date);
@@ -914,6 +946,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             approvedBy: debt.approved_by,
             approvalDate: debt.approval_date,
             approvalNotes: debt.approval_notes,
+            reviewStatus: (debt as any).review_status || 'pending',
+            reviewedBy: (debt as any).reviewed_by,
+            reviewDate: (debt as any).review_date,
+            reviewNotes: (debt as any).review_notes,
             isEdited: debt.is_edited || false,
             editedAt: debt.updated_at,
             customerBalance: debt.customer_id ? (
@@ -1496,6 +1532,73 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     }
   };
 
+  // Review handlers
+  const handleOpenReviewDialog = (sale: SavedSale) => {
+    setReviewingSale(sale);
+    setReviewStatus('reviewed');
+    setReviewNotes('');
+    setReviewedByName('');
+    setIsReviewDialogOpen(true);
+  };
+
+  const handleReviewSale = async () => {
+    if (!reviewingSale) return;
+
+    try {
+      if (!reviewedByName.trim()) {
+        toast({
+          title: "Reviewer Required",
+          description: "Please enter the reviewer's name",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const success = await reviewOutletDebt(
+        reviewingSale.id,
+        reviewStatus,
+        reviewedByName,
+        reviewNotes || undefined
+      );
+
+      if (success) {
+        const updatedSales = sales.map(s => 
+          s.id === reviewingSale.id 
+            ? { 
+                ...s, 
+                reviewStatus: reviewStatus,
+                reviewedBy: reviewedByName,
+                reviewDate: new Date().toISOString(),
+                reviewNotes: reviewNotes || undefined
+              }
+            : s
+        );
+        setSales(updatedSales);
+        
+        toast({ 
+          title: reviewStatus === 'reviewed' ? "Sale Reviewed" : "Changes Requested",
+          description: `Debt sale ${reviewingSale.invoiceNumber} has been ${reviewStatus === 'reviewed' ? 'reviewed' : 'marked as needs changes'}`
+        });
+        
+        setIsReviewDialogOpen(false);
+        setReviewingSale(null);
+      } else {
+        toast({ 
+          title: "Error", 
+          description: `Failed to review sale`,
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Error reviewing sale:', error);
+      toast({
+        title: "Error",
+        description: "Failed to review sale",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Approval handlers
   const handleOpenApprovalDialog = (sale: SavedSale, status: 'approved' | 'rejected') => {
     setApprovingSale(sale);
@@ -1570,6 +1673,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     // Approval status filter
     const saleStatus = sale.approvalStatus || 'pending'; // Default to pending if undefined
     if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+    
+    // Review status filter
+    const saleReviewStatus = sale.reviewStatus || 'pending';
+    if (reviewFilter !== 'all' && saleReviewStatus !== reviewFilter) return false;
     
     // Date range filter
     if (startDate || endDate) {
@@ -1686,17 +1793,28 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             />
           </div>
           
-          {/* Approval Status Filter + Action Button */}
-          <div className="flex items-center gap-2">
+          {/* Approval Status Filter + Review Status Filter + Action Button */}
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={approvalFilter}
               onChange={(e) => setApprovalFilter(e.target.value as 'all' | 'pending' | 'approved' | 'rejected')}
               className="h-8 px-3 border rounded-md text-sm flex-1 md:flex-none"
             >
-              <option value="all">All Status</option>
+              <option value="all">All Approval</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
+            </select>
+
+            <select
+              value={reviewFilter}
+              onChange={(e) => setReviewFilter(e.target.value as 'all' | 'pending' | 'reviewed' | 'needs_changes')}
+              className="h-8 px-3 border rounded-md text-sm flex-1 md:flex-none"
+            >
+              <option value="all">All Review</option>
+              <option value="pending">Pending Review</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="needs_changes">Needs Changes</option>
             </select>
             
             {/* Action Button */}
@@ -1752,6 +1870,10 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
               // Approval status filter
               const saleStatus = sale.approvalStatus || 'pending'; // Default to pending if undefined
               if (approvalFilter !== 'all' && saleStatus !== approvalFilter) return false;
+              
+              // Review status filter
+              const saleReviewStatus = sale.reviewStatus || 'pending';
+              if (reviewFilter !== 'all' && saleReviewStatus !== reviewFilter) return false;
               
               // Date range filter
               if (startDate || endDate) {
@@ -1835,6 +1957,18 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                            '⏳ Pending'}
                         </Badge>
                       )}
+                      {/* Review Status Badge */}
+                      <Badge
+                        className={
+                          sale.reviewStatus === 'reviewed' ? 'bg-blue-100 text-blue-800' :
+                          sale.reviewStatus === 'needs_changes' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-600'
+                        }
+                      >
+                        {sale.reviewStatus === 'reviewed' ? '✓ Reviewed' :
+                         sale.reviewStatus === 'needs_changes' ? '⚠ Needs Changes' :
+                         '○ Pending Review'}
+                      </Badge>
                     </div>
                     <div className="text-xs md:text-sm text-muted-foreground flex flex-wrap gap-x-2 gap-y-1">
                       <span>{sale.date}</span>
@@ -1885,6 +2019,18 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       >
                         <Printer className="h-4 w-4 mr-1" />
                         Print
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className={
+                          sale.reviewStatus === 'reviewed' ? 'bg-blue-600 hover:bg-blue-700 text-white' :
+                          sale.reviewStatus === 'needs_changes' ? 'bg-orange-600 hover:bg-orange-700 text-white' :
+                          'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        }
+                        onClick={() => handleOpenReviewDialog(sale)}
+                      >
+                        <ClipboardCheck className="h-4 w-4 mr-1" />
+                        {sale.reviewStatus === 'reviewed' ? 'Reviewed' : sale.reviewStatus === 'needs_changes' ? 'Re-review' : 'Review'}
                       </Button>
                       {sale.approvalStatus === 'pending' && (
                         <>
@@ -2560,6 +2706,98 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       Save Changes
                     </>
                   )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Dialog */}
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-blue-600" />
+              Review Sale
+            </DialogTitle>
+          </DialogHeader>
+          
+          {reviewingSale && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Invoice Number</p>
+                <p className="font-semibold">{reviewingSale.invoiceNumber}</p>
+                <p className="text-sm text-muted-foreground mt-1">Customer: {reviewingSale.customer}</p>
+                <p className="text-sm text-muted-foreground">Amount: {formatCurrency(reviewingSale.total)}</p>
+                {reviewingSale.reviewStatus && reviewingSale.reviewStatus !== 'pending' && (
+                  <div className="mt-2 pt-2 border-t">
+                    <p className="text-xs text-muted-foreground">Previous Review: <span className="font-medium">{reviewingSale.reviewStatus}</span></p>
+                    {reviewingSale.reviewedBy && <p className="text-xs text-muted-foreground">By: {reviewingSale.reviewedBy}</p>}
+                    {reviewingSale.reviewNotes && <p className="text-xs text-muted-foreground mt-1">Notes: {reviewingSale.reviewNotes}</p>}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Review Decision</label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={reviewStatus === 'reviewed' ? 'default' : 'outline'}
+                    className={reviewStatus === 'reviewed' ? 'bg-blue-600 hover:bg-blue-700 flex-1' : 'flex-1'}
+                    onClick={() => setReviewStatus('reviewed')}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Approve Review
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={reviewStatus === 'needs_changes' ? 'default' : 'outline'}
+                    className={reviewStatus === 'needs_changes' ? 'bg-orange-600 hover:bg-orange-700 flex-1' : 'flex-1'}
+                    onClick={() => setReviewStatus('needs_changes')}
+                  >
+                    <AlertCircle className="h-4 w-4 mr-1" />
+                    Needs Changes
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Reviewed By
+                </label>
+                <Input
+                  value={reviewedByName}
+                  onChange={(e) => setReviewedByName(e.target.value)}
+                  placeholder="Enter reviewer name..."
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (Optional)</label>
+                <textarea
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  className="w-full min-h-[100px] p-3 border rounded-md resize-none"
+                  placeholder={`Add notes for ${reviewStatus === 'reviewed' ? 'review approval' : 'changes needed'}...`}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsReviewDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleReviewSale}
+                  className={reviewStatus === 'reviewed' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  {reviewStatus === 'reviewed' ? 'Submit Review' : 'Request Changes'}
                 </Button>
               </div>
             </div>
