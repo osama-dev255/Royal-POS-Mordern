@@ -1607,22 +1607,24 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
 
   return (
     <div className="container mx-auto py-6 px-4">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6" />
-            Saved Debts
-          </h1>
-          <p className="text-muted-foreground">View and manage debt transactions</p>
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <Button variant="outline" size="icon" onClick={onBack} className="flex-shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 md:flex-initial">
+            <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+              <FileText className="h-5 w-5 md:h-6 md:w-6" />
+              Saved Debts
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground">View and manage debt transactions</p>
+          </div>
         </div>
-        <div className="text-right">
-          <Badge variant="outline" className="text-lg px-4 py-2">
+        <div className="md:text-right w-full md:w-auto">
+          <Badge variant="outline" className="text-base md:text-lg px-3 md:px-4 py-1 md:py-2">
             {filteredSales.length} Debts
           </Badge>
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 flex flex-wrap md:block gap-x-3 gap-y-1 md:space-y-1">
             <p className="text-sm text-muted-foreground">Total: {formatCurrency(totalDebt)}</p>
             <p className="text-xs text-green-600">Paid: {formatCurrency(totalPaid)}</p>
             <p className="text-xs text-red-600">Remaining: {formatCurrency(totalRemaining)}</p>
@@ -1632,26 +1634,26 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
       </div>
 
       <div className="space-y-4">
-        {/* Date Range Filter + Search Bar - Side by Side */}
-        <div className="flex gap-4 items-center">
-          {/* Date Range Filter - Right Aligned */}
-          <div className="flex justify-end flex-1">
-            <Card className="w-auto">
+        {/* Date Range Filter + Search Bar - Responsive */}
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:items-center">
+          {/* Date Range Filter */}
+          <div className="flex-1 md:flex-none md:ml-auto">
+            <Card className="w-full md:w-auto">
               <CardContent className="p-2">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <Input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="h-8 w-[140px]"
+                    className="h-8 flex-1 md:w-[140px] min-w-[120px]"
                     placeholder="From"
                   />
                   <Input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="h-8 w-[140px]"
+                    className="h-8 flex-1 md:w-[140px] min-w-[120px]"
                     placeholder="To"
                   />
                   {(startDate || endDate) && (
@@ -1662,7 +1664,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         setStartDate('');
                         setEndDate('');
                       }}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 flex-shrink-0"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -1673,58 +1675,58 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
           </div>
           
           {/* Search Bar */}
-          <div className="relative w-[300px]">
+          <div className="relative w-full md:w-[300px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search by name or invoice..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-8"
+              className="pl-10 h-8 w-full"
             />
           </div>
           
-          {/* Approval Status Filter */}
+          {/* Approval Status Filter + Action Button */}
           <div className="flex items-center gap-2">
             <select
               value={approvalFilter}
               onChange={(e) => setApprovalFilter(e.target.value as 'all' | 'pending' | 'approved' | 'rejected')}
-              className="h-8 px-3 border rounded-md text-sm"
+              className="h-8 px-3 border rounded-md text-sm flex-1 md:flex-none"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
             </select>
+            
+            {/* Action Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-2 flex-shrink-0">
+                  <span>Actions</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => handlePrintDebts()}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  <span>Print</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownload()}>
+                  <Download className="h-4 w-4 mr-2" />
+                  <span>Download</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportXLS()}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span>Export to XLS</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSharePDF()}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  <span>Share as PDF</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          
-          {/* Action Button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-2">
-                <span>Actions</span>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => handlePrintDebts()}>
-                <Printer className="h-4 w-4 mr-2" />
-                <span>Print</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDownload()}>
-                <Download className="h-4 w-4 mr-2" />
-                <span>Download</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportXLS()}>
-                <FileText className="h-4 w-4 mr-2" />
-                <span>Export to XLS</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSharePDF()}>
-                <Share2 className="h-4 w-4 mr-2" />
-                <span>Share as PDF</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
         
         {loading ? (
@@ -1814,11 +1816,11 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                 
                 return (
             <Card key={sale.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold">{sale.invoiceNumber}</span>
+              <CardContent className="p-3 md:p-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="font-semibold text-sm md:text-base">{sale.invoiceNumber}</span>
                       {statusBadge}
                       {sale.approvalStatus && (
                         <Badge 
@@ -1834,22 +1836,22 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         </Badge>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-xs md:text-sm text-muted-foreground flex flex-wrap gap-x-2 gap-y-1">
                       <span>{sale.date}</span>
-                      <span className="mx-2">•</span>
+                      <span className="hidden md:inline">•</span>
                       <span className="font-medium text-red-600">{sale.customer || 'Unknown Customer'}</span>
-                      <span className="mx-2">•</span>
+                      <span className="hidden md:inline">•</span>
                       <span>{sale.items.length} items</span>
                     </div>
-                    <div className="text-sm mt-1">
+                    <div className="text-xs md:text-sm mt-1 flex flex-wrap gap-x-2 gap-y-1">
                       <span className="text-muted-foreground">Paid: {formatCurrency(amountPaid)}</span>
-                      <span className="mx-2">•</span>
+                      <span className="hidden md:inline">•</span>
                       <span className={remaining > 0 ? 'text-red-600' : 'text-green-600'}>
                         {remaining > 0 ? `Due: ${formatCurrency(remaining)}` : 'Fully Paid'}
                       </span>
                       {sale.customerBalance !== undefined && (
                         <>
-                          <span className="mx-2">•</span>
+                          <span className="hidden md:inline">•</span>
                           <span className={`font-semibold ${sale.customerBalance > 0 ? 'text-red-700' : sale.customerBalance < 0 ? 'text-green-700' : 'text-gray-600'}`}>
                             Cust Bal: {formatCurrency(sale.customerBalance)}
                           </span>
@@ -1857,9 +1859,9 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-red-600">{formatCurrency(sale.total)}</p>
-                    <div className="flex gap-2 mt-2">
+                  <div className="md:text-right flex-shrink-0">
+                    <p className="text-base md:text-lg font-bold text-red-600 mb-2">{formatCurrency(sale.total)}</p>
+                    <div className="flex flex-wrap gap-2">
                       <Button 
                         size="sm" 
                         variant="outline"
@@ -1913,16 +1915,6 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
                         <Download className="h-4 w-4 mr-1" />
                         Export
                       </Button>
-                      {/* Delete button hidden - commented out
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        onClick={() => handleDelete(sale.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                      */}
                     </div>
                   </div>
                 </div>
