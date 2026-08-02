@@ -15318,7 +15318,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                                     <div className="flex items-center justify-between mb-2">
                                       <h3 className="font-bold text-sm">GODOWN STOCK COUNT - {getCurrentBatchGodown()?.name}</h3>
                                     </div>
-                                    <div className="overflow-x-auto">
+                                    <div className="overflow-visible">
                                       <table className="w-full text-sm border-collapse">
                                         <thead>
                                           <tr className="border-b-2 border-gray-800">
@@ -15520,7 +15520,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                           {!stockTakeGodownId && (
                             <p className="text-sm text-muted-foreground mb-2 italic">Select a Godown above to filter products by warehouse stock.</p>
                           )}
-                          <div className="overflow-x-auto">
+                          <div className="overflow-visible">
                             <table className="w-full text-sm border-collapse">
                               <thead>
                                 <tr className="border-b-2 border-gray-800">
