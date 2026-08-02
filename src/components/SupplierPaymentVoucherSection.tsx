@@ -14,7 +14,7 @@ import {
   LinkedReference,
   PaymentBreakdownEntry
 } from "@/utils/supplierPaymentVoucherUtils";
-import { getSupplierBalance, getUniqueSuppliers } from "@/utils/supplierLedgerUtils";
+import { getSupplierBalance, getSupplierLedgerSummary, SupplierLedgerSummary } from "@/utils/supplierLedgerUtils";
 import { formatCurrency } from "@/lib/currency";
 import { PrintUtils } from "@/utils/printUtils";
 import { toast } from "@/components/ui/use-toast";
@@ -68,17 +68,17 @@ export const SupplierPaymentVoucherSection = ({ onBack, onLogout, username }: Su
 
   // Form state
   const [form, setForm] = useState<SupplierPaymentVoucherData>(emptyForm());
-  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [suppliers, setSuppliers] = useState<SupplierLedgerSummary[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
   const [supplierBalance, setSupplierBalance] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  // Load suppliers from Supplier Ledger only
+  // Load suppliers from Supplier Ledger with outstanding balances
   useEffect(() => {
     const loadSuppliers = async () => {
       try {
-        const ledgerSuppliers = await getUniqueSuppliers();
-        setSuppliers(ledgerSuppliers);
+        const summary = await getSupplierLedgerSummary();
+        setSuppliers(summary);
       } catch (e) {
         console.error('Error loading suppliers from ledger:', e);
       }
@@ -130,7 +130,7 @@ export const SupplierPaymentVoucherSection = ({ onBack, onLogout, username }: Su
 
   // Filtered suppliers
   const filteredSuppliers = suppliers.filter(s =>
-    s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+    s.supplier_name.toLowerCase().includes(supplierSearch.toLowerCase())
   );
 
   // ── Form handlers ──────────────────────────────────────────────────────────
@@ -139,12 +139,12 @@ export const SupplierPaymentVoucherSection = ({ onBack, onLogout, username }: Su
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSelectSupplier = (supplier: { id: string; name: string }) => {
-    setSupplierSearch(supplier.name);
+  const handleSelectSupplier = (supplier: SupplierLedgerSummary) => {
+    setSupplierSearch(supplier.supplier_name);
     setForm(prev => ({
       ...prev,
-      supplierId: supplier.id,
-      supplierName: supplier.name,
+      supplierId: supplier.supplier_id,
+      supplierName: supplier.supplier_name,
     }));
   };
 
@@ -478,11 +478,14 @@ export const SupplierPaymentVoucherSection = ({ onBack, onLogout, username }: Su
                   placeholder="Type to search supplier..."
                   className="mt-1"
                 />
-                {supplierSearch && filteredSuppliers.length > 0 && form.supplierName !== filteredSuppliers.find(s => s.name === supplierSearch)?.name && (
+                {supplierSearch && filteredSuppliers.length > 0 && form.supplierName !== filteredSuppliers.find(s => s.supplier_name === supplierSearch)?.supplier_name && (
                   <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
                     {filteredSuppliers.map(s => (
-                      <div key={s.id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm" onClick={() => handleSelectSupplier(s)}>
-                        {s.name}
+                      <div key={s.supplier_id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex justify-between items-center" onClick={() => handleSelectSupplier(s)}>
+                        <span>{s.supplier_name}</span>
+                        <span className={`text-xs font-bold ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {formatCurrency(s.balance)}
+                        </span>
                       </div>
                     ))}
                   </div>

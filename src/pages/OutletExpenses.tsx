@@ -103,12 +103,14 @@ import {
   getVendorTypes,
   createVendorType,
   deleteVendorType,
+  getSuppliers,
   Expense,
   ExpenseBudget,
   ExpenseAnalytics,
   Vendor,
   ExpenseCategory,
-  VendorType
+  VendorType,
+  Supplier
 } from "@/services/databaseService";
 
 interface OutletExpensesProps {
@@ -313,6 +315,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     vendor_type: "supplier"
   });
 
+  // Registered suppliers (from Supplier Management)
+  const [registeredSuppliers, setRegisteredSuppliers] = useState<Supplier[]>([]);
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+
   const budgetForm = {
     category: "",
     sub_category: "",
@@ -374,6 +381,10 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       setVendors(vendorsData);
       setDbCategories(categoriesData);
       setDbVendorTypes(vendorTypesData);
+
+      // Load registered suppliers from Supplier Management
+      const suppliersData = await getSuppliers();
+      setRegisteredSuppliers(suppliersData);
       
       // Load custom categories and sub-categories from database
       const customCats = categoriesData
@@ -3884,11 +3895,66 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Vendor Name *</label>
-              <Input
-                value={newVendorData.vendor_name}
-                onChange={(e) => setNewVendorData(prev => ({ ...prev, vendor_name: e.target.value }))}
-                placeholder="Enter vendor name"
-              />
+              <div className="relative">
+                <Input
+                  value={newVendorData.vendor_name}
+                  onChange={(e) => {
+                    setNewVendorData(prev => ({ ...prev, vendor_name: e.target.value }));
+                    setSupplierSearchTerm(e.target.value);
+                    setShowSupplierDropdown(true);
+                  }}
+                  onFocus={() => {
+                    setShowSupplierDropdown(true);
+                    setSupplierSearchTerm("");
+                  }}
+                  placeholder="Search registered suppliers or type vendor name"
+                />
+                {showSupplierDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
+                    {registeredSuppliers
+                      .filter(s => 
+                        s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
+                        (s.contact_person && s.contact_person.toLowerCase().includes(supplierSearchTerm.toLowerCase())) ||
+                        (s.phone && s.phone.includes(supplierSearchTerm))
+                      )
+                      .map((supplier) => (
+                        <div
+                          key={supplier.id}
+                          className="px-3 py-2 hover:bg-muted cursor-pointer"
+                          onClick={() => {
+                            setNewVendorData(prev => ({
+                              ...prev,
+                              vendor_name: supplier.name,
+                              vendor_contact: supplier.phone || "",
+                              vendor_email: supplier.email || "",
+                              vendor_type: "supplier"
+                            }));
+                            setShowSupplierDropdown(false);
+                            setSupplierSearchTerm("");
+                          }}
+                        >
+                          <div className="font-medium text-sm">{supplier.name}</div>
+                          <div className="text-xs text-muted-foreground flex gap-2">
+                            {supplier.contact_person && <span>Contact: {supplier.contact_person}</span>}
+                            {supplier.phone && <span>{supplier.phone}</span>}
+                          </div>
+                        </div>
+                      ))
+                    }
+                    {registeredSuppliers.filter(s => 
+                        s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
+                        (s.contact_person && s.contact_person.toLowerCase().includes(supplierSearchTerm.toLowerCase()))
+                      ).length === 0 && (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No registered suppliers found — type to add manually
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select from registered suppliers or type a custom vendor name
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium">Contact Number</label>

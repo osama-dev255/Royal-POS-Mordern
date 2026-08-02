@@ -69,6 +69,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
     notes: string;
     date: string;
     transaction_type: 'settlement' | 'inventory_payment' | 'adjustment' | 'refund';
+    adjustment_direction: 'debit' | 'credit';
   }>({
     supplier_name: "",
     supplier_id: "",
@@ -78,6 +79,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
     notes: "",
     date: new Date().toISOString().split('T')[0],
     transaction_type: "settlement",
+    adjustment_direction: "debit",
   });
 
   const { toast } = useToast();
@@ -146,15 +148,20 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       return;
     }
 
+    const isDR = newEntry.transaction_type === 'settlement'
+      || newEntry.transaction_type === 'inventory_payment'
+      || (newEntry.transaction_type === 'adjustment' && newEntry.adjustment_direction === 'debit');
+    const isCR = !isDR;
+
     const result = await recordSupplierLedgerEntry({
       supplier_id: newEntry.supplier_id || newEntry.supplier_name,
       supplier_name: newEntry.supplier_name,
       transaction_type: newEntry.transaction_type,
       reference_number: newEntry.reference_number || `STL-${Date.now()}`,
-      debit_amount: newEntry.transaction_type === 'settlement' || newEntry.transaction_type === 'inventory_payment' ? newEntry.amount : 0,
-      credit_amount: newEntry.transaction_type === 'adjustment' || newEntry.transaction_type === 'refund' ? newEntry.amount : 0,
+      debit_amount: isDR ? newEntry.amount : 0,
+      credit_amount: isCR ? newEntry.amount : 0,
       transaction_date: new Date(newEntry.date).toISOString(),
-      description: `${transactionTypeLabels[newEntry.transaction_type]} - ${newEntry.supplier_name}`,
+      description: `${transactionTypeLabels[newEntry.transaction_type]}${newEntry.transaction_type === 'adjustment' ? (newEntry.adjustment_direction === 'debit' ? ' (DR)' : ' (CR)') : ''} - ${newEntry.supplier_name}`,
       payment_method: newEntry.paymentMethod,
       notes: newEntry.notes,
     });
@@ -186,6 +193,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       notes: "",
       date: new Date().toISOString().split('T')[0],
       transaction_type: "settlement",
+      adjustment_direction: "debit",
     });
   };
 
@@ -242,6 +250,29 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {newEntry.transaction_type === 'adjustment' && (
+                    <div className="grid gap-2">
+                      <Label>Adjustment Direction *</Label>
+                      <Select
+                        value={newEntry.adjustment_direction}
+                        onValueChange={(value: any) => setNewEntry({ ...newEntry, adjustment_direction: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="debit">DR — Debit (reduces what we owe)</SelectItem>
+                          <SelectItem value="credit">CR — Credit (increases what we owe)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {newEntry.adjustment_direction === 'debit'
+                          ? 'Use DR to decrease the outstanding balance (e.g. discount received, debt forgiven).'
+                          : 'Use CR to increase the outstanding balance (e.g. additional charges, price correction).'}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid gap-2">
                     <Label htmlFor="supplier_name">Supplier Name *</Label>
