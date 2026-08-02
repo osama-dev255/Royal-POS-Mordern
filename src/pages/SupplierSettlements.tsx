@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import {
@@ -136,6 +139,169 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
   const totalDebit = filteredEntries.reduce((sum, e) => sum + (Number(e.debit_amount) || 0), 0);
   const outstandingBalance = totalCredit - totalDebit;
 
+  // ── Export Handlers ────────────────────────────────────────────────────────
+
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const rowsHtml = filteredEntries.map(entry => `
+      <tr>
+        <td style="padding:8px;border:1px solid #ddd;">${new Date(entry.transaction_date).toLocaleDateString()}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${entry.reference_number || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${entry.description || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${entry.supplier_name}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${transactionTypeLabels[entry.transaction_type] || entry.transaction_type}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${formatCurrency(Math.abs(Number(entry.running_balance) || 0))}${Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Supplier Ledger Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; color: #333; }
+          .summary { display: flex; justify-content: space-between; margin: 20px 0; }
+          .summary-box { padding: 10px 20px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+          th { background: #f59e0b; color: white; padding: 10px; text-align: left; }
+          .total-row { font-weight: bold; background: #f9f9f9; }
+          @media print { body { padding: 0; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <h1>Supplier Ledger (DR / CR)</h1>
+        <div class="summary">
+          <div class="summary-box"><strong>Total Payable (CR):</strong> ${formatCurrency(totalCredit)}</div>
+          <div class="summary-box"><strong>Total Paid (DR):</strong> ${formatCurrency(totalDebit)}</div>
+          <div class="summary-box"><strong>Outstanding:</strong> ${formatCurrency(Math.abs(outstandingBalance))}${outstandingBalance >= 0 ? ' CR' : ' DR'}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Reference</th><th>Description</th><th>Supplier</th><th>Type</th>
+              <th style="text-align:right;">Debit (DR)</th><th style="text-align:right;">Credit (CR)</th><th style="text-align:right;">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr class="total-row">
+              <td colspan="5" style="text-align:right;padding:8px;border:1px solid #ddd;">TOTALS</td>
+              <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#dc2626;">${formatCurrency(totalDebit)}</td>
+              <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#16a34a;">${formatCurrency(totalCredit)}</td>
+              <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${formatCurrency(Math.abs(outstandingBalance))}${outstandingBalance >= 0 ? ' CR' : ' DR'}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:20px;text-align:center;" class="no-print">
+          <button onclick="window.print()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:5px;cursor:pointer;">Print</button>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Supplier Ledger (DR / CR)', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Total Payable (CR): ${formatCurrency(totalCredit)}`, 14, 30);
+    doc.text(`Total Paid (DR): ${formatCurrency(totalDebit)}`, 14, 36);
+    doc.text(`Outstanding: ${formatCurrency(Math.abs(outstandingBalance))}${outstandingBalance >= 0 ? ' CR' : ' DR'}`, 14, 42);
+
+    const tableData = filteredEntries.map(entry => [
+      new Date(entry.transaction_date).toLocaleDateString(),
+      entry.reference_number || '-',
+      entry.supplier_name,
+      transactionTypeLabels[entry.transaction_type] || entry.transaction_type,
+      Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-',
+      Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-',
+      `${formatCurrency(Math.abs(Number(entry.running_balance) || 0))}${Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}`,
+    ]);
+
+    autoTable(doc, {
+      startY: 50,
+      head: [['Date', 'Reference', 'Supplier', 'Type', 'Debit (DR)', 'Credit (CR)', 'Balance']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+
+    doc.save('Supplier_Ledger_Report.pdf');
+    toast({ title: "Download Started", description: "Downloading supplier ledger as PDF" });
+  };
+
+  const handleExportXLS = () => {
+    let csvContent = "Date,Reference,Description,Supplier,Type,Debit (DR),Credit (CR),Balance\n";
+    filteredEntries.forEach(entry => {
+      csvContent += `${new Date(entry.transaction_date).toLocaleDateString()},${entry.reference_number || '-'},"${(entry.description || '').replace(/"/g, '""')}",${entry.supplier_name},${transactionTypeLabels[entry.transaction_type] || entry.transaction_type},${Number(entry.debit_amount) || 0},${Number(entry.credit_amount) || 0},${Number(entry.running_balance) || 0}\n`;
+    });
+    csvContent += `\nTOTALS,,,,,${totalDebit},${totalCredit},${outstandingBalance}\n`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Supplier_Ledger_Report.csv';
+    link.click();
+    toast({ title: "Export Started", description: "Exporting supplier ledger as CSV" });
+  };
+
+  const handleSharePDF = async () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Supplier Ledger (DR / CR)', 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Total Payable (CR): ${formatCurrency(totalCredit)}`, 14, 30);
+      doc.text(`Total Paid (DR): ${formatCurrency(totalDebit)}`, 14, 36);
+      doc.text(`Outstanding: ${formatCurrency(Math.abs(outstandingBalance))}${outstandingBalance >= 0 ? ' CR' : ' DR'}`, 14, 42);
+
+      const tableData = filteredEntries.map(entry => [
+        new Date(entry.transaction_date).toLocaleDateString(),
+        entry.reference_number || '-',
+        entry.supplier_name,
+        transactionTypeLabels[entry.transaction_type] || entry.transaction_type,
+        Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-',
+        Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-',
+        `${formatCurrency(Math.abs(Number(entry.running_balance) || 0))}${Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}`,
+      ]);
+
+      autoTable(doc, {
+        startY: 50,
+        head: [['Date', 'Reference', 'Supplier', 'Type', 'Debit (DR)', 'Credit (CR)', 'Balance']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], 'Supplier_Ledger_Report.pdf', { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Supplier Ledger Report',
+          text: `Supplier Ledger with ${filteredEntries.length} entries`
+        });
+        toast({ title: "Shared Successfully", description: "Supplier ledger has been shared" });
+      } else {
+        handleDownloadPDF();
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+        handleDownloadPDF();
+      }
+    }
+  };
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleRecordSettlement = async () => {
@@ -215,6 +381,35 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
+            {/* Actions Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Actions
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handlePrintReport}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  <span>Print</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLS}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span>Export .xls</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  <span>Download .pdf</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSharePDF}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  <span>Share</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button variant="outline" size="sm" onClick={fetchLedger}>
               <RefreshCw className="h-4 w-4 mr-1" />
               Refresh
