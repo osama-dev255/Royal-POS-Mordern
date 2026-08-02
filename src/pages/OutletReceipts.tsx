@@ -43,11 +43,13 @@ import {
   MoreVertical,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  ClipboardCheck,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement, getCustomerLedgerBalance, getPendingSettlementApprovals, approveOutletCustomerSettlement, OutletCustomerSettlement } from "@/services/databaseService";
+import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement, getCustomerLedgerBalance, getPendingSettlementApprovals, approveOutletCustomerSettlement, reviewOutletCustomerSettlement, OutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
@@ -79,6 +81,12 @@ interface ReceiptSale {
   preparedBy?: string;
   approvedBy?: string;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedByName?: string;
+  approvalDate?: string;
+  reviewStatus?: 'pending' | 'reviewed' | 'needs_changes';
+  reviewedBy?: string;
+  reviewDate?: string;
+  reviewNotes?: string;
   createdAt?: string;
 }
 
@@ -95,6 +103,21 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
   
   // Pending approvals state
   const [pendingApprovals, setPendingApprovals] = useState<OutletCustomerSettlement[]>([]);
+  
+  // Review state
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'pending' | 'reviewed' | 'needs_changes'>('all');
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<'reviewed' | 'needs_changes'>('reviewed');
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [reviewedByName, setReviewedByName] = useState('');
+  const [reviewingSettlement, setReviewingSettlement] = useState<OutletCustomerSettlement | null>(null);
+  
+  // Approval dialog state
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvingSettlement, setApprovingSettlement] = useState<OutletCustomerSettlement | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvedByName, setApprovedByName] = useState('');
+  const [approvalNotes, setApprovalNotes] = useState('');
   
   // Commission receipt form
   const [commissionFrom, setCommissionFrom] = useState('');
@@ -347,6 +370,12 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         preparedBy: s.prepared_by,
         approvedBy: s.approved_by,
         approvalStatus: s.approval_status || 'pending',
+        approvedByName: s.approved_by_name,
+        approvalDate: s.approval_date,
+        reviewStatus: s.review_status || 'pending',
+        reviewedBy: s.reviewed_by,
+        reviewDate: s.review_date,
+        reviewNotes: s.review_notes,
         createdAt: s.created_at
       }));
       
@@ -412,12 +441,16 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         return;
       }
 
-      const result = await approveOutletCustomerSettlement(settlementId, status, user.id);
+      const result = await approveOutletCustomerSettlement(settlementId, status, user.id, undefined, approvedByName || undefined);
       if (result) {
         toast({ 
           title: "Success", 
           description: `Settlement ${status} successfully` 
         });
+        setIsApprovalDialogOpen(false);
+        setApprovingSettlement(null);
+        setApprovedByName('');
+        setApprovalNotes('');
         // Reload data
         await fetchReceipts();
       } else {
@@ -430,6 +463,54 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         description: error.message || "Failed to approve settlement", 
         variant: "destructive" 
       });
+    }
+  };
+
+  const handleOpenApprovalDialog = (settlement: OutletCustomerSettlement, status: 'approved' | 'rejected') => {
+    setApprovingSettlement(settlement);
+    setApprovalStatus(status);
+    setApprovedByName('');
+    setApprovalNotes('');
+    setIsApprovalDialogOpen(true);
+  };
+
+  const handleOpenReviewDialog = (settlement: OutletCustomerSettlement) => {
+    setReviewingSettlement(settlement);
+    setReviewStatus('reviewed');
+    setReviewNotes('');
+    setReviewedByName('');
+    setIsReviewDialogOpen(true);
+  };
+
+  const handleReviewSettlement = async () => {
+    if (!reviewingSettlement?.id) return;
+    if (!reviewedByName.trim()) {
+      toast({ title: "Validation Error", description: "Please enter reviewer name", variant: "destructive" });
+      return;
+    }
+    try {
+      const result = await reviewOutletCustomerSettlement(
+        reviewingSettlement.id,
+        reviewStatus,
+        reviewedByName,
+        reviewNotes || undefined
+      );
+      if (result) {
+        toast({ 
+          title: "Success", 
+          description: `Settlement ${reviewStatus === 'reviewed' ? 'reviewed' : 'marked as needs changes'} successfully` 
+        });
+        setIsReviewDialogOpen(false);
+        setReviewingSettlement(null);
+        setReviewedByName('');
+        setReviewNotes('');
+        await fetchReceipts();
+      } else {
+        toast({ title: "Error", description: "Failed to review settlement", variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error('Error reviewing settlement:', error);
+      toast({ title: "Error", description: error.message || "Failed to review settlement", variant: "destructive" });
     }
   };
 
@@ -2634,6 +2715,25 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                       <span className="mx-2">•</span>
                       <span>{receipt.items.length} items</span>
                     </div>
+                    {/* Review & Approval Info */}
+                    {receipt.type === 'sales' && (receipt.reviewedBy || receipt.approvedByName) && (
+                      <div className="text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        {receipt.reviewedBy && (
+                          <span className="text-blue-700">
+                            <ClipboardCheck className="h-3 w-3 inline mr-0.5" />
+                            Reviewed by <span className="font-medium">{receipt.reviewedBy}</span>
+                            {receipt.reviewDate && <span className="text-muted-foreground"> ({new Date(receipt.reviewDate).toLocaleDateString()})</span>}
+                          </span>
+                        )}
+                        {receipt.approvedByName && (
+                          <span className={receipt.approvalStatus === 'rejected' ? 'text-red-700' : 'text-green-700'}>
+                            <CheckCircle className="h-3 w-3 inline mr-0.5" />
+                            {receipt.approvalStatus === 'rejected' ? 'Rejected' : 'Approved'} by <span className="font-medium">{receipt.approvedByName}</span>
+                            {receipt.approvalDate && <span className="text-muted-foreground"> ({new Date(receipt.approvalDate).toLocaleDateString()})</span>}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-green-600">{formatCurrency(receipt.total)}</p>
@@ -2707,6 +2807,21 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
               </p>
             </CardHeader>
             <CardContent>
+              {/* Review Filter */}
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-3 mb-4">
+                <label className="text-sm font-medium">Review Status:</label>
+                <select
+                  value={reviewFilter}
+                  onChange={(e) => setReviewFilter(e.target.value as any)}
+                  className="border rounded-md px-3 py-1.5 text-sm bg-background"
+                >
+                  <option value="all">All</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="needs_changes">Needs Changes</option>
+                </select>
+              </div>
+
               {pendingApprovals.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-600" />
@@ -2715,12 +2830,38 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {pendingApprovals.map((settlement) => (
-                    <div key={settlement.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors">
+                  {pendingApprovals
+                    .filter(s => reviewFilter === 'all' || (s.review_status || 'pending') === reviewFilter)
+                    .map((settlement) => (
+                    <div key={settlement.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors gap-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <div className="font-semibold">{settlement.invoice_number}</div>
                           <Badge variant="outline">{settlement.payment_method}</Badge>
+                          {/* Approval Status Badge */}
+                          <Badge
+                            variant={
+                              settlement.approval_status === 'approved' ? 'default' :
+                              settlement.approval_status === 'rejected' ? 'destructive' :
+                              'secondary'
+                            }
+                          >
+                            {settlement.approval_status === 'approved' ? '✓ Approved' :
+                             settlement.approval_status === 'rejected' ? '✗ Rejected' :
+                             '⏳ Pending'}
+                          </Badge>
+                          {/* Review Status Badge */}
+                          <Badge
+                            className={
+                              settlement.review_status === 'reviewed' ? 'bg-blue-100 text-blue-800' :
+                              settlement.review_status === 'needs_changes' ? 'bg-orange-100 text-orange-800' :
+                              'bg-gray-100 text-gray-600'
+                            }
+                          >
+                            {settlement.review_status === 'reviewed' ? '✓ Reviewed' :
+                             settlement.review_status === 'needs_changes' ? '⚠ Needs Changes' :
+                             '○ Pending Review'}
+                          </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground">
                           Customer: {settlement.customer_name}
@@ -2739,17 +2880,48 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                           <div>Payment: <span className="font-medium text-green-600">{formatCurrency(settlement.payment_amount)}</span></div>
                           <div>New Balance: <span className="font-medium">{formatCurrency(settlement.new_balance)}</span></div>
                         </div>
+                        {/* Review & Approval Info */}
+                        {(settlement.reviewed_by || settlement.approved_by_name) && (
+                          <div className="text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            {settlement.reviewed_by && (
+                              <span className="text-blue-700">
+                                <ClipboardCheck className="h-3 w-3 inline mr-0.5" />
+                                Reviewed by <span className="font-medium">{settlement.reviewed_by}</span>
+                                {settlement.review_date && <span className="text-muted-foreground"> ({new Date(settlement.review_date).toLocaleDateString()})</span>}
+                              </span>
+                            )}
+                            {settlement.approved_by_name && (
+                              <span className={settlement.approval_status === 'rejected' ? 'text-red-700' : 'text-green-700'}>
+                                <CheckCircle className="h-3 w-3 inline mr-0.5" />
+                                {settlement.approval_status === 'rejected' ? 'Rejected' : 'Approved'} by <span className="font-medium">{settlement.approved_by_name}</span>
+                                {settlement.approval_date && <span className="text-muted-foreground"> ({new Date(settlement.approval_date).toLocaleDateString()})</span>}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 ml-4">
+                      <div className="flex items-center gap-3 md:ml-4">
                         <div className="text-right">
                           <div className="text-lg font-bold">{formatCurrency(settlement.payment_amount)}</div>
                           <div className="text-xs text-muted-foreground">Amount Paid</div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            className={
+                              settlement.review_status === 'reviewed' ? 'bg-blue-600 hover:bg-blue-700 text-white' :
+                              settlement.review_status === 'needs_changes' ? 'bg-orange-600 hover:bg-orange-700 text-white' :
+                              'bg-indigo-600 hover:bg-indigo-700 text-white'
+                            }
+                            onClick={() => handleOpenReviewDialog(settlement)}
+                          >
+                            <ClipboardCheck className="h-4 w-4 mr-1" />
+                            Review
+                          </Button>
                           <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700"
-                            onClick={() => handleApproveSettlement(settlement.id!, 'approved')}
+                            onClick={() => handleOpenApprovalDialog(settlement, 'approved')}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Approve
@@ -2758,7 +2930,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                             size="sm"
                             variant="outline"
                             className="text-red-600"
-                            onClick={() => handleApproveSettlement(settlement.id!, 'rejected')}
+                            onClick={() => handleOpenApprovalDialog(settlement, 'rejected')}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
                             Reject
@@ -3214,6 +3386,144 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
                     </div>
                   </Button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Dialog */}
+      {isReviewDialogOpen && reviewingSettlement && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <ClipboardCheck className="h-5 w-5 text-indigo-600" />
+                  Review Settlement
+                </h2>
+                <Button variant="outline" size="icon" onClick={() => setIsReviewDialogOpen(false)}>
+                  <span className="text-xl">&times;</span>
+                </Button>
+              </div>
+              <div className="space-y-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm font-medium">{reviewingSettlement.invoice_number}</p>
+                  <p className="text-sm text-muted-foreground">{reviewingSettlement.customer_name}</p>
+                  <p className="text-sm font-semibold">{formatCurrency(reviewingSettlement.payment_amount)}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    className={`flex-1 ${reviewStatus === 'reviewed' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}`}
+                    onClick={() => setReviewStatus('reviewed')}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Approve Review
+                  </Button>
+                  <Button
+                    className={`flex-1 ${reviewStatus === 'needs_changes' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-orange-100 text-orange-800 hover:bg-orange-200'}`}
+                    onClick={() => setReviewStatus('needs_changes')}
+                  >
+                    <AlertCircle className="h-4 w-4 mr-1" />
+                    Needs Changes
+                  </Button>
+                </div>
+                <div>
+                  <Label>Reviewer Name *</Label>
+                  <Input
+                    value={reviewedByName}
+                    onChange={(e) => setReviewedByName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Review Notes</Label>
+                  <Textarea
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder="Optional notes about the review..."
+                    rows={3}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsReviewDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleReviewSettlement}
+                  >
+                    Submit Review
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approval Dialog */}
+      {isApprovalDialogOpen && approvingSettlement && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  {approvalStatus === 'approved' ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                  {approvalStatus === 'approved' ? 'Approve' : 'Reject'} Settlement
+                </h2>
+                <Button variant="outline" size="icon" onClick={() => setIsApprovalDialogOpen(false)}>
+                  <span className="text-xl">&times;</span>
+                </Button>
+              </div>
+              <div className="space-y-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm font-medium">{approvingSettlement.invoice_number}</p>
+                  <p className="text-sm text-muted-foreground">{approvingSettlement.customer_name}</p>
+                  <p className="text-sm font-semibold">{formatCurrency(approvingSettlement.payment_amount)}</p>
+                </div>
+                <div>
+                  <Label>Approver Name *</Label>
+                  <Input
+                    value={approvedByName}
+                    onChange={(e) => setApprovedByName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Notes (optional)</Label>
+                  <Textarea
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    placeholder="Optional notes..."
+                    rows={3}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsApprovalDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className={`flex-1 ${approvalStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                    onClick={() => {
+                      if (!approvedByName.trim()) {
+                        toast({ title: "Validation Error", description: "Please enter approver name", variant: "destructive" });
+                        return;
+                      }
+                      handleApproveSettlement(approvingSettlement.id!, approvalStatus);
+                    }}
+                  >
+                    {approvalStatus === 'approved' ? 'Approve' : 'Reject'}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

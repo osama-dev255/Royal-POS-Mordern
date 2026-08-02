@@ -5745,6 +5745,11 @@ export interface OutletCustomerSettlement {
   approval_status?: 'pending' | 'approved' | 'rejected';
   approval_date?: string;
   approval_notes?: string;
+  approved_by_name?: string;
+  review_status?: 'pending' | 'reviewed' | 'needs_changes';
+  reviewed_by?: string;
+  review_date?: string;
+  review_notes?: string;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
@@ -5994,23 +5999,55 @@ export const deleteOutletCustomerSettlement = async (id: string): Promise<boolea
   }
 };
 
-// Approve or reject customer settlement
-export const approveOutletCustomerSettlement = async (
+// Review customer settlement (pre-approval step)
+export const reviewOutletCustomerSettlement = async (
   settlementId: string,
-  status: 'approved' | 'rejected',
-  approvedBy: string,
+  status: 'reviewed' | 'needs_changes',
+  reviewedBy: string,
   notes?: string
 ): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from('customer_settlements')
       .update({
-        approval_status: status,
-        approved_by: approvedBy,
-        approval_date: new Date().toISOString(),
-        approval_notes: notes,
+        review_status: status,
+        reviewed_by: reviewedBy,
+        review_date: new Date().toISOString(),
+        review_notes: notes,
         updated_at: new Date().toISOString()
       })
+      .eq('id', settlementId);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error reviewing customer settlement:', error);
+    return false;
+  }
+};
+
+// Approve or reject customer settlement
+export const approveOutletCustomerSettlement = async (
+  settlementId: string,
+  status: 'approved' | 'rejected',
+  approvedBy: string,
+  notes?: string,
+  approvedByName?: string
+): Promise<boolean> => {
+  try {
+    const updateData: any = {
+      approval_status: status,
+      approved_by: approvedBy,
+      approval_date: new Date().toISOString(),
+      approval_notes: notes,
+      updated_at: new Date().toISOString()
+    };
+    if (approvedByName) {
+      updateData.approved_by_name = approvedByName;
+    }
+    const { error } = await supabase
+      .from('customer_settlements')
+      .update(updateData)
       .eq('id', settlementId);
       
     if (error) throw error;
