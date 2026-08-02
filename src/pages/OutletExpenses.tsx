@@ -3070,6 +3070,14 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewExpense(expense)}
+                            title="View Expense Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700"
                             onClick={() => handleApproveExpense(expense.id!, 'approved')}
