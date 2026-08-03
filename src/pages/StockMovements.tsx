@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, ArrowUpDown, ArrowDown, ArrowUp, Package, Filter, RefreshCw, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, ArrowUpDown, ArrowDown, ArrowUp, Package, Filter, RefreshCw, Loader2, Printer, Download, Share2, FileText, ChevronDown } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { getStockMovements, getStockMovementSummary, getMovedProductNames, StockMovementWithDetails, StockMovementSummary } from "@/utils/stockMovementUtils";
 import { getOutlets, Outlet } from "@/services/databaseService";
+import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface StockMovementsProps {
   username?: string;
@@ -72,6 +76,8 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  const { toast } = useToast();
+
   useEffect(() => {
     loadData();
   }, []);
@@ -112,6 +118,239 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
     if (searchTerm && !s.product_name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
+
+  // ── Export Handlers ────────────────────────────────────────────────────────
+
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const data = activeTab === "movements" ? filteredMovements : filteredSummaries;
+    
+    let tableHtml = '';
+    if (activeTab === "movements") {
+      const rows = (data as StockMovementWithDetails[]).map(m => `
+        <tr>
+          <td style="padding:8px;border:1px solid #ddd;">${m.created_at ? new Date(m.created_at).toLocaleString() : '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;">${m.product_name}</td>
+          <td style="padding:8px;border:1px solid #ddd;">${m.movement_type}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${m.movement_type.includes('OUT') || m.movement_type === 'SOLD' || m.movement_type === 'DAMAGE' ? '-' : '+'}${Number(m.quantity).toLocaleString()}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(Number(m.unit_cost || 0))}</td>
+          <td style="padding:8px;border:1px solid #ddd;">${m.reference_number || '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;">${m.outlet_name || '-'}</td>
+        </tr>
+      `).join('');
+      tableHtml = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date/Time</th><th>Product</th><th>Type</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit Cost</th><th>Reference</th><th>Outlet</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } else {
+      const rows = (data as StockMovementSummary[]).map(s => `
+        <tr>
+          <td style="padding:8px;border:1px solid #ddd;">${s.product_name}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#16a34a;">${s.total_in > 0 ? '+' + s.total_in : '0'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#dc2626;">${s.total_out > 0 ? '-' + s.total_out : '0'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#9333ea;">${s.total_sold > 0 ? '-' + s.total_sold : '0'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#2563eb;">${s.total_transfer_in > 0 ? '+' + s.total_transfer_in : '0'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#ea580c;">${s.total_transfer_out > 0 ? '-' + s.total_transfer_out : '0'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${s.net_movement >= 0 ? '+' : ''}${s.net_movement}</td>
+        </tr>
+      `).join('');
+      tableHtml = `
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th><th style="text-align:right;">In</th><th style="text-align:right;">Out</th><th style="text-align:right;">Sold</th><th style="text-align:right;">T-In</th><th style="text-align:right;">T-Out</th><th style="text-align:right;">Net</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Stock Movements Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; color: #333; }
+          .summary { display: flex; justify-content: space-around; margin: 20px 0; }
+          .summary-box { padding: 10px 20px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; }
+          th { background: #3b82f6; color: white; padding: 10px; text-align: left; }
+          @media print { body { padding: 0; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <h1>Stock Movements Report - ${activeTab === "movements" ? 'Movement Ledger' : 'Product Summary'}</h1>
+        <div class="summary">
+          <div class="summary-box"><strong>Stock In:</strong> ${totalIn}</div>
+          <div class="summary-box"><strong>Stock Out:</strong> ${totalOut}</div>
+          <div class="summary-box"><strong>Sold:</strong> ${totalSold}</div>
+          <div class="summary-box"><strong>Transfer In:</strong> ${totalTransferIn}</div>
+          <div class="summary-box"><strong>Transfer Out:</strong> ${totalTransferOut}</div>
+          <div class="summary-box"><strong>Adjustments:</strong> ${totalAdjustment}</div>
+        </div>
+        ${tableHtml}
+        <div style="margin-top:20px;text-align:center;" class="no-print">
+          <button onclick="window.print()" style="padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:5px;cursor:pointer;">Print</button>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Stock Movements Report', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    doc.text(`Stock In: ${totalIn} | Out: ${totalOut} | Sold: ${totalSold}`, 14, 34);
+
+    if (activeTab === "movements") {
+      const tableData = filteredMovements.map(m => [
+        m.created_at ? new Date(m.created_at).toLocaleString() : '-',
+        m.product_name,
+        m.movement_type,
+        `${m.movement_type.includes('OUT') || m.movement_type === 'SOLD' || m.movement_type === 'DAMAGE' ? '-' : '+'}${Number(m.quantity)}`,
+        formatCurrency(Number(m.unit_cost || 0)),
+        m.reference_number || '-',
+        m.outlet_name || '-',
+      ]);
+
+      autoTable(doc, {
+        startY: 42,
+        head: [['Date/Time', 'Product', 'Type', 'Qty', 'Unit Cost', 'Reference', 'Outlet']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 8 },
+      });
+    } else {
+      const tableData = filteredSummaries.map(s => [
+        s.product_name,
+        s.total_in > 0 ? `+${s.total_in}` : '0',
+        s.total_out > 0 ? `-${s.total_out}` : '0',
+        s.total_sold > 0 ? `-${s.total_sold}` : '0',
+        s.total_transfer_in > 0 ? `+${s.total_transfer_in}` : '0',
+        s.total_transfer_out > 0 ? `-${s.total_transfer_out}` : '0',
+        `${s.net_movement >= 0 ? '+' : ''}${s.net_movement}`,
+      ]);
+
+      autoTable(doc, {
+        startY: 42,
+        head: [['Product', 'In', 'Out', 'Sold', 'T-In', 'T-Out', 'Net']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 8 },
+      });
+    }
+
+    doc.save(`Stock_Movements_${activeTab}_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast({ title: "Download Started", description: "Downloading stock movements as PDF" });
+  };
+
+  const handleExportXLS = () => {
+    let csvContent = '';
+    
+    if (activeTab === "movements") {
+      csvContent = "Date/Time,Product,Type,Qty,Unit Cost,Reference,Outlet,Godown,Zone,Notes\n";
+      filteredMovements.forEach(m => {
+        csvContent += `"${m.created_at ? new Date(m.created_at).toLocaleString() : '-'}","${m.product_name}","${m.movement_type}",${m.movement_type.includes('OUT') || m.movement_type === 'SOLD' || m.movement_type === 'DAMAGE' ? '-' : '+'}${Number(m.quantity)},${Number(m.unit_cost || 0)},"${m.reference_number || '-'}","${m.outlet_name || '-'}","${m.godown_name || '-'}","${m.zone_name || '-'}","${(m.notes || '').replace(/"/g, '""')}"\n`;
+      });
+    } else {
+      csvContent = "Product,In,Out,Sold,T-In,T-Out,Adj.,Net\n";
+      filteredSummaries.forEach(s => {
+        csvContent += `"${s.product_name}",${s.total_in},${s.total_out},${s.total_sold},${s.total_transfer_in},${s.total_transfer_out},${s.total_adjustment},${s.net_movement}\n`;
+      });
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Stock_Movements_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast({ title: "Export Started", description: "Exporting stock movements as CSV" });
+  };
+
+  const handleSharePDF = async () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Stock Movements Report', 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+
+      if (activeTab === "movements") {
+        const tableData = filteredMovements.map(m => [
+          m.created_at ? new Date(m.created_at).toLocaleString() : '-',
+          m.product_name,
+          m.movement_type,
+          `${m.movement_type.includes('OUT') || m.movement_type === 'SOLD' || m.movement_type === 'DAMAGE' ? '-' : '+'}${Number(m.quantity)}`,
+          formatCurrency(Number(m.unit_cost || 0)),
+          m.reference_number || '-',
+          m.outlet_name || '-',
+        ]);
+
+        autoTable(doc, {
+          startY: 36,
+          head: [['Date/Time', 'Product', 'Type', 'Qty', 'Unit Cost', 'Reference', 'Outlet']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246] },
+          styles: { fontSize: 8 },
+        });
+      } else {
+        const tableData = filteredSummaries.map(s => [
+          s.product_name,
+          s.total_in > 0 ? `+${s.total_in}` : '0',
+          s.total_out > 0 ? `-${s.total_out}` : '0',
+          s.total_sold > 0 ? `-${s.total_sold}` : '0',
+          s.net_movement >= 0 ? `+${s.net_movement}` : `${s.net_movement}`,
+        ]);
+
+        autoTable(doc, {
+          startY: 36,
+          head: [['Product', 'In', 'Out', 'Sold', 'Net']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [59, 130, 246] },
+          styles: { fontSize: 8 },
+        });
+      }
+
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], `Stock_Movements_${activeTab}.pdf`, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Stock Movements Report',
+          text: `Stock Movements Report - ${activeTab === "movements" ? 'Movement Ledger' : 'Product Summary'}`
+        });
+        toast({ title: "Shared Successfully", description: "Stock movements report has been shared" });
+      } else {
+        doc.save(`Stock_Movements_${activeTab}_${new Date().toISOString().split('T')[0]}.pdf`);
+        toast({ title: "Downloaded", description: "Sharing not supported. PDF downloaded instead." });
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+        toast({ title: "Error", description: "Failed to share report", variant: "destructive" });
+      }
+    }
+  };
 
   const totalIn = filteredMovements.filter(m => m.movement_type === 'IN').reduce((sum, m) => sum + Number(m.quantity), 0);
   const totalOut = filteredMovements.filter(m => m.movement_type === 'OUT').reduce((sum, m) => sum + Number(m.quantity), 0);
@@ -226,7 +465,7 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
         </Card>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Button
             variant={activeTab === "movements" ? "default" : "outline"}
             size="sm"
@@ -243,6 +482,37 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
             <Filter className="h-4 w-4 mr-1" />
             Product Summary ({filteredSummaries.length})
           </Button>
+
+          {/* Actions Dropdown */}
+          <div className="ml-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Actions
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handlePrintReport}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  <span>Print</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  <span>Download .pdf</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLS}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span>Export .xls</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSharePDF}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  <span>Share</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Movement Log Tab */}
