@@ -2356,6 +2356,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
             quantity: itemQuantity,
             reference_type: 'GRN' as const,
             reference_number: newGRN.data.grnNumber,
+            unit_cost: item.unitCost || 0,
             notes: `GRN from ${newGRN.data.supplierName || 'Supplier'}`
           });
         }

@@ -141,7 +141,8 @@ export const getStockMovements = async (filters?: {
         *,
         outlets!stock_movements_outlet_id_fkey(name),
         godowns!stock_movements_godown_id_fkey(name),
-        godown_zones!stock_movements_zone_id_fkey(zone_name)
+        godown_zones!stock_movements_zone_id_fkey(zone_name),
+        products!stock_movements_product_id_fkey(cost_price)
       `)
       .not('movement_type', 'in', '(TRANSFER_IN,TRANSFER_OUT)')
       .order('created_at', { ascending: false });
@@ -186,7 +187,7 @@ export const getStockMovements = async (filters?: {
       reference_type: row.reference_type,
       reference_id: row.reference_id,
       reference_number: row.reference_number,
-      unit_cost: row.unit_cost,
+      unit_cost: (Number(row.unit_cost) > 0 ? Number(row.unit_cost) : Number(row.products?.cost_price) || 0),
       total_cost: row.total_cost,
       notes: row.notes,
       batch_number: row.batch_number,
