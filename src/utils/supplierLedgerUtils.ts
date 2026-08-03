@@ -41,9 +41,9 @@ export interface SupplierLedgerSummary {
 // ── CRUD Operations ────────────────────────────────────────────────────────────
 
 /**
- * Fetch all supplier ledger entries, optionally filtered by supplier
+ * Fetch all supplier ledger entries, optionally filtered by supplier name
  */
-export const getSupplierLedger = async (supplierId?: string): Promise<SupplierLedgerEntry[]> => {
+export const getSupplierLedger = async (supplierName?: string): Promise<SupplierLedgerEntry[]> => {
   try {
     let query = supabase
       .from('supplier_ledger')
@@ -51,8 +51,8 @@ export const getSupplierLedger = async (supplierId?: string): Promise<SupplierLe
       .order('transaction_date', { ascending: true })
       .order('created_at', { ascending: true });
 
-    if (supplierId) {
-      query = query.eq('supplier_id', supplierId);
+    if (supplierName) {
+      query = query.eq('supplier_name', supplierName);
     }
 
     const { data, error } = await query;
@@ -70,7 +70,7 @@ export const getSupplierLedger = async (supplierId?: string): Promise<SupplierLe
 export const getSupplierLedgerByDateRange = async (
   startDate: string,
   endDate: string,
-  supplierId?: string
+  supplierName?: string
 ): Promise<SupplierLedgerEntry[]> => {
   try {
     let query = supabase
@@ -81,8 +81,8 @@ export const getSupplierLedgerByDateRange = async (
       .order('transaction_date', { ascending: true })
       .order('created_at', { ascending: true });
 
-    if (supplierId) {
-      query = query.eq('supplier_id', supplierId);
+    if (supplierName) {
+      query = query.eq('supplier_name', supplierName);
     }
 
     const { data, error } = await query;
@@ -97,17 +97,24 @@ export const getSupplierLedgerByDateRange = async (
 /**
  * Get the current outstanding balance for a specific supplier
  */
-export const getSupplierBalance = async (supplierId: string): Promise<number> => {
+export const getSupplierBalance = async (supplierName: string): Promise<number> => {
   try {
+    // Try RPC first (if the DB function has been updated to use supplier_name)
     const { data, error } = await supabase
-      .rpc('get_supplier_balance', { p_supplier_id: supplierId });
+      .rpc('get_supplier_balance_by_name', { p_supplier_name: supplierName });
 
-    if (error) throw error;
+    if (error) {
+      // Fallback: calculate manually by supplier_name
+      const entries = await getSupplierLedger(supplierName);
+      const totalCredit = entries.reduce((sum, e) => sum + (Number(e.credit_amount) || 0), 0);
+      const totalDebit = entries.reduce((sum, e) => sum + (Number(e.debit_amount) || 0), 0);
+      return totalCredit - totalDebit;
+    }
     return data || 0;
   } catch (error) {
     console.error('Error getting supplier balance:', error);
     // Fallback: calculate manually
-    const entries = await getSupplierLedger(supplierId);
+    const entries = await getSupplierLedger(supplierName);
     const totalCredit = entries.reduce((sum, e) => sum + (Number(e.credit_amount) || 0), 0);
     const totalDebit = entries.reduce((sum, e) => sum + (Number(e.debit_amount) || 0), 0);
     return totalCredit - totalDebit;
@@ -142,15 +149,16 @@ export const getSupplierLedgerSummary = async (): Promise<SupplierLedgerSummary[
   try {
     const entries = await getSupplierLedger();
 
-    // Aggregate by supplier_id
+    // Aggregate by supplier_name (canonical key — supplier_id is unreliable across triggers)
     const map = new Map<string, SupplierLedgerSummary>();
 
     for (const entry of entries) {
-      const key = entry.supplier_id || entry.supplier_name;
+      const key = (entry.supplier_name || '').trim();
+      if (!key) continue;
       if (!map.has(key)) {
         map.set(key, {
-          supplier_id: entry.supplier_id,
-          supplier_name: entry.supplier_name,
+          supplier_id: key,
+          supplier_name: key,
           total_credit: 0,
           total_debit: 0,
           balance: 0,
@@ -200,21 +208,23 @@ export const getUniqueSuppliers = async (): Promise<Array<{ id: string; name: st
   try {
     const { data, error } = await supabase
       .from('supplier_ledger')
-      .select('supplier_id, supplier_name');
+      .select('supplier_name');
 
     if (error) throw error;
 
-    // Deduplicate
+    // Deduplicate by supplier_name (case-insensitive, trimmed)
     const seen = new Map<string, string>();
     for (const row of data || []) {
-      const key = row.supplier_id || row.supplier_name;
+      const name = (row.supplier_name || '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
       if (!seen.has(key)) {
-        seen.set(key, row.supplier_name);
+        seen.set(key, name);
       }
     }
 
     return Array.from(seen.entries())
-      .map(([id, name]) => ({ id, name }))
+      .map(([, name]) => ({ id: name, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {
     console.error('Error fetching unique suppliers:', error);
