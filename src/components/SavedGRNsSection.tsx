@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Download, Printer, Eye, Pencil, Calendar, FileSpreadsheet, Share2, ChevronDown, FileText, Loader2 } from "lucide-react";
+import { Search, Package, Download, Printer, Eye, Pencil, Calendar, FileSpreadsheet, Share2, ChevronDown, FileText, Loader2, ExternalLink } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SavedGRNsCard } from "./SavedGRNsCard";
@@ -331,6 +331,25 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                   <p>PO Number: {selectedGRN.data.poNumber}</p>
                   <p>Date: {new Date(selectedGRN.data.date).toLocaleDateString()}</p>
                   <p>Status: {selectedGRN.data.status}</p>
+                  {selectedGRN.data.suppliers && selectedGRN.data.suppliers.filter(s => s.documentUrl).length > 0 && (
+                    <div className="mt-1">
+                      <span>Document: </span>
+                      {selectedGRN.data.suppliers.filter(s => s.documentUrl).map((s, idx) => (
+                        <span key={idx}>
+                          {idx > 0 && ', '}
+                          <a
+                            href={s.documentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            {s.documentName || `Document - ${s.name || 'Supplier'}`}
+                          </a>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold">Delivery Information</h3>
@@ -368,6 +387,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                     )}
                   </div>
                 )}
+
               </div>
               <div className="mt-4">
                 <h3 className="font-semibold">Items Received</h3>
@@ -640,7 +660,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                       items: grn.data.items.reduce((sum, item) => sum + (item.receivedQuantity || item.delivered || 0), 0),
                       total: grn.total || grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
                       poNumber: grn.data.poNumber,
-                      status: grn.data.status === "pending" || grn.data.status === "cancelled" ? "received" : (grn.data.status || "received")
+                      status: (grn.data.status === "pending" || grn.data.status === "cancelled" || grn.data.status === "draft") ? "received" : (grn.data.status === "received" || grn.data.status === "checked" || grn.data.status === "approved" || grn.data.status === "completed" ? grn.data.status : "received")
                     }}
                     onViewDetails={() => handleViewGRN(grn)}
                     onPrintGRN={() => handlePrintGRN(grn)}

@@ -88,6 +88,20 @@ export interface GRNData {
   destinationZoneId?: string; // ID of destination zone
   destinationGodownName?: string; // Name of destination godown (for display)
   destinationZoneName?: string; // Name of destination zone (for display)
+  // Supplier array with document URLs (for multi-supplier GRNs)
+  suppliers?: Array<{
+    id: string;
+    name: string;
+    supplierId?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    tinNumber?: string;
+    businessTin?: string;
+    stockType?: 'exempt' | 'vatable' | '';
+    documentUrl?: string;
+    documentName?: string;
+  }>;
 }
 
 export interface SavedGRN {
@@ -188,7 +202,9 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       destination_godown_id: grn.data.destinationGodownId || null,
       destination_zone_id: grn.data.destinationZoneId || null,
       destination_godown_name: grn.data.destinationGodownName || null,
-      destination_zone_name: grn.data.destinationZoneName || null
+      destination_zone_name: grn.data.destinationZoneName || null,
+      // Suppliers array (includes document URLs)
+      suppliers: grn.data.suppliers || null
     };
     
     console.log('3. Attempting database insert...');
@@ -435,7 +451,14 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             destinationGodownId: dbGRN.destination_godown_id || '',
             destinationZoneId: dbGRN.destination_zone_id || '',
             destinationGodownName: dbGRN.destination_godown_name || '',
-            destinationZoneName: dbGRN.destination_zone_name || ''
+            destinationZoneName: dbGRN.destination_zone_name || '',
+            // Suppliers array with document URLs
+            suppliers: (() => {
+              if (dbGRN.suppliers && typeof dbGRN.suppliers === 'string') {
+                try { return JSON.parse(dbGRN.suppliers); } catch { return []; }
+              }
+              return Array.isArray(dbGRN.suppliers) ? dbGRN.suppliers : [];
+            })()
           },
           createdAt: dbGRN.created_at || new Date().toISOString(),
           updatedAt: dbGRN.updated_at || new Date().toISOString()
