@@ -4,13 +4,14 @@
  * @returns Formatted currency string in TZS
  */
 export function formatCurrency(amount: number): string {
+  const safe = Number.isFinite(amount) ? amount : 0;
   return new Intl.NumberFormat('en-TZ', {
     style: 'currency',
     currency: 'TZS',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     useGrouping: true
-  }).format(amount);
+  }).format(safe);
 }
 
 /**

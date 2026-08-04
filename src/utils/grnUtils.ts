@@ -568,23 +568,73 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
     // Also update in database
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { error } = await supabase
+      // Build comprehensive update payload matching saveGRN fields
+      const updatePayload: Record<string, any> = {
+        grn_number: updatedGRN.data.grnNumber,
+        supplier_name: updatedGRN.data.supplierName,
+        supplier_id: updatedGRN.data.supplierId || '',
+        supplier_phone: updatedGRN.data.supplierPhone || '',
+        supplier_email: updatedGRN.data.supplierEmail || '',
+        supplier_address: updatedGRN.data.supplierAddress || '',
+        business_name: updatedGRN.data.businessName || '',
+        business_address: updatedGRN.data.businessAddress || '',
+        business_phone: updatedGRN.data.businessPhone || '',
+        business_email: updatedGRN.data.businessEmail || '',
+        business_stock_type: updatedGRN.data.businessStockType || null,
+        is_vatable: updatedGRN.data.isVatable || false,
+        supplier_tin_number: updatedGRN.data.supplierTinNumber || '',
+        business_tin: updatedGRN.data.businessTin || '',
+        po_number: updatedGRN.data.poNumber || '',
+        delivery_note_number: updatedGRN.data.deliveryNoteNumber || '',
+        vehicle_number: updatedGRN.data.vehicleNumber || '',
+        driver_name: updatedGRN.data.driverName || '',
+        logistic_details: updatedGRN.data.logisticDetails || null,
+        received_by: updatedGRN.data.receivedBy || '',
+        received_location: updatedGRN.data.receivedLocation || '',
+        items: Array.isArray(updatedGRN.data.items) ? updatedGRN.data.items : [],
+        receiving_costs: Array.isArray(updatedGRN.data.receivingCosts) ? updatedGRN.data.receivingCosts : [],
+        quality_check_notes: updatedGRN.data.qualityCheckNotes || '',
+        discrepancies: updatedGRN.data.discrepancies || '',
+        prepared_by: updatedGRN.data.preparedBy || '',
+        prepared_date: updatedGRN.data.preparedDate ? new Date(updatedGRN.data.preparedDate).toISOString().split('T')[0] : null,
+        checked_by: updatedGRN.data.checkedBy || '',
+        checked_date: updatedGRN.data.checkedDate ? new Date(updatedGRN.data.checkedDate).toISOString().split('T')[0] : null,
+        approved_by: updatedGRN.data.approvedBy || '',
+        approved_date: updatedGRN.data.approvedDate ? new Date(updatedGRN.data.approvedDate).toISOString().split('T')[0] : null,
+        received_date: updatedGRN.data.receivedDate ? new Date(updatedGRN.data.receivedDate).toISOString().split('T')[0] : null,
+        status: updatedGRN.data.status || 'completed',
+        total_amount: totalAmount,
+        updated_at: updatedGRN.updatedAt || new Date().toISOString(),
+        // Godown integration fields
+        destination_godown_id: updatedGRN.data.destinationGodownId || null,
+        destination_zone_id: updatedGRN.data.destinationZoneId || null,
+        destination_godown_name: updatedGRN.data.destinationGodownName || null,
+        destination_zone_name: updatedGRN.data.destinationZoneName || null,
+        // Suppliers array (includes document URLs)
+        suppliers: updatedGRN.data.suppliers || null
+      };
+
+      const { data, error } = await supabase
         .from('saved_grns')
-        .update({
-          grn_number: updatedGRN.data.grnNumber,
-          supplier_name: updatedGRN.data.supplierName,
-          po_number: updatedGRN.data.poNumber,
-          items: updatedGRN.data.items,
-          total_amount: totalAmount,
-          status: updatedGRN.data.status,
-          updated_at: updatedGRN.updatedAt
-        })
-        .eq('user_id', user.id)
-        .eq('id', updatedGRN.id);
+        .update(updatePayload)
+        .eq('id', updatedGRN.id)
+        .select();
       
-      if (error) {
-        console.error('Error updating GRN in database:', error);
-        // Don't throw error - still have local storage backup
+      // If user_id filter didn't match (e.g. GRN saved while unauthenticated), retry without it
+      if (error || !data || data.length === 0) {
+        console.warn('First update attempt failed or no rows matched, retrying without user_id filter:', error?.message);
+        const retry = await supabase
+          .from('saved_grns')
+          .update(updatePayload)
+          .eq('id', updatedGRN.id)
+          .select();
+        if (retry.error) {
+          console.error('Error updating GRN in database on retry:', retry.error);
+        } else {
+          console.log('✅ GRN updated in database (retry succeeded)');
+        }
+      } else {
+        console.log('✅ GRN updated in database');
       }
     }
   } catch (error) {

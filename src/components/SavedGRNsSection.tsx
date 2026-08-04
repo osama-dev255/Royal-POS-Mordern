@@ -37,13 +37,13 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
   // Function to distribute receiving costs among items based on quantity
   const distributeReceivingCosts = (items: any[], receivingCosts: Array<{ description: string; amount: number }>) => {
     // Calculate total quantity of all items
-    const totalQuantity = items.reduce((sum, item) => sum + item.delivered, 0);
+    const totalQuantity = items.reduce((sum, item) => sum + (item.delivered || 0), 0);
     
     if (totalQuantity === 0) {
       return items.map(item => ({
         ...item,
         receivingCostPerUnit: 0,
-        totalWithReceivingCost: item.unitCost ? item.unitCost * item.delivered : 0
+        totalWithReceivingCost: (item.unitCost || 0) * (item.delivered || 0)
       }));
     }
     
@@ -57,7 +57,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
     return items.map(item => {
       const receivingCostPerUnit = costPerUnit;
       const unitCostWithReceiving = (item.unitCost || 0) + receivingCostPerUnit;
-      const totalWithReceivingCost = unitCostWithReceiving * item.delivered;
+      const totalWithReceivingCost = unitCostWithReceiving * (item.delivered || 0);
       
       return {
         ...item,
@@ -419,20 +419,20 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                       {distributeReceivingCosts(selectedGRN.data.items, selectedGRN.data.receivingCosts).map((item, index) => (
                         <tr key={index}>
                           <td className="px-6 py-4 whitespace-nowrap">{item.description}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.delivered}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.quantity || 0}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.delivered || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.soldout || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.rejectedOut || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.rejectionIn || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.damaged || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.complimentary || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.physicalStock || 0}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.available || (item.delivered - (item.soldout || 0) - (item.rejectedOut || 0) + (item.rejectionIn || 0) - (item.damaged || 0) - (item.complimentary || 0))}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{Number.isFinite(item.available) ? item.available : ((item.delivered || 0) - (item.soldout || 0) - (item.rejectedOut || 0) + (item.rejectionIn || 0) - (item.damaged || 0) - (item.complimentary || 0))}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.unit}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.unitCost - (item.receivingCostPerUnit || 0))}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency((item.unitCost || 0) - (item.receivingCostPerUnit || 0))}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.receivingCostPerUnit || 0)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.unitCost)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.totalWithReceivingCost || (item.delivered * (item.unitCost || 0)))}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.unitCost || 0)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.totalWithReceivingCost || ((item.delivered || 0) * (item.unitCost || 0)))}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.batchNumber || ''}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.expiryDate || ''}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.remarks || ''}</td>
