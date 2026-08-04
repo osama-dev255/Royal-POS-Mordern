@@ -40,11 +40,17 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
     const totalQuantity = items.reduce((sum, item) => sum + (item.delivered || 0), 0);
     
     if (totalQuantity === 0) {
-      return items.map(item => ({
-        ...item,
-        receivingCostPerUnit: 0,
-        totalWithReceivingCost: (item.unitCost || 0) * (item.delivered || 0)
-      }));
+      return items.map(item => {
+        // Use originalUnitCost if available (stored at GRN creation), otherwise derive from unitCost
+        const baseCost = item.originalUnitCost || (item.unitCost || 0) - (item.receivingCostPerUnit || 0) || 0;
+        return {
+          ...item,
+          originalUnitCost: baseCost,
+          receivingCostPerUnit: 0,
+          unitCost: baseCost,
+          totalWithReceivingCost: baseCost * (item.delivered || 0)
+        };
+      });
     }
     
     // Calculate total receiving costs
@@ -55,13 +61,15 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
     
     // Update each item with receiving cost per unit and total cost with receiving costs
     return items.map(item => {
-      const receivingCostPerUnit = costPerUnit;
-      const unitCostWithReceiving = (item.unitCost || 0) + receivingCostPerUnit;
+      // Use originalUnitCost if available (stored at GRN creation), otherwise derive from unitCost
+      const baseCost = item.originalUnitCost || (item.unitCost || 0) - (item.receivingCostPerUnit || 0) || 0;
+      const unitCostWithReceiving = baseCost + costPerUnit;
       const totalWithReceivingCost = unitCostWithReceiving * (item.delivered || 0);
       
       return {
         ...item,
-        receivingCostPerUnit,
+        originalUnitCost: baseCost,
+        receivingCostPerUnit: costPerUnit,
         totalWithReceivingCost,
         unitCost: unitCostWithReceiving
       };
@@ -429,7 +437,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                           <td className="px-6 py-4 whitespace-nowrap">{item.physicalStock || 0}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{Number.isFinite(item.available) ? item.available : ((item.delivered || 0) - (item.soldout || 0) - (item.rejectedOut || 0) + (item.rejectionIn || 0) - (item.damaged || 0) - (item.complimentary || 0))}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{item.unit}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency((item.unitCost || 0) - (item.receivingCostPerUnit || 0))}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.originalUnitCost || 0)}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.receivingCostPerUnit || 0)}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.unitCost || 0)}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(item.totalWithReceivingCost || ((item.delivered || 0) * (item.unitCost || 0)))}</td>
