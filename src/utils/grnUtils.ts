@@ -152,10 +152,19 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
     
     console.log('User authenticated:', user.id);
     
-    // Calculate total from items
+    // Calculate total from items (including receiving costs)
     const totalAmount = Array.isArray(grn.data.items) 
       ? grn.data.items.reduce((sum, item) => {
           return sum + Number(item.totalWithReceivingCost || item.total || 0);
+        }, 0)
+      : 0;
+    
+    // Calculate total excluding receiving costs (for supplier ledger CR)
+    const totalExclReceiving = Array.isArray(grn.data.items)
+      ? grn.data.items.reduce((sum, item) => {
+          const baseCost = Number(item.originalUnitCost || (item.unitCost || 0) - (item.receivingCostPerUnit || 0) || 0);
+          const qty = Number(item.delivered || item.receivedQuantity || 0);
+          return sum + (baseCost * qty);
         }, 0)
       : 0;
     
@@ -196,6 +205,7 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       received_date: grn.data.receivedDate ? new Date(grn.data.receivedDate).toISOString().split('T')[0] : null,
       status: grn.data.status || 'pending',
       total_amount: totalAmount,
+      total_excl_receiving: totalExclReceiving,
       created_at: grn.createdAt || new Date().toISOString(),
       updated_at: grn.updatedAt || new Date().toISOString(),
       // Godown integration fields
@@ -560,9 +570,16 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
     );
     localStorage.setItem(SAVED_GRNS_KEY, JSON.stringify(updatedGRNs));
     
-    // Calculate total from items
+    // Calculate total from items (including receiving costs)
     const totalAmount = updatedGRN.data.items?.reduce((sum, item) => {
       return sum + Number(item.totalWithReceivingCost || item.total || 0);
+    }, 0) || 0;
+    
+    // Calculate total excluding receiving costs (for supplier ledger CR)
+    const totalExclReceiving = updatedGRN.data.items?.reduce((sum, item) => {
+      const baseCost = Number(item.originalUnitCost || (item.unitCost || 0) - (item.receivingCostPerUnit || 0) || 0);
+      const qty = Number(item.delivered || item.receivedQuantity || 0);
+      return sum + (baseCost * qty);
     }, 0) || 0;
     
     // Also update in database
@@ -604,6 +621,7 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
         received_date: updatedGRN.data.receivedDate ? new Date(updatedGRN.data.receivedDate).toISOString().split('T')[0] : null,
         status: updatedGRN.data.status || 'completed',
         total_amount: totalAmount,
+        total_excl_receiving: totalExclReceiving,
         updated_at: updatedGRN.updatedAt || new Date().toISOString(),
         // Godown integration fields
         destination_godown_id: updatedGRN.data.destinationGodownId || null,
