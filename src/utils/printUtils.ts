@@ -4037,7 +4037,19 @@ export class PrintUtils {
       }
       .amount-negative {
         color: #000;
-        text-decoration: line-through;
+        font-style: italic;
+      }
+      .paid-badge {
+        display: inline-block;
+        background: #000;
+        color: #fff;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        padding: 1px 5px;
+        margin-left: 6px;
+        vertical-align: middle;
+        text-transform: uppercase;
       }
       .calculation-section {
         margin: 10px 0;
@@ -4186,7 +4198,7 @@ export class PrintUtils {
           ` : ''}
           <div class="calc-row">
             <span>Payment Received</span>
-            <span class="row-value amount-negative">- ${formatCurrency(amountPaid)}</span>
+            <span class="row-value amount-negative">(${formatCurrency(amountPaid)})<span class="paid-badge">PAID</span></span>
           </div>
           <div class="calc-row grand-total" style="${newBalance < 0 ? 'background: #f0fdf4;' : ''}">
             <span>Closing Balance ${newBalance < 0 ? '(Credit Due to Overpayment)' : ''}</span>
@@ -5946,6 +5958,94 @@ export class PrintUtils {
   </div>
 
   <div class="footer">Generated on ${new Date().toLocaleDateString()} | ${v.businessName || ''}</div>
+
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+    }
+  }
+
+  // ── Cash Handover Note Print ───────────────────────────────────────────────
+
+  static printCashHandoverNote(note: any) {
+    const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const n = note;
+
+    const statusColor = n.status === 'completed' ? '#16a34a' : n.status === 'cancelled' ? '#dc2626' : '#d97706';
+
+    const html = `<!DOCTYPE html>
+<html><head><title>Cash Handover Note - ${n.referenceNumber || ''}</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; }
+  .header { text-align: center; border-bottom: 3px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 16px; }
+  .header h1 { font-size: 18px; letter-spacing: 1px; margin-bottom: 2px; }
+  .header .sub { font-size: 10px; color: #555; }
+  .header .status { display: inline-block; margin-top: 4px; padding: 2px 10px; font-size: 10px; font-weight: 700; color: #fff; background: ${statusColor}; border-radius: 3px; }
+  .business-info { text-align: center; margin-bottom: 12px; font-size: 11px; color: #555; }
+  .business-info .biz-name { font-weight: 700; color: #1a1a1a; font-size: 12px; }
+  .amount-box { border: 2px solid #1a1a1a; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 20px; }
+  .amount-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; }
+  .amount-box .value { font-size: 28px; font-weight: 800; color: #16a34a; margin-top: 4px; }
+  .amount-box .date { font-size: 11px; color: #555; margin-top: 4px; }
+  .notes-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; font-size: 11px; white-space: pre-line; margin-bottom: 20px; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px; border-left: 3px solid #1a1a1a; padding-left: 6px; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; padding-top: 16px; border-top: 1px solid #d1d5db; }
+  .sig-block .sig-label { font-size: 9px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; }
+  .sig-block .sig-name { font-size: 12px; font-weight: 600; margin-top: 4px; min-height: 30px; border-bottom: 1px solid #999; padding-bottom: 20px; }
+  .sig-block .sig-date { font-size: 10px; color: #6b7280; margin-top: 2px; }
+  .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
+  }
+</style></head><body>
+
+  <div class="header">
+    <h1>CASH HANDOVER NOTE</h1>
+    <div class="sub">Reference: ${n.referenceNumber || ''}</div>
+    <div class="status">${(n.status || 'PENDING').toUpperCase()}</div>
+  </div>
+
+  ${n.businessName ? `<div class="business-info">
+    <div class="biz-name">${n.businessName}</div>
+    ${n.businessAddress ? '<div>' + n.businessAddress + '</div>' : ''}
+    ${n.businessPhone ? '<div>Phone: ' + n.businessPhone + '</div>' : ''}
+  </div>` : ''}
+
+  <div class="amount-box">
+    <div class="label">Total Cash Amount</div>
+    <div class="value">${fmt(n.totalAmount || 0)}</div>
+    <div class="date">Date: ${n.date || ''}</div>
+  </div>
+
+  ${n.notes ? '<div class="section-title">Notes</div><div class="notes-box">' + (n.notes || '') + '</div>' : ''}
+
+  <div class="section-title">Authorization & Signatures</div>
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-label">Prepared By</div>
+      <div class="sig-name">${n.preparedBy || ''}</div>
+      <div class="sig-date">${n.preparedDate || ''}</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Handed Over By</div>
+      <div class="sig-name">${n.handedOverBy || ''}</div>
+      <div class="sig-date">${n.handedOverDate || ''}</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Received By (Agent)</div>
+      <div class="sig-name">${n.receivedBy || ''}</div>
+      <div class="sig-date">${n.receivedDate || ''}</div>
+    </div>
+  </div>
+
+  <div class="footer">Generated on ${new Date().toLocaleDateString()} | Cash Handover Note</div>
 
 </body></html>`;
 

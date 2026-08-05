@@ -42,7 +42,8 @@ import {
   FolderOpen,
   ShoppingCart,
   Loader2,
-  ClipboardCheck
+  ClipboardCheck,
+  Banknote
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -69,12 +70,13 @@ import { PurchaseOrderSection } from '@/components/PurchaseOrderSection';
 import { savePurchaseOrder, updatePurchaseOrder } from '@/utils/purchaseOrderUtils';
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock, getProductsBySupplierId, linkProductToSupplier } from '@/services/databaseService';
 import { SupplierPaymentVoucherSection } from '@/components/SupplierPaymentVoucherSection';
+import { CashHandoverNoteSection } from '@/components/CashHandoverNoteSection';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
   id: string;
   name: string;
-  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note" | "supplier-payment-voucher";
+  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note" | "supplier-payment-voucher" | "cash-handover-note";
   description: string;
   content: string;
   lastModified: string;
@@ -675,7 +677,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack, editSPNData, onEditSPNLoaded, editPOData, onEditPOLoaded, editGRNData, onEditGRNLoaded }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders" | "savedSupplierPaymentVouchers">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders" | "savedSupplierPaymentVouchers" | "savedCashHandoverNotes">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1293,6 +1295,28 @@ PAYMENT BREAKDOWN:
 Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
 Received By: [RECEIVED_BY]    Date: [RECEIVED_DATE]
 Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
+      lastModified: new Date().toISOString().split('T')[0],
+      isActive: true
+    },
+    {
+      id: "19",
+      name: "Cash Handover Note",
+      type: "cash-handover-note",
+      description: "Professional template for recording cash handover to money agent for banking",
+      content: `CASH HANDOVER NOTE
+Reference #[REFERENCE_NUMBER]
+Date: [DATE]
+
+BUSINESS:
+[BUSINESS_NAME]
+[BUSINESS_ADDRESS]
+Phone: [BUSINESS_PHONE]
+
+Total Cash Amount: [TOTAL_AMOUNT]
+
+Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
+Handed Over By: [HANDED_OVER_BY]    Date: [HANDED_OVER_DATE]
+Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
       lastModified: new Date().toISOString().split('T')[0],
       isActive: true
     }
@@ -3600,6 +3624,10 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     const template = templates.find(t => t.id === templateId);
     if (template?.type === "supplier-payment-voucher") {
       setActiveTab("savedSupplierPaymentVouchers");
+      return;
+    }
+    if (template?.type === "cash-handover-note") {
+      setActiveTab("savedCashHandoverNotes");
       return;
     }
     if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take" || template.type === "supplier-purchase-note")) {
@@ -10491,6 +10519,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       case "sales-order": return <ShoppingCart className="h-5 w-5" />;
       case "stock-take": return <ClipboardCheck className="h-5 w-5" />;
       case "supplier-payment-voucher": return <CreditCard className="h-5 w-5" />;
+      case "cash-handover-note": return <Banknote className="h-5 w-5" />;
       default: return <FileText className="h-5 w-5" />;
     }
   };
@@ -10619,6 +10648,14 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                     >
                       <CreditCard className="h-4 w-4" />
                       Payment Vouchers
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedCashHandoverNotes')}
+                      className="flex items-center gap-2"
+                    >
+                      <Banknote className="h-4 w-4" />
+                      Cash Handover Notes
                     </Button>
                   </div>
                 </div>
@@ -10855,6 +10892,27 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                   </Button>
                 </div>
                 <SupplierPaymentVoucherSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
+            ) : activeTab === "savedCashHandoverNotes" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Cash Handover Notes</h3>
+                    <p className="text-sm text-muted-foreground">Record cash handover to money agent for banking</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <CashHandoverNoteSection 
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User" 
