@@ -4038,6 +4038,7 @@ export class PrintUtils {
       .amount-negative {
         color: #000;
         font-style: italic;
+        font-size: 24px;
       }
       .paid-badge {
         display: inline-block;
