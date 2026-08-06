@@ -13,7 +13,6 @@ import {
   Plus, 
   Search,
   Edit,
-  Trash2,
   Loader2,
   X,
   Wallet,
@@ -21,7 +20,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { format } from "date-fns";
-import { getOutlets, createOutlet, updateOutlet, deleteOutlet, Outlet } from "@/services/databaseService";
+import { getOutlets, createOutlet, updateOutlet, Outlet } from "@/services/databaseService";
 
 export const RegisteredOutlets = () => {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -75,19 +74,6 @@ export const RegisteredOutlets = () => {
     }
   };
 
-  const handleDeleteOutlet = async (id: string) => {
-    try {
-      const success = await deleteOutlet(id);
-      if (success) {
-        setOutlets(outlets.filter(outlet => outlet.id !== id));
-      } else {
-        setError("Failed to delete outlet. Please try again.");
-      }
-    } catch (err) {
-      setError("Failed to delete outlet. Please try again.");
-      console.error("Error deleting outlet:", err);
-    }
-  };
 
   const handleAddOutlet = async () => {
     try {
@@ -352,18 +338,6 @@ export const RegisteredOutlets = () => {
                       >
                         <DollarSign className="h-4 w-4 mr-1" />
                         Expenses
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteOutlet(outlet.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
                       </Button>
                     </div>
                   </div>
