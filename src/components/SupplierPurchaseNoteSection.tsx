@@ -129,7 +129,11 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         lines.push('');
       });
       lines.push('');
-      lines.push(`💰 JUMLA: ${fmtCurrency(total)}`);
+      lines.push(`💰 JUMLA MANUNUZI: ${fmtCurrency(total)}`);
+      if (showSellingPrice) {
+        const totalSales = items.reduce((s: number, i: any) => s + ((i.sellingPrice || 0) * (i.quantity || 0)), 0);
+        lines.push(`💵 JUMLA MAUZO: ${fmtCurrency(totalSales)}`);
+      }
       lines.push('');
       if (showProjectedProfit) {
         const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0);
