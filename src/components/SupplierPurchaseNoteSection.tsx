@@ -139,6 +139,9 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
         lines.push('');
       });
       lines.push('');
+      const totalQuantity = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+      lines.push(`📊 JUMLA IDADI: ${totalQuantity}`);
+      lines.push('');
       lines.push(`💰 JUMLA MANUNUZI: ${fmtCurrency(total)}`);
       if (showSellingPrice) {
         const totalSales = items.reduce((s: number, i: any) => s + ((i.sellingPrice || 0) * (i.quantity || 0)), 0);
