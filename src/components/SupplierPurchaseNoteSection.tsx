@@ -113,6 +113,16 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       lines.push('');
       lines.push(`🏪 Muuzaji: ${data.supplierName || 'N/A'}`);
       lines.push(`🏢 Mnunuzi: ${data.businessName || 'N/A'}`);
+      if (data.stockType || data.receiptIssued) {
+        lines.push('');
+        lines.push('📋 COMPLIANCE:');
+        if (data.stockType) {
+          lines.push(`  Aina ya Stock: ${data.stockType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+        }
+        if (data.receiptIssued) {
+          lines.push(`  Risiti Imetolewa: ${data.receiptIssued === 'yes' ? 'Ndio' : 'Hapana'}`);
+        }
+      }
       lines.push('');
       lines.push('📦 BIDHAA:');
       lines.push('');
