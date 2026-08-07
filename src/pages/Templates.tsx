@@ -15377,8 +15377,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                     <div className="flex items-center justify-between mb-2">
                                       <h3 className="font-bold text-sm">GODOWN STOCK COUNT - {getCurrentBatchGodown()?.name}</h3>
                                     </div>
-                                    <div className="overflow-visible">
-                                      <table className="w-full text-sm border-collapse">
+                                    <div className="overflow-x-auto -mx-2 px-2">
+                                      <table className="w-full min-w-[640px] text-sm border-collapse">
                                         <thead>
                                           <tr className="border-b-2 border-gray-800">
                                             <th className="text-left p-2">No.</th>
@@ -15579,8 +15579,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                           {!stockTakeGodownId && (
                             <p className="text-sm text-muted-foreground mb-2 italic">Select a Godown above to filter products by warehouse stock.</p>
                           )}
-                          <div className="overflow-visible">
-                            <table className="w-full text-sm border-collapse">
+                          <div className="overflow-x-auto -mx-2 px-2">
+                            <table className="w-full min-w-[700px] text-sm border-collapse">
                               <thead>
                                 <tr className="border-b-2 border-gray-800">
                                   <th className="text-left p-2">No.</th>
