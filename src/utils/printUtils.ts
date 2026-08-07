@@ -4702,7 +4702,7 @@ export class PrintUtils {
             ` : ''}
             <div class="summary-row">
               <span class="summary-label">Amount Paid (Current):</span>
-              <span>${formatCurrency(transaction.amountPaid || 0)}</span>
+              <span style="font-size: 24px;">${formatCurrency(transaction.amountPaid || 0)}</span>
             </div>
             ${transaction.debtPaymentAmount > 0 ? `
             <div class="summary-row">
