@@ -1627,6 +1627,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
     }));
     setStockTakeProductSearch(prev => ({ ...prev, [itemId]: productName }));
     setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: false }));
+    setActiveFloatingDropdown(null);
   };
 
   // Add new row to stock take items
@@ -7190,6 +7191,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
   const [batchProductSearch, setBatchProductSearch] = useState<Record<string, string>>({});
   const [batchProductResults, setBatchProductResults] = useState<Record<string, Array<{ productId: string; name: string; quantity: number; zoneId?: string; zoneName?: string }>>>({});
   const [batchShowDropdown, setBatchShowDropdown] = useState<Record<string, boolean>>({});
+  const [activeFloatingDropdown, setActiveFloatingDropdown] = useState<string | null>(null);
+  const [floatingDropdownPos, setFloatingDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const searchBatchProducts = async (itemId: string, query: string) => {
     const godown = getCurrentBatchGodown();
@@ -7252,6 +7255,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
     });
     setBatchProductSearch(prev => ({ ...prev, [itemId]: productName.replace(/ \[.*\]$/, '') }));
     setBatchShowDropdown(prev => ({ ...prev, [itemId]: false }));
+    setActiveFloatingDropdown(null);
   };
 
   // Generate Stock Take HTML for printing
@@ -15394,27 +15398,21 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                           {getCurrentBatchItems().map((item, idx) => (
                                             <tr key={item.id} className="border-b">
                                               <td className="p-2">{idx + 1}</td>
-                                              <td className="p-2 relative">
+                                              <td className="p-2">
                                                 <Input
                                                   value={batchProductSearch[item.id] || ''}
                                                   onChange={(e) => searchBatchProducts(item.id, e.target.value)}
-                                                  onFocus={() => { if (batchProductResults[item.id]?.length) setBatchShowDropdown(prev => ({ ...prev, [item.id]: true })); }}
+                                                  onFocus={(e) => {
+                                                    if (batchProductResults[item.id]?.length) {
+                                                      setBatchShowDropdown(prev => ({ ...prev, [item.id]: true }));
+                                                      const rect = e.currentTarget.getBoundingClientRect();
+                                                      setFloatingDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
+                                                      setActiveFloatingDropdown(item.id);
+                                                    }
+                                                  }}
                                                   placeholder="Search product..."
                                                   className="text-sm p-1 h-7"
                                                 />
-                                                {batchShowDropdown[item.id] && batchProductResults[item.id]?.length > 0 && (
-                                                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md max-h-48 overflow-y-auto">
-                                                    {batchProductResults[item.id].map((p, pIdx) => (
-                                                      <div key={`${p.productId}-${p.zoneId || 'nz'}-${pIdx}`} className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center" onClick={() => selectBatchProduct(item.id, p.productId, p.name, p.quantity, p.zoneId, p.zoneName)}>
-                                                        <span className="text-sm">{p.name}</span>
-                                                        <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                                {batchShowDropdown[item.id] && batchProductResults[item.id]?.length === 0 && batchProductSearch[item.id] && (
-                                                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md p-2 text-sm text-muted-foreground">No products found.</div>
-                                                )}
                                               </td>
                                               <td className="p-2">
                                                 <Select
@@ -15597,39 +15595,21 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                 {stockTakeItems.map((item, idx) => (
                                   <tr key={item.id} className="border-b">
                                     <td className="p-2">{idx + 1}</td>
-                                    <td className="p-2 relative">
+                                    <td className="p-2">
                                       <Input
                                         value={stockTakeProductSearch[item.id] || ''}
                                         onChange={(e) => searchStockTakeProducts(item.id, e.target.value)}
-                                        onFocus={() => {
+                                        onFocus={(e) => {
                                           if (stockTakeProductResults[item.id]?.length) {
                                             setStockTakeShowDropdown(prev => ({ ...prev, [item.id]: true }));
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            setFloatingDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
+                                            setActiveFloatingDropdown(item.id);
                                           }
                                         }}
                                         placeholder="Search product..."
                                         className="text-sm p-1 h-7"
                                       />
-                                      {stockTakeShowDropdown[item.id] && stockTakeProductResults[item.id]?.length > 0 && (
-                                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md max-h-48 overflow-y-auto">
-                                          {stockTakeProductResults[item.id].map(p => (
-                                            <div
-                                              key={p.productId}
-                                              className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
-                                              onClick={() => selectStockTakeProduct(item.id, p.productId, p.name, p.quantity)}
-                                            >
-                                              <span className="text-sm">{p.name}</span>
-                                              {stockTakeGodownId && (
-                                                <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {stockTakeShowDropdown[item.id] && stockTakeProductResults[item.id]?.length === 0 && stockTakeProductSearch[item.id] && (
-                                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded shadow-md p-2 text-sm text-muted-foreground">
-                                          {stockTakeGodownId ? 'No products found in selected godown/zone.' : 'Select a godown first to filter products.'}
-                                        </div>
-                                      )}
                                     </td>
                                     <td className="p-2"><span className="text-sm">{item.godownName || '-'}</span></td>
                                     <td className="p-2"><span className="text-sm">{item.zoneName || '-'}</span></td>
@@ -15707,6 +15687,46 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                           </div>
                         </div>
                         </div>
+                        )}
+
+                        {/* Floating Product Search Dropdown - renders outside table overflow containers */}
+                        {activeFloatingDropdown && (
+                          <div
+                            className="fixed z-[9999] bg-white border rounded shadow-lg max-h-48 overflow-y-auto"
+                            style={{
+                              top: floatingDropdownPos.top + 4,
+                              left: floatingDropdownPos.left,
+                              width: Math.max(floatingDropdownPos.width, 200),
+                            }}
+                          >
+                            {batchMode ? (
+                              <>
+                                {(batchProductResults[activeFloatingDropdown] || []).map((p, pIdx) => (
+                                  <div key={`${p.productId}-${p.zoneId || 'nz'}-${pIdx}`} className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center" onClick={() => { selectBatchProduct(activeFloatingDropdown, p.productId, p.name, p.quantity, p.zoneId, p.zoneName); setActiveFloatingDropdown(null); }}>
+                                    <span className="text-sm">{p.name}</span>
+                                    <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
+                                  </div>
+                                ))}
+                                {(batchProductResults[activeFloatingDropdown] || []).length === 0 && batchProductSearch[activeFloatingDropdown] && (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">No products found.</div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {(stockTakeProductResults[activeFloatingDropdown] || []).map(p => (
+                                  <div key={p.productId} className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center" onClick={() => { selectStockTakeProduct(activeFloatingDropdown, p.productId, p.name, p.quantity); setActiveFloatingDropdown(null); }}>
+                                    <span className="text-sm">{p.name}</span>
+                                    {stockTakeGodownId && <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>}
+                                  </div>
+                                ))}
+                                {(stockTakeProductResults[activeFloatingDropdown] || []).length === 0 && stockTakeProductSearch[activeFloatingDropdown] && (
+                                  <div className="px-2 py-1 text-sm text-muted-foreground">
+                                    {stockTakeGodownId ? 'No products found in selected godown/zone.' : 'Select a godown first to filter products.'}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : currentTemplate?.type === "supplier-purchase-note" ? (
