@@ -18,6 +18,8 @@ export interface CashHandoverNoteData {
   businessPhone: string;
   totalAmount: number;
   notes: string;
+  agentClaimNote: string;
+  agentOwedNote: string;
   preparedBy: string;
   preparedDate: string;
   handedOverBy: string;
@@ -38,6 +40,8 @@ export interface SavedCashHandoverNote {
   businessPhone: string;
   totalAmount: number;
   notes: string;
+  agentClaimNote: string;
+  agentOwedNote: string;
   preparedBy: string;
   preparedDate: string;
   handedOverBy: string;
@@ -73,6 +77,8 @@ export const saveCashHandoverNote = async (
       business_phone: data.businessPhone || '',
       total_amount: data.totalAmount || 0,
       notes: data.notes || '',
+      agent_claim_note: data.agentClaimNote || '',
+      agent_owed_note: data.agentOwedNote || '',
       prepared_by: data.preparedBy || '',
       prepared_date: data.preparedDate || null,
       handed_over_by: data.handedOverBy || '',
@@ -134,6 +140,8 @@ export const getSavedCashHandoverNotes = async (
       businessPhone: db.business_phone || '',
       totalAmount: db.total_amount || 0,
       notes: db.notes || '',
+      agentClaimNote: db.agent_claim_note || '',
+      agentOwedNote: db.agent_owed_note || '',
       preparedBy: db.prepared_by || '',
       preparedDate: db.prepared_date || '',
       handedOverBy: db.handed_over_by || '',
@@ -191,6 +199,8 @@ export const updateCashHandoverNote = async (
     if (data.businessPhone !== undefined) updateData.business_phone = data.businessPhone;
     if (data.totalAmount !== undefined) updateData.total_amount = data.totalAmount;
     if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.agentClaimNote !== undefined) updateData.agent_claim_note = data.agentClaimNote;
+    if (data.agentOwedNote !== undefined) updateData.agent_owed_note = data.agentOwedNote;
     if (data.preparedBy !== undefined) updateData.prepared_by = data.preparedBy;
     if (data.preparedDate !== undefined) updateData.prepared_date = data.preparedDate;
     if (data.handedOverBy !== undefined) updateData.handed_over_by = data.handedOverBy;

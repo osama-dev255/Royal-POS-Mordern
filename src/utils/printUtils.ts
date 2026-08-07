@@ -5976,77 +5976,212 @@ export class PrintUtils {
     const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const n = note;
 
-    const statusColor = n.status === 'completed' ? '#16a34a' : n.status === 'cancelled' ? '#dc2626' : '#d97706';
+    // Generate a verification hash from note data
+    const verifyStr = (n.referenceNumber || '') + (n.date || '') + fmt(n.totalAmount || 0) + (n.preparedBy || '') + (n.receivedBy || '');
+    let hash = 0;
+    for (let i = 0; i < verifyStr.length; i++) { hash = ((hash << 5) - hash + verifyStr.charCodeAt(i)) | 0; }
+    const verifyCode = 'CHN-' + Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
 
     const html = `<!DOCTYPE html>
 <html><head><title>Cash Handover Note - ${n.referenceNumber || ''}</title>
 <style>
-  @page { size: A4 portrait; margin: 15mm; }
+  @page { size: A4 portrait; margin: 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; }
-  .header { text-align: center; border-bottom: 3px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 16px; }
-  .header h1 { font-size: 18px; letter-spacing: 1px; margin-bottom: 2px; }
-  .header .sub { font-size: 10px; color: #555; }
-  .header .status { display: inline-block; margin-top: 4px; padding: 2px 10px; font-size: 10px; font-weight: 700; color: #fff; background: ${statusColor}; border-radius: 3px; }
-  .business-info { text-align: center; margin-bottom: 12px; font-size: 11px; color: #555; }
-  .business-info .biz-name { font-weight: 700; color: #1a1a1a; font-size: 12px; }
-  .amount-box { border: 2px solid #1a1a1a; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 20px; }
-  .amount-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; }
-  .amount-box .value { font-size: 28px; font-weight: 800; color: #16a34a; margin-top: 4px; }
-  .amount-box .date { font-size: 11px; color: #555; margin-top: 4px; }
-  .notes-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 12px; font-size: 11px; white-space: pre-line; margin-bottom: 20px; }
-  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px; border-left: 3px solid #1a1a1a; padding-left: 6px; }
-  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; padding-top: 16px; border-top: 1px solid #d1d5db; }
-  .sig-block .sig-label { font-size: 9px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; }
-  .sig-block .sig-name { font-size: 12px; font-weight: 600; margin-top: 4px; min-height: 30px; border-bottom: 1px solid #999; padding-bottom: 20px; }
-  .sig-block .sig-date { font-size: 10px; color: #6b7280; margin-top: 2px; }
-  .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 20px; color: #000; background: #fff; position: relative; }
+
+  /* ── Watermark ── */
+  .watermark {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none; overflow: hidden;
+  }
+  .watermark-inner {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    white-space: nowrap;
+  }
+  .watermark-text {
+    font-size: 72px; font-weight: 700; color: rgba(0,0,0,0.04);
+    letter-spacing: 18px; text-transform: uppercase;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  /* ── Security Border ── */
+  .doc-border {
+    position: relative; z-index: 1;
+    border: 1.5px solid #000;
+    padding: 3mm;
+  }
+  .doc-border::before {
+    content: ''; position: absolute; top: 1.5mm; left: 1.5mm; right: 1.5mm; bottom: 1.5mm;
+    border: 0.5px solid #000; pointer-events: none;
+  }
+  .doc-inner { padding: 4mm 3mm; }
+
+  /* ── Corner Ornaments ── */
+  .corner { position: absolute; width: 14px; height: 14px; z-index: 2; }
+  .corner::before, .corner::after { content: ''; position: absolute; background: #000; }
+  .corner-tl { top: 2mm; left: 2mm; }
+  .corner-tl::before { top: 0; left: 0; width: 14px; height: 2px; }
+  .corner-tl::after { top: 0; left: 0; width: 2px; height: 14px; }
+  .corner-tr { top: 2mm; right: 2mm; }
+  .corner-tr::before { top: 0; right: 0; width: 14px; height: 2px; }
+  .corner-tr::after { top: 0; right: 0; width: 2px; height: 14px; }
+  .corner-bl { bottom: 2mm; left: 2mm; }
+  .corner-bl::before { bottom: 0; left: 0; width: 14px; height: 2px; }
+  .corner-bl::after { bottom: 0; left: 0; width: 2px; height: 14px; }
+  .corner-br { bottom: 2mm; right: 2mm; }
+  .corner-br::before { bottom: 0; right: 0; width: 14px; height: 2px; }
+  .corner-br::after { bottom: 0; right: 0; width: 2px; height: 14px; }
+
+  /* ── Header ── */
+  .header { text-align: center; padding-bottom: 10px; border-bottom: 3px double #000; margin-bottom: 14px; }
+  .header h1 { font-size: 20px; letter-spacing: 4px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+  .header-rule { width: 60px; height: 1px; background: #000; margin: 6px auto; }
+  .header-meta { display: flex; justify-content: center; gap: 30px; font-size: 20px; color: #333; }
+  .header-meta span { font-weight: 700; }
+  .header-status { display: inline-block; margin-top: 6px; padding: 2px 14px; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border: 1.5px solid #000; }
+
+  /* ── Two-Column Info ── */
+  .info-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 18px; }
+  .info-col { padding: 0; }
+  .info-col-header { padding: 0 0 4px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #000; margin-bottom: 6px; }
+  .info-col-body { padding: 0 4px; font-size: 20px; line-height: 1.6; }
+  .party-label { font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+
+  /* ── Agent Notes ── */
+  .agent-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 18px; }
+  .agent-note-col { }
+  .agent-note-header { font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 4px; margin-bottom: 6px; }
+  .agent-note-body { font-size: 20px; line-height: 1.6; min-height: 40px; }
+  .agent-note-line { border-bottom: 1px solid #000; margin-top: 8px; padding-bottom: 4px; min-height: 28px; display: inline-block; width: 60%; }
+
+  .agent-note-col-right { text-align: right; }
+
+  /* ── Amount Box ── */
+  .amount-section { text-align: center; margin-bottom: 18px; }
+  .amount-box { display: block; border: none; padding: 12px 80px; text-align: center; position: relative; width: 100%; box-sizing: border-box; }
+  .amount-box::before { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: none; }
+  .amount-box .amt-label { font-size: 26px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: #333; }
+  .amount-box .amt-value { font-size: 26px; font-weight: 700; color: #000; margin-top: 2px; letter-spacing: -0.5px; }
+  .amount-box .amt-date { font-size: 20px; color: #333; margin-top: 4px; }
+
+  /* ── Section Title ── */
+  .section-title { font-size: 20px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; padding-left: 8px; border-left: 3px solid #000; }
+
+  /* ── Notes ── */
+  .notes-box { border: 1px solid #000; padding: 8px 12px; font-size: 20px; white-space: pre-line; margin-bottom: 18px; }
+
+  /* ── Signatures ── */
+  .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 24px; }
+  .sig-block { text-align: center; }
+  .sig-block .sig-label { font-size: 20px; text-transform: uppercase; letter-spacing: 1px; color: #333; font-weight: 700; margin-bottom: 6px; }
+  .sig-block .sig-name { font-size: 20px; font-weight: 700; color: #000; padding: 8px 0; border-bottom: 1.5px solid #000; margin-bottom: 4px; min-height: 28px; }
+  .sig-block .sig-date { font-size: 20px; color: #333; }
+
+  /* ── Footer ── */
+  .footer { margin-top: 24px; text-align: center; font-size: 20px; color: #666; border-top: 1px solid #000; padding-top: 8px; }
+  .verify-code { font-family: 'Courier New', Courier, monospace; font-size: 20px; letter-spacing: 1px; color: #333; margin-top: 4px; }
+  .micro-print { font-size: 20px; color: #999; margin-top: 4px; letter-spacing: 0.5px; }
+
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none !important; }
+    .watermark { position: fixed; }
   }
 </style></head><body>
 
-  <div class="header">
-    <h1>CASH HANDOVER NOTE</h1>
-    <div class="sub">Reference: ${n.referenceNumber || ''}</div>
-    <div class="status">${(n.status || 'PENDING').toUpperCase()}</div>
-  </div>
-
-  ${n.businessName ? `<div class="business-info">
-    <div class="biz-name">${n.businessName}</div>
-    ${n.businessAddress ? '<div>' + n.businessAddress + '</div>' : ''}
-    ${n.businessPhone ? '<div>Phone: ' + n.businessPhone + '</div>' : ''}
-  </div>` : ''}
-
-  <div class="amount-box">
-    <div class="label">Total Cash Amount</div>
-    <div class="value">${fmt(n.totalAmount || 0)}</div>
-    <div class="date">Date: ${n.date || ''}</div>
-  </div>
-
-  ${n.notes ? '<div class="section-title">Notes</div><div class="notes-box">' + (n.notes || '') + '</div>' : ''}
-
-  <div class="section-title">Authorization & Signatures</div>
-  <div class="signatures">
-    <div class="sig-block">
-      <div class="sig-label">Prepared By</div>
-      <div class="sig-name">${n.preparedBy || ''}</div>
-      <div class="sig-date">${n.preparedDate || ''}</div>
-    </div>
-    <div class="sig-block">
-      <div class="sig-label">Handed Over By</div>
-      <div class="sig-name">${n.handedOverBy || ''}</div>
-      <div class="sig-date">${n.handedOverDate || ''}</div>
-    </div>
-    <div class="sig-block">
-      <div class="sig-label">Received By (Agent)</div>
-      <div class="sig-name">${n.receivedBy || ''}</div>
-      <div class="sig-date">${n.receivedDate || ''}</div>
+  <!-- Watermark Layer -->
+  <div class="watermark">
+    <div class="watermark-inner">
+      <div class="watermark-text">KABIDHI YA PESA</div>
     </div>
   </div>
 
-  <div class="footer">Generated on ${new Date().toLocaleDateString()} | Cash Handover Note</div>
+  <!-- Security Border -->
+  <div class="doc-border">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <div class="doc-inner">
+
+      <div class="header">
+        <h1>Noti ya Kabidhi ya Pesa</h1>
+        <div class="header-rule"></div>
+        <div class="header-meta">
+          <div>Rejea: <span>${n.referenceNumber || ''}</span></div>
+          <div>Tarehe: <span>_______________________</span></div>
+        </div>
+      </div>
+
+      <div class="info-columns">
+        <div class="info-col">
+          <div class="party-label">KUTOKA KWA:</div>
+          <div class="info-col-header">Biashara</div>
+          <div class="info-col-body">
+            ${n.businessName || '\u2014'}<br>
+            ${n.businessAddress || '\u2014'}<br>
+            ${n.businessPhone || '\u2014'}
+          </div>
+        </div>
+        <div class="info-col">
+          <div class="party-label">KWENDA KWA:</div>
+          <div class="info-col-header">Wakala wa Pesa</div>
+          <div class="info-col-body">
+            ${n.receivedBy || '\u2014'}<br>
+            ${n.receivedDate || '\u2014'}<br>
+            ${n.businessPhone || '\u2014'}
+          </div>
+        </div>
+      </div>
+
+      <div class="amount-section">
+        <div class="amount-box">
+          <div class="amt-label">Jumla ya Pesa</div>
+          <div class="amt-value">_____________________________________</div>
+        </div>
+      </div>
+
+      <div class="agent-notes">
+        <div class="agent-note-col">
+          <div class="agent-note-header">Pesa Anayodai Wakala</div>
+          <div class="agent-note-line">${n.agentClaimNote || ''}</div>
+        </div>
+        <div class="agent-note-col agent-note-col-right">
+          <div class="agent-note-header">Pesa Anayodaiwa Wakala</div>
+          <div class="agent-note-line">${n.agentOwedNote || ''}</div>
+        </div>
+      </div>
+
+      ${n.notes ? '<div class="section-title">Maelezo</div><div class="notes-box">' + (n.notes || '') + '</div>' : ''}
+
+      <div class="section-title">Idhini na Sahihi</div>
+      <div class="signatures">
+        <div class="sig-block">
+          <div class="sig-label">Imetayarishwa Na</div>
+          <div class="sig-name">${n.preparedBy || ''}</div>
+          <div class="sig-date">${n.preparedDate || ''}</div>
+        </div>
+        <div class="sig-block">
+          <div class="sig-label">Imekabidhiwa Na</div>
+          <div class="sig-name">${n.handedOverBy || ''}</div>
+          <div class="sig-date">${n.handedOverDate || ''}</div>
+        </div>
+        <div class="sig-block">
+          <div class="sig-label">Imepokelewa Na (Wakala)</div>
+          <div class="sig-name">${n.receivedBy || ''}</div>
+          <div class="sig-date">${n.receivedDate || ''}</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Noti ya Kabidhi ya Pesa &nbsp;|&nbsp; ${n.referenceNumber || ''}
+        <div class="verify-code">Uthibitisho: ${verifyCode}</div>
+        <div class="micro-print">Hii ni hati iliyotolewa na mfumo. Thibitisha uhalali kwa kutumia msimbo hapo juu. Mabadiliko yasiyoidhinishwa ni batili.</div>
+      </div>
+
+    </div>
+  </div>
 
 </body></html>`;
 
