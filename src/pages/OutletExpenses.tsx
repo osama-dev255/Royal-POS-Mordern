@@ -3437,8 +3437,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               <label className="text-sm font-medium">Receipt/Invoice (PDF)</label>
               {!expenseData.receipt_url ? (
                 <div className="mt-2">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/30 rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-colors">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <div className="relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/30 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none">
                       {uploadingFile ? (
                         <>
                           <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-2" />
@@ -3455,7 +3455,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                         <>
                           <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                           <p className="text-sm text-muted-foreground">
-                            <span className="font-medium">Click to upload</span> or drag and drop
+                            <span className="font-medium">Tap to upload</span> or click to browse
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">PDF only (MAX. 10MB)</p>
                         </>
@@ -3463,12 +3463,12 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     </div>
                     <input
                       type="file"
-                      className="hidden"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       accept=".pdf,application/pdf"
                       onChange={handleFileUpload}
                       disabled={uploadingFile}
                     />
-                  </label>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-2 p-4 border rounded-lg bg-green-50 border-green-200">
