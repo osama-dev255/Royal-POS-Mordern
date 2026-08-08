@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1555,14 +1556,11 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
   // Search products in selected godown/zone for stock take
   const searchStockTakeProducts = async (itemId: string, query: string) => {
     setStockTakeProductSearch(prev => ({ ...prev, [itemId]: query }));
-    if (!query || query.length < 1) {
-      setStockTakeProductResults(prev => ({ ...prev, [itemId]: [] }));
-      setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: false }));
-      return;
-    }
     try {
       const allProducts = await getProducts();
-      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      const filtered = query.length > 0
+        ? allProducts.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+        : allProducts;
       
       // If a godown is selected, filter to only products with stock in that godown
       if (stockTakeGodownId) {
@@ -1585,6 +1583,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
         setStockTakeProductResults(prev => ({ ...prev, [itemId]: filtered.slice(0, 20).map(p => ({ productId: p.id || '', name: p.name, quantity: 0 })) }));
       }
       setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: true }));
+      setStockTakeDropdownActive(itemId);
     } catch (error) {
       console.error('Error searching stock take products:', error);
     }
@@ -1627,7 +1626,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
     }));
     setStockTakeProductSearch(prev => ({ ...prev, [itemId]: productName }));
     setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: false }));
-    setActiveFloatingDropdown(null);
+    setStockTakeDropdownActive(null);
   };
 
   // Add new row to stock take items
@@ -7191,20 +7190,18 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
   const [batchProductSearch, setBatchProductSearch] = useState<Record<string, string>>({});
   const [batchProductResults, setBatchProductResults] = useState<Record<string, Array<{ productId: string; name: string; quantity: number; zoneId?: string; zoneName?: string }>>>({});
   const [batchShowDropdown, setBatchShowDropdown] = useState<Record<string, boolean>>({});
-  const [activeFloatingDropdown, setActiveFloatingDropdown] = useState<string | null>(null);
-  const [floatingDropdownPos, setFloatingDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const [stockTakeDropdownActive, setStockTakeDropdownActive] = useState<string | null>(null);
+  const [stockTakeDropdownPos, setStockTakeDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const searchBatchProducts = async (itemId: string, query: string) => {
     const godown = getCurrentBatchGodown();
     if (!godown) return;
     setBatchProductSearch(prev => ({ ...prev, [itemId]: query }));
-    if (query.length < 1) {
-      setBatchProductResults(prev => ({ ...prev, [itemId]: [] }));
-      return;
-    }
     try {
       const allProducts = await getProducts();
-      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      const filtered = query.length > 0
+        ? allProducts.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+        : allProducts;
       const resultsWithQty: Array<{ productId: string; name: string; quantity: number; zoneId?: string; zoneName?: string }> = [];
       for (const p of filtered.slice(0, 10)) {
         if (!p.id) continue;
@@ -7233,7 +7230,12 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
         }
       }
       setBatchProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
-      if (resultsWithQty.length > 0) setBatchShowDropdown(prev => ({ ...prev, [itemId]: true }));
+      if (resultsWithQty.length > 0) {
+        setBatchShowDropdown(prev => ({ ...prev, [itemId]: true }));
+        setStockTakeDropdownActive(itemId);
+      } else {
+        setStockTakeDropdownActive(null);
+      }
     } catch (error) {
       console.error('Error searching batch products:', error);
     }
@@ -7255,7 +7257,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
     });
     setBatchProductSearch(prev => ({ ...prev, [itemId]: productName.replace(/ \[.*\]$/, '') }));
     setBatchShowDropdown(prev => ({ ...prev, [itemId]: false }));
-    setActiveFloatingDropdown(null);
+    setStockTakeDropdownActive(null);
   };
 
   // Generate Stock Take HTML for printing
@@ -15381,7 +15383,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                     <div className="flex items-center justify-between mb-2">
                                       <h3 className="font-bold text-sm">GODOWN STOCK COUNT - {getCurrentBatchGodown()?.name}</h3>
                                     </div>
-                                    <div className="overflow-x-auto -mx-2 px-2">
+                                    <div className="overflow-x-auto relative">
                                       <table className="w-full min-w-[640px] text-sm border-collapse">
                                         <thead>
                                           <tr className="border-b-2 border-gray-800">
@@ -15403,15 +15405,12 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                                   value={batchProductSearch[item.id] || ''}
                                                   onChange={(e) => searchBatchProducts(item.id, e.target.value)}
                                                   onFocus={(e) => {
-                                                    if (batchProductResults[item.id]?.length) {
-                                                      setBatchShowDropdown(prev => ({ ...prev, [item.id]: true }));
-                                                      const rect = e.currentTarget.getBoundingClientRect();
-                                                      setFloatingDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
-                                                      setActiveFloatingDropdown(item.id);
-                                                    }
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setStockTakeDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 250) });
+                                                    searchBatchProducts(item.id, batchProductSearch[item.id] || '');
                                                   }}
                                                   placeholder="Search product..."
-                                                  className="text-sm p-1 h-7"
+                                                  className="text-sm p-1 h-7 w-full"
                                                 />
                                               </td>
                                               <td className="p-2">
@@ -15577,7 +15576,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                           {!stockTakeGodownId && (
                             <p className="text-sm text-muted-foreground mb-2 italic">Select a Godown above to filter products by warehouse stock.</p>
                           )}
-                          <div className="overflow-x-auto -mx-2 px-2">
+                          <div className="overflow-x-auto relative">
                             <table className="w-full min-w-[700px] text-sm border-collapse">
                               <thead>
                                 <tr className="border-b-2 border-gray-800">
@@ -15600,15 +15599,12 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                         value={stockTakeProductSearch[item.id] || ''}
                                         onChange={(e) => searchStockTakeProducts(item.id, e.target.value)}
                                         onFocus={(e) => {
-                                          if (stockTakeProductResults[item.id]?.length) {
-                                            setStockTakeShowDropdown(prev => ({ ...prev, [item.id]: true }));
-                                            const rect = e.currentTarget.getBoundingClientRect();
-                                            setFloatingDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
-                                            setActiveFloatingDropdown(item.id);
-                                          }
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setStockTakeDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 250) });
+                                          searchStockTakeProducts(item.id, stockTakeProductSearch[item.id] || '');
                                         }}
                                         placeholder="Search product..."
-                                        className="text-sm p-1 h-7"
+                                        className="text-sm p-1 h-7 w-full"
                                       />
                                     </td>
                                     <td className="p-2"><span className="text-sm">{item.godownName || '-'}</span></td>
@@ -15689,44 +15685,45 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                         </div>
                         )}
 
-                        {/* Floating Product Search Dropdown - renders outside table overflow containers */}
-                        {activeFloatingDropdown && (
+                        {/* Portal-rendered product search dropdown - floats above all overflow containers */}
+                        {stockTakeDropdownActive && createPortal(
                           <div
-                            className="fixed z-[9999] bg-white border rounded shadow-lg max-h-48 overflow-y-auto"
+                            className="fixed z-[9999] bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-auto"
                             style={{
-                              top: floatingDropdownPos.top + 4,
-                              left: floatingDropdownPos.left,
-                              width: Math.max(floatingDropdownPos.width, 200),
+                              top: stockTakeDropdownPos.top,
+                              left: stockTakeDropdownPos.left,
+                              width: stockTakeDropdownPos.width,
                             }}
                           >
                             {batchMode ? (
                               <>
-                                {(batchProductResults[activeFloatingDropdown] || []).map((p, pIdx) => (
-                                  <div key={`${p.productId}-${p.zoneId || 'nz'}-${pIdx}`} className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center" onClick={() => { selectBatchProduct(activeFloatingDropdown, p.productId, p.name, p.quantity, p.zoneId, p.zoneName); setActiveFloatingDropdown(null); }}>
-                                    <span className="text-sm">{p.name}</span>
-                                    <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
+                                {(batchProductResults[stockTakeDropdownActive] || []).map((p, pIdx) => (
+                                  <div key={`${p.productId}-${p.zoneId || 'nz'}-${pIdx}`} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex justify-between items-center" onMouseDown={() => { selectBatchProduct(stockTakeDropdownActive, p.productId, p.name, p.quantity, p.zoneId, p.zoneName); setStockTakeDropdownActive(null); }}>
+                                    <span className="flex-1">{p.name}</span>
+                                    <span className="ml-2 text-xs font-semibold text-green-700">Qty: {p.quantity}</span>
                                   </div>
                                 ))}
-                                {(batchProductResults[activeFloatingDropdown] || []).length === 0 && batchProductSearch[activeFloatingDropdown] && (
-                                  <div className="px-2 py-1 text-sm text-muted-foreground">No products found.</div>
+                                {(batchProductResults[stockTakeDropdownActive] || []).length === 0 && batchProductSearch[stockTakeDropdownActive] && (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">No products found.</div>
                                 )}
                               </>
                             ) : (
                               <>
-                                {(stockTakeProductResults[activeFloatingDropdown] || []).map(p => (
-                                  <div key={p.productId} className="px-2 py-1 hover:bg-gray-100 cursor-pointer flex justify-between items-center" onClick={() => { selectStockTakeProduct(activeFloatingDropdown, p.productId, p.name, p.quantity); setActiveFloatingDropdown(null); }}>
-                                    <span className="text-sm">{p.name}</span>
-                                    {stockTakeGodownId && <span className="text-xs font-semibold text-green-700">Qty: {p.quantity}</span>}
+                                {(stockTakeProductResults[stockTakeDropdownActive] || []).map(p => (
+                                  <div key={p.productId} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex justify-between items-center" onMouseDown={() => { selectStockTakeProduct(stockTakeDropdownActive, p.productId, p.name, p.quantity); setStockTakeDropdownActive(null); }}>
+                                    <span className="flex-1">{p.name}</span>
+                                    {stockTakeGodownId && <span className="ml-2 text-xs font-semibold text-green-700">Qty: {p.quantity}</span>}
                                   </div>
                                 ))}
-                                {(stockTakeProductResults[activeFloatingDropdown] || []).length === 0 && stockTakeProductSearch[activeFloatingDropdown] && (
-                                  <div className="px-2 py-1 text-sm text-muted-foreground">
+                                {(stockTakeProductResults[stockTakeDropdownActive] || []).length === 0 && stockTakeProductSearch[stockTakeDropdownActive] && (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">
                                     {stockTakeGodownId ? 'No products found in selected godown/zone.' : 'Select a godown first to filter products.'}
                                   </div>
                                 )}
                               </>
                             )}
-                          </div>
+                          </div>,
+                          document.body
                         )}
                       </div>
                     ) : currentTemplate?.type === "supplier-purchase-note" ? (
