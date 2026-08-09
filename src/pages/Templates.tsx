@@ -1556,6 +1556,9 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
 
   // Search products in selected godown/zone for stock take
   const searchStockTakeProducts = async (itemId: string, query: string) => {
+    // Track this search to prevent race conditions
+    const searchId = (stockTakeSearchIdRef.current[itemId] || 0) + 1;
+    stockTakeSearchIdRef.current[itemId] = searchId;
     setStockTakeProductSearch(prev => ({ ...prev, [itemId]: query }));
     try {
       const allProducts = await getProducts();
@@ -1578,13 +1581,21 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
             resultsWithQty.push({ productId: p.id, name: p.name, quantity: totalQty });
           }
         }
-        setStockTakeProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
+        // Only update state if this is still the latest search for this item
+        if (stockTakeSearchIdRef.current[itemId] === searchId) {
+          setStockTakeProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
+        }
       } else {
         // No godown selected - show all products with a hint
-        setStockTakeProductResults(prev => ({ ...prev, [itemId]: filtered.slice(0, 20).map(p => ({ productId: p.id || '', name: p.name, quantity: 0 })) }));
+        if (stockTakeSearchIdRef.current[itemId] === searchId) {
+          setStockTakeProductResults(prev => ({ ...prev, [itemId]: filtered.slice(0, 20).map(p => ({ productId: p.id || '', name: p.name, quantity: 0 })) }));
+        }
       }
-      setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: true }));
-      setStockTakeDropdownActive(itemId);
+      // Only update dropdown state if this is still the latest search
+      if (stockTakeSearchIdRef.current[itemId] === searchId) {
+        setStockTakeShowDropdown(prev => ({ ...prev, [itemId]: true }));
+        setStockTakeDropdownActive(itemId);
+      }
     } catch (error) {
       console.error('Error searching stock take products:', error);
     }
@@ -7193,10 +7204,14 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
   const [batchShowDropdown, setBatchShowDropdown] = useState<Record<string, boolean>>({});
   const [stockTakeDropdownActive, setStockTakeDropdownActive] = useState<string | null>(null);
   const [stockTakeDropdownPos, setStockTakeDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const stockTakeSearchIdRef = useRef<Record<string, number>>({});
 
   const searchBatchProducts = async (itemId: string, query: string) => {
     const godown = getCurrentBatchGodown();
     if (!godown) return;
+    // Track this search to prevent race conditions
+    const searchId = (stockTakeSearchIdRef.current[itemId] || 0) + 1;
+    stockTakeSearchIdRef.current[itemId] = searchId;
     setBatchProductSearch(prev => ({ ...prev, [itemId]: query }));
     try {
       const allProducts = await getProducts();
@@ -7230,12 +7245,11 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
           });
         }
       }
-      setBatchProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
-      if (resultsWithQty.length > 0) {
+      // Only update state if this is still the latest search for this item
+      if (stockTakeSearchIdRef.current[itemId] === searchId) {
+        setBatchProductResults(prev => ({ ...prev, [itemId]: resultsWithQty }));
         setBatchShowDropdown(prev => ({ ...prev, [itemId]: true }));
         setStockTakeDropdownActive(itemId);
-      } else {
-        setStockTakeDropdownActive(null);
       }
     } catch (error) {
       console.error('Error searching batch products:', error);
@@ -15384,7 +15398,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                     <div className="flex items-center justify-between mb-2">
                                       <h3 className="font-bold text-sm">GODOWN STOCK COUNT - {getCurrentBatchGodown()?.name}</h3>
                                     </div>
-                                    <div className="overflow-x-auto relative">
+                                    <div className="overflow-x-auto border rounded-md">
                                       <table className="w-full min-w-[640px] text-sm border-collapse">
                                         <thead>
                                           <tr className="border-b-2 border-gray-800">
@@ -15577,7 +15591,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                           {!stockTakeGodownId && (
                             <p className="text-sm text-muted-foreground mb-2 italic">Select a Godown above to filter products by warehouse stock.</p>
                           )}
-                          <div className="overflow-x-auto relative">
+                          <div className="overflow-x-auto border rounded-md">
                             <table className="w-full min-w-[700px] text-sm border-collapse">
                               <thead>
                                 <tr className="border-b-2 border-gray-800">
