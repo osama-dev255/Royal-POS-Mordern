@@ -40,7 +40,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, reviewOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getOutletDebtPaymentsByDebtId, updateOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance, recalculateCustomerLedgerBalance } from "@/services/databaseService";
+import { getOutletDebtsByOutletId, deleteOutletDebt, updateOutletDebt, approveOutletDebt, reviewOutletDebt, OutletDebt, getOutletCustomerById, getOutletDebtItemsByDebtId, deleteOutletDebtItem, createOutletDebtItem, createOutletDebtPayment, getOutletDebtPaymentsByDebtId, updateOutletDebtPayment, getInventoryProductsByOutlet, InventoryProduct, incrementSoldQuantity, getCustomerLedgerBalance, recalculateCustomerLedgerBalance, reconcileCustomerLedgerAfterDebtEdit } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
@@ -1242,8 +1242,6 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         
         // Step 3b: Sync the credit side of the ledger by updating the existing
         // debt_payment record (or creating one if none exists).
-        // The DB trigger 'trg_update_ledger_entry_for_debt_payment' will
-        // automatically update the customer_ledger credit entry.
         const newAmountPaid = editFormData.amountPaid || 0;
         const existingPayments = await getOutletDebtPaymentsByDebtId(selectedSale.id);
         
@@ -1256,7 +1254,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             payment_date: new Date().toISOString(),
             notes: `Payment updated via edit - ${selectedSale.invoiceNumber || 'unknown'}`
           });
-          console.log('✅ Payment record updated, ledger credit entry will be updated by trigger');
+          console.log('✅ Payment record updated');
         } else if (newAmountPaid > 0) {
           // No existing payment record but amount_paid > 0: create one
           console.log(`💰 No existing payment record, creating one for amount ${newAmountPaid}...`);
@@ -1268,7 +1266,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
             notes: `Payment recorded via edit - ${selectedSale.invoiceNumber || 'unknown'}`,
             created_by: null
           });
-          console.log('✅ Debt payment record created, ledger credit entry will be created by trigger');
+          console.log('✅ Debt payment record created');
         }
         
         // Step 4: Delete existing items
@@ -1312,13 +1310,52 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         
         console.log('✅ All items created and inventory updated successfully');
         
-        // Step 6: Force recalculate customer ledger balances as a safety net
-        // This ensures the ledger is always in sync after an edit, even if the
-        // DB trigger didn't fire (e.g. when total_amount didn't change)
+        // Step 6: Reconcile customer ledger — ensure ledger entries match debt
+        // record exactly. This replaces the old "recalculate only" approach with
+        // a full upsert of credit_sale and debt_payment entries, so the ledger
+        // balance always matches the debt records. Throws on failure (no silent
+        // failures).
         if (selectedSale.customerId) {
-          console.log('🔄 Force recalculating customer ledger balances...');
-          await recalculateCustomerLedgerBalance(outletId, selectedSale.customerId);
-          console.log('✅ Customer ledger balances recalculated');
+          console.log('🔄 Reconciling customer ledger after debt edit...');
+          try {
+            const reconciliation = await reconcileCustomerLedgerAfterDebtEdit(
+              outletId,
+              selectedSale.customerId,
+              selectedSale.id,
+              editFormData.total || 0,
+              editFormData.amountPaid || 0,
+              selectedSale.invoiceNumber
+            );
+            
+            // Verify: ledger balance should equal sum of all customer debts' remaining
+            const sumOfRemaining = sales
+              .filter(s => s.customerId === selectedSale.customerId)
+              .reduce((sum, s) => {
+                if (s.id === selectedSale.id) {
+                  // Use the newly calculated remaining for THIS debt
+                  return sum + ((editFormData.total || 0) - (editFormData.amountPaid || 0));
+                }
+                return sum + (s.remainingAmount || 0);
+              }, 0);
+            
+            console.log(`🔍 Verification — Ledger balance: ${reconciliation.ledgerBalance}, Sum of debt remaining: ${sumOfRemaining}`);
+            
+            if (Math.abs(reconciliation.ledgerBalance - sumOfRemaining) > 0.01) {
+              console.warn(
+                `⚠️ Ledger balance (${reconciliation.ledgerBalance}) differs from sum of debt remaining (${sumOfRemaining}) by ${reconciliation.ledgerBalance - sumOfRemaining}. ` +
+                `This may be due to settlements or adjustments not allocated to specific debts.`
+              );
+            }
+            
+            console.log('✅ Customer ledger reconciliation complete');
+          } catch (reconcileError) {
+            console.error('❌ Ledger reconciliation failed:', reconcileError);
+            toast({
+              title: "Warning",
+              description: "Debt saved but ledger reconciliation failed. Customer balance may be out of sync.",
+              variant: "destructive"
+            });
+          }
         }
         
         toast({

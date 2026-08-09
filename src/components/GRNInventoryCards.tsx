@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, Package, Filter, Download, Upload, Calendar, SortAsc, SortDesc } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Search, Package, Filter, Download, Upload, Calendar, SortAsc, SortDesc, X } from "lucide-react";
 import { GRNInventoryCard } from "./GRNInventoryCard";
 import { SavedGRN } from "@/utils/grnUtils";
 
@@ -26,6 +28,58 @@ export const GRNInventoryCards = ({
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date-desc");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [datePreset, setDatePreset] = useState("all");
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const handleDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setDateRange({ from: todayStr, to: todayStr });
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split('T')[0];
+        setDateRange({ from: yStr, to: yStr });
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setDateRange({ from: d.toISOString().split('T')[0], to: todayStr });
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setDateRange({ from: d.toISOString().split('T')[0], to: todayStr });
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setDateRange({ from: first, to: todayStr });
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setDateRange({ from: first.toISOString().split('T')[0], to: last.toISOString().split('T')[0] });
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setDateRange({ from: first, to: todayStr });
+        break;
+      }
+      case 'all':
+      default:
+        setDateRange({ from: "", to: "" });
+        break;
+    }
+  };
 
   // Filter and sort GRNs
   const filteredAndSortedGRNs = useMemo(() => {
@@ -81,6 +135,7 @@ export const GRNInventoryCards = ({
     setStatusFilter("all");
     setSortBy("date-desc");
     setDateRange({ from: "", to: "" });
+    setDatePreset("all");
   };
 
   const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || sortBy !== "date-desc" || dateRange.from !== "" || dateRange.to !== "";
@@ -147,7 +202,7 @@ export const GRNInventoryCards = ({
                   type="date"
                   className="pl-10"
                   value={dateRange.from}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+                  onChange={(e) => { setDateRange(prev => ({ ...prev, from: e.target.value })); setDatePreset('custom'); }}
                 />
               </div>
             </div>
@@ -160,7 +215,7 @@ export const GRNInventoryCards = ({
                   type="date"
                   className="pl-10"
                   value={dateRange.to}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
+                  onChange={(e) => { setDateRange(prev => ({ ...prev, to: e.target.value })); setDatePreset('custom'); }}
                 />
               </div>
             </div>
@@ -201,6 +256,60 @@ export const GRNInventoryCards = ({
             </div>
           </div>
           
+          {/* Quick Range Presets */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium mr-1">Quick Range:</span>
+            {[
+              { key: 'today', label: 'Today' },
+              { key: 'yesterday', label: 'Yesterday' },
+              { key: 'last7', label: 'Last 7 Days' },
+              { key: 'last30', label: 'Last 30 Days' },
+              { key: 'thisMonth', label: 'This Month' },
+              { key: 'lastMonth', label: 'Last Month' },
+              { key: 'thisYear', label: 'This Year' },
+              { key: 'all', label: 'All Time' },
+            ].map(preset => (
+              <Button
+                key={preset.key}
+                size="sm"
+                variant={datePreset === preset.key ? 'default' : 'outline'}
+                onClick={() => handleDatePreset(preset.key)}
+                className={datePreset === preset.key ? '' : 'text-xs'}
+              >
+                {preset.label}
+              </Button>
+            ))}
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 whitespace-nowrap">
+                  <Calendar className="h-4 w-4 mr-1" />
+                  Calendar
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <CalendarComponent
+                  mode="range"
+                  selected={{
+                    from: dateRange.from ? new Date(dateRange.from) : undefined,
+                    to: dateRange.to ? new Date(dateRange.to) : undefined,
+                  }}
+                  onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                    if (range?.from) setDateRange(prev => ({ ...prev, from: range.from!.toISOString().split('T')[0] }));
+                    if (range?.to) setDateRange(prev => ({ ...prev, to: range.to!.toISOString().split('T')[0] }));
+                    setDatePreset('custom');
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+            {(dateRange.from || dateRange.to) && (
+              <Button variant="ghost" size="sm" onClick={() => handleDatePreset('all')} className="h-8 text-xs">
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            )}
+          </div>
+
           {/* Active Filters Summary */}
           {hasActiveFilters && (
             <div className="flex items-center justify-between pt-2 border-t">
