@@ -1411,6 +1411,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
   const [spnLoadingProducts, setSpnLoadingProducts] = useState<boolean>(false);
   const [spnItemProductSearch, setSpnItemProductSearch] = useState<Record<string, string>>({});
   const [spnItemShowProductDropdown, setSpnItemShowProductDropdown] = useState<Record<string, boolean>>({});
+    const [spnActiveItemDropdown, setSpnActiveItemDropdown] = useState<{ itemId: string; rect: DOMRect } | null>(null);
   const [spnShowNewProductDialog, setSpnShowNewProductDialog] = useState<boolean>(false);
   const [spnNewProductForm, setSpnNewProductForm] = useState({ name: '', unit_of_measure: '', cost_price: 0, selling_price: 0, category_id: '', quantity: 0 });
   const [spnSavingNewProduct, setSpnSavingNewProduct] = useState<boolean>(false);
@@ -15910,8 +15911,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                         {/* Items Table */}
                         <div>
                           <h3 className="font-bold mb-2">ITEMS PURCHASED</h3>
-                          <div className="overflow-visible">
-                            <table className="w-full text-sm border-collapse">
+                          <div className="overflow-x-auto border rounded-md">
+                            <table className="w-full text-sm border-collapse min-w-[700px]">
                               <thead>
                                 <tr className="border-b-2 border-indigo-300 bg-indigo-50">
                                   <th className="text-left p-2">Description</th>
@@ -15936,77 +15937,19 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                             handleSupplierPurchaseItemChange(item.id, 'description', val);
                                             setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
                                           }}
-                                          onFocus={() => {
+                                          onFocus={(e) => {
                                             setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                            setSpnActiveItemDropdown({ itemId: item.id, rect: e.currentTarget.getBoundingClientRect() });
                                           }}
                                           onBlur={() => {
-                                            setTimeout(() => setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false })), 200);
+                                            setTimeout(() => {
+                                              setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
+                                              setSpnActiveItemDropdown(null);
+                                            }, 200);
                                           }}
                                           className="p-1 h-8 text-sm"
                                           placeholder="Search product or type description..."
                                         />
-                                        {spnItemShowProductDropdown[item.id] && (
-                                          <div className="absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
-                                            {spnLoadingProducts ? (
-                                              <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
-                                            ) : spnSupplierProducts.length > 0 ? (
-                                              <div>
-                                                {spnSupplierProducts
-                                                  .filter(p => {
-                                                    const search = (spnItemProductSearch[item.id] || item.description || '').toLowerCase();
-                                                    return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
-                                                  })
-                                                  .map((product) => (
-                                                    <div
-                                                      key={product.id}
-                                                      onMouseDown={(e) => {
-                                                        e.preventDefault();
-                                                        handleSupplierPurchaseItemChange(item.id, 'description', product.name);
-                                                        handleSupplierPurchaseItemChange(item.id, 'unit', product.unit_of_measure || '');
-                                                        handleSupplierPurchaseItemChange(item.id, 'unitPrice', product.cost_price || 0);
-                                                        handleSupplierPurchaseItemChange(item.id, 'sellingPrice', product.selling_price || 0);
-                                                        setSpnItemProductSearch(prev => ({ ...prev, [item.id]: product.name }));
-                                                        setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
-                                                      }}
-                                                      className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
-                                                    >
-                                                      <div className="flex flex-col gap-0.5">
-                                                        <span className="font-semibold text-sm">{product.name}</span>
-                                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                                          {product.unit_of_measure && <span>Unit: {product.unit_of_measure}</span>}
-                                                          <span>Cost: {formatCurrency(product.cost_price || 0)}</span>
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  ))}
-                                              </div>
-                                            ) : (
-                                              <div className="p-3 text-center text-sm text-muted-foreground">
-                                                {supplierPurchaseNoteData.supplierId ? 'No products for this supplier' : 'Select a supplier first'}
-                                              </div>
-                                            )}
-                                            <div
-                                              onMouseDown={(e) => {
-                                                e.preventDefault();
-                                                setSpnItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
-                                                setSpnNewProductItemId(item.id);
-                                                setSpnNewProductForm({
-                                                  name: spnItemProductSearch[item.id] || item.description || '',
-                                                  unit_of_measure: item.unit || '',
-                                                  cost_price: item.unitPrice || 0,
-                                                  selling_price: 0,
-                                                  category_id: '',
-                                                  quantity: item.quantity || 0
-                                                });
-                                                setSpnShowNewProductDialog(true);
-                                              }}
-                                              className="cursor-pointer py-2 px-3 hover:bg-emerald-50 border-t bg-emerald-100/50 text-emerald-800 font-medium text-sm flex items-center gap-2"
-                                            >
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                                              Register New Product
-                                            </div>
-                                          </div>
-                                        )}
                                       </div>
                                     </td>
                                     <td className="p-2">
@@ -16041,6 +15984,85 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                             <Plus className="h-4 w-4 mr-1" /> Add Item
                           </Button>
                         </div>
+
+                        {/* Product Dropdown Portal - rendered outside overflow container */}
+                        {spnActiveItemDropdown && spnItemShowProductDropdown[spnActiveItemDropdown.itemId] && (() => {
+                          const activeItem = supplierPurchaseNoteData.items.find(i => i.id === spnActiveItemDropdown.itemId);
+                          if (!activeItem) return null;
+                          const rect = spnActiveItemDropdown.rect;
+                          return createPortal(
+                            <div
+                              className="fixed z-[9999] bg-white border rounded-b-lg shadow-lg max-h-48 overflow-auto"
+                              style={{
+                                left: rect.left,
+                                top: rect.bottom,
+                                width: rect.width,
+                              }}
+                            >
+                              {spnLoadingProducts ? (
+                                <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
+                              ) : spnSupplierProducts.length > 0 ? (
+                                <div>
+                                  {spnSupplierProducts
+                                    .filter(p => {
+                                      const search = (spnItemProductSearch[spnActiveItemDropdown.itemId] || activeItem.description || '').toLowerCase();
+                                      return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                                    })
+                                    .map((product) => (
+                                      <div
+                                        key={product.id}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          handleSupplierPurchaseItemChange(spnActiveItemDropdown.itemId, 'description', product.name);
+                                          handleSupplierPurchaseItemChange(spnActiveItemDropdown.itemId, 'unit', product.unit_of_measure || '');
+                                          handleSupplierPurchaseItemChange(spnActiveItemDropdown.itemId, 'unitPrice', product.cost_price || 0);
+                                          handleSupplierPurchaseItemChange(spnActiveItemDropdown.itemId, 'sellingPrice', product.selling_price || 0);
+                                          setSpnItemProductSearch(prev => ({ ...prev, [spnActiveItemDropdown.itemId]: product.name }));
+                                          setSpnItemShowProductDropdown(prev => ({ ...prev, [spnActiveItemDropdown.itemId]: false }));
+                                          setSpnActiveItemDropdown(null);
+                                        }}
+                                        className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                      >
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="font-semibold text-sm">{product.name}</span>
+                                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                            {product.unit_of_measure && <span>Unit: {product.unit_of_measure}</span>}
+                                            <span>Cost: {formatCurrency(product.cost_price || 0)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                              ) : (
+                                <div className="p-3 text-center text-sm text-muted-foreground">
+                                  {supplierPurchaseNoteData.supplierId ? 'No products for this supplier' : 'Select a supplier first'}
+                                </div>
+                              )}
+                              <div
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setSpnItemShowProductDropdown(prev => ({ ...prev, [spnActiveItemDropdown.itemId]: false }));
+                                  setSpnNewProductItemId(spnActiveItemDropdown.itemId);
+                                  setSpnNewProductForm({
+                                    name: spnItemProductSearch[spnActiveItemDropdown.itemId] || activeItem.description || '',
+                                    unit_of_measure: activeItem.unit || '',
+                                    cost_price: activeItem.unitPrice || 0,
+                                    selling_price: 0,
+                                    category_id: '',
+                                    quantity: activeItem.quantity || 0
+                                  });
+                                  setSpnShowNewProductDialog(true);
+                                  setSpnActiveItemDropdown(null);
+                                }}
+                                className="cursor-pointer py-2 px-3 hover:bg-emerald-50 border-t bg-emerald-100/50 text-emerald-800 font-medium text-sm flex items-center gap-2"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                Register New Product
+                              </div>
+                            </div>,
+                            document.body
+                          );
+                        })()}
 
                         {/* Destination, Total */}
                         <div className="grid grid-cols-2 gap-4">
