@@ -1451,13 +1451,16 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     const earlierRemaining = sale.creditBroughtForward || 0;
     const debtPaymentAmount = sale.debtPaymentAmount || 0;
 
-    // Amount Due = this invoice's current remaining + current remaining of all
-    // earlier invoices. This equals the customer's true outstanding balance and
-    // stays correct even after earlier invoices are edited or paid down.
-    // We do NOT subtract debtPaymentAmount here: any debt payment made in this
-    // transaction already reduced the earlier invoices' live remaining, so
-    // subtracting it again would double-count the payment.
-    const totalBalance = remainingAmount + earlierRemaining;
+    // Debt-based calculation (from outlet_debts.remaining_amount only)
+    const debtBasedBalance = remainingAmount + earlierRemaining;
+
+    // Use customerBalance (from ledger) as the authoritative Amount Due when
+    // available. The ledger includes ALL transactions: debts, payments,
+    // settlements, and adjustments — so it's always the most accurate figure.
+    // Fall back to debt-based calculation when customerBalance is undefined.
+    const totalBalance = sale.customerBalance !== undefined
+      ? sale.customerBalance
+      : debtBasedBalance;
 
     // For the printed line items to reconcile (Total + Previous Balance -
     // Amount Paid - Debt Payment = Amount Due), reconstruct the PRE-payment
@@ -1465,9 +1468,7 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
     // earlier remaining.
     const creditBroughtForward = earlierRemaining + debtPaymentAmount;
 
-    // Note: amountPaid is the debt's capped value (max = debt total).
-    // The customer's overall credit balance (customerBalance) is shown
-    // separately in the print summary to avoid incorrect per-debt attribution.
+    // amountPaid is the debt's capped value (max = debt total).
     const actualPaid = sale.amountPaid || 0;
     
     // Create transaction object that matches PrintUtils.printDebtInvoice expectations
