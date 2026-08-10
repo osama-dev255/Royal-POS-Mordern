@@ -39,7 +39,10 @@ const unitOfMeasureOptions = [
   { value: "gal", label: "Gallon" },
   { value: "box", label: "Box" },
   { value: "pack", label: "Pack" },
-  { value: "dozen", label: "Dozen" }
+  { value: "dozen", label: "Dozen" },
+  { value: "ctns", label: "Cartons (Ctns)" },
+  { value: "bkts", label: "Baskets (BKts)" },
+  { value: "cases", label: "Cases" }
 ];
 
 // Helper function to generate a unique ID for categories with null/empty IDs
