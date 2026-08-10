@@ -40,8 +40,8 @@ const unitOfMeasureOptions = [
   { value: "box", label: "Box" },
   { value: "pack", label: "Pack" },
   { value: "dozen", label: "Dozen" },
-  { value: "ctns", label: "Cartons (Ctns)" },
-  { value: "bkts", label: "Baskets (BKts)" },
+  { value: "ctns", label: "Ctns" },
+  { value: "bkts", label: "BKts" },
   { value: "cases", label: "Cases" }
 ];
 
@@ -70,7 +70,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
     description: "",
     barcode: "",
     sku: "",
-    unit_of_measure: "piece",
+    unit_of_measure: "ctns",
     selling_price: 0,
     cost_price: 0,
     wholesale_price: 0,
@@ -131,6 +131,12 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
       console.log("ProductManagement: Categories loaded:", data.length);
       console.log("ProductManagement: Sample categories:", data.slice(0, 3));
       setCategories(data);
+      // Set default category to "Food & Beverage" if it exists
+      const defaultCategory = data.find(c => c.name.toLowerCase().trim() === 'food & beverage');
+      if (defaultCategory) {
+        const defaultId = getCategoryId(defaultCategory);
+        setNewProduct(prev => ({ ...prev, category_id: defaultId }));
+      }
     } catch (error) {
       console.error("ProductManagement: Error loading categories:", error);
       setError("Failed to load categories: " + (error as Error).message);
@@ -359,13 +365,16 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   };
 
   const resetForm = () => {
+    // Find "Food & Beverage" category ID for default
+    const defaultCategory = categories.find(c => c.name.toLowerCase().trim() === 'food & beverage');
+    const defaultCategoryId = defaultCategory ? getCategoryId(defaultCategory) : null;
     setNewProduct({
       name: "",
-      category_id: null,
+      category_id: defaultCategoryId,
       description: "",
       barcode: "",
       sku: "",
-      unit_of_measure: "piece",
+      unit_of_measure: "ctns",
       selling_price: 0,
       cost_price: 0,
       wholesale_price: 0,
@@ -508,7 +517,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
           description: "This is a sample product for testing",
           barcode: "1234567890123",
           sku: "SAMPLE-001",
-          unit_of_measure: "piece",
+          unit_of_measure: "ctns",
           selling_price: 29.99,
           cost_price: 15.00,
           wholesale_price: 24.99,
@@ -522,7 +531,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
           description: "Another sample product for testing",
           barcode: "1234567890124",
           sku: "SAMPLE-002",
-          unit_of_measure: "piece",
+          unit_of_measure: "ctns",
           selling_price: 49.99,
           cost_price: 25.00,
           wholesale_price: 39.99,
@@ -536,7 +545,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
           description: "This product has low stock",
           barcode: "1234567890125",
           sku: "SAMPLE-003",
-          unit_of_measure: "piece",
+          unit_of_measure: "ctns",
           selling_price: 19.99,
           cost_price: 10.00,
           wholesale_price: 15.99,
@@ -705,7 +714,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="none">No Category</SelectItem>
-                                {categories.map((category) => {
+                                {Array.from(new Map(categories.map(c => [c.name.toLowerCase().trim(), c])).values()).map((category) => {
                                   const categoryId = getCategoryId(category);
                                   return (
                                     <SelectItem 
@@ -835,11 +844,11 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                           <Label htmlFor="unit_of_measure">Unit of Measure</Label>
                           {viewOnlyMode ? (
                             <div className="p-2 bg-muted rounded">
-                              {unitOfMeasureOptions.find(u => u.value === (editingProduct?.unit_of_measure || "piece"))?.label || "Piece"}
+                              {unitOfMeasureOptions.find(u => u.value === (editingProduct?.unit_of_measure || "ctns"))?.label || "Ctns"}
                             </div>
                           ) : (
                             <Select
-                              value={editingProduct ? (editingProduct.unit_of_measure || "piece") : (newProduct.unit_of_measure || "piece")}
+                              value={editingProduct ? (editingProduct.unit_of_measure || "ctns") : (newProduct.unit_of_measure || "ctns")}
                               onValueChange={(value) => 
                                 editingProduct
                                   ? setEditingProduct({...editingProduct, unit_of_measure: value})
@@ -1344,7 +1353,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((category) => {
+                    {Array.from(new Map(categories.map(c => [c.name.toLowerCase().trim(), c])).values()).map((category) => {
                       const categoryId = getCategoryId(category);
                       return (
                         <SelectItem 
