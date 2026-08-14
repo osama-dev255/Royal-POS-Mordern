@@ -11938,7 +11938,143 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                         {/* Items Table */}
                         <div>
                           <div className="font-bold mb-2">ITEMS ORDERED:</div>
-                          <div className="overflow-visible">
+
+                          {/* Mobile: Card Layout */}
+                          <div className="md:hidden space-y-3">
+                            {purchaseOrderData.items.map((item, index) => (
+                              <div key={item.id} className="border border-gray-300 rounded-lg p-3 space-y-2 bg-gray-50">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-muted-foreground">ITM-{String(index + 1).padStart(3, '0')}</span>
+                                  <Button
+                                    onClick={() => handleRemovePurchaseOrderItem(item.id)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="p-1 h-7 w-7 text-red-500 border-red-300 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                                <div className="relative">
+                                  <Input
+                                    value={poItemProductSearch[item.id] ?? item.description ?? ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setPoItemProductSearch(prev => ({ ...prev, [item.id]: val }));
+                                      handlePurchaseOrderItemChange(item.id, 'description', val);
+                                      setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                    }}
+                                    onFocus={() => {
+                                      setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: true }));
+                                    }}
+                                    onBlur={() => {
+                                      setTimeout(() => setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: false })), 200);
+                                    }}
+                                    className="p-2 h-10 text-sm"
+                                    placeholder="Search product..."
+                                  />
+                                  {item.description && (
+                                    <button
+                                      onClick={() => {
+                                        setPoItemProductSearch(prev => ({ ...prev, [item.id]: '' }));
+                                        handlePurchaseOrderItemChange(item.id, 'description', '');
+                                        handlePurchaseOrderItemChange(item.id, 'unit', '');
+                                        handlePurchaseOrderItemChange(item.id, 'unitPrice', 0);
+                                        handlePurchaseOrderItemChange(item.id, 'total', 0);
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-100 p-1 rounded z-10"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                    </button>
+                                  )}
+                                  {poItemShowProductDropdown[item.id] && (
+                                    <div className="max-h-48 overflow-auto absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                      {poLoadingAllProducts ? (
+                                        <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
+                                      ) : poAllProducts.length > 0 ? (
+                                        <div>
+                                          {poAllProducts
+                                            .filter(p => {
+                                              const search = (poItemProductSearch[item.id] || '').toLowerCase();
+                                              if (!search) return true;
+                                              return p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                                            })
+                                            .map((product) => (
+                                              <div
+                                                key={product.id}
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault();
+                                                  handlePurchaseOrderItemChange(item.id, 'description', product.name);
+                                                  handlePurchaseOrderItemChange(item.id, 'unit', product.unit_of_measure || '');
+                                                  handlePurchaseOrderItemChange(item.id, 'unitPrice', product.cost_price || 0);
+                                                  handlePurchaseOrderItemChange(item.id, 'total', (product.cost_price || 0) * (item.quantity || 0));
+                                                  setPoItemProductSearch(prev => ({ ...prev, [item.id]: product.name }));
+                                                  setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
+                                                }}
+                                                className="cursor-pointer py-2 px-3 hover:bg-gray-50 border-b last:border-b-0"
+                                              >
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span className="font-semibold text-sm">{product.name}</span>
+                                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                    {product.unit_of_measure && <span>Unit: {product.unit_of_measure}</span>}
+                                                    <span>Cost: {formatCurrency(product.cost_price || 0)}</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      ) : (
+                                        <div className="p-3 text-center text-sm text-muted-foreground">No products found</div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div>
+                                    <label className="text-xs text-muted-foreground mb-1">Qty</label>
+                                    <Input
+                                      type="number"
+                                      value={item.quantity}
+                                      onChange={(e) => {
+                                        const newQuantity = parseFloat(e.target.value);
+                                        handlePurchaseOrderItemChange(item.id, 'quantity', newQuantity);
+                                        handlePurchaseOrderItemChange(item.id, 'total', newQuantity * item.unitPrice);
+                                      }}
+                                      className="p-1 h-8 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-muted-foreground mb-1">Unit</label>
+                                    <Input
+                                      value={item.unit}
+                                      onChange={(e) => handlePurchaseOrderItemChange(item.id, 'unit', e.target.value)}
+                                      className="p-1 h-8 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-muted-foreground mb-1">Unit Price</label>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={item.unitPrice}
+                                      onChange={(e) => {
+                                        const newPrice = parseFloat(e.target.value);
+                                        handlePurchaseOrderItemChange(item.id, 'unitPrice', newPrice);
+                                        handlePurchaseOrderItemChange(item.id, 'total', item.quantity * newPrice);
+                                      }}
+                                      className="p-1 h-8 text-sm"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-1 border-t border-gray-200">
+                                  <span className="text-sm font-bold">Total</span>
+                                  <span className="text-sm font-bold">{formatCurrency(item.total)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Desktop: Table Layout */}
+                          <div className="hidden md:block overflow-visible">
                             <table className="w-full border-collapse border border-gray-300 text-sm">
                               <thead>
                                 <tr className="bg-gray-100">
@@ -12040,7 +12176,6 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                         onChange={(e) => {
                                           const newQuantity = parseFloat(e.target.value);
                                           handlePurchaseOrderItemChange(item.id, 'quantity', newQuantity);
-                                          // Update total when quantity changes
                                           handlePurchaseOrderItemChange(item.id, 'total', newQuantity * item.unitPrice);
                                         }}
                                         className="p-1 h-8 text-sm"
