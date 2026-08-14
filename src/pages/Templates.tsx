@@ -10940,8 +10940,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                 />
               </div>
             ) : activeTab === "preview" ? (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
+              <div className="space-y-4 md:space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <h3 className="text-lg font-medium">
                     {currentTemplate?.type === "order-form" ? "Purchase Order Preview" : currentTemplate?.type === "invoice" ? "Invoice Preview" : currentTemplate?.type === "expense-voucher" ? "Expense Voucher Preview" : currentTemplate?.type === "salary-slip" ? "Salary Slip Preview" : currentTemplate?.type === "complimentary-goods" ? "Complimentary Goods Preview" : currentTemplate?.type === "report" ? "Report Template Preview" : currentTemplate?.type === "customer-settlement" ? "Customer Settlement Preview" : currentTemplate?.type === "supplier-settlement" ? "Supplier Settlement Preview" : currentTemplate?.type === "goods-received-note" ? "Goods Received Note Preview" : currentTemplate?.type === "sales-order" ? "Sales Order Preview" : currentTemplate?.type === "stock-take" ? "Stock Take Preview" : currentTemplate?.type === "supplier-purchase-note" ? "Supplier Purchase Note Preview" : "Delivery Note Preview"}
                   </h3>
@@ -11702,7 +11702,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                 
 
                 
-                <div className="border rounded-lg p-6 max-w-6xl mx-auto" id="template-preview-content">
+                <div className="border rounded-lg p-3 sm:p-4 md:p-6 max-w-6xl mx-auto" id="template-preview-content">
                   <div className="space-y-6">
                     {/* Header */}
                     {currentTemplate?.type === "order-form" ? (
@@ -11729,9 +11729,9 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                     {/* Business Info and Content - Separated by template type */}
                     {currentTemplate?.type === "order-form" ? (
                       // Purchase Order Content
-                      <div className="space-y-6">
+                      <div className="space-y-4 md:space-y-6">
                         {/* Order Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                           <div>
                             <div className="font-bold mb-1">ORDER #</div>
                             <Input
@@ -11751,20 +11751,20 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                               onChange={(e) => handlePurchaseOrderChange("businessAddress", e.target.value)}
                               className="text-sm mb-1 p-1 h-8"
                             />
-                            <div className="flex items-center gap-2 text-sm mt-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm mt-1">
                               <span>Phone:</span>
                               <Input
                                 value={purchaseOrderData.businessPhone}
                                 onChange={(e) => handlePurchaseOrderChange("businessPhone", e.target.value)}
-                                className="text-sm p-1 h-8 w-40 inline-block"
+                                className="text-sm p-1 h-8 w-full sm:w-40"
                               />
                             </div>
-                            <div className="flex items-center gap-2 text-sm mt-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm mt-1">
                               <span>Contact:</span>
                               <Input
                                 value={purchaseOrderData.businessEmail}
                                 onChange={(e) => handlePurchaseOrderChange("businessEmail", e.target.value)}
-                                className="text-sm p-1 h-8 w-40 inline-block"
+                                className="text-sm p-1 h-8 w-full sm:w-40"
                               />
                             </div>
                           </div>
@@ -11884,27 +11884,27 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                               className="text-sm mb-1 p-1 h-8"
                               placeholder="Supplier Address"
                             />
-                            <div className="flex items-center gap-2 text-sm mt-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm mt-1">
                               <span>Phone:</span>
                               <Input
                                 value={purchaseOrderData.supplierPhone}
                                 onChange={(e) => handlePurchaseOrderChange("supplierPhone", e.target.value)}
-                                className="text-sm p-1 h-8 w-40 inline-block"
+                                className="text-sm p-1 h-8 w-full sm:w-40"
                               />
                             </div>
-                            <div className="flex items-center gap-2 text-sm mt-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm mt-1">
                               <span>Contact:</span>
                               <Input
                                 value={purchaseOrderData.supplierEmail}
                                 onChange={(e) => handlePurchaseOrderChange("supplierEmail", e.target.value)}
-                                className="text-sm p-1 h-8 w-40 inline-block"
+                                className="text-sm p-1 h-8 w-full sm:w-40"
                               />
                             </div>
                           </div>
                         </div>
                         
                         {/* Document Details */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                           <div>
                             <div className="text-sm font-medium">DATE</div>
                             <Input
@@ -11919,7 +11919,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                         {/* Items Table */}
                         <div>
                           <div className="font-bold mb-2">ITEMS ORDERED:</div>
-                          <div className="overflow-visible">
+                          <div className="overflow-x-auto">
                             <table className="w-full border-collapse border border-gray-300 text-sm">
                               <thead>
                                 <tr className="bg-gray-100">
@@ -12078,7 +12078,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                         </div>
                         
                         {/* Signatures */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
                           <div>
                             <div className="font-bold mb-2">REQUESTED BY</div>
                             <div className="text-sm space-y-2">
