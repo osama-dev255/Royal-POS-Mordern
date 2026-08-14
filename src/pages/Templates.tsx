@@ -1405,6 +1405,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
   const [poLoadingProducts, setPoLoadingProducts] = useState<boolean>(false);
   const [poItemProductSearch, setPoItemProductSearch] = useState<Record<string, string>>({});
   const [poItemShowProductDropdown, setPoItemShowProductDropdown] = useState<Record<string, boolean>>({});
+  const [poAllProducts, setPoAllProducts] = useState<Product[]>([]);
+  const [poLoadingAllProducts, setPoLoadingAllProducts] = useState<boolean>(false);
 
   // SPN Product dropdown state
   const [spnSupplierProducts, setSpnSupplierProducts] = useState<Product[]>([]);
@@ -1714,6 +1716,23 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
       }
     };
     loadSuppliers();
+  }, []);
+
+  // Load all products for PO item searchable dropdown
+  useEffect(() => {
+    const loadAllProducts = async () => {
+      setPoLoadingAllProducts(true);
+      try {
+        const data = await getProducts();
+        setPoAllProducts(data);
+      } catch (error) {
+        console.error('Error loading products:', error);
+        setPoAllProducts([]);
+      } finally {
+        setPoLoadingAllProducts(false);
+      }
+    };
+    loadAllProducts();
   }, []);
 
   // Load ALL zones on mount (needed for per-row zone name resolution across multiple godowns)
@@ -11919,7 +11938,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                         {/* Items Table */}
                         <div>
                           <div className="font-bold mb-2">ITEMS ORDERED:</div>
-                          <div className="overflow-x-auto">
+                          <div className="overflow-visible">
                             <table className="w-full border-collapse border border-gray-300 text-sm">
                               <thead>
                                 <tr className="bg-gray-100">
@@ -11957,16 +11976,31 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                           className="p-1 h-8 text-sm"
                                           placeholder="Search product..."
                                         />
+                                        {item.description && (
+                                          <button
+                                            onClick={() => {
+                                              setPoItemProductSearch(prev => ({ ...prev, [item.id]: '' }));
+                                              handlePurchaseOrderItemChange(item.id, 'description', '');
+                                              handlePurchaseOrderItemChange(item.id, 'unit', '');
+                                              handlePurchaseOrderItemChange(item.id, 'unitPrice', 0);
+                                              handlePurchaseOrderItemChange(item.id, 'total', 0);
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-gray-100 p-1 rounded z-10"
+                                          >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                          </button>
+                                        )}
                                         {poItemShowProductDropdown[item.id] && (
-                                          <div className="absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full max-h-48 overflow-auto left-0 top-full">
-                                            {poLoadingProducts ? (
+                                          <div className="max-h-48 overflow-auto absolute z-[9999] bg-white border rounded-b-lg shadow-lg w-full mt-[-1px]">
+                                            {poLoadingAllProducts ? (
                                               <div className="p-3 text-center text-sm text-muted-foreground">Loading products...</div>
-                                            ) : poSupplierProducts.length > 0 ? (
+                                            ) : poAllProducts.length > 0 ? (
                                               <div>
-                                                {poSupplierProducts
+                                                {poAllProducts
                                                   .filter(p => {
-                                                    const search = (poItemProductSearch[item.id] || item.description || '').toLowerCase();
-                                                    return !search || p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                                                    const search = (poItemProductSearch[item.id] || '').toLowerCase();
+                                                    if (!search) return true;
+                                                    return p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
                                                   })
                                                   .map((product) => (
                                                     <div
@@ -11975,6 +12009,8 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                                         e.preventDefault();
                                                         handlePurchaseOrderItemChange(item.id, 'description', product.name);
                                                         handlePurchaseOrderItemChange(item.id, 'unit', product.unit_of_measure || '');
+                                                        handlePurchaseOrderItemChange(item.id, 'unitPrice', product.cost_price || 0);
+                                                        handlePurchaseOrderItemChange(item.id, 'total', (product.cost_price || 0) * (item.quantity || 0));
                                                         setPoItemProductSearch(prev => ({ ...prev, [item.id]: product.name }));
                                                         setPoItemShowProductDropdown(prev => ({ ...prev, [item.id]: false }));
                                                       }}
@@ -11991,9 +12027,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                                                   ))}
                                               </div>
                                             ) : (
-                                              <div className="p-3 text-center text-sm text-muted-foreground">
-                                                {purchaseOrderData.supplierName ? 'No products for this supplier' : 'Select a supplier first'}
-                                              </div>
+                                              <div className="p-3 text-center text-sm text-muted-foreground">No products found</div>
                                             )}
                                           </div>
                                         )}
