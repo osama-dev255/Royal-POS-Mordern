@@ -12250,6 +12250,18 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                           </div>
                         </div>
                         
+                        {/* Special Instructions */}
+                        <div>
+                          <div className="font-bold mb-2">SPECIAL INSTRUCTIONS:</div>
+                          <textarea
+                            value={purchaseOrderData.notes || ''}
+                            onChange={(e) => handlePurchaseOrderChange('notes' as any, e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm min-h-[80px] resize-y"
+                            placeholder="Enter any special instructions or notes..."
+                            rows={3}
+                          />
+                        </div>
+                        
                         {/* Signatures */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
                           <div>
