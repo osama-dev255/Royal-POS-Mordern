@@ -100,6 +100,10 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
   const [rejectionName, setRejectionName] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [approvingNote, setApprovingNote] = useState<SavedInternalConsumptionNote | null>(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [approveSubmitting, setApproveSubmitting] = useState(false);
+  const [rejectLoading, setRejectLoading] = useState(false);
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   // Load notes
   const loadNotes = async () => {
@@ -284,6 +288,7 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
       toast({ title: 'Validation', description: 'Approver name is required', variant: 'destructive' });
       return;
     }
+    setApproveSubmitting(true);
     try {
       const result = await approveInternalConsumptionNote(approvingNote.id, approvalName);
       if (result.success) {
@@ -302,6 +307,8 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
       }
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to approve note', variant: 'destructive' });
+    } finally {
+      setApproveSubmitting(false);
     }
   };
 
@@ -311,6 +318,7 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
       toast({ title: 'Validation', description: 'Rejector name is required', variant: 'destructive' });
       return;
     }
+    setRejectSubmitting(true);
     try {
       const result = await rejectInternalConsumptionNote(approvingNote.id, rejectionName, rejectionReason);
       if (result.success) {
@@ -325,6 +333,8 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
       }
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to reject note', variant: 'destructive' });
+    } finally {
+      setRejectSubmitting(false);
     }
   };
 
@@ -410,11 +420,11 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
           <div className="flex gap-2">
             {n.status === 'pending' && (
               <>
-                <Button variant="outline" className="text-emerald-600 border-emerald-300 hover:bg-emerald-50" onClick={() => { setApprovingNote(n); setShowApproveDialog(true); }}>
-                  <ShieldCheck className="h-4 w-4 mr-2" /> Approve & Deduct Stock
+                <Button variant="outline" className="text-emerald-600 border-emerald-300 hover:bg-emerald-50" disabled={approveLoading} onClick={async () => { setApproveLoading(true); await new Promise(r => setTimeout(r, 400)); setApprovingNote(n); setShowApproveDialog(true); setApproveLoading(false); }}>
+                  {approveLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : <><ShieldCheck className="h-4 w-4 mr-2" /> Approve & Deduct Stock</>}
                 </Button>
-                <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => { setApprovingNote(n); setShowRejectDialog(true); }}>
-                  <AlertCircle className="h-4 w-4 mr-2" /> Reject
+                <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" disabled={rejectLoading} onClick={async () => { setRejectLoading(true); await new Promise(r => setTimeout(r, 400)); setApprovingNote(n); setShowRejectDialog(true); setRejectLoading(false); }}>
+                  {rejectLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : <><AlertCircle className="h-4 w-4 mr-2" /> Reject</>}
                 </Button>
               </>
             )}
@@ -1184,9 +1194,9 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => { setShowApproveDialog(false); setApprovingNote(null); }}>Cancel</Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleApprove}>
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+              <Button variant="outline" onClick={() => { setShowApproveDialog(false); setApprovingNote(null); }} disabled={approveSubmitting}>Cancel</Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700" disabled={approveSubmitting} onClick={handleApprove}>
+                {approveSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</> : <><CheckCircle2 className="h-4 w-4 mr-2" /> Approve</>}
               </Button>
             </div>
           </div>
@@ -1219,9 +1229,9 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => { setShowRejectDialog(false); setApprovingNote(null); }}>Cancel</Button>
-              <Button variant="destructive" onClick={handleReject}>
-                <AlertCircle className="h-4 w-4 mr-2" /> Reject
+              <Button variant="outline" onClick={() => { setShowRejectDialog(false); setApprovingNote(null); }} disabled={rejectSubmitting}>Cancel</Button>
+              <Button variant="destructive" disabled={rejectSubmitting} onClick={handleReject}>
+                {rejectSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</> : <><AlertCircle className="h-4 w-4 mr-2" /> Reject</>}
               </Button>
             </div>
           </div>

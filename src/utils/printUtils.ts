@@ -6199,9 +6199,9 @@ export class PrintUtils {
 
     const reasonLabels: Record<string, string> = {
       consumption: 'Internal Consumption',
-      damage: 'Damage/Loss',
+      damage: 'Damage / Loss',
       benefit: 'Employee Benefit',
-      owner_draw: 'Owner/Investor Draw',
+      owner_draw: 'Owner / Investor Draw',
       other: 'Other'
     };
     const personTypeLabels: Record<string, string> = {
@@ -6210,62 +6210,53 @@ export class PrintUtils {
       investor: 'Investor',
       owner: 'Owner'
     };
+    const statusLabels: Record<string, string> = {
+      pending: 'PENDING APPROVAL',
+      approved: 'APPROVED',
+      rejected: 'REJECTED'
+    };
 
-    // Generate a verification hash
+    // Generate verification hash
     const verifyStr = (n.noteNumber || '') + (n.date || '') + fmt(n.totalAmount || 0) + (n.takenBy || '') + (n.preparedBy || '');
     let hash = 0;
     for (let i = 0; i < verifyStr.length; i++) { hash = ((hash << 5) - hash + verifyStr.charCodeAt(i)) | 0; }
     const verifyCode = 'ICN-' + Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
 
-    const items = (n.items || []).map((item: any, i: number) => `
+    const statusBadge = statusLabels[n.status] || (n.status || '').toUpperCase();
+
+    const itemRows = (n.items || []).map((item: any, i: number) => `
       <tr>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${i + 1}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${item.productName || ''}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${item.godownName || '\u2014'}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${item.zoneName || '\u2014'}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity || 0}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${item.unit || ''}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">${fmt(item.costPrice || 0)}</td>
-        <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 700;">${fmt(item.total || 0)}</td>
+        <td class="td-c">${i + 1}</td>
+        <td class="td">${item.productName || ''}</td>
+        <td class="td">${item.godownName || '\u2014'}</td>
+        <td class="td">${item.zoneName || '\u2014'}</td>
+        <td class="td-c">${item.quantity || 0}</td>
+        <td class="td-c">${item.unit || ''}</td>
+        <td class="td-r">${fmt(item.costPrice || 0)}</td>
+        <td class="td-r td-bold">${fmt(item.total || 0)}</td>
       </tr>
     `).join('');
+
+    const totalItems = (n.items || []).reduce((s: number, item: any) => s + (item.quantity || 0), 0);
 
     const html = `<!DOCTYPE html>
 <html><head><title>Internal Consumption Note - ${n.noteNumber || ''}</title>
 <style>
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 portrait; margin: 14mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Times New Roman', Times, serif; font-size: 20px; color: #000; background: #fff; position: relative; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 20px; color: #000; background: #fff; position: relative; line-height: 1.35; }
 
-  /* Watermark */
-  .watermark {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 0; pointer-events: none; overflow: hidden;
-  }
-  .watermark-inner {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-35deg);
-    white-space: nowrap;
-  }
-  .watermark-text {
-    font-size: 72px; font-weight: 700; color: rgba(0,0,0,0.04);
-    letter-spacing: 18px; text-transform: uppercase;
-    font-family: Arial, Helvetica, sans-serif;
-  }
+  /* ── Watermark ── */
+  .watermark { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; overflow: hidden; }
+  .watermark-inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); white-space: nowrap; }
+  .watermark-text { font-size: 80px; font-weight: 700; color: rgba(0,0,0,0.035); letter-spacing: 16px; text-transform: uppercase; font-family: Arial, Helvetica, sans-serif; }
 
-  /* Security Border */
-  .doc-border {
-    position: relative; z-index: 1;
-    border: 1.5px solid #000;
-    padding: 3mm;
-  }
-  .doc-border::before {
-    content: ''; position: absolute; top: 1.5mm; left: 1.5mm; right: 1.5mm; bottom: 1.5mm;
-    border: 0.5px solid #000; pointer-events: none;
-  }
-  .doc-inner { padding: 4mm 3mm; }
+  /* ── Security Border ── */
+  .doc-border { position: relative; z-index: 1; border: 1.5px solid #000; padding: 3mm; }
+  .doc-border::before { content: ''; position: absolute; top: 1.5mm; left: 1.5mm; right: 1.5mm; bottom: 1.5mm; border: 0.5px solid #000; pointer-events: none; }
+  .doc-inner { padding: 5mm 4mm; }
 
-  /* Corner Ornaments */
+  /* ── Corner Ornaments ── */
   .corner { position: absolute; width: 14px; height: 14px; z-index: 2; }
   .corner::before, .corner::after { content: ''; position: absolute; background: #000; }
   .corner-tl { top: 2mm; left: 2mm; }
@@ -6281,45 +6272,63 @@ export class PrintUtils {
   .corner-br::before { bottom: 0; right: 0; width: 14px; height: 2px; }
   .corner-br::after { bottom: 0; right: 0; width: 2px; height: 14px; }
 
-  /* Header */
+  /* ── Header ── */
   .header { text-align: center; padding-bottom: 10px; border-bottom: 3px double #000; margin-bottom: 14px; }
-  .header h1 { font-size: 20px; letter-spacing: 4px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
-  .header-rule { width: 60px; height: 1px; background: #000; margin: 6px auto; }
-  .header-meta { display: flex; justify-content: center; gap: 30px; font-size: 20px; color: #333; }
-  .header-meta span { font-weight: 700; }
+  .header h1 { font-family: Arial, Helvetica, sans-serif; font-size: 26px; letter-spacing: 5px; font-weight: 900; text-transform: uppercase; margin-bottom: 2px; }
+  .header-subtitle { font-size: 20px; letter-spacing: 3px; text-transform: uppercase; color: #555; margin-bottom: 8px; }
+  .header-rule { width: 70px; height: 1px; background: #000; margin: 6px auto; }
+  .header-meta { display: flex; justify-content: center; align-items: center; gap: 28px; font-size: 20px; color: #222; margin-top: 6px; }
+  .header-meta strong { font-weight: 700; }
+  .status-badge { display: inline-block; padding: 2px 12px; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; border: 1.5px solid #000; font-family: Arial, Helvetica, sans-serif; margin-top: 6px; }
 
-  /* Info Grid */
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; font-size: 20px; }
-  .info-item { padding: 4px 0; }
-  .info-label { font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #333; }
-  .info-value { font-size: 20px; margin-top: 2px; }
+  /* ── Info Panel ── */
+  .info-panel { border: 1px solid #000; margin-bottom: 14px; }
+  .info-panel-header { background: #f0f0f0; padding: 5px 12px; font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid #000; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; padding: 8px 12px; gap: 10px; }
+  .info-field {}
+  .info-label { font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #555; border-bottom: 1px dotted #aaa; padding-bottom: 2px; margin-bottom: 3px; font-family: Arial, Helvetica, sans-serif; }
+  .info-value { font-size: 20px; font-weight: 600; }
 
-  /* Items Table */
+  /* ── Items Table ── */
+  .section-heading { font-family: Arial, Helvetica, sans-serif; font-size: 20px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 6px; padding-left: 8px; border-left: 3px solid #000; }
   .items-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 20px; }
-  .items-table th { background: #f5f5f5; padding: 8px; text-align: left; font-size: 20px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #000; }
-  .items-table tfoot td { padding: 8px; font-weight: 700; border-top: 2px solid #000; }
+  .items-table thead th { background: #e8e8e8; padding: 6px 8px; text-align: left; font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #999; }
+  .items-table .td { padding: 5px 8px; border: 1px solid #bbb; vertical-align: middle; }
+  .items-table .td-c { padding: 5px 8px; border: 1px solid #bbb; text-align: center; vertical-align: middle; }
+  .items-table .td-r { padding: 5px 8px; border: 1px solid #bbb; text-align: right; vertical-align: middle; }
+  .items-table .td-bold { font-weight: 700; }
+  .items-table tfoot td { padding: 6px 8px; font-weight: 700; border: 1.5px solid #000; background: #f5f5f5; font-size: 20px; }
 
-  /* Section Title */
-  .section-title { font-size: 20px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; padding-left: 8px; border-left: 3px solid #000; }
+  /* ── Total Section ── */
+  .total-section { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .total-box { border: 1.5px solid #000; padding: 8px 20px; text-align: right; background: #f8f8f8; }
+  .total-label { font-size: 20px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: #444; font-family: Arial, Helvetica, sans-serif; }
+  .total-value { font-size: 26px; font-weight: 700; color: #000; letter-spacing: -0.3px; }
 
-  /* Notes */
-  .notes-box { border: 1px solid #000; padding: 8px 12px; font-size: 20px; white-space: pre-line; margin-bottom: 14px; }
+  /* ── Damage Box ── */
+  .damage-section { border: 1.5px solid #000; margin-bottom: 14px; }
+  .damage-header { background: #f0f0f0; padding: 5px 12px; font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid #000; }
+  .damage-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 8px 12px; gap: 10px; }
+  .damage-field {}
+  .damage-field-wide { grid-column: span 3; }
+  .damage-label { font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #555; border-bottom: 1px dotted #aaa; padding-bottom: 2px; margin-bottom: 3px; font-family: Arial, Helvetica, sans-serif; }
+  .damage-value { font-size: 20px; font-weight: 600; }
 
-  /* Damage Box */
-  .damage-box { border: 1.5px solid #000; padding: 10px 14px; margin-bottom: 14px; }
-  .damage-title { font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  /* ── Notes ── */
+  .notes-box { border: 1px solid #000; padding: 8px 12px; font-size: 20px; white-space: pre-line; margin-bottom: 14px; min-height: 30px; }
 
-  /* Signatures */
-  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; }
+  /* ── Signatures ── */
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 24px; }
   .sig-block { text-align: center; }
-  .sig-block .sig-label { font-size: 20px; text-transform: uppercase; letter-spacing: 1px; color: #333; font-weight: 700; margin-bottom: 6px; }
-  .sig-block .sig-name { font-size: 20px; font-weight: 700; color: #000; padding: 8px 0; border-bottom: 1.5px solid #000; margin-bottom: 4px; min-height: 28px; }
-  .sig-block .sig-date { font-size: 20px; color: #333; }
+  .sig-label { font-size: 20px; text-transform: uppercase; letter-spacing: 1.5px; color: #444; font-weight: 700; margin-bottom: 6px; font-family: Arial, Helvetica, sans-serif; }
+  .sig-name { font-size: 20px; font-weight: 700; color: #000; padding: 8px 0; border-bottom: 1.5px solid #000; margin-bottom: 4px; min-height: 28px; }
+  .sig-date { font-size: 20px; color: #444; }
 
-  /* Footer */
-  .footer { margin-top: 24px; text-align: center; font-size: 20px; color: #666; border-top: 1px solid #000; padding-top: 8px; }
-  .verify-code { font-family: 'Courier New', Courier, monospace; font-size: 20px; letter-spacing: 1px; color: #333; margin-top: 4px; }
-  .micro-print { font-size: 20px; color: #999; margin-top: 4px; letter-spacing: 0.5px; }
+  /* ── Footer ── */
+  .footer { margin-top: 20px; text-align: center; font-size: 20px; color: #555; border-top: 1px solid #000; padding-top: 8px; }
+  .footer-doc-title { font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .verify-code { font-family: 'Courier New', Courier, monospace; font-size: 20px; letter-spacing: 1.5px; color: #222; margin-top: 4px; font-weight: 700; }
+  .micro-print { font-size: 20px; color: #888; margin-top: 3px; letter-spacing: 0.3px; }
 
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -6330,7 +6339,7 @@ export class PrintUtils {
   <!-- Watermark -->
   <div class="watermark">
     <div class="watermark-inner">
-      <div class="watermark-text">MATUMIZI YA NDANI</div>
+      <div class="watermark-text">INTERNAL CONSUMPTION</div>
     </div>
   </div>
 
@@ -6343,103 +6352,126 @@ export class PrintUtils {
 
     <div class="doc-inner">
 
+      <!-- Header -->
       <div class="header">
-        <h1>Noti ya Matumizi ya Ndani</h1>
+        <h1>Internal Consumption Note</h1>
+        <div class="header-subtitle">Inventory Control Document</div>
         <div class="header-rule"></div>
         <div class="header-meta">
-          <div>Rejea: <span>${n.noteNumber || ''}</span></div>
-          <div>Tarehe: <span>${n.date || ''}</span></div>
+          <div>Reference: <strong>${n.noteNumber || ''}</strong></div>
+          <div>Date: <strong>${n.date || ''}</strong></div>
+        </div>
+        <div class="status-badge">${statusBadge}</div>
+      </div>
+
+      <!-- Recipient / Person Info -->
+      <div class="info-panel">
+        <div class="info-panel-header">Recipient Details</div>
+        <div class="info-grid">
+          <div class="info-field">
+            <div class="info-label">Taken By</div>
+            <div class="info-value">${n.takenBy || '\u2014'}</div>
+          </div>
+          <div class="info-field">
+            <div class="info-label">Person Type</div>
+            <div class="info-value">${personTypeLabels[n.personType] || n.personType || '\u2014'}</div>
+          </div>
+          <div class="info-field">
+            <div class="info-label">Department</div>
+            <div class="info-value">${n.department || '\u2014'}</div>
+          </div>
+          <div class="info-field">
+            <div class="info-label">Reason</div>
+            <div class="info-value">${reasonLabels[n.reason] || n.reason || '\u2014'}</div>
+          </div>
         </div>
       </div>
 
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">Imechukuliwa Na</div>
-          <div class="info-value">${n.takenBy || '\u2014'}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Aina ya Mtu</div>
-          <div class="info-value">${personTypeLabels[n.personType] || n.personType || '\u2014'}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Idara</div>
-          <div class="info-value">${n.department || '\u2014'}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Sababu</div>
-          <div class="info-value">${reasonLabels[n.reason] || n.reason || '\u2014'}</div>
-        </div>
-      </div>
-
-      <div class="section-title">Vilivyochukuliwa</div>
+      <!-- Items Section -->
+      <div class="section-heading">Items Consumed</div>
       <table class="items-table">
         <thead>
           <tr>
-            <th style="text-align: center; width: 40px;">#</th>
-            <th>Bidhaa</th>
+            <th style="text-align: center; width: 32px;">#</th>
+            <th>Product Description</th>
             <th>Godown</th>
             <th>Zone</th>
-            <th style="text-align: center;">Idadi</th>
-            <th>Kipimo</th>
-            <th style="text-align: right;">Bei ya Gharama</th>
-            <th style="text-align: right;">Jumla</th>
+            <th style="text-align: center; width: 50px;">Qty</th>
+            <th style="text-align: center; width: 55px;">Unit</th>
+            <th style="text-align: right; width: 85px;">Unit Cost</th>
+            <th style="text-align: right; width: 90px;">Total</th>
           </tr>
         </thead>
         <tbody>
-          ${items}
+          ${itemRows}
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="7" style="text-align: right; padding: 8px;">JUMLA KUU:</td>
-            <td style="text-align: right; padding: 8px; font-size: 24px;">${fmt(n.totalAmount || 0)}</td>
+            <td colspan="4" style="text-align: right; padding: 6px 8px;">Totals (${totalItems} items):</td>
+            <td style="text-align: center; padding: 6px 8px;"></td>
+            <td style="padding: 6px 8px;"></td>
+            <td style="padding: 6px 8px;"></td>
+            <td style="text-align: right; padding: 6px 8px;">${fmt(n.totalAmount || 0)}</td>
           </tr>
         </tfoot>
       </table>
 
+      <!-- Grand Total -->
+      <div class="total-section">
+        <div class="total-box">
+          <div class="total-label">Grand Total Value</div>
+          <div class="total-value">${fmt(n.totalAmount || 0)}</div>
+        </div>
+      </div>
+
+      <!-- Damage Details (conditional) -->
       ${n.reason === 'damage' ? `
-      <div class="damage-box">
-        <div class="damage-title">Maelezo ya Uharibifu</div>
-        <div class="info-grid">
-          <div class="info-item" style="grid-column: span 2;">
-            <div class="info-label">Maelezo</div>
-            <div class="info-value">${n.damageDescription || '\u2014'}</div>
+      <div class="damage-section">
+        <div class="damage-header">Damage / Loss Details</div>
+        <div class="damage-grid">
+          <div class="damage-field damage-field-wide">
+            <div class="damage-label">Description</div>
+            <div class="damage-value">${n.damageDescription || '\u2014'}</div>
           </div>
-          <div class="info-item">
-            <div class="info-label">Tarehe ya Uharibifu</div>
-            <div class="info-value">${n.damageDate || '\u2014'}</div>
+          <div class="damage-field">
+            <div class="damage-label">Date of Damage</div>
+            <div class="damage-value">${n.damageDate || '\u2014'}</div>
           </div>
-          <div class="info-item">
-            <div class="info-label">Inaweza Kupatikana</div>
-            <div class="info-value">${n.recoverable ? 'Ndio' : 'Hapana'}</div>
+          <div class="damage-field">
+            <div class="damage-label">Recoverable</div>
+            <div class="damage-value">${n.recoverable ? 'Yes' : 'No'}</div>
           </div>
-          <div class="info-item" style="grid-column: span 2;">
-            <div class="info-label">Njia ya Kutupa</div>
-            <div class="info-value">${n.disposalMethod || '\u2014'}</div>
+          <div class="damage-field">
+            <div class="damage-label">Disposal Method</div>
+            <div class="damage-value">${n.disposalMethod || '\u2014'}</div>
           </div>
         </div>
       </div>
       ` : ''}
 
-      ${n.notes ? '<div class="section-title">Maelezo</div><div class="notes-box">' + (n.notes || '') + '</div>' : ''}
+      <!-- Notes -->
+      ${n.notes ? '<div class="section-heading">Remarks</div><div class="notes-box">' + (n.notes || '') + '</div>' : ''}
 
-      <div class="section-title">Idhini na Sahihi</div>
+      <!-- Signatures -->
+      <div class="section-heading">Authorization &amp; Signatures</div>
       <div class="signatures">
         <div class="sig-block">
-          <div class="sig-label">Imetayarishwa Na</div>
+          <div class="sig-label">Prepared By</div>
           <div class="sig-name">${n.preparedBy || ''}</div>
           <div class="sig-date">${n.preparedDate || ''}</div>
         </div>
         <div class="sig-block">
-          <div class="sig-label">Imeidhinishwa Na</div>
+          <div class="sig-label">Approved By</div>
           <div class="sig-name">${n.approvedBy || ''}</div>
           <div class="sig-date">${n.approvedDate || ''}</div>
         </div>
       </div>
 
+      <!-- Footer -->
       <div class="footer">
-        Noti ya Matumizi ya Ndani &nbsp;|&nbsp; ${n.noteNumber || ''}
-        <div class="verify-code">Uthibitisho: ${verifyCode}</div>
-        <div class="micro-print">Hii ni hati iliyotolewa na mfumo. Thibitisha uhalali kwa kutumia msimbo hapo juu.</div>
+        <span class="footer-doc-title">Internal Consumption Note</span> &nbsp;&bull;&nbsp; ${n.noteNumber || ''}
+        <div class="verify-code">Verification Code: ${verifyCode}</div>
+        <div class="micro-print">This is a system-generated document. Verify authenticity using the code above. Unauthorized alterations are void.</div>
       </div>
 
     </div>

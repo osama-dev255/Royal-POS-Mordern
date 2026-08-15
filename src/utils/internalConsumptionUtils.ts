@@ -349,10 +349,15 @@ export const approveInternalConsumptionNote = async (
       return { success: false, error: 'Note is already approved' };
     }
 
+    // Import services for inventory updates
+    const { updateGodownStock } = await import('@/services/godownService');
+    const { getProducts, updateProduct } = await import('@/services/databaseService');
+    
     // Record stock movements for each item
     const movementType = note.reason === 'damage' ? 'DAMAGE' : 'OUT';
     
     for (const item of note.items) {
+      // 1. Record stock movement in the ledger
       const movementResult = await recordStockMovement({
         product_id: item.productId,
         product_name: item.productName,
@@ -372,6 +377,34 @@ export const approveInternalConsumptionNote = async (
       if (!movementResult.success) {
         console.error('Failed to record stock movement for item:', item.productName);
         // Continue with other items even if one fails
+      }
+
+      // 2. Deduct from godown stock (if godown and zone are specified)
+      if (item.godownId) {
+        try {
+          await updateGodownStock(
+            item.productId,
+            item.godownId,
+            item.zoneId || null,
+            -item.quantity // Negative to decrease
+          );
+          console.log(`✅ Deducted ${item.quantity} from godown stock: ${item.godownName} / ${item.zoneName}`);
+        } catch (godownErr) {
+          console.error(`Failed to deduct godown stock for ${item.productName}:`, godownErr);
+        }
+      }
+
+      // 3. Deduct from general product stock_quantity
+      try {
+        const allProducts = await getProducts();
+        const product = allProducts.find(p => p.id === item.productId);
+        if (product) {
+          const newStock = Math.max(0, (product.stock_quantity || 0) - item.quantity);
+          await updateProduct(item.productId, { stock_quantity: newStock });
+          console.log(`✅ Deducted ${item.quantity} from product stock_quantity: ${item.productName} (${product.stock_quantity} → ${newStock})`);
+        }
+      } catch (productErr) {
+        console.error(`Failed to deduct product stock for ${item.productName}:`, productErr);
       }
     }
 
