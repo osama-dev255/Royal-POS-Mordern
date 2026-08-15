@@ -356,6 +356,12 @@ export const approveInternalConsumptionNote = async (
     const movementType = note.reason === 'damage' ? 'DAMAGE' : 'OUT';
     
     for (const item of note.items) {
+      // Skip items with no quantity
+      if (!item.quantity || item.quantity <= 0) {
+        console.warn(`Skipping item with invalid quantity: ${item.productName}`);
+        continue;
+      }
+
       // 1. Record stock movement in the ledger
       const movementResult = await recordStockMovement({
         product_id: item.productId,
@@ -476,6 +482,8 @@ export const updateInternalConsumptionNoteWithInventory = async (
 
       // Step 1: Reverse old inventory deductions (add back old items)
       for (const item of oldNote.items) {
+        if (!item.quantity || item.quantity <= 0) continue;
+
         // Add back to godown stock
         if (item.godownId) {
           try {
@@ -517,6 +525,8 @@ export const updateInternalConsumptionNoteWithInventory = async (
       // Step 4: Apply new inventory deductions with updated items
       const newMovementType = data.reason === 'damage' ? 'DAMAGE' : 'OUT';
       for (const item of data.items) {
+        if (!item.quantity || item.quantity <= 0) continue;
+
         // Deduct from godown stock
         if (item.godownId) {
           try {
