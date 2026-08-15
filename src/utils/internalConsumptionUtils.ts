@@ -1,0 +1,421 @@
+/**
+ * Internal Consumption Note Utilities
+ *
+ * Manages the saved_internal_consumption_notes table.
+ * Records when products are taken by internal personnel (employees, managers,
+ * investors, owners) for free — as internal consumption, loss/damage,
+ * employee benefit, or owner/investor draw.
+ */
+
+import { supabase } from '@/lib/supabaseClient';
+import { recordStockMovement } from './stockMovementUtils';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+export interface InternalConsumptionItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  costPrice: number;
+  total: number;
+  godownId?: string;
+  godownName?: string;
+  zoneId?: string;
+  zoneName?: string;
+}
+
+export interface InternalConsumptionNoteData {
+  id?: string;
+  noteNumber: string;
+  date: string;
+  takenBy: string;
+  personType: 'employee' | 'manager' | 'investor' | 'owner';
+  department?: string;
+  reason: 'consumption' | 'damage' | 'benefit' | 'owner_draw' | 'other';
+  items: InternalConsumptionItem[];
+  totalAmount: number;
+  notes?: string;
+  // Damage tracking fields
+  damageDescription?: string;
+  damageDate?: string;
+  recoverable?: boolean;
+  disposalMethod?: string;
+  // Approval
+  preparedBy?: string;
+  preparedDate?: string;
+  approvedBy?: string;
+  approvedDate?: string;
+  rejectionReason?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  outletId?: string;
+  createdAt?: string;
+}
+
+export interface SavedInternalConsumptionNote {
+  id: string;
+  noteNumber: string;
+  date: string;
+  takenBy: string;
+  personType: 'employee' | 'manager' | 'investor' | 'owner';
+  department: string;
+  reason: 'consumption' | 'damage' | 'benefit' | 'owner_draw' | 'other';
+  items: InternalConsumptionItem[];
+  totalAmount: number;
+  notes: string;
+  damageDescription: string;
+  damageDate: string;
+  recoverable: boolean;
+  disposalMethod: string;
+  preparedBy: string;
+  preparedDate: string;
+  approvedBy: string;
+  approvedDate: string;
+  rejectionReason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  outletId: string;
+  createdAt: string;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+export const generateNoteNumber = (): string => {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+  const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return `ICN-${dateStr}-${random}`;
+};
+
+export const getReasonLabel = (reason: string): string => {
+  const labels: Record<string, string> = {
+    consumption: 'Internal Consumption',
+    damage: 'Damage/Loss',
+    benefit: 'Employee Benefit',
+    owner_draw: 'Owner/Investor Draw',
+    other: 'Other'
+  };
+  return labels[reason] || reason;
+};
+
+export const getPersonTypeLabel = (personType: string): string => {
+  const labels: Record<string, string> = {
+    employee: 'Employee',
+    manager: 'Manager',
+    investor: 'Investor',
+    owner: 'Owner'
+  };
+  return labels[personType] || personType;
+};
+
+// ── CRUD ───────────────────────────────────────────────────────────────────────
+
+/**
+ * Save a new internal consumption note to the database.
+ */
+export const saveInternalConsumptionNote = async (
+  data: InternalConsumptionNoteData
+): Promise<{ success: boolean; id?: string; error?: string }> => {
+  try {
+    const insertData = {
+      note_number: data.noteNumber || generateNoteNumber(),
+      date: data.date || new Date().toISOString().split('T')[0],
+      taken_by: data.takenBy,
+      person_type: data.personType,
+      department: data.department || null,
+      reason: data.reason,
+      items: data.items || [],
+      total_amount: data.totalAmount || 0,
+      notes: data.notes || null,
+      damage_description: data.damageDescription || null,
+      damage_date: data.damageDate || null,
+      recoverable: data.recoverable || false,
+      disposal_method: data.disposalMethod || null,
+      prepared_by: data.preparedBy || null,
+      prepared_date: data.preparedDate || null,
+      approved_by: data.approvedBy || null,
+      approved_date: data.approvedDate || null,
+      rejection_reason: data.rejectionReason || null,
+      status: data.status || 'pending',
+      outlet_id: data.outletId || null,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: result, error } = await supabase
+      .from('saved_internal_consumption_notes')
+      .insert([insertData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving internal consumption note:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, id: result.id };
+  } catch (err) {
+    console.error('Error saving internal consumption note:', err);
+    return { success: false, error: 'Failed to save internal consumption note' };
+  }
+};
+
+/**
+ * Fetch all saved internal consumption notes.
+ */
+export const getSavedInternalConsumptionNotes = async (
+  outletId?: string
+): Promise<SavedInternalConsumptionNote[]> => {
+  try {
+    let query = supabase
+      .from('saved_internal_consumption_notes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (outletId) {
+      query = query.eq('outlet_id', outletId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching internal consumption notes:', error);
+      return [];
+    }
+
+    return (data || []).map((db: any) => ({
+      id: db.id,
+      noteNumber: db.note_number || '',
+      date: db.date || '',
+      takenBy: db.taken_by || '',
+      personType: db.person_type || 'employee',
+      department: db.department || '',
+      reason: db.reason || 'consumption',
+      items: db.items || [],
+      totalAmount: db.total_amount || 0,
+      notes: db.notes || '',
+      damageDescription: db.damage_description || '',
+      damageDate: db.damage_date || '',
+      recoverable: db.recoverable || false,
+      disposalMethod: db.disposal_method || '',
+      preparedBy: db.prepared_by || '',
+      preparedDate: db.prepared_date || '',
+      approvedBy: db.approved_by || '',
+      approvedDate: db.approved_date || '',
+      rejectionReason: db.rejection_reason || '',
+      status: db.status || 'pending',
+      outletId: db.outlet_id || '',
+      createdAt: db.created_at || new Date().toISOString()
+    }));
+  } catch (err) {
+    console.error('Error fetching internal consumption notes:', err);
+    return [];
+  }
+};
+
+/**
+ * Fetch a single internal consumption note by ID.
+ */
+export const getInternalConsumptionNoteById = async (
+  id: string
+): Promise<SavedInternalConsumptionNote | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_internal_consumption_notes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching internal consumption note:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      noteNumber: data.note_number || '',
+      date: data.date || '',
+      takenBy: data.taken_by || '',
+      personType: data.person_type || 'employee',
+      department: data.department || '',
+      reason: data.reason || 'consumption',
+      items: data.items || [],
+      totalAmount: data.total_amount || 0,
+      notes: data.notes || '',
+      damageDescription: data.damage_description || '',
+      damageDate: data.damage_date || '',
+      recoverable: data.recoverable || false,
+      disposalMethod: data.disposal_method || '',
+      preparedBy: data.prepared_by || '',
+      preparedDate: data.prepared_date || '',
+      approvedBy: data.approved_by || '',
+      approvedDate: data.approved_date || '',
+      rejectionReason: data.rejection_reason || '',
+      status: data.status || 'pending',
+      outletId: data.outlet_id || '',
+      createdAt: data.created_at || new Date().toISOString()
+    };
+  } catch (err) {
+    console.error('Error fetching internal consumption note:', err);
+    return null;
+  }
+};
+
+/**
+ * Update an internal consumption note.
+ */
+export const updateInternalConsumptionNote = async (
+  id: string,
+  data: Partial<InternalConsumptionNoteData>
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const updateData: any = { updated_at: new Date().toISOString() };
+
+    if (data.noteNumber) updateData.note_number = data.noteNumber;
+    if (data.date) updateData.date = data.date;
+    if (data.takenBy) updateData.taken_by = data.takenBy;
+    if (data.personType) updateData.person_type = data.personType;
+    if (data.department !== undefined) updateData.department = data.department;
+    if (data.reason) updateData.reason = data.reason;
+    if (data.items !== undefined) updateData.items = data.items;
+    if (data.totalAmount !== undefined) updateData.total_amount = data.totalAmount;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.damageDescription !== undefined) updateData.damage_description = data.damageDescription;
+    if (data.damageDate !== undefined) updateData.damage_date = data.damageDate;
+    if (data.recoverable !== undefined) updateData.recoverable = data.recoverable;
+    if (data.disposalMethod !== undefined) updateData.disposal_method = data.disposalMethod;
+    if (data.preparedBy !== undefined) updateData.prepared_by = data.preparedBy;
+    if (data.preparedDate !== undefined) updateData.prepared_date = data.preparedDate;
+    if (data.approvedBy !== undefined) updateData.approved_by = data.approvedBy;
+    if (data.approvedDate !== undefined) updateData.approved_date = data.approvedDate;
+    if (data.rejectionReason !== undefined) updateData.rejection_reason = data.rejectionReason;
+    if (data.status) updateData.status = data.status;
+
+    const { error } = await supabase
+      .from('saved_internal_consumption_notes')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating internal consumption note:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error updating internal consumption note:', err);
+    return { success: false, error: 'Failed to update internal consumption note' };
+  }
+};
+
+/**
+ * Delete an internal consumption note.
+ */
+export const deleteInternalConsumptionNote = async (
+  id: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from('saved_internal_consumption_notes')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting internal consumption note:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error deleting internal consumption note:', err);
+    return { success: false, error: 'Failed to delete internal consumption note' };
+  }
+};
+
+/**
+ * Approve an internal consumption note and deduct stock.
+ * Records stock movements for each item.
+ */
+export const approveInternalConsumptionNote = async (
+  id: string,
+  approvedBy: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // First, fetch the note to get items and details
+    const note = await getInternalConsumptionNoteById(id);
+    if (!note) {
+      return { success: false, error: 'Note not found' };
+    }
+
+    if (note.status === 'approved') {
+      return { success: false, error: 'Note is already approved' };
+    }
+
+    // Record stock movements for each item
+    const movementType = note.reason === 'damage' ? 'DAMAGE' : 'OUT';
+    
+    for (const item of note.items) {
+      const movementResult = await recordStockMovement({
+        product_id: item.productId,
+        product_name: item.productName,
+        outlet_id: note.outletId || undefined,
+        godown_id: item.godownId || undefined,
+        zone_id: item.zoneId || undefined,
+        movement_type: movementType,
+        quantity: item.quantity,
+        reference_type: 'INTERNAL_CONSUMPTION',
+        reference_id: id,
+        reference_number: note.noteNumber,
+        unit_cost: item.costPrice,
+        total_cost: item.total,
+        notes: `Internal consumption by ${note.takenBy} (${note.personType}) - ${getReasonLabel(note.reason)}${item.godownName ? ` from ${item.godownName}` : ''}${item.zoneName ? ` / ${item.zoneName}` : ''}`
+      });
+
+      if (!movementResult.success) {
+        console.error('Failed to record stock movement for item:', item.productName);
+        // Continue with other items even if one fails
+      }
+    }
+
+    // Update the note status to approved
+    const updateResult = await updateInternalConsumptionNote(id, {
+      status: 'approved',
+      approvedBy,
+      approvedDate: new Date().toISOString().split('T')[0]
+    });
+
+    if (!updateResult.success) {
+      return { success: false, error: updateResult.error };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error approving internal consumption note:', err);
+    return { success: false, error: 'Failed to approve internal consumption note' };
+  }
+};
+
+/**
+ * Reject an internal consumption note.
+ */
+export const rejectInternalConsumptionNote = async (
+  id: string,
+  rejectedBy: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const updateResult = await updateInternalConsumptionNote(id, {
+      status: 'rejected',
+      approvedBy: rejectedBy,
+      approvedDate: new Date().toISOString().split('T')[0],
+      rejectionReason: reason
+    });
+
+    if (!updateResult.success) {
+      return { success: false, error: updateResult.error };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error rejecting internal consumption note:', err);
+    return { success: false, error: 'Failed to reject internal consumption note' };
+  }
+};

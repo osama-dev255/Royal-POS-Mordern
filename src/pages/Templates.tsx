@@ -44,7 +44,8 @@ import {
   ShoppingCart,
   Loader2,
   ClipboardCheck,
-  Banknote
+  Banknote,
+  Package
 } from "lucide-react";
 import { getTemplateConfig, saveTemplateConfig, ReceiptTemplateConfig } from '@/utils/templateUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -72,12 +73,13 @@ import { savePurchaseOrder, updatePurchaseOrder } from '@/utils/purchaseOrderUti
 import { getProducts, createProduct, Product, getOutlets, Outlet, incrementProductStock, decrementProductStock, getProductsBySupplierId, linkProductToSupplier } from '@/services/databaseService';
 import { SupplierPaymentVoucherSection } from '@/components/SupplierPaymentVoucherSection';
 import { CashHandoverNoteSection } from '@/components/CashHandoverNoteSection';
+import { InternalConsumptionSection } from '@/components/InternalConsumptionSection';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Template {
   id: string;
   name: string;
-  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note" | "supplier-payment-voucher" | "cash-handover-note";
+  type: "delivery-note" | "order-form" | "contract" | "invoice" | "receipt" | "notice" | "quotation" | "report" | "salary-slip" | "complimentary-goods" | "expense-voucher" | "customer-settlement" | "supplier-settlement" | "goods-received-note" | "purchase-order" | "sales-order" | "stock-take" | "supplier-purchase-note" | "supplier-payment-voucher" | "cash-handover-note" | "internal-consumption-note";
   description: string;
   content: string;
   lastModified: string;
@@ -678,7 +680,7 @@ interface TemplatesProps {
 }
 
 export const Templates = ({ onBack, editSPNData, onEditSPNLoaded, editPOData, onEditPOLoaded, editGRNData, onEditGRNLoaded }: TemplatesProps) => {
-  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders" | "savedSupplierPaymentVouchers" | "savedCashHandoverNotes">("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "customize" | "preview" | "savedDeliveries" | "savedCustomerSettlements" | "savedSupplierSettlements" | "savedGRNs" | "savedSalesOrders" | "savedStockTakes" | "savedSupplierPurchaseNotes" | "savedPurchaseOrders" | "savedSupplierPaymentVouchers" | "savedCashHandoverNotes" | "savedInternalConsumptionNotes">("manage");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1318,6 +1320,30 @@ Total Cash Amount: [TOTAL_AMOUNT]
 Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
 Handed Over By: [HANDED_OVER_BY]    Date: [HANDED_OVER_DATE]
 Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
+      lastModified: new Date().toISOString().split('T')[0],
+      isActive: true
+    },
+    {
+      id: "20",
+      name: "Internal Consumption Note",
+      type: "internal-consumption-note",
+      description: "Track products taken by internal personnel for free — consumption, damage, benefit, or owner draw",
+      content: `INTERNAL CONSUMPTION NOTE
+Note #[NOTE_NUMBER]
+Date: [DATE]
+
+Taken By: [TAKEN_BY]
+Person Type: [PERSON_TYPE]
+Department: [DEPARTMENT]
+Reason: [REASON]
+
+Items:
+[ITEM_LIST]
+
+Total Value: [TOTAL_AMOUNT]
+
+Prepared By: [PREPARED_BY]    Date: [PREPARED_DATE]
+Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       lastModified: new Date().toISOString().split('T')[0],
       isActive: true
     }
@@ -3659,6 +3685,10 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
     }
     if (template?.type === "cash-handover-note") {
       setActiveTab("savedCashHandoverNotes");
+      return;
+    }
+    if (template?.type === "internal-consumption-note") {
+      setActiveTab("savedInternalConsumptionNotes");
       return;
     }
     if (template && (template.type === "delivery-note" || template.type === "order-form" || template.type === "invoice" || template.type === "expense-voucher" || template.type === "salary-slip" || template.type === "complimentary-goods" || template.type === "report" || template.type === "customer-settlement" || template.type === "supplier-settlement" || template.type === "goods-received-note" || template.type === "sales-order" || template.type === "stock-take" || template.type === "supplier-purchase-note")) {
@@ -10560,6 +10590,7 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
       case "stock-take": return <ClipboardCheck className="h-5 w-5" />;
       case "supplier-payment-voucher": return <CreditCard className="h-5 w-5" />;
       case "cash-handover-note": return <Banknote className="h-5 w-5" />;
+      case "internal-consumption-note": return <Package className="h-5 w-5" />;
       default: return <FileText className="h-5 w-5" />;
     }
   };
@@ -10696,6 +10727,14 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                     >
                       <Banknote className="h-4 w-4" />
                       Cash Handover Notes
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('savedInternalConsumptionNotes')}
+                      className="flex items-center gap-2"
+                    >
+                      <Package className="h-4 w-4" />
+                      Internal Consumption
                     </Button>
                   </div>
                 </div>
@@ -10953,6 +10992,27 @@ Received By (Agent): [RECEIVED_BY]    Date: [RECEIVED_DATE]`,
                   </Button>
                 </div>
                 <CashHandoverNoteSection 
+                  onBack={() => setActiveTab('manage')} 
+                  onLogout={() => {}} 
+                  username="User" 
+                />
+              </div>
+            ) : activeTab === "savedInternalConsumptionNotes" ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold">Internal Consumption Notes</h3>
+                    <p className="text-sm text-muted-foreground">Track products taken by internal personnel for free</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('manage')}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Templates
+                  </Button>
+                </div>
+                <InternalConsumptionSection 
                   onBack={() => setActiveTab('manage')} 
                   onLogout={() => {}} 
                   username="User" 

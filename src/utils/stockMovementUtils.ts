@@ -9,7 +9,7 @@ export interface StockMovement {
   zone_id?: string;
   movement_type: 'IN' | 'OUT' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'SOLD' | 'ADJUSTMENT' | 'RETURN' | 'DAMAGE';
   quantity: number;
-  reference_type?: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN';
+  reference_type?: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN' | 'INTERNAL_CONSUMPTION';
   reference_id?: string;
   reference_number?: string;
   unit_cost?: number;
