@@ -100,9 +100,7 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
   const [rejectionName, setRejectionName] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [approvingNote, setApprovingNote] = useState<SavedInternalConsumptionNote | null>(null);
-  const [approveLoading, setApproveLoading] = useState(false);
   const [approveSubmitting, setApproveSubmitting] = useState(false);
-  const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   // Load notes
@@ -420,11 +418,11 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
           <div className="flex gap-2">
             {n.status === 'pending' && (
               <>
-                <Button variant="outline" className="text-emerald-600 border-emerald-300 hover:bg-emerald-50" disabled={approveLoading} onClick={async () => { setApproveLoading(true); await new Promise(r => setTimeout(r, 400)); setApprovingNote(n); setShowApproveDialog(true); setApproveLoading(false); }}>
-                  {approveLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : <><ShieldCheck className="h-4 w-4 mr-2" /> Approve & Deduct Stock</>}
+                <Button variant="outline" className="text-emerald-600 border-emerald-300 hover:bg-emerald-50" onClick={() => { setApprovingNote(n); setShowApproveDialog(true); }}>
+                  <ShieldCheck className="h-4 w-4 mr-2" /> Approve & Deduct Stock
                 </Button>
-                <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" disabled={rejectLoading} onClick={async () => { setRejectLoading(true); await new Promise(r => setTimeout(r, 400)); setApprovingNote(n); setShowRejectDialog(true); setRejectLoading(false); }}>
-                  {rejectLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</> : <><AlertCircle className="h-4 w-4 mr-2" /> Reject</>}
+                <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => { setApprovingNote(n); setShowRejectDialog(true); }}>
+                  <AlertCircle className="h-4 w-4 mr-2" /> Reject
                 </Button>
               </>
             )}
@@ -597,6 +595,67 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
             </div>
           </CardContent>
         </Card>
+
+        {/* Approve Dialog */}
+        {showApproveDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+              <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-600" /> Approve & Deduct Stock
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                This will deduct the listed products from inventory and record stock movements.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Approved By (Name) <span className="text-red-500">*</span></label>
+                  <Input value={approvalName} onChange={e => setApprovalName(e.target.value)} className="mt-1" placeholder="Approver name" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => { setShowApproveDialog(false); setApprovingNote(null); }} disabled={approveSubmitting}>Cancel</Button>
+                <Button className="bg-emerald-600 hover:bg-emerald-700" disabled={approveSubmitting} onClick={handleApprove}>
+                  {approveSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</> : <><CheckCircle2 className="h-4 w-4 mr-2" /> Approve</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject Dialog */}
+        {showRejectDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+              <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600" /> Reject Note
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                This note will be rejected and stock will NOT be deducted.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Rejected By (Name) <span className="text-red-500">*</span></label>
+                  <Input value={rejectionName} onChange={e => setRejectionName(e.target.value)} className="mt-1" placeholder="Your name" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Reason for Rejection</label>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={e => setRejectionReason(e.target.value)}
+                    className="w-full p-3 border rounded-lg text-sm h-20 resize-none mt-1 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    placeholder="Why is this note being rejected?"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => { setShowRejectDialog(false); setApprovingNote(null); }} disabled={rejectSubmitting}>Cancel</Button>
+                <Button variant="destructive" disabled={rejectSubmitting} onClick={handleReject}>
+                  {rejectSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</> : <><AlertCircle className="h-4 w-4 mr-2" /> Reject</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

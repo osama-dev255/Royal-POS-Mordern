@@ -80,10 +80,9 @@ export interface SavedInternalConsumptionNote {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 export const generateNoteNumber = (): string => {
-  const now = new Date();
-  const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
-  const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-  return `ICN-${dateStr}-${random}`;
+  const timestamp = Date.now();
+  const random = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+  return `ICN-${String(timestamp).slice(-8)}-${random}`;
 };
 
 export const getReasonLabel = (reason: string): string => {
