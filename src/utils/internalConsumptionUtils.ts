@@ -451,3 +451,128 @@ export const rejectInternalConsumptionNote = async (
     return { success: false, error: 'Failed to reject internal consumption note' };
   }
 };
+
+/**
+ * Update an internal consumption note with inventory adjustments.
+ * Reverses old inventory deductions, updates the note, then applies new deductions.
+ * Only adjusts inventory if the note was already approved.
+ */
+export const updateInternalConsumptionNoteWithInventory = async (
+  id: string,
+  data: InternalConsumptionNoteData
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Get the old note to check status and old items
+    const oldNote = await getInternalConsumptionNoteById(id);
+    if (!oldNote) {
+      return { success: false, error: 'Note not found' };
+    }
+
+    if (oldNote.status === 'approved') {
+      // Import services for inventory updates
+      const { updateGodownStock } = await import('@/services/godownService');
+      const { getProducts, updateProduct } = await import('@/services/databaseService');
+      const { deleteStockMovementsByReference, recordStockMovement } = await import('@/utils/stockMovementUtils');
+
+      // Step 1: Reverse old inventory deductions (add back old items)
+      for (const item of oldNote.items) {
+        // Add back to godown stock
+        if (item.godownId) {
+          try {
+            await updateGodownStock(
+              item.productId,
+              item.godownId,
+              item.zoneId || null,
+              item.quantity // Positive to add back
+            );
+            console.log(`✅ Reversed: Added back ${item.quantity} to godown stock: ${item.godownName} / ${item.zoneName}`);
+          } catch (godownErr) {
+            console.error(`Failed to reverse godown stock for ${item.productName}:`, godownErr);
+          }
+        }
+
+        // Add back to product stock_quantity
+        try {
+          const allProducts = await getProducts();
+          const product = allProducts.find(p => p.id === item.productId);
+          if (product) {
+            const newStock = (product.stock_quantity || 0) + item.quantity;
+            await updateProduct(item.productId, { stock_quantity: newStock });
+            console.log(`✅ Reversed: Added back ${item.quantity} to product stock: ${item.productName}`);
+          }
+        } catch (productErr) {
+          console.error(`Failed to reverse product stock for ${item.productName}:`, productErr);
+        }
+      }
+
+      // Step 2: Delete old stock movements
+      await deleteStockMovementsByReference('INTERNAL_CONSUMPTION', oldNote.noteNumber);
+
+      // Step 3: Update the note in database
+      const updateResult = await updateInternalConsumptionNote(id, data);
+      if (!updateResult.success) {
+        return { success: false, error: updateResult.error };
+      }
+
+      // Step 4: Apply new inventory deductions with updated items
+      const newMovementType = data.reason === 'damage' ? 'DAMAGE' : 'OUT';
+      for (const item of data.items) {
+        // Deduct from godown stock
+        if (item.godownId) {
+          try {
+            await updateGodownStock(
+              item.productId,
+              item.godownId,
+              item.zoneId || null,
+              -item.quantity // Negative to deduct
+            );
+            console.log(`✅ Deducted ${item.quantity} from godown stock: ${item.godownName} / ${item.zoneName}`);
+          } catch (godownErr) {
+            console.error(`Failed to deduct godown stock for ${item.productName}:`, godownErr);
+          }
+        }
+
+        // Deduct from product stock_quantity
+        try {
+          const allProducts = await getProducts();
+          const product = allProducts.find(p => p.id === item.productId);
+          if (product) {
+            const newStock = Math.max(0, (product.stock_quantity || 0) - item.quantity);
+            await updateProduct(item.productId, { stock_quantity: newStock });
+            console.log(`✅ Deducted ${item.quantity} from product stock: ${item.productName}`);
+          }
+        } catch (productErr) {
+          console.error(`Failed to deduct product stock for ${item.productName}:`, productErr);
+        }
+
+        // Record new stock movement
+        await recordStockMovement({
+          product_id: item.productId,
+          product_name: item.productName,
+          outlet_id: oldNote.outletId || undefined,
+          godown_id: item.godownId || undefined,
+          zone_id: item.zoneId || undefined,
+          movement_type: newMovementType,
+          quantity: item.quantity,
+          reference_type: 'INTERNAL_CONSUMPTION',
+          reference_id: id,
+          reference_number: data.noteNumber,
+          unit_cost: item.costPrice,
+          total_cost: item.total,
+          notes: `Internal consumption (edited) by ${data.takenBy} (${data.personType}) - ${getReasonLabel(data.reason)}${item.godownName ? ` from ${item.godownName}` : ''}${item.zoneName ? ` / ${item.zoneName}` : ''}`
+        });
+      }
+    } else {
+      // Note is not approved, just update the database record
+      const updateResult = await updateInternalConsumptionNote(id, data);
+      if (!updateResult.success) {
+        return { success: false, error: updateResult.error };
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error updating internal consumption note with inventory:', err);
+    return { success: false, error: 'Failed to update internal consumption note' };
+  }
+};

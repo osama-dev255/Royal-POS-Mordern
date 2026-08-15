@@ -330,7 +330,7 @@ export const getMovedProductNames = async (): Promise<string[]> => {
  * Used when editing a transaction to remove old movements before creating new ones
  */
 export const deleteStockMovementsByReference = async (
-  referenceType: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN',
+  referenceType: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN' | 'INTERNAL_CONSUMPTION',
   referenceNumber: string
 ): Promise<{ success: boolean; count?: number; error?: string }> => {
   try {
@@ -359,7 +359,7 @@ export const deleteStockMovementsByReference = async (
  * Used when editing a transaction to reflect changes in the Movement Ledger
  */
 export const updateStockMovementsForTransaction = async (
-  referenceType: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN',
+  referenceType: 'GRN' | 'DELIVERY_NOTE' | 'SALE' | 'STOCK_TAKE' | 'ADJUSTMENT' | 'TRANSFER' | 'RETURN' | 'INTERNAL_CONSUMPTION',
   referenceNumber: string,
   newMovements: StockMovement[]
 ): Promise<{ success: boolean; count?: number; error?: string }> => {

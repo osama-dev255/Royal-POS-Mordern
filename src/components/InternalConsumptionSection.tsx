@@ -7,7 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import {
   Package, Printer, Eye, Plus, Save, Share2, ArrowLeft, Trash2, FileText, Users,
   StickyNote, Clock, CheckCircle2, AlertCircle, AlertTriangle, ShieldCheck, Search,
-  CalendarDays, ChevronDown, Check, Loader2, Building2
+  CalendarDays, ChevronDown, Check, Loader2, Building2, Pencil
 } from "lucide-react";
 import {
   getSavedInternalConsumptionNotes,
@@ -15,6 +15,7 @@ import {
   saveInternalConsumptionNote,
   approveInternalConsumptionNote,
   rejectInternalConsumptionNote,
+  updateInternalConsumptionNoteWithInventory,
   generateNoteNumber,
   getReasonLabel,
   getPersonTypeLabel,
@@ -79,6 +80,7 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
   // Form state
   const [form, setForm] = useState<InternalConsumptionNoteData>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
   // Product data
   const [products, setProducts] = useState<Product[]>([]);
@@ -233,6 +235,30 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
+  const handleEdit = (note: SavedInternalConsumptionNote) => {
+    // Load note data into form for editing
+    setForm({
+      noteNumber: note.noteNumber,
+      date: note.date,
+      takenBy: note.takenBy,
+      personType: note.personType,
+      department: note.department,
+      reason: note.reason,
+      items: note.items.length > 0 ? note.items : [emptyItem()],
+      totalAmount: note.totalAmount,
+      notes: note.notes,
+      damageDescription: note.damageDescription,
+      damageDate: note.damageDate,
+      recoverable: note.recoverable,
+      disposalMethod: note.disposalMethod,
+      preparedBy: note.preparedBy,
+      preparedDate: note.preparedDate,
+      status: note.status
+    });
+    setEditingNoteId(note.id);
+    setView('form');
+  };
+
   const handleSave = async () => {
     // Validation
     if (!form.takenBy) {
@@ -262,14 +288,29 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
 
     setSaving(true);
     try {
-      const result = await saveInternalConsumptionNote(form);
-      if (result.success) {
-        toast({ title: 'Success', description: 'Internal Consumption Note saved successfully' });
-        setForm(emptyForm());
-        setView('list');
-        loadNotes();
+      if (editingNoteId) {
+        // Update existing note with inventory adjustments
+        const result = await updateInternalConsumptionNoteWithInventory(editingNoteId, form);
+        if (result.success) {
+          toast({ title: 'Success', description: 'Internal Consumption Note updated successfully' });
+          setForm(emptyForm());
+          setEditingNoteId(null);
+          setView('list');
+          loadNotes();
+        } else {
+          toast({ title: 'Error', description: result.error || 'Failed to update note', variant: 'destructive' });
+        }
       } else {
-        toast({ title: 'Error', description: result.error || 'Failed to save note', variant: 'destructive' });
+        // Save new note
+        const result = await saveInternalConsumptionNote(form);
+        if (result.success) {
+          toast({ title: 'Success', description: 'Internal Consumption Note saved successfully' });
+          setForm(emptyForm());
+          setView('list');
+          loadNotes();
+        } else {
+          toast({ title: 'Error', description: result.error || 'Failed to save note', variant: 'destructive' });
+        }
       }
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to save internal consumption note', variant: 'destructive' });
@@ -416,6 +457,11 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
             <ArrowLeft className="h-4 w-4 mr-2" /> Back to Notes
           </Button>
           <div className="flex gap-2">
+            {n.status !== 'rejected' && (
+              <Button variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50" onClick={() => handleEdit(n)}>
+                <Pencil className="h-4 w-4 mr-2" /> Edit
+              </Button>
+            )}
             {n.status === 'pending' && (
               <>
                 <Button variant="outline" className="text-emerald-600 border-emerald-300 hover:bg-emerald-50" onClick={() => { setApprovingNote(n); setShowApproveDialog(true); }}>
@@ -664,24 +710,25 @@ export const InternalConsumptionSection = ({ onBack, onLogout, username }: Inter
 
   if (view === 'form') {
     const isDamage = form.reason === 'damage';
+    const isEditing = !!editingNoteId;
 
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <Button variant="outline" onClick={() => setView('list')}>
+          <Button variant="outline" onClick={() => { setView('list'); setEditingNoteId(null); }}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back to Notes
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            {saving ? 'Saving...' : 'Save Note'}
+            {saving ? (isEditing ? 'Updating...' : 'Saving...') : (isEditing ? 'Update Note' : 'Save Note')}
           </Button>
         </div>
 
         <Card className="overflow-hidden">
           {/* Form Header */}
           <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 text-white">
-            <h2 className="text-lg font-bold tracking-wide">NEW INTERNAL CONSUMPTION NOTE</h2>
-            <p className="text-slate-300 text-xs mt-0.5">Record products taken by internal personnel for free</p>
+            <h2 className="text-lg font-bold tracking-wide">{isEditing ? 'EDIT INTERNAL CONSUMPTION NOTE' : 'NEW INTERNAL CONSUMPTION NOTE'}</h2>
+            <p className="text-slate-300 text-xs mt-0.5">{isEditing ? `Editing ${form.noteNumber}` : 'Record products taken by internal personnel for free'}</p>
           </div>
 
           <CardContent className="p-6 space-y-6">
