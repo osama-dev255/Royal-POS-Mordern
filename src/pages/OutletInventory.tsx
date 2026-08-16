@@ -42,9 +42,10 @@ import {
   Download,
   FileOutput,
   Calendar,
-  Info
+  Info,
+  Trash2
 } from "lucide-react";
-import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct, getAvailableInventoryByOutlet, deleteInventoryProduct } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { supabase } from "@/lib/supabaseClient";
 import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
@@ -371,6 +372,29 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       sellingPrice: item.sellingPrice
     });
     setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = async (item: InventoryItem) => {
+    if (!window.confirm(`Are you sure you want to remove "${item.name}" from this outlet's inventory? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Use database UUID (dbId) if available
+      const idToDelete = item.dbId || item.id;
+      const success = await deleteInventoryProduct(idToDelete);
+      
+      if (success) {
+        // Remove from local state
+        setInventory(prev => prev.filter(i => i.id !== item.id));
+        alert(`Successfully removed "${item.name}" from inventory.`);
+      } else {
+        alert(`Failed to remove "${item.name}" from inventory. Please try again.`);
+      }
+    } catch (error) {
+      console.error('Error deleting inventory product:', error);
+      alert(`Failed to remove "${item.name}" from inventory. Please try again.`);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -787,6 +811,15 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                       <Pencil className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleDeleteClick(item)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -846,13 +879,23 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditClick(item)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleEditClick(item)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDeleteClick(item)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
