@@ -811,15 +811,6 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                       <Pencil className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDeleteClick(item)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -879,23 +870,13 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleEditClick(item)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDeleteClick(item)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditClick(item)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
