@@ -20,7 +20,7 @@ import { PrintUtils } from "@/utils/printUtils";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import { saveInvoice, InvoiceData } from "@/utils/invoiceUtils";
 // Import Supabase database service
-import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, createCustomerLedgerEntry, getOutletCustomerSettlementsByOutletId, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
+import { getProducts, getCustomers, updateProductStock, createCustomer, createCustomerForOutlet, createSale, createSaleItem, createDebt, getDebtsByCustomerId, createSavedSale, getOutletCustomers, createOutletCustomer, createOutletSale, createOutletSaleItem, createOutletDebt, createOutletDebtItem, createOutletCashSale, createOutletCashSaleItem, createOutletCardSale, createOutletCardSaleItem, createOutletMobileSale, createOutletMobileSaleItem, getOutletDebtsByCustomerId, updateOutletDebt, deleteOutletDebt, createOutletDebtPayment, createCustomerLedgerEntry, getCustomerLedgerBalance, Product, Customer as DatabaseCustomer, OutletCustomer, incrementSoldQuantity, getAvailableInventoryByOutlet } from "@/services/databaseService";
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
@@ -256,31 +256,23 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
         }));
         setCustomers(formattedCustomers);
         
-        // Fetch customer balances from outlet_debts AND settlements if outletId is present
+        // Fetch customer balances from the authoritative customer_ledger table if outletId is present
         if (outletId) {
-          const debts = await getOutletDebtsByOutletId(outletId);
           const balances: Record<string, number> = {};
-          
-          // Include ALL debts with non-zero remaining_amount
-          // Positive = customer owes money (debt)
-          // Negative = customer has credit (overpaid)
-          debts.forEach(debt => {
-            if (debt.customer_id && (debt.remaining_amount !== 0)) {
-              balances[debt.customer_id] = (balances[debt.customer_id] || 0) + (debt.remaining_amount || 0);
-            }
-          });
-          
-          // ALSO fetch settlements to include overpayments
-          const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
-          settlements.forEach(settlement => {
-            if (settlement.customer_id && settlement.new_balance !== undefined) {
-              // Only add negative balances (credits) to avoid double-counting
-              if (settlement.new_balance < 0) {
-                balances[settlement.customer_id] = (balances[settlement.customer_id] || 0) + settlement.new_balance;
+
+          // Use customer_ledger.running_balance as the single source of truth.
+          // This avoids stale outlet_debts.remaining_amount values that can diverge
+          // from the ledger after debt edits or payment allocations.
+          // Positive = customer owes money (debt), Negative = customer has credit (overpayment)
+          await Promise.all(formattedCustomers.map(async (customer) => {
+            if (customer.id) {
+              const balance = await getCustomerLedgerBalance(outletId, customer.id);
+              if (balance !== 0) {
+                balances[customer.id] = balance;
               }
             }
-          });
-          
+          }));
+
           setCustomerBalances(balances);
         }
       } catch (error) {
@@ -520,36 +512,20 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
     if (selectedCustomer?.id && creditBroughtForward === 0 && outletId) {
       console.log('⚠️ Customer selected but no balance fetched, fetching now...');
       try {
-        let totalDebt = 0;
-        
-        // Get outlet-specific debts from database
-        const outletDebts = await getOutletDebtsByCustomerId(outletId, selectedCustomer.id);
-        console.log('📊 Outlet debts:', outletDebts.length, 'records');
-        totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
-        console.log('💰 Debt total:', totalDebt);
-        
-        // ALSO get customer settlements to include overpayments
-        const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
-        const customerSettlements = settlements.filter(s => s.customer_id === selectedCustomer.id);
-        console.log('📋 Customer settlements:', customerSettlements.length, 'records');
-        
-        // Add negative settlement balances (credits/overpayments)
-        customerSettlements.forEach(settlement => {
-          if (settlement.new_balance !== undefined && settlement.new_balance < 0) {
-            totalDebt += settlement.new_balance;
-            console.log('💚 Added credit:', settlement.new_balance);
-          }
-        });
-        
-        console.log('✅ Final balanceToUse:', totalDebt);
-        balanceToUse = totalDebt; // Use local variable instead of state
-        setCreditBroughtForward(totalDebt); // Also update state for UI
-        
+        // Use the authoritative customer_ledger.running_balance as source of truth.
+        // This avoids stale outlet_debts.remaining_amount values that can diverge
+        // from the ledger after debt edits or payment allocations.
+        const ledgerBalance = await getCustomerLedgerBalance(outletId, selectedCustomer.id);
+        console.log('💰 Customer ledger balance:', ledgerBalance);
+
+        balanceToUse = ledgerBalance; // Use local variable instead of state
+        setCreditBroughtForward(ledgerBalance); // Also update state for UI
+
         // Recalculate effectiveTotal with the fetched balance
         finalEffectiveTotal = Math.max(0, total - (balanceToUse < 0 ? Math.abs(balanceToUse) : 0));
         console.log('🔄 Recalculated finalEffectiveTotal:', finalEffectiveTotal);
       } catch (error) {
-        console.error('Error fetching customer debts:', error);
+        console.error('Error fetching customer balance:', error);
       }
     }
     
@@ -1957,25 +1933,11 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                           });
                           
                           if (outletId) {
-                            // Get outlet-specific debts from database
-                            const outletDebts = await getOutletDebtsByCustomerId(outletId, customer.id);
-                            console.log('📊 Outlet debts:', outletDebts.length, 'records');
-                            totalDebt = outletDebts.reduce((sum, debt) => sum + (debt.remaining_amount || 0), 0);
-                            console.log('💰 Debt total:', totalDebt);
-                            
-                            // ALSO get customer settlements to include overpayments
-                            const settlements = await getOutletCustomerSettlementsByOutletId(outletId);
-                            const customerSettlements = settlements.filter(s => s.customer_id === customer.id);
-                            console.log('📋 Customer settlements:', customerSettlements.length, 'records');
-                            
-                            // Add negative settlement balances (credits/overpayments)
-                            // Only add negative balances to avoid double-counting payments
-                            customerSettlements.forEach(settlement => {
-                              if (settlement.new_balance !== undefined && settlement.new_balance < 0) {
-                                totalDebt += settlement.new_balance; // This adds negative value (credit)
-                                console.log('💚 Added credit:', settlement.new_balance);
-                              }
-                            });
+                            // Use the authoritative customer_ledger.running_balance as source of truth.
+                            // This avoids stale outlet_debts.remaining_amount values that can diverge
+                            // from the ledger after debt edits or payment allocations.
+                            totalDebt = await getCustomerLedgerBalance(outletId, customer.id);
+                            console.log('💰 Customer ledger balance:', totalDebt);
                           } else {
                             console.log('⚠️ No outletId, fetching general debts');
                             // Get general debts from database
