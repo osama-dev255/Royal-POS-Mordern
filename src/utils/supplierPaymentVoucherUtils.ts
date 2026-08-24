@@ -214,6 +214,24 @@ export const getSavedSupplierPaymentVouchers = async (
 };
 
 /**
+ * Fetch a single supplier payment voucher by its database id (raw database row).
+ */
+export const getSupplierPaymentVoucherById = async (id: string): Promise<any | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('supplier_payment_vouchers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching supplier payment voucher by id:', error);
+    return null;
+  }
+};
+
+/**
  * Delete a supplier payment voucher.
  * NOTE: Does NOT reverse the ledger entry — that would require additional logic.
  */

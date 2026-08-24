@@ -336,6 +336,24 @@ const updateGRNGodownStock = async (grn: SavedGRN): Promise<void> => {
   }
 };
 
+/**
+ * Fetch a single saved GRN by its database id (raw database row).
+ */
+export const getSavedGRNById = async (id: string): Promise<any | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('saved_grns')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching GRN by id:', error);
+    return null;
+  }
+};
+
 export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
   try {
     console.log('Getting saved GRNs...');

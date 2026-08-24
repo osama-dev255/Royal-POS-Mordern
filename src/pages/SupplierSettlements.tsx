@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown } from "lucide-react";
+import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown, Eye, Loader2, Receipt } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -22,6 +22,9 @@ import {
   type SupplierLedgerEntry,
   type SupplierLedgerSummary,
 } from "@/utils/supplierLedgerUtils";
+import { getSavedGRNById } from "@/utils/grnUtils";
+import { getSupplierPaymentVoucherById } from "@/utils/supplierPaymentVoucherUtils";
+import { getExpenseById } from "@/services/databaseService";
 
 const paymentMethods = [
   "Cash",
@@ -87,6 +90,12 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
 
   const { toast } = useToast();
 
+  // View transaction dialog state
+  const [viewEntry, setViewEntry] = useState<SupplierLedgerEntry | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
 
   const fetchLedger = useCallback(async () => {
@@ -138,6 +147,51 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
   const totalCredit = filteredEntries.reduce((sum, e) => sum + (Number(e.credit_amount) || 0), 0);
   const totalDebit = filteredEntries.reduce((sum, e) => sum + (Number(e.debit_amount) || 0), 0);
   const outstandingBalance = totalCredit - totalDebit;
+
+  // Open the view dialog and fetch the underlying transaction record
+  const handleViewTransaction = async (entry: SupplierLedgerEntry) => {
+    setViewEntry(entry);
+    setIsViewDialogOpen(true);
+    setTransactionDetails(null);
+    setLoadingDetails(true);
+
+    try {
+      if (!entry.reference_id) {
+        setLoadingDetails(false);
+        return;
+      }
+
+      switch (entry.transaction_type) {
+        case 'grn_received': {
+          const grn = await getSavedGRNById(entry.reference_id);
+          setTransactionDetails(grn);
+          break;
+        }
+        case 'inventory_payment': {
+          const expense = await getExpenseById(entry.reference_id);
+          setTransactionDetails(expense);
+          break;
+        }
+        case 'settlement': {
+          const voucher = await getSupplierPaymentVoucherById(entry.reference_id);
+          setTransactionDetails(voucher);
+          break;
+        }
+        default:
+          // adjustment, refund — no underlying record to fetch
+          break;
+      }
+    } catch (error) {
+      console.error('Error fetching transaction details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load transaction details",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   // ── Export Handlers ────────────────────────────────────────────────────────
 
@@ -760,10 +814,36 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                         </Badge>
                       </TableCell>
                       <TableCell className={`text-right font-medium ${Number(entry.debit_amount) > 0 ? 'text-red-600' : ''}`}>
-                        {Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-'}
+                        {Number(entry.debit_amount) > 0 ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{formatCurrency(entry.debit_amount)}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-blue-600 hover:text-blue-800"
+                              onClick={() => handleViewTransaction(entry)}
+                              title="View transaction"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className={`text-right font-medium ${Number(entry.credit_amount) > 0 ? 'text-green-600' : ''}`}>
-                        {Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-'}
+                        {Number(entry.credit_amount) > 0 ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{formatCurrency(entry.credit_amount)}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-blue-600 hover:text-blue-800"
+                              onClick={() => handleViewTransaction(entry)}
+                              title="View transaction"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className={`text-right font-bold ${Number(entry.running_balance) >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
                         {formatCurrency(Math.abs(Number(entry.running_balance) || 0))}
@@ -791,6 +871,292 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
             </Table>
           </CardContent>
         </Card>
+        {/* View Transaction Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Transaction Details
+              </DialogTitle>
+            </DialogHeader>
+
+            {loadingDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : viewEntry ? (
+              <div className="space-y-4">
+                {/* Ledger Entry Summary */}
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Transaction Type</p>
+                    <Badge variant={transactionTypeBadgeVariant[viewEntry.transaction_type] || "outline"}>
+                      {transactionTypeLabels[viewEntry.transaction_type] || viewEntry.transaction_type}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Date</p>
+                    <p className="font-medium">{new Date(viewEntry.transaction_date).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Supplier</p>
+                    <p className="font-medium">{viewEntry.supplier_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Reference No.</p>
+                    <p className="font-medium">{viewEntry.reference_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Debit (DR)</p>
+                    <p className="font-medium text-red-600">{Number(viewEntry.debit_amount) > 0 ? formatCurrency(viewEntry.debit_amount) : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Credit (CR)</p>
+                    <p className="font-medium text-green-600">{Number(viewEntry.credit_amount) > 0 ? formatCurrency(viewEntry.credit_amount) : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment Method</p>
+                    <p className="font-medium">{viewEntry.payment_method || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Running Balance</p>
+                    <p className={`font-bold ${Number(viewEntry.running_balance) >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                      {formatCurrency(Math.abs(Number(viewEntry.running_balance) || 0))}
+                      {Number(viewEntry.running_balance) >= 0 ? ' CR' : ' DR'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Type-specific Source Document */}
+                {transactionDetails && (
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Receipt className="h-4 w-4" />
+                      Source Document — {transactionTypeLabels[viewEntry.transaction_type]}
+                    </h4>
+
+                    {/* GRN Received */}
+                    {viewEntry.transaction_type === 'grn_received' && transactionDetails && (
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">GRN Number</p>
+                          <p className="font-medium">{transactionDetails.grn_number || transactionDetails.name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">GRN Date</p>
+                          <p className="font-medium">{transactionDetails.date ? new Date(transactionDetails.date).toLocaleDateString() : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Supplier</p>
+                          <p className="font-medium">{transactionDetails.supplier_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Supplier TIN</p>
+                          <p className="font-medium">{transactionDetails.supplier_tin_number || transactionDetails.supplier_tin || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">PO Number</p>
+                          <p className="font-medium">{transactionDetails.po_number || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Delivery Note No.</p>
+                          <p className="font-medium">{transactionDetails.delivery_note_number || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Vehicle Number</p>
+                          <p className="font-medium">{transactionDetails.vehicle_number || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Driver Name</p>
+                          <p className="font-medium">{transactionDetails.driver_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Received By</p>
+                          <p className="font-medium">{transactionDetails.received_by || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Status</p>
+                          <p className="font-medium">{transactionDetails.status || '-'}</p>
+                        </div>
+                        {transactionDetails.total != null && (
+                          <div className="col-span-2">
+                            <p className="text-muted-foreground">Total Amount</p>
+                            <p className="font-bold text-lg text-green-600">{formatCurrency(transactionDetails.total)}</p>
+                          </div>
+                        )}
+                        {Array.isArray(transactionDetails.items) && transactionDetails.items.length > 0 && (
+                          <div className="col-span-2">
+                            <p className="text-muted-foreground mb-1">Items ({transactionDetails.items.length})</p>
+                            <div className="border rounded max-h-40 overflow-y-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead className="text-right">Qty</TableHead>
+                                    <TableHead className="text-right">Unit Cost</TableHead>
+                                    <TableHead className="text-right">Total</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {transactionDetails.items.map((item: any, idx: number) => (
+                                    <TableRow key={idx}>
+                                      <TableCell className="text-xs">{item.description || item.productName || '-'}</TableCell>
+                                      <TableCell className="text-xs text-right">{item.quantity ?? '-'}</TableCell>
+                                      <TableCell className="text-xs text-right">{item.unitCost != null ? formatCurrency(item.unitCost) : '-'}</TableCell>
+                                      <TableCell className="text-xs text-right">{item.total != null ? formatCurrency(item.total) : '-'}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Inventory Payment (Expense) */}
+                    {viewEntry.transaction_type === 'inventory_payment' && transactionDetails && (
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Category</p>
+                          <p className="font-medium">{transactionDetails.category || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Sub-Category</p>
+                          <p className="font-medium">{transactionDetails.sub_category || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Amount</p>
+                          <p className="font-bold text-red-600">{formatCurrency(transactionDetails.amount ?? 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Payment Method</p>
+                          <p className="font-medium">{transactionDetails.payment_method || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Expense Date</p>
+                          <p className="font-medium">{transactionDetails.expense_date ? new Date(transactionDetails.expense_date).toLocaleDateString() : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Vendor</p>
+                          <p className="font-medium">{transactionDetails.vendor_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Approval Status</p>
+                          <p className="font-medium">{transactionDetails.approval_status || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Prepared By</p>
+                          <p className="font-medium">{transactionDetails.prepared_by_name || '-'}</p>
+                        </div>
+                        {transactionDetails.description && (
+                          <div className="col-span-2">
+                            <p className="text-muted-foreground">Description</p>
+                            <p className="text-sm">{transactionDetails.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Settlement (Supplier Payment Voucher) */}
+                    {viewEntry.transaction_type === 'settlement' && transactionDetails && (
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Voucher Number</p>
+                          <p className="font-medium">{transactionDetails.voucher_number || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Voucher Date</p>
+                          <p className="font-medium">{transactionDetails.date ? new Date(transactionDetails.date).toLocaleDateString() : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Supplier</p>
+                          <p className="font-medium">{transactionDetails.supplier_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Supplier TIN</p>
+                          <p className="font-medium">{transactionDetails.supplier_tin || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Linkage Mode</p>
+                          <p className="font-medium capitalize">{transactionDetails.linkage_mode || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Status</p>
+                          <p className="font-medium capitalize">{transactionDetails.status || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Total Amount</p>
+                          <p className="font-bold text-red-600">{formatCurrency(transactionDetails.total_amount ?? 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Previous Balance</p>
+                          <p className="font-medium">{formatCurrency(transactionDetails.previous_balance ?? 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">New Balance</p>
+                          <p className="font-medium">{formatCurrency(transactionDetails.new_balance ?? 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Prepared By</p>
+                          <p className="font-medium">{transactionDetails.prepared_by || '-'}</p>
+                        </div>
+                        {Array.isArray(transactionDetails.payment_breakdown) && transactionDetails.payment_breakdown.length > 0 && (
+                          <div className="col-span-2">
+                            <p className="text-muted-foreground mb-1">Payment Breakdown</p>
+                            <div className="border rounded">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Method</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead>Reference</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {transactionDetails.payment_breakdown.map((pb: any, idx: number) => (
+                                    <TableRow key={idx}>
+                                      <TableCell className="text-xs">{pb.method || '-'}</TableCell>
+                                      <TableCell className="text-xs text-right">{formatCurrency(pb.amount ?? 0)}</TableCell>
+                                      <TableCell className="text-xs">{pb.reference || '-'}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Ledger Description & Notes */}
+                {viewEntry.description && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Ledger Description</p>
+                    <p className="text-sm bg-muted/30 p-2 rounded">{viewEntry.description}</p>
+                  </div>
+                )}
+                {viewEntry.notes && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                    <p className="text-sm bg-muted/30 p-2 rounded">{viewEntry.notes}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">No transaction data available.</p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
