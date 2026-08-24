@@ -22,9 +22,28 @@ import {
   FileText,
   Share2,
   FileSpreadsheet,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  ShoppingCart,
+  Loader2,
+  Receipt
 } from "lucide-react";
-import { getCustomerLedgerByCustomerId, getCustomerLedgerBalance, OutletCustomer, CustomerLedgerEntry } from "@/services/databaseService";
+import {
+  getCustomerLedgerByCustomerId,
+  getCustomerLedgerBalance,
+  getOutletDebtById,
+  getOutletDebtPaymentById,
+  getOutletCustomerSettlementById,
+  getOutletCashSaleById,
+  getOutletCardSaleById,
+  getOutletMobileSaleById,
+  getOutletDebtItemsByDebtId,
+  getOutletCashSaleItemsBySaleId,
+  getOutletCardSaleItemsBySaleId,
+  getOutletMobileSaleItemsBySaleId,
+  OutletCustomer,
+  CustomerLedgerEntry,
+} from "@/services/databaseService";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -33,6 +52,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface CustomerLedgerProps {
   customer: OutletCustomer;
@@ -64,6 +89,13 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [filteredEntries, setFilteredEntries] = useState<LedgerEntry[]>([]);
   const { toast } = useToast();
+
+  // View transaction dialog state
+  const [viewEntry, setViewEntry] = useState<LedgerEntry | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [transactionItems, setTransactionItems] = useState<any[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     loadLedgerData();
@@ -158,6 +190,98 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
 
     setFilteredEntries(filtered);
   }, [searchTerm, dateFrom, dateTo, ledgerEntries]);
+
+  // Helper: human-readable label for a transaction type
+  const getTransactionTypeLabel = (type: LedgerEntry['type']): string => {
+    const labels: Record<string, string> = {
+      credit_sale: 'Credit Sale',
+      cash_sale: 'Cash Sale',
+      card_sale: 'Card Sale',
+      mobile_sale: 'Mobile Sale',
+      debt_payment: 'Debt Payment',
+      settlement: 'Settlement',
+      adjustment: 'Adjustment',
+      refund: 'Refund',
+    };
+    return labels[type] || type;
+  };
+
+  // Open the view dialog and fetch the underlying transaction record
+  const handleViewTransaction = async (entry: LedgerEntry) => {
+    setViewEntry(entry);
+    setIsViewDialogOpen(true);
+    setTransactionDetails(null);
+    setTransactionItems([]);
+    setLoadingDetails(true);
+
+    try {
+      if (!entry.reference) {
+        setLoadingDetails(false);
+        return;
+      }
+
+      switch (entry.type) {
+        case 'credit_sale': {
+          const debt = await getOutletDebtById(entry.reference);
+          setTransactionDetails(debt);
+          if (debt) {
+            const items = await getOutletDebtItemsByDebtId(entry.reference);
+            setTransactionItems(items);
+          }
+          break;
+        }
+        case 'debt_payment': {
+          const payment = await getOutletDebtPaymentById(entry.reference);
+          setTransactionDetails(payment);
+          break;
+        }
+        case 'settlement': {
+          const settlement = await getOutletCustomerSettlementById(entry.reference);
+          setTransactionDetails(settlement);
+          break;
+        }
+        case 'cash_sale': {
+          const sale = await getOutletCashSaleById(entry.reference);
+          setTransactionDetails(sale);
+          if (sale) {
+            const items = await getOutletCashSaleItemsBySaleId(entry.reference);
+            setTransactionItems(items);
+          }
+          break;
+        }
+        case 'card_sale': {
+          const sale = await getOutletCardSaleById(entry.reference);
+          setTransactionDetails(sale);
+          if (sale) {
+            const items = await getOutletCardSaleItemsBySaleId(entry.reference);
+            setTransactionItems(items);
+          }
+          break;
+        }
+        case 'mobile_sale': {
+          const sale = await getOutletMobileSaleById(entry.reference);
+          setTransactionDetails(sale);
+          if (sale) {
+            const items = await getOutletMobileSaleItemsBySaleId(entry.reference);
+            setTransactionItems(items);
+          }
+          break;
+        }
+        default:
+          // adjustment, refund — no underlying record to fetch
+          break;
+      }
+    } catch (error) {
+      console.error('Error fetching transaction details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load transaction details",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -1450,10 +1574,40 @@ Generated: ${new Date().toLocaleDateString('en-TZ', { year: 'numeric', month: 'l
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-red-600">
-                        {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
+                        {entry.debit > 0 ? (
+                          <div className="flex items-center justify-end gap-1">
+                            {formatCurrency(entry.debit)}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewTransaction(entry);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5 text-blue-500" />
+                            </Button>
+                          </div>
+                        ) : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                        {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
+                        {entry.credit > 0 ? (
+                          <div className="flex items-center justify-end gap-1">
+                            {formatCurrency(entry.credit)}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewTransaction(entry);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5 text-blue-500" />
+                            </Button>
+                          </div>
+                        ) : '-'}
                       </td>
                       <td className={`px-4 py-3 text-sm text-right font-bold ${entry.balance > 0 ? 'text-red-600' : entry.balance < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                         {formatCurrency(Math.abs(entry.balance))} {entry.balance > 0 ? 'Dr' : entry.balance < 0 ? 'Cr' : ''}
@@ -1476,6 +1630,242 @@ Generated: ${new Date().toLocaleDateString('en-TZ', { year: 'numeric', month: 'l
           </div>
         </CardContent>
       </Card>
+
+      {/* View Transaction Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Transaction Details
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+            {loadingDetails ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : viewEntry ? (
+              <>
+                {/* Transaction type & direction */}
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Transaction Type</p>
+                    <p className="font-semibold">{getTransactionTypeLabel(viewEntry.type)}</p>
+                  </div>
+                  <Badge className={viewEntry.debit > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                    {viewEntry.debit > 0 ? 'Debit (Sale)' : 'Credit (Payment)'}
+                  </Badge>
+                </div>
+
+                {/* Date & description */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Date</p>
+                      <p className="text-sm font-medium">{viewEntry.date}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Description</p>
+                    <p className="text-sm font-medium">{viewEntry.description}</p>
+                  </div>
+                </div>
+
+                {/* Amounts */}
+                <div className="grid grid-cols-2 gap-3">
+                  {viewEntry.debit > 0 && (
+                    <div className="p-3 bg-red-50 rounded-lg">
+                      <p className="text-sm text-muted-foreground">Debit</p>
+                      <p className="text-lg font-bold text-red-600">{formatCurrency(viewEntry.debit)}</p>
+                    </div>
+                  )}
+                  {viewEntry.credit > 0 && (
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm text-muted-foreground">Credit</p>
+                      <p className="text-lg font-bold text-green-600">{formatCurrency(viewEntry.credit)}</p>
+                    </div>
+                  )}
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Running Balance</p>
+                    <p className="text-lg font-bold">{formatCurrency(Math.abs(viewEntry.balance))} {viewEntry.balance > 0 ? 'Dr' : viewEntry.balance < 0 ? 'Cr' : ''}</p>
+                  </div>
+                </div>
+
+                {/* Type-specific transaction details */}
+                {transactionDetails && (
+                  <div className="border-t pt-4 space-y-3">
+                    {/* Sale-type transactions: credit_sale, cash_sale, card_sale, mobile_sale */}
+                    {(viewEntry.type === 'credit_sale' || viewEntry.type === 'cash_sale' || viewEntry.type === 'card_sale' || viewEntry.type === 'mobile_sale') && (
+                      <>
+                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Invoice Number</p>
+                            <p className="font-semibold">{transactionDetails.invoice_number || '-'}</p>
+                          </div>
+                          {viewEntry.type === 'credit_sale' && transactionDetails.payment_status && (
+                            <Badge className={
+                              transactionDetails.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
+                              transactionDetails.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+                              transactionDetails.payment_status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                              transactionDetails.payment_status === 'refunded' ? 'bg-purple-100 text-purple-800' :
+                              'bg-red-100 text-red-800'
+                            }>
+                              {transactionDetails.payment_status}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div><span className="text-muted-foreground">Subtotal: </span><span className="font-medium">{formatCurrency(transactionDetails.subtotal || 0)}</span></div>
+                          <div><span className="text-muted-foreground">Discount: </span><span className="font-medium">{formatCurrency(transactionDetails.discount_amount || 0)}</span></div>
+                          <div><span className="text-muted-foreground">Tax: </span><span className="font-medium">{formatCurrency(transactionDetails.tax_amount || 0)}</span></div>
+                          <div><span className="text-muted-foreground">Total: </span><span className="font-medium">{formatCurrency(transactionDetails.total_amount || 0)}</span></div>
+                          <div><span className="text-muted-foreground">Amount Paid: </span><span className="font-medium">{formatCurrency(transactionDetails.amount_paid || 0)}</span></div>
+                          {viewEntry.type === 'credit_sale' && (
+                            <div><span className="text-muted-foreground">Remaining: </span><span className="font-medium">{formatCurrency(transactionDetails.remaining_amount || 0)}</span></div>
+                          )}
+                          {(viewEntry.type === 'cash_sale' || viewEntry.type === 'card_sale' || viewEntry.type === 'mobile_sale') && (
+                            <div><span className="text-muted-foreground">Change: </span><span className="font-medium">{formatCurrency(transactionDetails.change_amount || 0)}</span></div>
+                          )}
+                        </div>
+                        {/* Credit sale specifics */}
+                        {viewEntry.type === 'credit_sale' && (transactionDetails.due_date || transactionDetails.salesman || transactionDetails.driver || transactionDetails.truck) && (
+                          <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-muted/30 rounded-lg">
+                            {transactionDetails.due_date && <div><span className="text-muted-foreground">Due Date: </span><span className="font-medium">{new Date(transactionDetails.due_date).toLocaleDateString()}</span></div>}
+                            {transactionDetails.salesman && <div><span className="text-muted-foreground">Salesman: </span><span className="font-medium">{transactionDetails.salesman}</span></div>}
+                            {transactionDetails.driver && <div><span className="text-muted-foreground">Driver: </span><span className="font-medium">{transactionDetails.driver}</span></div>}
+                            {transactionDetails.truck && <div><span className="text-muted-foreground">Truck: </span><span className="font-medium">{transactionDetails.truck}</span></div>}
+                          </div>
+                        )}
+                        {/* Card sale specifics */}
+                        {viewEntry.type === 'card_sale' && (transactionDetails.card_type || transactionDetails.card_last_four || transactionDetails.transaction_id) && (
+                          <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-muted/30 rounded-lg">
+                            {transactionDetails.card_type && <div><span className="text-muted-foreground">Card Type: </span><span className="font-medium">{transactionDetails.card_type}</span></div>}
+                            {transactionDetails.card_last_four && <div><span className="text-muted-foreground">Card Last 4: </span><span className="font-medium">****{transactionDetails.card_last_four}</span></div>}
+                            {transactionDetails.transaction_id && <div><span className="text-muted-foreground">Transaction ID: </span><span className="font-medium">{transactionDetails.transaction_id}</span></div>}
+                          </div>
+                        )}
+                        {/* Mobile sale specifics */}
+                        {viewEntry.type === 'mobile_sale' && (transactionDetails.mobile_provider || transactionDetails.mobile_number || transactionDetails.transaction_id) && (
+                          <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-muted/30 rounded-lg">
+                            {transactionDetails.mobile_provider && <div><span className="text-muted-foreground">Provider: </span><span className="font-medium">{transactionDetails.mobile_provider}</span></div>}
+                            {transactionDetails.mobile_number && <div><span className="text-muted-foreground">Mobile Number: </span><span className="font-medium">{transactionDetails.mobile_number}</span></div>}
+                            {transactionDetails.transaction_id && <div><span className="text-muted-foreground">Transaction ID: </span><span className="font-medium">{transactionDetails.transaction_id}</span></div>}
+                          </div>
+                        )}
+                        <div className="text-sm"><span className="text-muted-foreground">Payment Method: </span><span className="font-medium">{transactionDetails.payment_method || '-'}</span></div>
+                        {transactionDetails.notes && (
+                          <div className="p-2 bg-muted/30 rounded text-sm"><span className="text-muted-foreground">Notes: </span>{transactionDetails.notes}</div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Debt Payment details */}
+                    {viewEntry.type === 'debt_payment' && (
+                      <>
+                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Payment Amount</p>
+                            <p className="text-lg font-bold text-green-600">{formatCurrency(transactionDetails.amount || 0)}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          {transactionDetails.payment_date && <div><span className="text-muted-foreground">Payment Date: </span><span className="font-medium">{new Date(transactionDetails.payment_date).toLocaleDateString()}</span></div>}
+                          <div><span className="text-muted-foreground">Payment Method: </span><span className="font-medium">{transactionDetails.payment_method || '-'}</span></div>
+                          {transactionDetails.reference_number && <div><span className="text-muted-foreground">Reference: </span><span className="font-medium">{transactionDetails.reference_number}</span></div>}
+                          {transactionDetails.created_by && <div><span className="text-muted-foreground">Created By: </span><span className="font-medium">{transactionDetails.created_by}</span></div>}
+                        </div>
+                        {transactionDetails.notes && (
+                          <div className="p-2 bg-muted/30 rounded text-sm"><span className="text-muted-foreground">Notes: </span>{transactionDetails.notes}</div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Settlement details */}
+                    {viewEntry.type === 'settlement' && (
+                      <>
+                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Invoice Number</p>
+                            <p className="font-semibold">{transactionDetails.invoice_number || '-'}</p>
+                          </div>
+                          {transactionDetails.approval_status && (
+                            <Badge className={
+                              transactionDetails.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
+                              transactionDetails.approval_status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }>
+                              {transactionDetails.approval_status}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          {transactionDetails.settlement_date && <div><span className="text-muted-foreground">Settlement Date: </span><span className="font-medium">{new Date(transactionDetails.settlement_date).toLocaleDateString()}</span></div>}
+                          <div><span className="text-muted-foreground">Payment Amount: </span><span className="font-medium">{formatCurrency(transactionDetails.payment_amount || 0)}</span></div>
+                          <div><span className="text-muted-foreground">Payment Method: </span><span className="font-medium">{transactionDetails.payment_method || '-'}</span></div>
+                          <div><span className="text-muted-foreground">Previous Balance: </span><span className="font-medium">{formatCurrency(transactionDetails.previous_balance || 0)}</span></div>
+                          <div><span className="text-muted-foreground">New Balance: </span><span className="font-medium">{formatCurrency(transactionDetails.new_balance || 0)}</span></div>
+                          {transactionDetails.customer_name && <div><span className="text-muted-foreground">Customer: </span><span className="font-medium">{transactionDetails.customer_name}</span></div>}
+                          {transactionDetails.cashier && <div><span className="text-muted-foreground">Cashier: </span><span className="font-medium">{transactionDetails.cashier}</span></div>}
+                          {transactionDetails.prepared_by && <div><span className="text-muted-foreground">Prepared By: </span><span className="font-medium">{transactionDetails.prepared_by}</span></div>}
+                        </div>
+                        {transactionDetails.notes && (
+                          <div className="p-2 bg-muted/30 rounded text-sm"><span className="text-muted-foreground">Notes: </span>{transactionDetails.notes}</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Items table for sale-type transactions */}
+                {transactionItems.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Items ({transactionItems.length})</p>
+                    </div>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Product</th>
+                            <th className="px-3 py-2 text-right">Qty</th>
+                            <th className="px-3 py-2 text-right">Unit Price</th>
+                            <th className="px-3 py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {transactionItems.map((item, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-3 py-2">{item.product_name || 'Unknown'}</td>
+                              <td className="px-3 py-2 text-right">{item.quantity}</td>
+                              <td className="px-3 py-2 text-right">{formatCurrency(item.unit_price)}</td>
+                              <td className="px-3 py-2 text-right font-medium">{formatCurrency(item.total_price)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* No underlying record available */}
+                {!transactionDetails && !viewEntry.reference && (
+                  <div className="p-4 bg-muted/30 rounded-lg text-center text-sm text-muted-foreground">
+                    No underlying transaction record available for this ledger entry.
+                  </div>
+                )}
+                {!transactionDetails && viewEntry.reference && (
+                  <div className="p-4 bg-muted/30 rounded-lg text-center text-sm text-muted-foreground">
+                    Transaction record could not be found (Ref: {viewEntry.reference}).
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

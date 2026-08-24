@@ -6237,6 +6237,101 @@ export const reconcileCustomerLedgerAfterDebtEdit = async (
   }
 };
 
+// ============================================
+// Fetch individual transactions by ID (for Customer Ledger view)
+// Each maps a customer_ledger.reference_id back to its source record.
+// ============================================
+
+export const getOutletDebtById = async (id: string): Promise<OutletDebt | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debts')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching outlet debt by id:', error);
+    return null;
+  }
+};
+
+export const getOutletDebtPaymentById = async (id: string): Promise<OutletDebtPayment | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_debt_payments')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching outlet debt payment by id:', error);
+    return null;
+  }
+};
+
+export const getOutletCustomerSettlementById = async (id: string): Promise<OutletCustomerSettlement | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('customer_settlements')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching customer settlement by id:', error);
+    return null;
+  }
+};
+
+export const getOutletCashSaleById = async (id: string): Promise<OutletCashSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_cash_sales')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching outlet cash sale by id:', error);
+    return null;
+  }
+};
+
+export const getOutletCardSaleById = async (id: string): Promise<OutletCardSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_card_sales')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching outlet card sale by id:', error);
+    return null;
+  }
+};
+
+export const getOutletMobileSaleById = async (id: string): Promise<OutletMobileSale | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_mobile_sales')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching outlet mobile sale by id:', error);
+    return null;
+  }
+};
+
 export const createCustomerLedgerEntry = async (
   entry: Omit<CustomerLedgerEntry, 'id' | 'created_at' | 'running_balance'>
 ): Promise<CustomerLedgerEntry | null> => {
