@@ -6151,8 +6151,13 @@ export const recalculateCustomerLedgerBalance = async (
 
 /**
  * Reconcile customer ledger entries after a debt edit.
- * Ensures the credit_sale and debt_payment ledger entries exist and have
- * correct amounts, then recalculates running balances.
+ * Ensures the credit_sale ledger entry exists and has the correct debit
+ * amount, then recalculates running balances. Individual debt_payment
+ * entries are managed automatically by the database triggers on
+ * outlet_debt_payments (INSERT/UPDATE/DELETE) and are NOT reconciled here —
+ * reconciling them previously created duplicate "Payment - Reconciled"
+ * entries (keyed by debt id) on top of the trigger-created entries (keyed
+ * by payment id), overstating credits and understating balances.
  * Throws on failure instead of returning false (no silent failures).
  */
 export const reconcileCustomerLedgerAfterDebtEdit = async (
@@ -6160,7 +6165,6 @@ export const reconcileCustomerLedgerAfterDebtEdit = async (
   customerId: string,
   debtId: string,
   totalAmount: number,
-  amountPaid: number,
   invoiceNumber?: string
 ): Promise<{ success: boolean; ledgerBalance: number }> => {
   try {
@@ -6211,70 +6215,18 @@ export const reconcileCustomerLedgerAfterDebtEdit = async (
       console.log(`📊 Created missing credit_sale ledger entry: debit=${totalAmount}`);
     }
 
-    // Step 2: Ensure debt_payment ledger entry exists with correct credit_amount
-    const { data: existingPaymentEntry } = await supabase
-      .from('customer_ledger')
-      .select('id, credit_amount')
-      .eq('reference_id', debtId)
-      .eq('transaction_type', 'debt_payment')
-      .eq('outlet_id', outletId)
-      .eq('customer_id', customerId)
-      .maybeSingle();
-
-    if (amountPaid > 0) {
-      if (existingPaymentEntry) {
-        // Update existing entry if amount differs
-        if (existingPaymentEntry.credit_amount !== amountPaid) {
-          const { error: updateError } = await supabase
-            .from('customer_ledger')
-            .update({
-              credit_amount: amountPaid,
-              description: 'Payment - Reconciled',
-              created_at: new Date().toISOString()
-            })
-            .eq('id', existingPaymentEntry.id);
-          if (updateError) throw new Error(`Failed to update debt_payment ledger entry: ${updateError.message}`);
-          console.log(`💰 Updated debt_payment ledger entry: credit ${existingPaymentEntry.credit_amount} → ${amountPaid}`);
-        }
-      } else {
-        // Create missing debt_payment entry
-        const { error: insertError } = await supabase
-          .from('customer_ledger')
-          .insert([{
-            outlet_id: outletId,
-            customer_id: customerId,
-            transaction_type: 'debt_payment',
-            reference_id: debtId,
-            reference_number: invoiceNumber || '',
-            debit_amount: 0,
-            credit_amount: amountPaid,
-            running_balance: 0,
-            transaction_date: new Date().toISOString(),
-            description: 'Payment - Reconciled',
-            payment_method: 'debt',
-            notes: 'Reconciled after debt edit',
-            created_at: new Date().toISOString()
-          }]);
-        if (insertError) throw new Error(`Failed to create debt_payment ledger entry: ${insertError.message}`);
-        console.log(`💰 Created missing debt_payment ledger entry: credit=${amountPaid}`);
-      }
-    } else if (existingPaymentEntry) {
-      // amountPaid is 0 but a payment entry exists — remove it
-      const { error: deleteError } = await supabase
-        .from('customer_ledger')
-        .delete()
-        .eq('id', existingPaymentEntry.id);
-      if (deleteError) throw new Error(`Failed to remove stale debt_payment ledger entry: ${deleteError.message}`);
-      console.log(`💰 Removed stale debt_payment ledger entry (amountPaid=0)`);
-    }
-
-    // Step 3: Recalculate all running balances for this customer
+    // Step 2: Recalculate all running balances for this customer.
+    // NOTE: debt_payment ledger entries are created/updated/deleted
+    // automatically by the triggers on outlet_debt_payments (one entry per
+    // payment, keyed by payment id). Do NOT upsert a debt_payment entry here —
+    // doing so creates duplicates ("Payment - Reconciled") that overstate
+    // credits and understate customer balances.
     const recalculated = await recalculateCustomerLedgerBalance(outletId, customerId);
     if (!recalculated) {
       throw new Error('Failed to recalculate customer ledger running balances');
     }
 
-    // Step 4: Fetch and return the final ledger balance for verification
+    // Step 3: Fetch and return the final ledger balance for verification
     const finalBalance = await getCustomerLedgerBalance(outletId, customerId);
     console.log(`✅ Ledger reconciliation complete. Final balance: ${finalBalance}`);
 

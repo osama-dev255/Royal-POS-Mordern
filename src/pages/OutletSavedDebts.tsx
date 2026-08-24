@@ -1310,11 +1310,11 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
         
         console.log('✅ All items created and inventory updated successfully');
         
-        // Step 6: Reconcile customer ledger — ensure ledger entries match debt
-        // record exactly. This replaces the old "recalculate only" approach with
-        // a full upsert of credit_sale and debt_payment entries, so the ledger
-        // balance always matches the debt records. Throws on failure (no silent
-        // failures).
+        // Step 6: Reconcile customer ledger after the debt edit. This ensures
+        // the credit_sale ledger entry matches the updated debt total and then
+        // recalculates running balances. debt_payment entries are handled
+        // automatically by the database triggers on outlet_debt_payments, so
+        // they are NOT upserted here. Throws on failure (no silent failures).
         if (selectedSale.customerId) {
           console.log('🔄 Reconciling customer ledger after debt edit...');
           try {
@@ -1323,7 +1323,6 @@ export const OutletSavedDebts = ({ onBack, outletId }: OutletSavedDebtsProps) =>
               selectedSale.customerId,
               selectedSale.id,
               editFormData.total || 0,
-              editFormData.amountPaid || 0,
               selectedSale.invoiceNumber
             );
             
