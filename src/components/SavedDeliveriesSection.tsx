@@ -320,22 +320,42 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
       // Update stock movements in the ledger to reflect the edit
       try {
         const { updateStockMovementsForTransaction } = await import('@/utils/stockMovementUtils');
+        const allProducts = await getProducts();
         const newMovements: any[] = [];
-        
+
+        // Delivery-level source godown/zone fallback for items without their own
+        const deliverySourceGodownId = editingDelivery.sourceGodownId || undefined;
+        const deliverySourceZoneId = editingDelivery.sourceZoneId || undefined;
+        const fallbackItem = editableItems.find((i: any) => i.godown_id || i.godownId);
+
         for (const item of editableItems) {
           const itemName = item.description || item.name;
           const itemQuantity = item.quantity || 0;
           
           if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
-          
-          // For delivery: OUT movement
+
+          const product = allProducts.find(p =>
+            p.name.toLowerCase().trim() === String(itemName).toLowerCase().trim()
+          );
+          const itemGodownId = item.godown_id || item.godownId || undefined;
+          const itemZoneId = item.zone_id || item.zoneId || undefined;
+
+          // For delivery: OUT movement (preserve godown/zone so the Movement Ledger stays consistent)
           newMovements.push({
+            product_id: item.product_id || product?.id || undefined,
             product_name: itemName,
             outlet_id: editingDelivery.outletId || undefined,
+            godown_id: itemGodownId
+              || fallbackItem?.godown_id || fallbackItem?.godownId
+              || deliverySourceGodownId,
+            zone_id: itemGodownId
+              ? (itemZoneId || undefined)
+              : (fallbackItem?.zone_id || fallbackItem?.zoneId || deliverySourceZoneId),
             movement_type: 'OUT' as const,
             quantity: itemQuantity,
             reference_type: 'DELIVERY_NOTE' as const,
             reference_number: editingDelivery.deliveryNoteNumber,
+            unit_cost: product?.cost_price || 0,
             notes: `Delivery to ${editingDelivery.customer || 'Unknown'}`
           });
         }

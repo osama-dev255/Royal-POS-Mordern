@@ -6349,6 +6349,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
           
           const { recordStockMovements } = await import('@/utils/stockMovementUtils');
           const allProducts = await getProducts();
+          // Delivery-level source godown/zone fallback for items without their own selection
+          // (same convention used for deliveryToSave.sourceGodownId above)
+          const fallbackGodownItem = deliveryNoteData.items.find(i => i.godownId);
           const deliveryMovements = deliveryNoteData.items
             .filter(item => item.description && (item.quantity || 0) > 0)
             .map(item => {
@@ -6359,8 +6362,10 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                 product_id: product?.id,
                 product_name: item.description,
                 outlet_id: outletId || undefined,
-                godown_id: item.godownId || undefined,
-                zone_id: item.zoneId || undefined,
+                godown_id: item.godownId || fallbackGodownItem?.godownId || undefined,
+                zone_id: item.godownId
+                  ? (item.zoneId || undefined)
+                  : (fallbackGodownItem?.zoneId || undefined),
                 movement_type: 'OUT' as const,
                 quantity: item.quantity || 0,
                 reference_type: 'DELIVERY_NOTE' as const,
