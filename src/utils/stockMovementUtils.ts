@@ -145,6 +145,8 @@ export const getStockMovements = async (filters?: {
         products!stock_movements_product_id_fkey(cost_price)
       `)
       .not('movement_type', 'in', '(TRANSFER_IN,TRANSFER_OUT)')
+      // Outlet Stock Takes (Sales Management) must not affect the general Stock Movements ledger
+      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE')
       .order('created_at', { ascending: false });
 
     if (filters?.productId) {
@@ -213,7 +215,9 @@ export const getStockMovementSummary = async (filters?: {
   try {
     let query = supabase
       .from('stock_movements')
-      .select('product_name, movement_type, quantity');
+      .select('product_name, movement_type, quantity')
+      // Outlet Stock Takes must not affect the product movement summary
+      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE');
 
     if (filters?.productId) {
       query = query.eq('product_id', filters.productId);
@@ -310,6 +314,8 @@ export const getMovedProductNames = async (): Promise<string[]> => {
     const { data, error } = await supabase
       .from('stock_movements')
       .select('product_name')
+      // Outlet Stock Takes must not affect the general product name list
+      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE')
       .order('product_name');
 
     if (error) {

@@ -29,7 +29,6 @@ const movementTypes = [
   { value: "TRANSFER_IN", label: "Transfer In" },
   { value: "TRANSFER_OUT", label: "Transfer Out" },
   { value: "SOLD", label: "Sold (POS)" },
-  { value: "ADJUSTMENT", label: "Adjustment (Stock Take)" },
   { value: "RETURN", label: "Return" },
   { value: "DAMAGE", label: "Damage" }
 ];
@@ -197,7 +196,6 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
           <div class="summary-box"><strong>Sold:</strong> ${totalSold}</div>
           <div class="summary-box"><strong>Transfer In:</strong> ${totalTransferIn}</div>
           <div class="summary-box"><strong>Transfer Out:</strong> ${totalTransferOut}</div>
-          <div class="summary-box"><strong>Adjustments:</strong> ${totalAdjustment}</div>
         </div>
         ${tableHtml}
         <div style="margin-top:20px;text-align:center;" class="no-print">
@@ -270,9 +268,9 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
         csvContent += `"${m.created_at ? new Date(m.created_at).toLocaleString() : '-'}","${m.product_name}","${m.movement_type}",${m.movement_type.includes('OUT') || m.movement_type === 'SOLD' || m.movement_type === 'DAMAGE' ? '-' : '+'}${Number(m.quantity)},${Number(m.unit_cost || 0)},"${m.reference_number || '-'}","${m.outlet_name || '-'}","${m.godown_name || '-'}","${m.zone_name || '-'}","${(m.notes || '').replace(/"/g, '""')}"\n`;
       });
     } else {
-      csvContent = "Product,In,Out,Sold,T-In,T-Out,Adj.,Net\n";
+      csvContent = "Product,In,Out,Sold,T-In,T-Out,Net\n";
       filteredSummaries.forEach(s => {
-        csvContent += `"${s.product_name}",${s.total_in},${s.total_out},${s.total_sold},${s.total_transfer_in},${s.total_transfer_out},${s.total_adjustment},${s.net_movement}\n`;
+        csvContent += `"${s.product_name}",${s.total_in},${s.total_out},${s.total_sold},${s.total_transfer_in},${s.total_transfer_out},${s.net_movement}\n`;
       });
     }
 
@@ -357,14 +355,13 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
   const totalSold = filteredMovements.filter(m => m.movement_type === 'SOLD').reduce((sum, m) => sum + Number(m.quantity), 0);
   const totalTransferIn = filteredMovements.filter(m => m.movement_type === 'TRANSFER_IN').reduce((sum, m) => sum + Number(m.quantity), 0);
   const totalTransferOut = filteredMovements.filter(m => m.movement_type === 'TRANSFER_OUT').reduce((sum, m) => sum + Number(m.quantity), 0);
-  const totalAdjustment = filteredMovements.filter(m => m.movement_type === 'ADJUSTMENT').reduce((sum, m) => sum + Number(m.quantity), 0);
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation title="Stock Movements" onBack={onBack} onLogout={onLogout} username={username} />
       <main className="container mx-auto p-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card className="bg-green-50 border-green-200">
             <CardContent className="p-4 text-center">
               <ArrowDown className="h-5 w-5 text-green-600 mx-auto mb-1" />
@@ -398,13 +395,6 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
               <ArrowUp className="h-5 w-5 text-orange-600 mx-auto mb-1" />
               <p className="text-xs text-muted-foreground">Transfer Out</p>
               <p className="text-lg font-bold text-orange-700">{totalTransferOut}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="p-4 text-center">
-              <ArrowUpDown className="h-5 w-5 text-yellow-600 mx-auto mb-1" />
-              <p className="text-xs text-muted-foreground">Adjustments</p>
-              <p className="text-lg font-bold text-yellow-700">{totalAdjustment}</p>
             </CardContent>
           </Card>
         </div>
@@ -615,14 +605,13 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                         <TableHead className="text-xs text-right text-purple-600">Sold</TableHead>
                         <TableHead className="text-xs text-right text-blue-600">T-In</TableHead>
                         <TableHead className="text-xs text-right text-orange-600">T-Out</TableHead>
-                        <TableHead className="text-xs text-right text-yellow-600">Adj.</TableHead>
                         <TableHead className="text-xs text-right font-bold">Net</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredSummaries.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             No movement data found
                           </TableCell>
                         </TableRow>
@@ -644,9 +633,6 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                             </TableCell>
                             <TableCell className="text-xs text-right font-mono text-orange-600">
                               {summary.total_transfer_out > 0 ? `-${summary.total_transfer_out}` : '0'}
-                            </TableCell>
-                            <TableCell className="text-xs text-right font-mono text-yellow-600">
-                              {summary.total_adjustment !== 0 ? summary.total_adjustment : '0'}
                             </TableCell>
                             <TableCell className={`text-xs text-right font-mono font-bold ${summary.net_movement >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                               {summary.net_movement >= 0 ? '+' : ''}{summary.net_movement}
