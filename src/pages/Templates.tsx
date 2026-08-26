@@ -2179,7 +2179,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       ],
       qualityCheckNotes: "",
       discrepancies: "",
-      preparedBy: "Inventory Clerk",
+      preparedBy: "",
       preparedDate: new Date().toISOString().split('T')[0],
       checkedBy: "Quality Inspector",
       checkedDate: new Date().toISOString().split('T')[0],
@@ -2277,6 +2277,13 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     // Validate Delivery Note # is filled
     if (!grnData.deliveryNoteNumber?.trim()) {
       alert('Please enter a Delivery Note #');
+      setIsSavingGRN(false);
+      return;
+    }
+
+    // Validate Prepared By is filled
+    if (!grnData.preparedBy?.trim()) {
+      alert('Please enter Prepared By before saving the GRN');
       setIsSavingGRN(false);
       return;
     }
@@ -3046,7 +3053,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     ],
     qualityCheckNotes: "",
     discrepancies: "",
-    preparedBy: "Inventory Clerk",
+    preparedBy: "",
     preparedDate: new Date().toISOString().split('T')[0],
     checkedBy: "Quality Inspector",
     checkedDate: new Date().toISOString().split('T')[0],
@@ -15266,7 +15273,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                         {/* Signatures */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
                           <div>
-                            <div className="font-bold mb-2">Prepared By</div>
+                            <div className="font-bold mb-2">Prepared By <span className="text-red-500">*</span></div>
                             <div className="text-sm space-y-2">
                               <div>
                                 <span>Name:</span>
