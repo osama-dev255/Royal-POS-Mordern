@@ -113,6 +113,9 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       lines.push('');
       lines.push(`🏪 Muuzaji: ${data.supplierName || 'N/A'}`);
       lines.push(`🏢 Mnunuzi: ${data.businessName || 'N/A'}`);
+      if (data.destination) {
+        lines.push(`📍 Destination: ${data.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+      }
       if (data.stockType || data.receiptIssued) {
         lines.push('');
         lines.push('📋 COMPLIANCE:');
