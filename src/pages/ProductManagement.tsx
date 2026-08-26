@@ -77,7 +77,8 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
     stock_quantity: 0,
     min_stock_level: 0,
     max_stock_level: 100,
-    is_active: true
+    is_active: true,
+    added_by: ""
   });
   const [sortBy, setSortBy] = useState<"name" | "price" | "stock" | "category">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -277,6 +278,15 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
       return;
     }
 
+    if (!newProduct.added_by || !newProduct.added_by.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your name in the 'Added By' field before saving the product",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const product = await createProduct(newProduct);
       if (product) {
@@ -381,7 +391,8 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
       stock_quantity: 0,
       min_stock_level: 0,
       max_stock_level: 100,
-      is_active: true
+      is_active: true,
+      added_by: ""
     });
     setEditingProduct(null);
     setViewOnlyMode(false);
@@ -762,6 +773,22 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                             className={viewOnlyMode ? "bg-muted" : ""}
                           />
                         </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="added_by">Added By *</Label>
+                        <Input
+                          id="added_by"
+                          value={editingProduct ? (editingProduct.added_by || "") : (newProduct.added_by || "")}
+                          onChange={(e) => 
+                            editingProduct && !viewOnlyMode
+                              ? setEditingProduct({...editingProduct, added_by: e.target.value})
+                              : !viewOnlyMode && setNewProduct({...newProduct, added_by: e.target.value})
+                          }
+                          placeholder="Enter your name"
+                          readOnly={viewOnlyMode}
+                          className={viewOnlyMode ? "bg-muted" : ""}
+                        />
                       </div>
                       
                       <div className="space-y-2">

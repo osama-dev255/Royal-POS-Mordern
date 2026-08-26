@@ -29,6 +29,7 @@ export interface Product {
   max_stock_level?: number;
   is_active?: boolean;
   image_url?: string;
+  added_by?: string;
   created_at?: string;
   updated_at?: string;
 }
