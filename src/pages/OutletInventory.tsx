@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,12 +41,17 @@ import {
   Share2,
   Download,
   FileOutput,
-  Calendar,
+  Calendar as CalendarIcon,
   Info,
-  Trash2
+  Trash2,
+  X
 } from "lucide-react";
+import { format as formatDate } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { getOutlets, Outlet, getInventoryTotalsByOutlet, InventoryTotals, getInventoryProductsByOutlet, InventoryProduct, getAvailableInventoryByOutlet, deleteInventoryProduct } from "@/services/databaseService";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
+import { getStockMovements, StockMovementWithDetails } from "@/utils/stockMovementUtils";
 import { supabase } from "@/lib/supabaseClient";
 import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
 
@@ -98,7 +103,10 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     start: '',
     end: ''
   });
+  const [datePreset, setDatePreset] = useState<string>('all');
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [deliveries, setDeliveries] = useState<DeliveryData[]>([]);
+  const [soldMovements, setSoldMovements] = useState<StockMovementWithDetails[]>([]);
   
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -128,28 +136,134 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     fetchOutletAndInventory();
   }, [propOutletId]);
 
+  // When a date range is selected, ALL products stay visible but their figures
+  // (Received, Sold, Available, Stock Level) reflect the selected period:
+  // - Received: quantities delivered to the outlet within the range (delivery notes)
+  // - Sold: quantities sold within the range (stock_movements SOLD ledger)
+  // - Available: stock position as of the range end date, derived from the current
+  //   snapshot by reversing stock changes that happened after the range
+  const datedInventory = useMemo<InventoryItem[]>(() => {
+    if (!dateRange.start && !dateRange.end) return inventory;
+
+    const startDate = dateRange.start ? new Date(dateRange.start) : null;
+    if (startDate) startDate.setHours(0, 0, 0, 0);
+    const endDate = dateRange.end ? new Date(dateRange.end) : null;
+    if (endDate) endDate.setHours(23, 59, 59, 999);
+
+    const inRange = (d: Date) => (!startDate || d >= startDate) && (!endDate || d <= endDate);
+    const afterRange = (d: Date) => !!endDate && d > endDate;
+
+    // Received quantities from delivery notes
+    const receivedInRange = new Map<string, number>();
+    const receivedAfterRange = new Map<string, number>();
+    for (const delivery of deliveries) {
+      if (!delivery.itemsList || !delivery.date) continue;
+      const deliveryDate = new Date(delivery.date);
+      if (isNaN(deliveryDate.getTime())) continue;
+      const isInRange = inRange(deliveryDate);
+      const isAfter = afterRange(deliveryDate);
+      if (!isInRange && !isAfter) continue;
+      for (const item of delivery.itemsList) {
+        const name = (item?.name || item?.description || item?.productName || '').toString().toLowerCase().trim();
+        const qty = Number(item?.quantity ?? item?.delivered ?? 0);
+        if (!name || qty <= 0) continue;
+        if (isInRange) receivedInRange.set(name, (receivedInRange.get(name) || 0) + qty);
+        if (isAfter) receivedAfterRange.set(name, (receivedAfterRange.get(name) || 0) + qty);
+      }
+    }
+
+    // Sold quantities from the stock movements ledger (SOLD via POS)
+    const soldInRange = new Map<string, number>();
+    const soldAfterRange = new Map<string, number>();
+    for (const movement of soldMovements) {
+      if (!movement.created_at) continue;
+      const soldDate = new Date(movement.created_at);
+      if (isNaN(soldDate.getTime())) continue;
+      const name = movement.product_name.toLowerCase().trim();
+      const qty = Number(movement.quantity) || 0;
+      if (qty <= 0) continue;
+      if (inRange(soldDate)) soldInRange.set(name, (soldInRange.get(name) || 0) + qty);
+      if (afterRange(soldDate)) soldAfterRange.set(name, (soldAfterRange.get(name) || 0) + qty);
+    }
+
+    return inventory.map(item => {
+      const key = item.name.toLowerCase().trim();
+      const received = receivedInRange.get(key) || 0;
+      const sold = soldInRange.get(key) || 0;
+      const recvAfter = receivedAfterRange.get(key) || 0;
+      const soldAfter = soldAfterRange.get(key) || 0;
+
+      // Stock position as of the range end date:
+      // current available - what arrived after the range + what was sold after the range
+      const availableAtDate = Math.max(0, item.quantity - recvAfter + soldAfter);
+      const status = (availableAtDate > item.minStock ? 'in-stock' :
+                      availableAtDate > 0 ? 'low-stock' : 'out-of-stock') as 'in-stock' | 'low-stock' | 'out-of-stock';
+
+      return {
+        ...item,
+        quantity: availableAtDate,
+        totalReceived: received,
+        soldQuantity: sold,
+        totalValue: availableAtDate * item.unitPrice,
+        totalPrice: availableAtDate * item.sellingPrice,
+        status
+      };
+    });
+  }, [inventory, deliveries, soldMovements, dateRange]);
+
   useEffect(() => {
     calculateStats();
-  }, [inventory, propOutletId, dateRange]);
+  }, [datedInventory, deliveries]);
 
-  // Helper function to filter inventory by date range
-  const filterByDateRange = (items: InventoryItem[]) => {
-    if (!dateRange.start && !dateRange.end) return items;
-    
-    return items.filter(item => {
-      const itemDate = new Date(item.lastUpdated);
-      if (dateRange.start) {
-        const startDate = new Date(dateRange.start);
-        startDate.setHours(0, 0, 0, 0);
-        if (itemDate < startDate) return false;
+  // Quick range presets (standard professional date range picker pattern)
+  const handleDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setDateRange({ start: todayStr, end: todayStr });
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split('T')[0];
+        setDateRange({ start: yStr, end: yStr });
+        break;
       }
-      if (dateRange.end) {
-        const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999);
-        if (itemDate > endDate) return false;
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
       }
-      return true;
-    });
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setDateRange({ start: first.toISOString().split('T')[0], end: last.toISOString().split('T')[0] });
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'all':
+      default:
+        setDateRange({ start: '', end: '' });
+        break;
+    }
   };
 
   const fetchOutletAndInventory = async () => {
@@ -176,6 +290,10 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       // Fetch deliveries for this outlet
       const outletDeliveries = await getDeliveriesByOutletId(propOutletId);
       setDeliveries(outletDeliveries);
+
+      // Fetch sold quantities history for this outlet from the stock movements ledger
+      const outletSoldMovements = await getStockMovements({ outletId: propOutletId, movementType: 'SOLD', limit: 5000 });
+      setSoldMovements(outletSoldMovements);
       
       // Fetch inventory from database with sold quantities (everything from database)
       const dbInventory = await getAvailableInventoryByOutlet(propOutletId);
@@ -218,8 +336,8 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   };
 
   const calculateStats = async () => {
-    // Filter inventory by date range first
-    const dateFilteredInventory = filterByDateRange(inventory);
+    // Use date-aware inventory (figures as of the selected range, all products included)
+    const dateFilteredInventory = datedInventory;
     
     // Calculate stats from filtered inventory
     const lowStock = dateFilteredInventory.filter(item => item.status === 'low-stock').length;
@@ -315,32 +433,16 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     }).format(amount);
   };
 
-  const filteredInventory = inventory.filter(item => {
+  const filteredInventory = datedInventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    
-    // Date range filtering
-    let matchesDateRange = true;
-    if (dateRange.start || dateRange.end) {
-      const itemDate = new Date(item.lastUpdated);
-      if (dateRange.start) {
-        const startDate = new Date(dateRange.start);
-        startDate.setHours(0, 0, 0, 0);
-        matchesDateRange = matchesDateRange && itemDate >= startDate;
-      }
-      if (dateRange.end) {
-        const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999);
-        matchesDateRange = matchesDateRange && itemDate <= endDate;
-      }
-    }
-    
-    return matchesSearch && matchesCategory && matchesDateRange;
+
+    return matchesSearch && matchesCategory;
   });
 
   // Ensure we have inventory data before filtering
-  const displayInventory = inventory.length > 0 ? filteredInventory : [];
+  const displayInventory = datedInventory.length > 0 ? filteredInventory : [];
 
   // Helper function to highlight search terms in text
   const highlightText = (text: string, searchTerm: string): JSX.Element => {
@@ -669,32 +771,45 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
             
             {/* Date Range Picker */}
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                className="px-2 py-1.5 border rounded-md text-sm"
-                placeholder="Start Date"
-              />
-              <span className="text-muted-foreground">to</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                className="px-2 py-1.5 border rounded-md text-sm"
-                placeholder="End Date"
-              />
-              {(dateRange.start || dateRange.end) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDateRange({ start: '', end: '' })}
-                  className="h-7 px-2"
-                >
-                  Clear
-                </Button>
-              )}
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => { setDateRange(prev => ({ ...prev, start: e.target.value })); setDatePreset('custom'); }}
+                  className="w-40"
+                />
+                <span className="text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => { setDateRange(prev => ({ ...prev, end: e.target.value })); setDatePreset('custom'); }}
+                  className="w-40"
+                />
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      Calendar
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarComponent
+                      mode="range"
+                      selected={{
+                        from: dateRange.start ? new Date(dateRange.start) : undefined,
+                        to: dateRange.end ? new Date(dateRange.end) : undefined,
+                      }}
+                      onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                        if (range?.from) setDateRange(prev => ({ ...prev, start: formatDate(range.from!, "yyyy-MM-dd") }));
+                        if (range?.to) setDateRange(prev => ({ ...prev, end: formatDate(range.to!, "yyyy-MM-dd") }));
+                        setDatePreset('custom');
+                      }}
+                      numberOfMonths={2}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
             
             <div className="flex gap-2 w-full md:w-auto">
@@ -737,6 +852,37 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* Quick Range Presets */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
+            <span className="text-sm font-medium mr-1">Quick Range:</span>
+            {[
+              { key: 'today', label: 'Today' },
+              { key: 'yesterday', label: 'Yesterday' },
+              { key: 'last7', label: 'Last 7 Days' },
+              { key: 'last30', label: 'Last 30 Days' },
+              { key: 'thisMonth', label: 'This Month' },
+              { key: 'lastMonth', label: 'Last Month' },
+              { key: 'thisYear', label: 'This Year' },
+              { key: 'all', label: 'All Time' },
+            ].map(preset => (
+              <Button
+                key={preset.key}
+                size="sm"
+                variant={datePreset === preset.key ? 'default' : 'outline'}
+                onClick={() => handleDatePreset(preset.key)}
+                className={datePreset === preset.key ? '' : 'text-xs'}
+              >
+                {preset.label}
+              </Button>
+            ))}
+            {(dateRange.start || dateRange.end) && (
+              <Button variant="ghost" size="sm" onClick={() => handleDatePreset('all')} className="h-7 text-xs">
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
