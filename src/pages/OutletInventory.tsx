@@ -213,7 +213,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
 
   useEffect(() => {
     calculateStats();
-  }, [datedInventory, deliveries]);
+  }, [datedInventory, deliveries, dateRange]);
 
   // Quick range presets (standard professional date range picker pattern)
   const handleDatePreset = (preset: string) => {
@@ -338,6 +338,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
   const calculateStats = async () => {
     // Use date-aware inventory (figures as of the selected range, all products included)
     const dateFilteredInventory = datedInventory;
+    const hasRange = !!(dateRange.start || dateRange.end);
     
     // Calculate stats from filtered inventory
     const lowStock = dateFilteredInventory.filter(item => item.status === 'low-stock').length;
@@ -347,13 +348,36 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     // Calculate totals from filtered inventory
     const totalInventoryValue = dateFilteredInventory.reduce((sum, item) => sum + item.totalValue, 0);
     const totalRetailValue = dateFilteredInventory.reduce((sum, item) => sum + item.totalPrice, 0);
-    const totalCostOfGoodsSold = dateFilteredInventory.reduce((sum, item) => {
-      const soldQty = item.maxStock - item.quantity; // Estimate sold from original vs current
-      return sum + (soldQty > 0 ? soldQty * item.unitPrice : 0);
-    }, 0);
+
+    // Cost of goods sold: with a date range use REAL sold quantities within the range;
+    // otherwise fall back to the original estimate (original vs current stock)
+    const totalCostOfGoodsSold = hasRange
+      ? dateFilteredInventory.reduce((sum, item) => {
+          const soldQty = item.soldQuantity || 0;
+          return sum + (soldQty > 0 ? soldQty * item.unitPrice : 0);
+        }, 0)
+      : dateFilteredInventory.reduce((sum, item) => {
+          const soldQty = item.maxStock - item.quantity; // Estimate sold from original vs current
+          return sum + (soldQty > 0 ? soldQty * item.unitPrice : 0);
+        }, 0);
     
     // Calculate avg turnover
     const avgTurnover = totalInventoryValue > 0 ? totalCostOfGoodsSold / totalInventoryValue : 0;
+
+    // Deliveries count: within the selected range when one is active
+    let deliveriesCount = deliveries.length;
+    if (hasRange) {
+      const startDate = dateRange.start ? new Date(dateRange.start) : null;
+      if (startDate) startDate.setHours(0, 0, 0, 0);
+      const endDate = dateRange.end ? new Date(dateRange.end) : null;
+      if (endDate) endDate.setHours(23, 59, 59, 999);
+      deliveriesCount = deliveries.filter(d => {
+        if (!d.date) return false;
+        const dt = new Date(d.date);
+        if (isNaN(dt.getTime())) return false;
+        return (!startDate || dt >= startDate) && (!endDate || dt <= endDate);
+      }).length;
+    }
     
     setStats({
       totalProducts: dateFilteredInventory.length,
@@ -364,7 +388,7 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       outOfStockItems: outOfStock,
       categories,
       avgTurnover,
-      totalDeliveries: deliveries.length
+      totalDeliveries: deliveriesCount
     });
   };
 
