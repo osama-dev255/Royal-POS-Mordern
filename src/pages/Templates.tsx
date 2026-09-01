@@ -2335,10 +2335,10 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       supplierPhone: primarySupplier.phone || grnData.supplierPhone,
       supplierEmail: primarySupplier.email || grnData.supplierEmail,
       supplierAddress: primarySupplier.address || grnData.supplierAddress,
-      businessName: primarySupplier.name || grnData.businessName,
-      businessAddress: primarySupplier.address || grnData.businessAddress,
-      businessPhone: primarySupplier.phone || grnData.businessPhone,
-      businessEmail: primarySupplier.email || grnData.businessEmail,
+      businessName: grnData.businessName,
+      businessAddress: grnData.businessAddress,
+      businessPhone: grnData.businessPhone,
+      businessEmail: grnData.businessEmail,
       isVatable: grnData.isVatable,
       supplierTinNumber: primarySupplier.tinNumber || grnData.supplierTinNumber,
       businessTin: grnData.suppliers?.[0]?.businessTin || '',
@@ -3278,8 +3278,15 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
   useEffect(() => {
     if (editGRNData) {
       const data = editGRNData.data || editGRNData;
+      // Normalize items: DB stores quantity/delivered, form expects orderedQuantity/receivedQuantity
+      const normalizedItems = (Array.isArray(data.items) ? data.items : []).map((item: any) => ({
+        ...item,
+        orderedQuantity: item.orderedQuantity ?? item.quantity ?? 0,
+        receivedQuantity: item.receivedQuantity ?? item.delivered ?? 0
+      }));
       setGrnData({
         ...data,
+        items: normalizedItems,
         numberOfSuppliers: data.numberOfSuppliers || 1,
         suppliers: data.suppliers || [{
           id: "supplier-1",
@@ -3303,6 +3310,11 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       setSelectedTemplate(null);
       setActiveTab('preview');
       onEditGRNLoaded?.();
+      // Pre-load zones for each item's godown so zone dropdowns populate correctly
+      const uniqueGodownIds = [...new Set(normalizedItems.filter((i: any) => i.destinationGodownId).map((i: any) => i.destinationGodownId))];
+      for (const gid of uniqueGodownIds) {
+        getZonesForGodown(gid);
+      }
     }
   }, [editGRNData]);
 
@@ -10914,8 +10926,15 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                   onLogout={() => {}} 
                   username="User"
                   onEditGRN={(grn) => {
+                    // Normalize items: DB stores quantity/delivered, form expects orderedQuantity/receivedQuantity
+                    const normalizedItems = (Array.isArray(grn.data.items) ? grn.data.items : []).map((item: any) => ({
+                      ...item,
+                      orderedQuantity: item.orderedQuantity ?? item.quantity ?? 0,
+                      receivedQuantity: item.receivedQuantity ?? item.delivered ?? 0
+                    }));
                     setGrnData({
                       ...grn.data,
+                      items: normalizedItems,
                       numberOfSuppliers: grn.data.numberOfSuppliers || 1,
                       suppliers: grn.data.suppliers || [{
                         id: "supplier-1",
@@ -10937,6 +10956,11 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                     setEditingGRNId(grn.id || '');
                     setViewingTemplate('14');
                     setActiveTab('preview');
+                    // Pre-load zones for each item's godown so zone dropdowns populate correctly
+                    const uniqueGodownIds = [...new Set(normalizedItems.filter((i: any) => i.destinationGodownId).map((i: any) => i.destinationGodownId))];
+                    for (const gid of uniqueGodownIds) {
+                      getZonesForGodown(gid);
+                    }
                   }}
                 />
               </div>
