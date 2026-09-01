@@ -2417,6 +2417,20 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     
     console.log('About to save GRN:', newGRN, 'editing:', !!editingGRNId);
       
+      // When editing, fetch old GRN data to reverse previous stock changes
+      let oldGRNItems: any[] = [];
+      if (editingGRNId) {
+        try {
+          const { getSavedGRNById } = await import('@/utils/grnUtils');
+          const oldGRN = await getSavedGRNById(editingGRNId);
+          if (oldGRN && Array.isArray(oldGRN.items)) {
+            oldGRNItems = typeof oldGRN.items === 'string' ? JSON.parse(oldGRN.items) : oldGRN.items;
+          }
+        } catch (e) {
+          console.warn('Could not fetch old GRN data for stock reversal:', e);
+        }
+      }
+      
       // Use updateGRN if editing, otherwise saveGRN
       if (editingGRNId) {
         const { updateGRN } = await import('@/utils/grnUtils');
@@ -2475,13 +2489,31 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       // Clear editing state
       setEditingGRNId(null);
       
-      // Always update general products inventory (products.stock_quantity)
-      // regardless of whether a destination godown is set.
-      // When a godown IS set, saveGRN() also handles godown_stock via updateGRNGodownStock.
+      // Update general products inventory (products.stock_quantity)
       try {
         const { getProducts, updateProduct } = await import('@/services/databaseService');
         const allProducts = await getProducts();
         
+        // When editing, reverse old item quantities first
+        if (editingGRNId && oldGRNItems.length > 0) {
+          for (const oldItem of oldGRNItems) {
+            const oldQty = oldItem.delivered || oldItem.receivedQuantity || 0;
+            if (!oldItem.description || oldQty <= 0) continue;
+            const product = allProducts.find(p => 
+              p.name.toLowerCase().trim() === oldItem.description.toLowerCase().trim()
+            );
+            if (product) {
+              const currentStock = product.stock_quantity || 0;
+              const reversedStock = currentStock - oldQty;
+              await updateProduct(product.id!, { ...product, stock_quantity: reversedStock });
+              // Update the in-memory stock for accurate subsequent calculations
+              product.stock_quantity = reversedStock;
+              console.log(`[Edit Reversal] Product ${product.name} stock: ${currentStock} -> ${reversedStock} (reversed ${oldQty})`);
+            }
+          }
+        }
+        
+        // Apply new item quantities
         for (const item of newGRN.data.items) {
           if (item.description && item.delivered > 0) {
             const product = allProducts.find(p => 
@@ -2496,12 +2528,60 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                 ? item.originalUnitCost
                 : product.cost_price;
               await updateProduct(product.id!, { ...product, stock_quantity: newStock, cost_price: newCostPrice });
+              // Update in-memory for accuracy
+              product.stock_quantity = newStock;
               console.log(`Product ${product.name} stock updated: ${currentStock} -> ${newStock}, cost_price updated to ${newCostPrice}`);
             }
           }
         }
       } catch (inventoryError) {
         console.error('Error updating product inventory after GRN save:', inventoryError);
+      }
+      
+      // Update godown stock when editing (reverse old + apply new)
+      if (editingGRNId) {
+        try {
+          const { updateGodownStock } = await import('@/services/godownService');
+          const { data: products } = await supabase.from('products').select('id, name');
+          const productNameToId = new Map<string, string>();
+          if (products) {
+            for (const p of products) {
+              productNameToId.set(p.name.toLowerCase().trim(), p.id);
+            }
+          }
+          
+          // Reverse old godown stock
+          for (const oldItem of oldGRNItems) {
+            const oldQty = oldItem.delivered || oldItem.receivedQuantity || 0;
+            if (oldQty <= 0) continue;
+            let productId = oldItem.productId || null;
+            if (!productId && oldItem.description) {
+              productId = productNameToId.get(oldItem.description.toLowerCase().trim()) || null;
+            }
+            const oldGodownId = oldItem.destinationGodownId || newGRN.data.destinationGodownId;
+            const oldZoneId = oldItem.destinationZoneId || newGRN.data.destinationZoneId || null;
+            if (!productId || !oldGodownId) continue;
+            await updateGodownStock(productId, oldGodownId, oldZoneId, -oldQty);
+            console.log(`[Edit Reversal] Godown stock reversed: product ${productId}, godown ${oldGodownId}, zone ${oldZoneId}, -${oldQty}`);
+          }
+          
+          // Apply new godown stock
+          for (const item of newGRN.data.items) {
+            const newQty = item.delivered || item.receivedQuantity || 0;
+            if (newQty <= 0) continue;
+            let productId = item.productId || null;
+            if (!productId && item.description) {
+              productId = productNameToId.get(item.description.toLowerCase().trim()) || null;
+            }
+            const itemGodownId = item.destinationGodownId || newGRN.data.destinationGodownId;
+            const itemZoneId = item.destinationZoneId || newGRN.data.destinationZoneId || null;
+            if (!productId || !itemGodownId) continue;
+            await updateGodownStock(productId, itemGodownId, itemZoneId, newQty);
+            console.log(`[Edit Apply] Godown stock updated: product ${productId}, godown ${itemGodownId}, zone ${itemZoneId}, +${newQty}`);
+          }
+        } catch (godownError) {
+          console.error('Error updating godown stock on edit:', godownError);
+        }
       }
       
       // Update local state
