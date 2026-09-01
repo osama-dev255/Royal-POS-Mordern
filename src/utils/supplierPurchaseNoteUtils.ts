@@ -15,6 +15,13 @@ export interface PaymentBreakdownEntry {
   amount: number;
 }
 
+export interface DestinationDetail {
+  godownName: string;
+  zoneId: string;
+  zoneName: string;
+  quantity: number;
+}
+
 export interface SupplierPurchaseNoteData {
   id?: string;
   purchaseNoteNumber: string;
@@ -44,6 +51,9 @@ export interface SupplierPurchaseNoteData {
   modeOfPayment: string;
   paymentBreakdown: PaymentBreakdownEntry[];
   destination: string;
+  destinationZoneId: string;
+  destinationZoneName: string;
+  destinationDetails: DestinationDetail[];
   stockType: string;
   receiptIssued: string;
   status: 'draft' | 'completed' | 'cancelled';
@@ -80,6 +90,9 @@ export interface SavedSupplierPurchaseNote {
   modeOfPayment: string;
   paymentBreakdown: PaymentBreakdownEntry[];
   destination: string;
+  destinationZoneId: string;
+  destinationZoneName: string;
+  destinationDetails: DestinationDetail[];
   stockType: string;
   receiptIssued: string;
   status: 'draft' | 'completed' | 'cancelled';
@@ -127,6 +140,9 @@ export const saveSupplierPurchaseNote = async (
       mode_of_payment: noteData.modeOfPayment || '',
       payment_breakdown: noteData.paymentBreakdown || [],
       destination: noteData.destination || '',
+      destination_zone_id: noteData.destinationZoneId || '',
+      destination_zone_name: noteData.destinationZoneName || '',
+      destination_details: JSON.stringify(noteData.destinationDetails || []),
       stock_type: noteData.stockType || '',
       receipt_issued: noteData.receiptIssued === 'yes',
       status: noteData.status || 'draft',
@@ -202,6 +218,9 @@ export const getSavedSupplierPurchaseNotes = async (
       modeOfPayment: dbNote.mode_of_payment || '',
       paymentBreakdown: dbNote.payment_breakdown || [],
       destination: dbNote.destination || '',
+      destinationZoneId: dbNote.destination_zone_id || '',
+      destinationZoneName: dbNote.destination_zone_name || '',
+      destinationDetails: (() => { try { return typeof dbNote.destination_details === 'string' ? JSON.parse(dbNote.destination_details) : (dbNote.destination_details || []); } catch { return []; } })(),
       stockType: dbNote.stock_type || '',
       receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
       status: dbNote.status || 'draft',
@@ -235,6 +254,9 @@ export const getSavedSupplierPurchaseNotes = async (
         modeOfPayment: dbNote.mode_of_payment || '',
         paymentBreakdown: dbNote.payment_breakdown || [],
         destination: dbNote.destination || '',
+        destinationZoneId: dbNote.destination_zone_id || '',
+        destinationZoneName: dbNote.destination_zone_name || '',
+        destinationDetails: (() => { try { return typeof dbNote.destination_details === 'string' ? JSON.parse(dbNote.destination_details) : (dbNote.destination_details || []); } catch { return []; } })(),
         stockType: dbNote.stock_type || '',
         receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
         status: dbNote.status || 'draft',
@@ -305,6 +327,9 @@ export const updateSupplierPurchaseNote = async (
     if (noteData.modeOfPayment !== undefined) updateData.mode_of_payment = noteData.modeOfPayment;
     if (noteData.paymentBreakdown !== undefined) updateData.payment_breakdown = noteData.paymentBreakdown;
     if (noteData.destination !== undefined) updateData.destination = noteData.destination;
+    if (noteData.destinationZoneId !== undefined) updateData.destination_zone_id = noteData.destinationZoneId;
+    if (noteData.destinationZoneName !== undefined) updateData.destination_zone_name = noteData.destinationZoneName;
+    if (noteData.destinationDetails !== undefined) updateData.destination_details = JSON.stringify(noteData.destinationDetails);
     if (noteData.stockType !== undefined) updateData.stock_type = noteData.stockType;
     if (noteData.receiptIssued !== undefined) updateData.receipt_issued = noteData.receiptIssued === 'yes';
     if (noteData.status) updateData.status = noteData.status;

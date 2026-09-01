@@ -114,7 +114,18 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       lines.push(`🏪 Muuzaji: ${data.supplierName || 'N/A'}`);
       lines.push(`🏢 Mnunuzi: ${data.businessName || 'N/A'}`);
       if (data.destination) {
-        lines.push(`📍 Destination: ${data.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`);
+        if (data.destinationDetails && data.destinationDetails.length > 0) {
+          lines.push('📍 DESTINATION:');
+          data.destinationDetails.forEach((e: any) => {
+            lines.push(`  • ${e.godownName} → ${e.zoneName} | Qty: ${e.quantity}`);
+          });
+          const totalDestQty = data.destinationDetails.reduce((s: number, e: any) => s + (e.quantity || 0), 0);
+          lines.push(`  Total Dest Qty: ${totalDestQty}`);
+        } else {
+          const destDisplay = data.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+          const zoneDisplay = data.destinationZoneName ? ` - ${data.destinationZoneName}` : '';
+          lines.push(`📍 Destination: ${destDisplay}${zoneDisplay}`);
+        }
       }
       if (data.stockType || data.receiptIssued) {
         lines.push('');
@@ -447,9 +458,39 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                       <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
                       Destination
                     </h3>
-                    <p className="text-xs font-semibold bg-gray-50 p-3 rounded border text-gray-700">
-                      {selectedNote.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                    </p>
+                    {selectedNote.destinationDetails && selectedNote.destinationDetails.length > 0 ? (
+                      <div className="bg-gray-50 p-3 rounded border">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-gray-400 uppercase text-[10px]">
+                              <th className="pb-1">Godown</th>
+                              <th className="pb-1">Zone</th>
+                              <th className="pb-1 text-right">Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedNote.destinationDetails.map((e: any, i: number) => (
+                              <tr key={i} className="border-t border-dashed">
+                                <td className="py-1 font-medium text-gray-700">{e.godownName}</td>
+                                <td className="py-1 text-gray-600">{e.zoneName}</td>
+                                <td className="py-1 text-right font-bold text-gray-800">{e.quantity}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t font-bold">
+                              <td colSpan={2} className="pt-1 text-gray-500">Total</td>
+                              <td className="pt-1 text-right text-gray-800">{selectedNote.destinationDetails.reduce((s: number, e: any) => s + (e.quantity || 0), 0)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-semibold bg-gray-50 p-3 rounded border text-gray-700">
+                        {selectedNote.destination.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                        {selectedNote.destinationZoneName ? ` - ${selectedNote.destinationZoneName}` : ''}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

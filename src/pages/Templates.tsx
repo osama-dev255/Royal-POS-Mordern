@@ -664,6 +664,9 @@ interface SupplierPurchaseNoteData {
   modeOfPayment: string;
   paymentBreakdown: { method: string; amount: number }[];
   destination: string;
+  destinationZoneId: string;
+  destinationZoneName: string;
+  destinationDetails: { godownName: string; zoneId: string; zoneName: string; quantity: number }[];
   stockType: string;
   receiptIssued: string;
   status: 'draft' | 'completed' | 'cancelled';
@@ -3137,8 +3140,17 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     modeOfPayment: '',
     paymentBreakdown: [],
     destination: '',
+    destinationZoneId: '',
+    destinationZoneName: '',
+    destinationDetails: [],
     status: 'draft'
   });
+
+  // Sequential destination flow state
+  const [spnDestGodown, setSpnDestGodown] = useState('');
+  const [spnDestZoneId, setSpnDestZoneId] = useState('');
+  const [spnDestZoneName, setSpnDestZoneName] = useState('');
+  const [spnDestQuantity, setSpnDestQuantity] = useState<number>(0);
 
   // Load edit data when provided from saved notes
   useEffect(() => {
@@ -3177,10 +3189,30 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
         modeOfPayment: data.modeOfPayment || '',
         paymentBreakdown: data.paymentBreakdown || [],
         destination: data.destination || '',
+        destinationZoneId: data.destinationZoneId || '',
+        destinationZoneName: data.destinationZoneName || '',
+        destinationDetails: data.destinationDetails || [],
         status: data.status || 'draft'
       });
       // Store the note ID for update
       setEditingSPNId(editSPNData.id || '');
+      // Load zones for the pre-selected destination godown(s)
+      if (data.destination) {
+        const destNames = data.destination.split(',').filter(Boolean);
+        (async () => {
+          const allZones: GodownZone[] = [];
+          for (const name of destNames) {
+            const godown = godowns.find(g => g.name === name);
+            if (godown?.id) {
+              try {
+                const zones = await getZones(godown.id);
+                allZones.push(...zones);
+              } catch {}
+            }
+          }
+          setSpnDestinationZones(allZones);
+        })();
+      }
       // Navigate to SPN preview
       setViewingTemplate('17');
       setSelectedTemplate(null);
@@ -3285,6 +3317,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     const [spnReceiptIssued, setSpnReceiptIssued] = useState<'yes' | 'no' | ''>('');
     const [evPostSaveDialogOpen, setEvPostSaveDialogOpen] = useState(false);
     const [evSavedData, setEvSavedData] = useState<ExpenseVoucherData | null>(null);
+    const [spnDestinationZones, setSpnDestinationZones] = useState<GodownZone[]>([]);
+    const [spnDestDropdownOpen, setSpnDestDropdownOpen] = useState(false);
+    const [spnZoneDropdownOpen, setSpnZoneDropdownOpen] = useState(false);
 
   const handleSupplierPurchaseNoteChange = (field: keyof SupplierPurchaseNoteData, value: any) => {
     setSupplierPurchaseNoteData(prev => ({ ...prev, [field]: value }));
@@ -3328,7 +3363,11 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       return;
     }
     if (!supplierPurchaseNoteData.destination) {
-      toast({ title: 'Validation Error', description: 'Destination is required', variant: 'destructive' });
+      toast({ title: 'Validation Error', description: 'At least one destination is required', variant: 'destructive' });
+      return;
+    }
+    if (!supplierPurchaseNoteData.destinationDetails || supplierPurchaseNoteData.destinationDetails.length === 0) {
+      toast({ title: 'Validation Error', description: 'Please add at least one destination with godown, zone and quantity', variant: 'destructive' });
       return;
     }
     const totalPaid = supplierPurchaseNoteData.paymentBreakdown.reduce((s, p) => s + (p.amount || 0), 0);
@@ -3408,8 +3447,16 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
           modeOfPayment: '',
           paymentBreakdown: [],
           destination: '',
+          destinationZoneId: '',
+          destinationZoneName: '',
+          destinationDetails: [],
           status: 'draft'
         });
+        setSpnDestinationZones([]);
+        setSpnDestGodown('');
+        setSpnDestZoneId('');
+        setSpnDestZoneName('');
+        setSpnDestQuantity(0);
         setActiveTab('manage');
       } else {
         toast({ title: 'Error', description: result.error || 'Failed to save note', variant: 'destructive' });
@@ -9192,7 +9239,17 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       </div>
       ${data.destination ? `<div class="destination-box">
         <div class="destination-header">Destination</div>
-        <div class="destination-body">${data.destination.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+        <div class="destination-body">${
+          data.destinationDetails && data.destinationDetails.length > 0
+            ? `<table style="width:100%;font-size:11px;border-collapse:collapse">
+                <tr style="text-align:left;font-weight:700;border-bottom:1px solid #ddd">
+                  <td style="padding:2px 4px">Godown</td><td style="padding:2px 4px">Zone</td><td style="padding:2px 4px;text-align:right">Qty</td>
+                </tr>
+                ${data.destinationDetails.map((e: any) => `<tr style="border-bottom:1px dashed #eee"><td style="padding:2px 4px">${e.godownName}</td><td style="padding:2px 4px">${e.zoneName}</td><td style="padding:2px 4px;text-align:right;font-weight:700">${e.quantity}</td></tr>`).join('')}
+                <tr style="font-weight:700"><td style="padding:2px 4px" colspan="2">Total</td><td style="padding:2px 4px;text-align:right">${data.destinationDetails.reduce((s: number, e: any) => s + (e.quantity || 0), 0)}</td></tr>
+              </table>`
+            : `${data.destination.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}${data.destinationZoneName ? ` - ${data.destinationZoneName}` : ''}`
+        }</div>
       </div>` : ''}
     </div>
     <div class="payment-box">
@@ -16335,29 +16392,159 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                           );
                         })()}
 
-                        {/* Destination, Total */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold mb-1 block">Destination <span className="text-red-500">*</span></label>
-                            <Select value={supplierPurchaseNoteData.destination} onValueChange={(val) => handleSupplierPurchaseNoteChange('destination', val)}>
-                              <SelectTrigger className="w-full h-8 text-sm">
-                                <SelectValue placeholder="Select destination" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="msikit_mdogo">Msikit Mdogo</SelectItem>
-                                <SelectItem value="mdote_godown">Mdote Godown</SelectItem>
-                                <SelectItem value="shimoni_godown">Shimoni Godown</SelectItem>
-                                <SelectItem value="masuguru_godown">Masuguru Godown</SelectItem>
-                                <SelectItem value="parking_godown">Parking Godown</SelectItem>
-                              </SelectContent>
-                            </Select>
+                        {/* Destination - Sequential Flow */}
+                        <div className="border rounded-md p-3 space-y-3">
+                          <div className="text-xs font-bold uppercase tracking-wide text-gray-500 flex items-center gap-2">
+                            <span className="w-[3px] h-3.5 bg-black rounded-sm inline-block" />
+                            Destination <span className="text-red-500">*</span>
                           </div>
-                          <div>
-                            <label className="text-xs font-bold">Total</label>
-                            <div className="p-1 h-8 text-sm font-bold flex items-center bg-indigo-50 rounded px-2">
-                              {formatCurrency(supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0))}
+
+                          {/* Step 1: Godown */}
+                          <div className="grid grid-cols-4 gap-3">
+                            <div>
+                              <label className="text-[10px] font-semibold text-gray-400 uppercase mb-1 block">1. Godown</label>
+                              <Select value={spnDestGodown} onValueChange={async (val) => {
+                                setSpnDestGodown(val);
+                                setSpnDestZoneId('');
+                                setSpnDestZoneName('');
+                                setSpnDestQuantity(0);
+                                const godown = godowns.find(g => g.name === val);
+                                if (godown?.id) {
+                                  try {
+                                    const zones = await getZones(godown.id);
+                                    setSpnDestinationZones(zones);
+                                  } catch { setSpnDestinationZones([]); }
+                                }
+                              }}>
+                                <SelectTrigger className="w-full h-8 text-sm">
+                                  <SelectValue placeholder="Select godown" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {godowns.map(g => (
+                                    <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Step 2: Zone */}
+                            <div>
+                              <label className="text-[10px] font-semibold text-gray-400 uppercase mb-1 block">2. Block / Zone</label>
+                              <Select value={spnDestZoneId} onValueChange={(val) => {
+                                const zone = spnDestinationZones.find(z => z.id === val);
+                                setSpnDestZoneId(val);
+                                setSpnDestZoneName(zone?.zone_name || '');
+                              }} disabled={!spnDestGodown}>
+                                <SelectTrigger className="w-full h-8 text-sm">
+                                  <SelectValue placeholder={spnDestGodown ? 'Select zone' : 'Select godown first'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {spnDestinationZones.map(z => (
+                                    <SelectItem key={z.id} value={z.id!}>{z.zone_name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Step 3: Quantity */}
+                            <div>
+                              <label className="text-[10px] font-semibold text-gray-400 uppercase mb-1 block">3. Quantity</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={spnDestQuantity || ''}
+                                onChange={(e) => setSpnDestQuantity(parseFloat(e.target.value) || 0)}
+                                disabled={!spnDestZoneId}
+                                className="w-full h-8 text-sm border rounded-md px-2 disabled:bg-gray-50 disabled:text-gray-400"
+                                placeholder={spnDestZoneId ? 'Enter qty' : 'Select zone first'}
+                              />
+                            </div>
+
+                            {/* Add button */}
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                disabled={!spnDestGodown || !spnDestZoneId || spnDestQuantity <= 0}
+                                onClick={() => {
+                                  const newEntry = { godownName: spnDestGodown, zoneId: spnDestZoneId, zoneName: spnDestZoneName, quantity: spnDestQuantity };
+                                  const updated = [...supplierPurchaseNoteData.destinationDetails, newEntry];
+                                  handleSupplierPurchaseNoteChange('destinationDetails', updated);
+                                  // Update comma-separated fields for backward compat
+                                  const godownNames = [...new Set(updated.map(e => e.godownName))];
+                                  const zoneNames = [...new Set(updated.map(e => e.zoneName))];
+                                  const zoneIds = [...new Set(updated.map(e => e.zoneId))];
+                                  handleSupplierPurchaseNoteChange('destination', godownNames.join(', '));
+                                  handleSupplierPurchaseNoteChange('destinationZoneId', zoneIds.join(','));
+                                  handleSupplierPurchaseNoteChange('destinationZoneName', zoneNames.join(', '));
+                                  // Reset for next entry
+                                  setSpnDestGodown('');
+                                  setSpnDestZoneId('');
+                                  setSpnDestZoneName('');
+                                  setSpnDestQuantity(0);
+                                  setSpnDestinationZones([]);
+                                }}
+                                className="h-8 px-3 text-xs font-bold bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                              >
+                                + Add
+                              </button>
                             </div>
                           </div>
+
+                          {/* Destination Summary Table */}
+                          {supplierPurchaseNoteData.destinationDetails.length > 0 && (
+                            <div className="border-t pt-2">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="text-left text-gray-400 uppercase text-[10px]">
+                                    <th className="pb-1 pr-2">Godown</th>
+                                    <th className="pb-1 pr-2">Block / Zone</th>
+                                    <th className="pb-1 pr-2 text-right">Qty</th>
+                                    <th className="pb-1 w-8"></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {supplierPurchaseNoteData.destinationDetails.map((entry, i) => (
+                                    <tr key={i} className="border-t border-dashed">
+                                      <td className="py-1.5 pr-2 font-medium">{entry.godownName}</td>
+                                      <td className="py-1.5 pr-2">{entry.zoneName}</td>
+                                      <td className="py-1.5 pr-2 text-right font-bold">{entry.quantity}</td>
+                                      <td className="py-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = supplierPurchaseNoteData.destinationDetails.filter((_, idx) => idx !== i);
+                                            handleSupplierPurchaseNoteChange('destinationDetails', updated);
+                                            const godownNames = [...new Set(updated.map(e => e.godownName))];
+                                            const zoneNames = [...new Set(updated.map(e => e.zoneName))];
+                                            const zoneIds = [...new Set(updated.map(e => e.zoneId))];
+                                            handleSupplierPurchaseNoteChange('destination', godownNames.join(', '));
+                                            handleSupplierPurchaseNoteChange('destinationZoneId', zoneIds.join(','));
+                                            handleSupplierPurchaseNoteChange('destinationZoneName', zoneNames.join(', '));
+                                          }}
+                                          className="text-red-400 hover:text-red-600"
+                                          title="Remove"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="border-t font-bold">
+                                    <td className="pt-1.5 pr-2" colSpan={2}>Total Destination Qty</td>
+                                    <td className="pt-1.5 pr-2 text-right">{supplierPurchaseNoteData.destinationDetails.reduce((s, e) => s + e.quantity, 0)}</td>
+                                    <td></td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Items Total */}
+                        <div className="flex justify-end">
+                          <div className="text-xs font-bold text-gray-500">Total: <span className="text-sm font-bold text-gray-800">{formatCurrency(supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0))}</span></div>
                         </div>
 
                         {/* Mode of Payment - Split Payment */}

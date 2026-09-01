@@ -5518,7 +5518,17 @@ export class PrintUtils {
       </div>
       ${data.destination ? `<div class="destination-box">
         <div class="destination-header">Destination</div>
-        <div class="destination-body">${data.destination}</div>
+        <div class="destination-body">${
+          data.destinationDetails && data.destinationDetails.length > 0
+            ? `<table style="width:100%;font-size:${fontSize}px;border-collapse:collapse">
+                <tr style="text-align:left;font-weight:700;border-bottom:1px solid #ddd">
+                  <td style="padding:2px 4px">Godown</td><td style="padding:2px 4px">Zone</td><td style="padding:2px 4px;text-align:right">Qty</td>
+                </tr>
+                ${data.destinationDetails.map((e: any) => `<tr style="border-bottom:1px dashed #eee"><td style="padding:2px 4px">${e.godownName}</td><td style="padding:2px 4px">${e.zoneName}</td><td style="padding:2px 4px;text-align:right;font-weight:700">${e.quantity}</td></tr>`).join('')}
+                <tr style="font-weight:700"><td style="padding:2px 4px" colspan="2">Total</td><td style="padding:2px 4px;text-align:right">${data.destinationDetails.reduce((s: number, e: any) => s + (e.quantity || 0), 0)}</td></tr>
+              </table>`
+            : `${data.destination}${data.destinationZoneName ? ` - ${data.destinationZoneName}` : ''}`
+        }</div>
       </div>` : ''}
     </div>
     <div class="payment-box">
