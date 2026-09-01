@@ -41,7 +41,8 @@ import {
   ShieldCheck,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  BarChart3
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +51,7 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabaseClient";
 import { getOutlets, Outlet, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
 import { DeliveryDetails } from "@/components/DeliveryDetails";
+import { DeliveryInReportEditor } from "@/components/DeliveryInReportEditor";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
@@ -126,6 +128,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   const [approvedByName, setApprovedByName] = useState('');
   const [approvingDelivery, setApprovingDelivery] = useState<DeliveryData | null>(null);
   const [isApprovingDelivery, setIsApprovingDelivery] = useState(false);
+  const [showReportEditor, setShowReportEditor] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -1948,6 +1951,19 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                 </Button>
               )}
             </div>
+
+            {/* Financial Report Button (only for Deliveries In) */}
+            {sectionFilter === "in" && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setShowReportEditor(true)}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <BarChart3 className="h-4 w-4 mr-1" />
+                Financial Report
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -3209,6 +3225,17 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Financial Report Editor */}
+      {sectionFilter === "in" && (
+        <DeliveryInReportEditor
+          open={showReportEditor}
+          onOpenChange={setShowReportEditor}
+          deliveries={filteredDeliveries}
+          formatCurrency={formatCurrency}
+          outletName={outlets.find(o => o.id === outletId)?.name}
+        />
+      )}
     </div>
   );
 };
