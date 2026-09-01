@@ -33,6 +33,11 @@ export interface DeliveryData {
   destinationZoneId?: string; // ID of destination zone
   sourceGodownName?: string; // Name of source godown (for display)
   sourceZoneName?: string; // Name of source zone (for display)
+  // Approval fields
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedByName?: string;
+  approvalNotes?: string;
+  approvedAt?: string;
 }
 
 export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
@@ -483,7 +488,12 @@ export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
         driverName: dbDelivery.driver_name,
         driverDate: dbDelivery.driver_date,
         receivedByName: dbDelivery.received_by_name,
-        receivedByDate: dbDelivery.received_by_date
+        receivedByDate: dbDelivery.received_by_date,
+        // Approval fields
+        approvalStatus: dbDelivery.approval_status || 'pending',
+        approvedByName: dbDelivery.approved_by_name,
+        approvalNotes: dbDelivery.approval_notes,
+        approvedAt: dbDelivery.approved_at
       }));
       
       return deliveries;
@@ -1095,7 +1105,12 @@ export const getDeliveriesByOutletId = async (outletId: string): Promise<Deliver
         driverName: dbDelivery.driver_name,
         driverDate: dbDelivery.driver_date,
         receivedByName: dbDelivery.received_by_name,
-        receivedByDate: dbDelivery.received_by_date
+        receivedByDate: dbDelivery.received_by_date,
+        // Approval fields
+        approvalStatus: dbDelivery.approval_status || 'pending',
+        approvedByName: dbDelivery.approved_by_name,
+        approvalNotes: dbDelivery.approval_notes,
+        approvedAt: dbDelivery.approved_at
       }));
       
       return deliveries;

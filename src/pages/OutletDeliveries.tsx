@@ -37,7 +37,11 @@ import {
   Plus,
   Pencil,
   Building,
-  Loader2
+  Loader2,
+  ShieldCheck,
+  CheckCircle,
+  XCircle,
+  Clock
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -115,6 +119,13 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     quantity: 0,
     rate: 0
   });
+  // Approval dialog state
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvedByName, setApprovedByName] = useState('');
+  const [approvingDelivery, setApprovingDelivery] = useState<DeliveryData | null>(null);
+  const [isApprovingDelivery, setIsApprovingDelivery] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -209,6 +220,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           preparedByDate: outgoing.prepared_by_date || null,
           receivedByName: outgoing.received_by_name || null,
           receivedByDate: outgoing.received_by_date || null,
+          approvalStatus: outgoing.approval_status || 'pending',
+          approvedByName: outgoing.approved_by_name || null,
+          approvalNotes: outgoing.approval_notes || null,
+          approvedAt: outgoing.approved_at || null,
           itemsList: items.map((item: any) => ({
             description: item.product_name || item.description,
             quantity: item.quantity,
@@ -321,6 +336,132 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     setShowEditDialog(true);
   };
 
+  const handleOpenApprovalDialog = (delivery: DeliveryData, status: 'approved' | 'rejected') => {
+    setApprovingDelivery(delivery);
+    setApprovalStatus(status);
+    setApprovalNotes('');
+    setApprovedByName('');
+    setIsApprovalDialogOpen(true);
+  };
+
+  const handleApproveDelivery = async () => {
+    if (!approvingDelivery) return;
+
+    if (!approvedByName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter approver name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsApprovingDelivery(true);
+
+    try {
+      const updateData = {
+        approval_status: approvalStatus,
+        approved_by_name: approvedByName.trim(),
+        approval_notes: approvalNotes.trim() || null,
+        approved_at: new Date().toISOString()
+      };
+
+      if (approvingDelivery.deliveryType === 'out') {
+        // Update outlet_deliveries_out
+        const { error } = await supabase
+          .from('outlet_deliveries_out')
+          .update(updateData)
+          .eq('id', approvingDelivery.id);
+
+        if (error) {
+          console.error('Error approving delivery:', error);
+          throw error;
+        }
+      } else {
+        // Update saved_delivery_notes
+        const { error } = await supabase
+          .from('saved_delivery_notes')
+          .update(updateData)
+          .eq('id', approvingDelivery.id);
+
+        if (error) {
+          console.error('Error approving delivery:', error);
+          throw error;
+        }
+      }
+
+      // Update local state
+      setDeliveries(prev => prev.map(d =>
+        d.id === approvingDelivery.id
+          ? { ...d, approvalStatus: approvalStatus, approvedByName: approvedByName.trim(), approvalNotes: approvalNotes.trim() || undefined, approvedAt: new Date().toISOString() }
+          : d
+      ));
+
+      toast({
+        title: approvalStatus === 'approved' ? "Delivery Approved" : "Delivery Rejected",
+        description: `Delivery ${approvingDelivery.deliveryNoteNumber} has been ${approvalStatus}`
+      });
+
+      setIsApprovalDialogOpen(false);
+      setApprovingDelivery(null);
+    } catch (error) {
+      console.error('Error approving delivery:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process approval",
+        variant: "destructive"
+      });
+    } finally {
+      setIsApprovingDelivery(false);
+    }
+  };
+
+  const handleResetToPending = async (delivery: DeliveryData) => {
+    try {
+      const updateData = {
+        approval_status: 'pending',
+        approved_by_name: null,
+        approval_notes: null,
+        approved_at: null
+      };
+
+      if (delivery.deliveryType === 'out') {
+        const { error } = await supabase
+          .from('outlet_deliveries_out')
+          .update(updateData)
+          .eq('id', delivery.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('saved_delivery_notes')
+          .update(updateData)
+          .eq('id', delivery.id);
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      setDeliveries(prev => prev.map(d =>
+        d.id === delivery.id
+          ? { ...d, approvalStatus: 'pending' as const, approvedByName: undefined, approvalNotes: undefined, approvedAt: undefined }
+          : d
+      ));
+
+      toast({
+        title: "Reset to Pending",
+        description: `Delivery ${delivery.deliveryNoteNumber} has been set back to pending`
+      });
+    } catch (error) {
+      console.error('Error resetting delivery to pending:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset delivery status",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleAddEditItem = (index: number | null = null) => {
     setEditItemIndex(index);
     if (index !== null && editingItems[index]) {
@@ -406,6 +547,17 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     if (delivery.driver) doc.text(`Driver: ${delivery.driver}`, 14, 56);
     if (delivery.vehicle) doc.text(`Vehicle: ${delivery.vehicle}`, 14, 62);
     
+    // Approval info
+    let nextY = 62;
+    if (delivery.vehicle) nextY += 6;
+    if (delivery.driver) nextY += 6;
+    if (delivery.approvalStatus && delivery.approvalStatus !== 'pending') {
+      const approvalLabel = delivery.approvalStatus === 'approved' ? 'Approved' : 'Rejected';
+      const approvalText = delivery.approvedByName ? `${approvalLabel} by ${delivery.approvedByName}` : approvalLabel;
+      doc.text(`Approval: ${approvalText}`, 14, nextY + 6);
+      nextY += 6;
+    }
+    
     const itemsList = delivery.itemsList || [];
     const tableData = itemsList.map((item: any) => [
       item.description || item.name || 'N/A',
@@ -415,7 +567,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     ]);
     
     autoTable(doc, {
-      startY: 70,
+      startY: nextY + 14,
       head: [['Description', 'Quantity', 'Rate', 'Amount']],
       body: tableData,
       theme: 'striped',
@@ -478,6 +630,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           <tr><td>Date:</td><td>${delivery.date}</td><td>Status:</td><td>${delivery.status}</td></tr>
           <tr><td>Customer:</td><td>${delivery.customer}</td><td>Driver:</td><td>${delivery.driver || 'N/A'}</td></tr>
           <tr><td>Vehicle:</td><td>${delivery.vehicle || 'N/A'}</td><td></td><td></td></tr>
+          ${delivery.approvalStatus && delivery.approvalStatus !== 'pending' ? `<tr><td>Approval:</td><td colspan="3">${delivery.approvalStatus === 'approved' ? 'Approved' : 'Rejected'}${delivery.approvedByName ? ` by ${delivery.approvedByName}` : ''}</td></tr>` : ''}
           <tr><th>Description</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr>
     `;
     
@@ -521,6 +674,17 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     if (delivery.driver) doc.text(`Driver: ${delivery.driver}`, 14, 56);
     if (delivery.vehicle) doc.text(`Vehicle: ${delivery.vehicle}`, 14, 62);
     
+    // Approval info
+    let shareNextY = 62;
+    if (delivery.vehicle) shareNextY += 6;
+    if (delivery.driver) shareNextY += 6;
+    if (delivery.approvalStatus && delivery.approvalStatus !== 'pending') {
+      const shareApprovalLabel = delivery.approvalStatus === 'approved' ? 'Approved' : 'Rejected';
+      const shareApprovalText = delivery.approvedByName ? `${shareApprovalLabel} by ${delivery.approvedByName}` : shareApprovalLabel;
+      doc.text(`Approval: ${shareApprovalText}`, 14, shareNextY + 6);
+      shareNextY += 6;
+    }
+    
     const itemsList = delivery.itemsList || [];
     const tableData = itemsList.map((item: any) => [
       item.description || item.name || 'N/A',
@@ -530,7 +694,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     ]);
     
     autoTable(doc, {
-      startY: 70,
+      startY: shareNextY + 14,
       head: [['Description', 'Quantity', 'Rate', 'Amount']],
       body: tableData,
       theme: 'striped',
@@ -671,6 +835,11 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         statusColor = '#856404';
       }
       
+      // Approval text
+      const approvalText = d.approvalStatus && d.approvalStatus !== 'pending'
+        ? (d.approvalStatus === 'approved' ? 'Approved' : 'Rejected') + (d.approvedByName ? ` by ${d.approvedByName}` : '')
+        : '-';
+      
       return `
       <tr>
         <td class="note-number">${d.deliveryNoteNumber}</td>
@@ -683,6 +852,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         </td>
         <td class="items">${d.items}</td>
         <td class="total">${formatCurrency(d.total)}</td>
+        <td class="approval">${approvalText}</td>
         <td class="products-summary">${productsSummary}</td>
       </tr>
     `;
@@ -909,6 +1079,12 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             white-space: nowrap;
           }
           
+          .approval {
+            font-size: 9px;
+            font-weight: 600;
+            color: #333;
+          }
+          
           .products-summary {
             font-size: 9px;
             color: #333;
@@ -1024,6 +1200,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                   <th style="width: 90px;" class="center">Status</th>
                   <th style="width: 60px;" class="center">Items</th>
                   <th style="width: 110px;" class="right">Total Value</th>
+                  <th style="width: 120px;">Approval</th>
                   <th>Products Summary</th>
                 </tr>
               </thead>
@@ -1091,6 +1268,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           }).join(', ')
         : 'N/A';
       
+      const approvalText = d.approvalStatus && d.approvalStatus !== 'pending'
+        ? (d.approvalStatus === 'approved' ? 'Approved' : 'Rejected') + (d.approvedByName ? ` by ${d.approvedByName}` : '')
+        : '-';
+      
       return [
         d.deliveryNoteNumber, 
         d.date, 
@@ -1098,13 +1279,14 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         d.status, 
         d.items.toString(), 
         formatCurrency(d.total),
+        approvalText,
         productsSummary
       ];
     });
     
     autoTable(doc, {
       startY: 50,
-      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value', 'Products Summary']],
+      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value', 'Approval', 'Products Summary']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [245, 158, 11] },
@@ -1130,9 +1312,9 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
       <head><meta charset="UTF-8"><style>td, th { padding: 5px; border: 1px solid #ccc; } th { background: #f59e0b; color: white; }</style></head>
       <body><table>
-        <tr><td colspan="7" style="font-weight: bold;">Outlet Deliveries Report</td></tr>
-        <tr><td colspan="7">Total Deliveries: ${filteredDeliveries.length} | Total Value: ${formatCurrency(totalValue)}</td></tr>
-        <tr><th>Note Number</th><th>Date</th><th>Customer</th><th>Status</th><th>Items</th><th>Total Value</th><th>Products Summary</th></tr>
+        <tr><td colspan="8" style="font-weight: bold;">Outlet Deliveries Report</td></tr>
+        <tr><td colspan="8">Total Deliveries: ${filteredDeliveries.length} | Total Value: ${formatCurrency(totalValue)}</td></tr>
+        <tr><th>Note Number</th><th>Date</th><th>Customer</th><th>Status</th><th>Items</th><th>Total Value</th><th>Approval</th><th>Products Summary</th></tr>
     `;
     
     filteredDeliveries.forEach(d => {
@@ -1145,7 +1327,11 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
           }).join(', ')
         : 'N/A';
       
-      html += `<tr><td>${d.deliveryNoteNumber}</td><td>${d.date}</td><td>${d.customer}</td><td>${d.status}</td><td>${d.items}</td><td>${d.total}</td><td>${productsSummary}</td></tr>`;
+      const approvalText = d.approvalStatus && d.approvalStatus !== 'pending'
+        ? (d.approvalStatus === 'approved' ? 'Approved' : 'Rejected') + (d.approvedByName ? ` by ${d.approvedByName}` : '')
+        : '-';
+      
+      html += `<tr><td>${d.deliveryNoteNumber}</td><td>${d.date}</td><td>${d.customer}</td><td>${d.status}</td><td>${d.items}</td><td>${d.total}</td><td>${approvalText}</td><td>${productsSummary}</td></tr>`;
     });
     
     html += '</table></body></html>';
@@ -1478,13 +1664,16 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     doc.text(`Total Deliveries: ${filteredDeliveries.length}`, 14, 36);
     doc.text(`Total Value: ${formatCurrency(totalValue)}`, 14, 42);
     
-    const tableData = filteredDeliveries.map(d => [
-      d.deliveryNoteNumber, d.date, d.customer, d.status, d.items.toString(), formatCurrency(d.total)
-    ]);
+    const tableData = filteredDeliveries.map(d => {
+      const approvalText = d.approvalStatus && d.approvalStatus !== 'pending'
+        ? (d.approvalStatus === 'approved' ? 'Approved' : 'Rejected') + (d.approvedByName ? ` by ${d.approvedByName}` : '')
+        : '-';
+      return [d.deliveryNoteNumber, d.date, d.customer, d.status, d.items.toString(), formatCurrency(d.total), approvalText];
+    });
     
     autoTable(doc, {
       startY: 50,
-      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value']],
+      head: [['Note Number', 'Date', 'Customer', 'Status', 'Items', 'Total Value', 'Approval']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [245, 158, 11] },
@@ -1774,6 +1963,18 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                       <Badge className={getStatusColor(delivery.status)}>
                         {delivery.status}
                       </Badge>
+                      {delivery.approvalStatus === 'approved' && (
+                        <Badge className="bg-green-100 text-green-800">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approved{delivery.approvedByName ? ` by ${delivery.approvedByName}` : ''}
+                        </Badge>
+                      )}
+                      {delivery.approvalStatus === 'rejected' && (
+                        <Badge className="bg-red-100 text-red-800">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Rejected{delivery.approvedByName ? ` by ${delivery.approvedByName}` : ''}
+                        </Badge>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
@@ -1860,6 +2061,40 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            title="Approve / Reject"
+                            className={
+                              delivery.approvalStatus === 'approved' 
+                                ? 'text-green-600 hover:text-green-700 hover:bg-green-50' 
+                                : delivery.approvalStatus === 'rejected' 
+                                  ? 'text-red-600 hover:text-red-700 hover:bg-red-50' 
+                                  : 'text-muted-foreground'
+                            }
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenApprovalDialog(delivery, 'approved')}>
+                            <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                            <span>Approve</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenApprovalDialog(delivery, 'rejected')}>
+                            <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                            <span>Reject</span>
+                          </DropdownMenuItem>
+                          {delivery.approvalStatus && delivery.approvalStatus !== 'pending' && (
+                            <DropdownMenuItem onClick={() => handleResetToPending(delivery)}>
+                              <Clock className="h-4 w-4 mr-2 text-yellow-600" />
+                              <span>Set Pending</span>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </div>
@@ -2878,6 +3113,92 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                 handleDownloadDelivery(viewingDelivery);
               }}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalStatus === 'approved' ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Approve Delivery
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  Reject Delivery
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {approvingDelivery && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Delivery Note</p>
+                <p className="font-semibold">{approvingDelivery.deliveryNoteNumber}</p>
+                <p className="text-sm text-muted-foreground mt-1">Customer: {approvingDelivery.customer}</p>
+                <p className="text-sm text-muted-foreground">Amount: {formatCurrency(approvingDelivery.total)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  {approvalStatus === 'approved' ? 'Approved By' : 'Rejected By'} <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={approvedByName}
+                  onChange={(e) => setApprovedByName(e.target.value)}
+                  placeholder={`Enter ${approvalStatus === 'approved' ? 'approver' : 'rejector'} name...`}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notes (Optional)</Label>
+                <Textarea
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder={`Add notes for ${approvalStatus === 'approved' ? 'approval' : 'rejection'}...`}
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsApprovalDialogOpen(false)}
+                  disabled={isApprovingDelivery}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleApproveDelivery}
+                  disabled={isApprovingDelivery}
+                  className={approvalStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                >
+                  {isApprovingDelivery ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : approvalStatus === 'approved' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
