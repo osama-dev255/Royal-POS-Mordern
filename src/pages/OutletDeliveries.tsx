@@ -268,8 +268,13 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (delivery.driver && delivery.driver.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    // Status filter
-    const matchesStatus = !statusFilter || delivery.status === statusFilter;
+    // Status filter (includes approval status)
+    let matchesStatus = true;
+    if (statusFilter === 'approved' || statusFilter === 'rejected') {
+      matchesStatus = delivery.approvalStatus === statusFilter;
+    } else {
+      matchesStatus = !statusFilter || delivery.status === statusFilter;
+    }
     
     // Section filter (All, Deliveries In, Deliveries Out)
     let matchesSection = true;
@@ -1910,6 +1915,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               <option value="in-transit">In Transit</option>
               <option value="pending">Pending</option>
               <option value="cancelled">Cancelled</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
             
             {/* Date Range Picker */}
