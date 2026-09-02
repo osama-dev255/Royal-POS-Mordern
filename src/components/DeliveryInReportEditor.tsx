@@ -41,6 +41,8 @@ interface EditableDelivery {
   excluded?: boolean;
   isManual?: boolean;
   notes?: string;
+  driver?: string;
+  preparedByName?: string;
 }
 
 interface Props {
@@ -88,6 +90,8 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
           })),
           excluded: false,
           isManual: false,
+          driver: d.driver || '',
+          preparedByName: (d as any).preparedByName || '',
         }))
       );
     }
@@ -536,7 +540,19 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
                 if (!d) return null;
                 return (
                   <Card key={dId}>
-                    <CardHeader className="py-2 px-4"><CardTitle className="text-sm">{d.deliveryNoteNumber} — {d.customer}</CardTitle></CardHeader>
+                    <CardHeader className="py-2 px-4">
+                      <CardTitle className="text-sm">{d.deliveryNoteNumber} — {d.customer}</CardTitle>
+                      {(d.driver || d.preparedByName) && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                          {d.preparedByName && (
+                            <span className="text-xs text-muted-foreground">Prepared By: <span className="font-medium text-foreground">{d.preparedByName}</span></span>
+                          )}
+                          {d.driver && (
+                            <span className="text-xs text-muted-foreground">Driver: <span className="font-medium text-foreground">{d.driver}</span></span>
+                          )}
+                        </div>
+                      )}
+                    </CardHeader>
                     <CardContent className="p-0">
                       <Table>
                         <TableHeader><TableRow><TableHead className="w-[40px]"></TableHead><TableHead>Item</TableHead><TableHead className="w-[120px]">Qty</TableHead><TableHead className="w-[140px]">Rate</TableHead><TableHead className="w-[120px] text-right">Amount</TableHead></TableRow></TableHeader>
