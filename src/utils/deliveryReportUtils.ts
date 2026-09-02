@@ -32,6 +32,9 @@ export interface DeliveryReportData {
   referenceNumber: string;
   notes: string;
   preparedByName: string;
+  checkedByName?: string;
+  verifiedByName?: string;
+  approvedByName?: string;
   deliveries: DeliveryReportEntry[];
 }
 
@@ -48,6 +51,9 @@ export interface SavedDeliveryReport {
   reference_number: string | null;
   deliveries: DeliveryReportEntry[];
   prepared_by_name: string | null;
+  checked_by_name: string | null;
+  verified_by_name: string | null;
+  approved_by_name: string | null;
   notes: string | null;
   status: string;
   created_at: string;
@@ -82,6 +88,9 @@ export const saveDeliveryInReport = async (
       reference_number: data.referenceNumber || null,
       deliveries: data.deliveries || [],
       prepared_by_name: data.preparedByName || '',
+      checked_by_name: data.checkedByName || '',
+      verified_by_name: data.verifiedByName || '',
+      approved_by_name: data.approvedByName || '',
       notes: data.notes || '',
       status: 'completed',
       updated_at: new Date().toISOString(),
@@ -133,6 +142,9 @@ export const getSavedDeliveryReports = async (
       reference_number: row.reference_number,
       deliveries: Array.isArray(row.deliveries) ? row.deliveries : [],
       prepared_by_name: row.prepared_by_name,
+      checked_by_name: row.checked_by_name,
+      verified_by_name: row.verified_by_name,
+      approved_by_name: row.approved_by_name,
       notes: row.notes,
       status: row.status,
       created_at: row.created_at,

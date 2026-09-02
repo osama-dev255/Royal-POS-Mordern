@@ -131,6 +131,10 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
     paymentMethod: 'cash',
     referenceNumber: '',
     notes: '',
+    preparedByName: '',
+    checkedByName: '',
+    verifiedByName: '',
+    approvedByName: '',
   });
 
   // Date range filter state
@@ -363,6 +367,10 @@ ${paymentSection}
       toast({ title: "Error", description: "Outlet ID is required to save report", variant: "destructive" });
       return;
     }
+    if (!paymentDetails.preparedByName.trim()) {
+      toast({ title: "Validation Error", description: "Prepared By field is required", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     try {
       const reportData: DeliveryReportData = {
@@ -374,7 +382,10 @@ ${paymentSection}
         paymentMethod: paymentDetails.paymentMethod,
         referenceNumber: paymentDetails.referenceNumber,
         notes: paymentDetails.notes,
-        preparedByName: '',
+        preparedByName: paymentDetails.preparedByName,
+        checkedByName: paymentDetails.checkedByName,
+        verifiedByName: paymentDetails.verifiedByName,
+        approvedByName: paymentDetails.approvedByName,
         deliveries: dateFilteredDeliveries.map(d => ({
           id: d.id,
           deliveryNoteNumber: d.deliveryNoteNumber,
@@ -727,6 +738,45 @@ ${paymentSection}
                   className="min-h-[60px] resize-none"
                   placeholder="Additional notes about this payment..."
                 />
+              </div>
+              {/* Signature Fields */}
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-red-600">Prepared By *</Label>
+                  <Input
+                    value={paymentDetails.preparedByName}
+                    onChange={e => setPaymentDetails(p => ({ ...p, preparedByName: e.target.value }))}
+                    placeholder="Enter name"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Checked By (optional)</Label>
+                  <Input
+                    value={paymentDetails.checkedByName}
+                    onChange={e => setPaymentDetails(p => ({ ...p, checkedByName: e.target.value }))}
+                    placeholder="Enter name"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Verified By (optional)</Label>
+                  <Input
+                    value={paymentDetails.verifiedByName}
+                    onChange={e => setPaymentDetails(p => ({ ...p, verifiedByName: e.target.value }))}
+                    placeholder="Enter name"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Approved By (optional)</Label>
+                  <Input
+                    value={paymentDetails.approvedByName}
+                    onChange={e => setPaymentDetails(p => ({ ...p, approvedByName: e.target.value }))}
+                    placeholder="Enter name"
+                    className="h-8"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
