@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { format as formatDate } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -41,50 +44,70 @@ interface EditableDelivery {
 }
 
 interface Props {
-  trigger: number;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   deliveries: DeliveryData[];
   formatCurrency: (amount: number) => string;
   outletName?: string;
 }
 
-export const DeliveryInReportEditor = ({ trigger, onClose, deliveries, formatCurrency, outletName }: Props) => {
+export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatCurrency, outletName }: Props) => {
   const { toast } = useToast();
-  const [visible, setVisible] = useState(false);
-  const prevTrigger = useRef(trigger);
+  const portalRef = useRef<HTMLDivElement | null>(null);
 
-  // Open modal when trigger changes
+  // Create a persistent DOM container for the portal
   useEffect(() => {
-    if (trigger !== prevTrigger.current && trigger > 0) {
-      setVisible(true);
-      prevTrigger.current = trigger;
+    if (!portalRef.current) {
+      const container = document.createElement('div');
+      container.setAttribute('data-portal', 'delivery-report-editor');
+      document.body.appendChild(container);
+      portalRef.current = container;
     }
-  }, [trigger]);
+    return () => {
+      // Cleanup is handled by the component unmounting
+    };
+  }, []);
+
+  // Sync editable deliveries when dialog opens
+  useEffect(() => {
+    if (open && deliveries.length > 0) {
+      setEditableDeliveries(
+        deliveries.map(d => ({
+          id: d.id,
+          deliveryNoteNumber: d.deliveryNoteNumber,
+          date: d.date,
+          customer: d.customer,
+          sourceType: d.sourceType || 'investment',
+          status: d.status,
+          items: (d.itemsList || []).map((item, idx) => ({
+            id: `${d.id}-item-${idx}`,
+            name: item.description || item.name || 'N/A',
+            quantity: item.quantity || item.delivered || 0,
+            rate: item.rate || item.price || 0,
+            excluded: false,
+          })),
+          excluded: false,
+          isManual: false,
+        }))
+      );
+    }
+  }, [open]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
 
   const handleClose = () => {
-    setVisible(false);
-    onClose();
+    onOpenChange(false);
   };
 
-  const [editableDeliveries, setEditableDeliveries] = useState<EditableDelivery[]>(() =>
-    deliveries.map(d => ({
-      id: d.id,
-      deliveryNoteNumber: d.deliveryNoteNumber,
-      date: d.date,
-      customer: d.customer,
-      sourceType: d.sourceType || 'investment',
-      status: d.status,
-      items: (d.itemsList || []).map((item, idx) => ({
-        id: `${d.id}-item-${idx}`,
-        name: item.description || item.name || 'N/A',
-        quantity: item.quantity || item.delivered || 0,
-        rate: item.rate || item.price || 0,
-        excluded: false,
-      })),
-      excluded: false,
-      isManual: false,
-    }))
-  );
+  const [editableDeliveries, setEditableDeliveries] = useState<EditableDelivery[]>([]);
 
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -94,6 +117,7 @@ export const DeliveryInReportEditor = ({ trigger, onClose, deliveries, formatCur
   // Date range filter state
   const [reportDateRange, setReportDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [reportDatePreset, setReportDatePreset] = useState<string>('all');
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const handleReportDatePreset = (preset: string) => {
     setReportDatePreset(preset);
@@ -295,11 +319,11 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
     toast({ title: "Downloaded", description: "PDF report saved" });
   };
 
-  if (!visible) return null;
+  if (!open || !portalRef.current) return null;
 
-  return (
+  return createPortal(
     <>
-      {/* Overlay - no onClick to test if stray clicks are the cause */}
+      {/* Overlay */}
       <div className="fixed inset-0 z-[9998] bg-black/80" />
       {/* Content */}
       <div className="fixed inset-x-[2.5vw] top-[4vh] bottom-[4vh] z-[9999] bg-background border rounded-lg overflow-y-auto shadow-lg">
@@ -345,8 +369,9 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
 
           {/* Date Range Picker */}
           <Card className="border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 w-full">
+            <CardContent className="p-4 space-y-3">
+              {/* Date Inputs */}
+              <div className="flex flex-wrap items-center gap-3">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <div className="flex flex-wrap items-center gap-2">
                   <Input
@@ -364,8 +389,8 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
                   />
                 </div>
               </div>
-              {/* Quick Range Presets */}
-              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
+              {/* Quick Range Presets + Calendar Popover */}
+              <div className="flex flex-wrap items-center gap-2 pt-3 border-t">
                 <span className="text-sm font-medium mr-1">Quick Range:</span>
                 {[
                   { key: 'today', label: 'Today' },
@@ -387,8 +412,31 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
                     {preset.label}
                   </Button>
                 ))}
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 whitespace-nowrap">
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      Calendar
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarComponent
+                      mode="range"
+                      selected={{
+                        from: reportDateRange.start ? new Date(reportDateRange.start) : undefined,
+                        to: reportDateRange.end ? new Date(reportDateRange.end) : undefined,
+                      }}
+                      onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                        if (range?.from) setReportDateRange(prev => ({ ...prev, start: range.from!.toISOString().split('T')[0] }));
+                        if (range?.to) setReportDateRange(prev => ({ ...prev, end: range.to!.toISOString().split('T')[0] }));
+                        setReportDatePreset('custom');
+                      }}
+                      numberOfMonths={2}
+                    />
+                  </PopoverContent>
+                </Popover>
                 {(reportDateRange.start || reportDateRange.end) && (
-                  <Button variant="ghost" size="sm" onClick={() => handleReportDatePreset('all')} className="h-7 text-xs">
+                  <Button variant="ghost" size="sm" onClick={() => handleReportDatePreset('all')} className="h-8 text-xs">
                     <X className="h-3 w-3 mr-1" />
                     Clear
                   </Button>
@@ -519,6 +567,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
           <Button onClick={handlePrintReport} disabled={isPrinting}>{isPrinting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin"/>Printing...</> : <><Printer className="h-4 w-4 mr-1"/>Print Report</>}</Button>
         </div>
       </div>
-    </>
+    </>,
+    portalRef.current
   );
 };
