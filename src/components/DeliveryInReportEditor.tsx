@@ -413,8 +413,36 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
           {/* Actions Bar */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">{dateFilteredDeliveries.length} deliveries in range — click to expand, toggle to exclude</p>
-            <Button onClick={() => setShowAddDialog(true)}><Plus className="h-4 w-4 mr-1"/>Add Unregistered Delivery</Button>
+            <Button variant={showAddDialog ? "secondary" : "default"} onClick={() => setShowAddDialog(!showAddDialog)}>{showAddDialog ? <><X className="h-4 w-4 mr-1"/>Cancel</> : <><Plus className="h-4 w-4 mr-1"/>Add Unregistered Delivery</>}</Button>
           </div>
+
+          {/* Add Manual Delivery - Inline Form */}
+          {showAddDialog && (
+            <Card className="border-2 border-dashed border-primary/40 bg-primary/5">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-sm flex items-center gap-2"><Plus className="h-4 w-4 text-primary"/>Add Unregistered Delivery</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><Label className="text-xs">Delivery Note # <span className="text-red-500">*</span></Label><Input value={manualForm.deliveryNoteNumber} onChange={e => setManualForm(p => ({...p, deliveryNoteNumber: e.target.value}))} placeholder="e.g. MAN-001" className="h-8"/></div>
+                  <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={manualForm.date} onChange={e => setManualForm(p => ({...p, date: e.target.value}))} className="h-8"/></div>
+                </div>
+                <div className="space-y-1"><Label className="text-xs">Customer / Source <span className="text-red-500">*</span></Label><Input value={manualForm.customer} onChange={e => setManualForm(p => ({...p, customer: e.target.value}))} placeholder="Source name" className="h-8"/></div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between"><Label className="text-xs">Items</Label><Button type="button" variant="outline" size="sm" className="h-7" onClick={() => setManualForm(p => ({...p, items: [...p.items, {name:'',quantity:0,rate:0}]}))}><Plus className="h-3 w-3 mr-1"/>Add Item</Button></div>
+                  {manualForm.items.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <Input placeholder="Item name" value={item.name} onChange={e => {const it=[...manualForm.items];it[idx]={...item,name:e.target.value};setManualForm(p=>({...p,items:it}));}} className="flex-1 h-8"/>
+                      <Input type="number" placeholder="Qty" value={item.quantity||''} onChange={e => {const it=[...manualForm.items];it[idx]={...item,quantity:Number(e.target.value)};setManualForm(p=>({...p,items:it}));}} className="w-20 h-8" min={0}/>
+                      <Input type="number" placeholder="Rate" value={item.rate||''} onChange={e => {const it=[...manualForm.items];it[idx]={...item,rate:Number(e.target.value)};setManualForm(p=>({...p,items:it}));}} className="w-24 h-8" min={0}/>
+                      {manualForm.items.length > 1 && <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {const it=manualForm.items.filter((_,i)=>i!==idx);setManualForm(p=>({...p,items:it}));}}><Trash2 className="h-3.5 w-3.5 text-red-500"/></Button>}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end"><Button onClick={handleAddManualDelivery}><Plus className="h-4 w-4 mr-1"/>Add to Report</Button></div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Editable Table */}
           <div className="border rounded-lg overflow-hidden">
@@ -504,37 +532,6 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
         </DialogFooter>
       </DialogContent>
 
-      {/* Add Manual Delivery Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5 text-primary"/>Add Unregistered Delivery</DialogTitle>
-            <DialogDescription>Manually add a delivery not in the system for official reporting.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Delivery Note # <span className="text-red-500">*</span></Label><Input value={manualForm.deliveryNoteNumber} onChange={e => setManualForm(p => ({...p, deliveryNoteNumber: e.target.value}))} placeholder="e.g. MAN-001"/></div>
-              <div className="space-y-1"><Label>Date</Label><Input type="date" value={manualForm.date} onChange={e => setManualForm(p => ({...p, date: e.target.value}))}/></div>
-            </div>
-            <div className="space-y-1"><Label>Customer / Source <span className="text-red-500">*</span></Label><Input value={manualForm.customer} onChange={e => setManualForm(p => ({...p, customer: e.target.value}))} placeholder="Source name"/></div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between"><Label>Items</Label><Button type="button" variant="outline" size="sm" onClick={() => setManualForm(p => ({...p, items: [...p.items, {name:'',quantity:0,rate:0}]}))}><Plus className="h-3 w-3 mr-1"/>Add Item</Button></div>
-              {manualForm.items.map((item, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <Input placeholder="Item name" value={item.name} onChange={e => {const it=[...manualForm.items];it[idx]={...item,name:e.target.value};setManualForm(p=>({...p,items:it}));}} className="flex-1"/>
-                  <Input type="number" placeholder="Qty" value={item.quantity||''} onChange={e => {const it=[...manualForm.items];it[idx]={...item,quantity:Number(e.target.value)};setManualForm(p=>({...p,items:it}));}} className="w-20" min={0}/>
-                  <Input type="number" placeholder="Rate" value={item.rate||''} onChange={e => {const it=[...manualForm.items];it[idx]={...item,rate:Number(e.target.value)};setManualForm(p=>({...p,items:it}));}} className="w-24" min={0}/>
-                  {manualForm.items.length > 1 && <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => {const it=manualForm.items.filter((_,i)=>i!==idx);setManualForm(p=>({...p,items:it}));}}><Trash2 className="h-3.5 w-3.5 text-red-500"/></Button>}
-                </div>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddManualDelivery}><Plus className="h-4 w-4 mr-1"/>Add to Report</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Dialog>
   );
 };
