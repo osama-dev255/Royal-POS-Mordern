@@ -323,7 +323,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
 .ftr{margin-top:30px;padding-top:15px;border-top:2px solid #333;display:flex;justify-content:space-between}.sl{width:200px;border-top:1px solid #333;padding-top:5px;text-align:center;font-size:10px}
 .nc{margin-top:15px;font-size:9px;color:#999;text-align:center}</style></head><body>
 <div class="hdr"><h1>DELIVERIES IN &mdash; FINANCIAL REPORT</h1><p>${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}${dateRangeLabel}</p></div>
-<div class="sum"><div class="si"><div class="l">Active</div><div class="v">${totals.activeCount}</div></div><div class="si"><div class="l">Items</div><div class="v">${totals.totalItems.toLocaleString()}</div></div><div class="si"><div class="l">Value</div><div class="v">${formatCurrency(totals.totalValue)}</div></div><div class="si"><div class="l">Excluded</div><div class="v">${totals.excludedCount}</div></div></div>
+<div class="sum"><div class="si"><div class="l">Active</div><div class="v">${totals.activeCount}</div></div><div class="si"><div class="l">Items</div><div class="v">${totals.totalItems.toLocaleString()}</div></div><div class="si"><div class="l">Value</div><div class="v">${formatCurrency(totals.totalValue)}</div></div><div class="si"><div class="l">Total Sales</div><div class="v">${formatCurrency(totalSales)}</div></div><div class="si"><div class="l">Total Expenses</div><div class="v">${formatCurrency(totalExp)}</div></div><div class="si"><div class="l">Excluded</div><div class="v">${totals.excludedCount}</div></div></div>
 <h2>Summary by Delivery</h2><table><thead><tr><th>Note #</th><th>Date</th><th>Source</th><th>Type</th><th style="text-align:right">Value</th><th>Items</th></tr></thead><tbody>${rows}</tbody></table>
 <h2>Detailed Item Breakdown</h2><table><thead><tr><th>Note #</th><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${detailRows}</tbody></table>
 ${paymentSection}
@@ -341,7 +341,7 @@ ${paymentSection}
     const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
     doc.setFontSize(18); doc.text('DELIVERIES IN - FINANCIAL REPORT', 14, 20);
     doc.setFontSize(9); doc.text(`${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}${dateRangeLabel}`, 14, 28);
-    doc.text(`Active: ${totals.activeCount} | Items: ${totals.totalItems} | Value: ${formatCurrency(totals.totalValue)} | Excluded: ${totals.excludedCount}`, 14, 34);
+    doc.text(`Active: ${totals.activeCount} | Items: ${totals.totalItems} | Value: ${formatCurrency(totals.totalValue)} | Total Sales: ${formatCurrency(totalSales)} | Total Expenses: ${formatCurrency(totalExp)} | Excluded: ${totals.excludedCount}`, 14, 34);
     const summary = active.map(d => { const ai=d.items.filter(i=>!i.excluded); return [d.deliveryNoteNumber, d.date?.substring(0,10), d.customer, d.sourceType==='outlet'?'Outlet':d.sourceType==='manual'?'Manual':'Investment', formatCurrency(ai.reduce((s,i)=>s+i.quantity*i.rate,0))]; });
     autoTable(doc, { startY:42, head:[['Note #','Date','Source','Type','Value']], body:summary, theme:'striped', headStyles:{fillColor:[51,51,51]}, styles:{fontSize:8} });
     const y1 = (doc as any).lastAutoTable?.finalY || 60;

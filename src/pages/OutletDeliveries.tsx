@@ -202,7 +202,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             body { font-family: Arial, sans-serif; padding: 20px; }
             h1 { color: #059669; margin-bottom: 10px; }
             .header { margin-bottom: 20px; }
-            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+            .summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 20px 0; }
             .summary-card { border: 1px solid #ddd; padding: 10px; text-align: center; }
             .summary-card h3 { font-size: 12px; color: #666; margin: 0 0 5px 0; }
             .summary-card p { font-size: 18px; font-weight: bold; margin: 0; }
@@ -224,6 +224,14 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
             <div class="summary-card">
               <h3>Total Value</h3>
               <p>${formatCurrency(report.total_value)}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Total Sales</h3>
+              <p>${formatCurrency(report.total_sales_amount || 0)}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Total Expenses</h3>
+              <p>${formatCurrency(report.total_expenses || 0)}</p>
             </div>
             <div class="summary-card">
               <h3>Amount Paid</h3>
@@ -301,25 +309,31 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
     // Summary boxes
     const yStart = 60;
     doc.setFillColor(240, 253, 244);
-    doc.rect(14, yStart, 45, 20, 'F');
-    doc.rect(63, yStart, 45, 20, 'F');
-    doc.rect(112, yStart, 45, 20, 'F');
-    doc.rect(161, yStart, 45, 20, 'F');
+    doc.rect(14, yStart, 30, 20, 'F');
+    doc.rect(47, yStart, 30, 20, 'F');
+    doc.rect(80, yStart, 30, 20, 'F');
+    doc.rect(113, yStart, 30, 20, 'F');
+    doc.rect(146, yStart, 30, 20, 'F');
+    doc.rect(179, yStart, 30, 20, 'F');
 
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.text('Total Value', 36.5, yStart + 6, { align: 'center' });
-    doc.text('Amount Paid', 85.5, yStart + 6, { align: 'center' });
-    doc.text('Balance Due', 134.5, yStart + 6, { align: 'center' });
-    doc.text('Payment Date', 183.5, yStart + 6, { align: 'center' });
+    doc.text('Total Value', 29, yStart + 6, { align: 'center' });
+    doc.text('Total Sales', 62, yStart + 6, { align: 'center' });
+    doc.text('Total Expenses', 95, yStart + 6, { align: 'center' });
+    doc.text('Amount Paid', 128, yStart + 6, { align: 'center' });
+    doc.text('Balance Due', 161, yStart + 6, { align: 'center' });
+    doc.text('Payment Date', 194, yStart + 6, { align: 'center' });
 
-    doc.setFontSize(14);
+    doc.setFontSize(11);
     doc.setTextColor(5, 150, 105);
-    doc.text(formatCurrency(report.total_value), 36.5, yStart + 14, { align: 'center' });
-    doc.text(formatCurrency(report.amount_paid), 85.5, yStart + 14, { align: 'center' });
-    doc.text(formatCurrency(report.balance_due), 134.5, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.total_value), 29, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.total_sales_amount || 0), 62, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.total_expenses || 0), 95, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.amount_paid), 128, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.balance_due), 161, yStart + 14, { align: 'center' });
     doc.setTextColor(0, 0, 0);
-    doc.text(report.payment_date?.substring(0, 10) || '-', 183.5, yStart + 14, { align: 'center' });
+    doc.text(report.payment_date?.substring(0, 10) || '-', 194, yStart + 14, { align: 'center' });
 
     // Payment details
     let yPos = 90;
@@ -380,6 +394,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       { 'Field': 'Outlet', 'Value': outlets.find(o => o.id === outletId)?.name || '' },
       { 'Field': 'Prepared By', 'Value': report.prepared_by_name || '' },
       { 'Field': 'Total Value', 'Value': report.total_value },
+      { 'Field': 'Total Sales Amount', 'Value': report.total_sales_amount || 0 },
+      { 'Field': 'Total Expenses', 'Value': report.total_expenses || 0 },
       { 'Field': 'Amount Paid', 'Value': report.amount_paid },
       { 'Field': 'Balance Due', 'Value': report.balance_due },
       { 'Field': 'Payment Date', 'Value': report.payment_date?.substring(0, 10) || '' },
@@ -399,7 +415,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
 
   const handleShareDeliveryReport = async (report: any) => {
     const outletName = outlets.find(o => o.id === outletId)?.name || '';
-    const text = `Delivery In Report\n\nReport #: ${report.report_number}\nDate: ${report.report_date?.substring(0, 10)}\nOutlet: ${outletName}\n\nSummary:\n- Total Value: ${formatCurrency(report.total_value)}\n- Amount Paid: ${formatCurrency(report.amount_paid)}\n- Balance Due: ${formatCurrency(report.balance_due)}\n- Payment Date: ${report.payment_date?.substring(0, 10) || '-'}\n\nDeliveries: ${report.deliveries?.length || 0} item(s)`;
+    const text = `Delivery In Report\n\nReport #: ${report.report_number}\nDate: ${report.report_date?.substring(0, 10)}\nOutlet: ${outletName}\n\nSummary:\n- Total Value: ${formatCurrency(report.total_value)}\n- Total Sales: ${formatCurrency(report.total_sales_amount || 0)}\n- Total Expenses: ${formatCurrency(report.total_expenses || 0)}\n- Amount Paid: ${formatCurrency(report.amount_paid)}\n- Balance Due: ${formatCurrency(report.balance_due)}\n- Payment Date: ${report.payment_date?.substring(0, 10) || '-'}\n\nDeliveries: ${report.deliveries?.length || 0} item(s)`;
 
     if (navigator.share) {
       try {
@@ -3555,6 +3571,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                         <TableHead className="min-w-[140px]">Report #</TableHead>
                         <TableHead className="w-[100px]">Date</TableHead>
                         <TableHead className="w-[130px] text-right">Total Value</TableHead>
+                        <TableHead className="w-[130px] text-right">Total Sales</TableHead>
+                        <TableHead className="w-[130px] text-right">Total Expenses</TableHead>
                         <TableHead className="w-[130px] text-right">Amount Paid</TableHead>
                         <TableHead className="w-[130px] text-right">Balance Due</TableHead>
                         <TableHead className="w-[110px]">Payment Method</TableHead>
@@ -3577,6 +3595,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                               <TableCell className="font-medium">{report.report_number}</TableCell>
                               <TableCell>{report.report_date?.substring(0, 10)}</TableCell>
                               <TableCell className="text-right font-semibold">{formatCurrency(report.total_value)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(report.total_sales_amount || 0)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(report.total_expenses || 0)}</TableCell>
                               <TableCell className="text-right">{formatCurrency(report.amount_paid)}</TableCell>
                               <TableCell className={`text-right font-semibold ${report.balance_due > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(report.balance_due)}</TableCell>
                               <TableCell><Badge variant="outline" className="text-xs">{methodLabel[report.payment_method || ''] || report.payment_method || '-'}</Badge></TableCell>
@@ -3616,11 +3636,13 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                             </TableRow>
                             {isExpanded && (
                               <TableRow key={`${report.id}-detail`}>
-                                <TableCell colSpan={9} className="bg-muted/20 p-4">
+                                <TableCell colSpan={11} className="bg-muted/20 p-4">
                                   <div className="space-y-3">
                                     {/* Payment Details */}
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                       <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Total Value</p><p className="text-lg font-bold text-blue-700">{formatCurrency(report.total_value)}</p></CardContent></Card>
+                                      <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Total Sales</p><p className="text-lg font-bold text-purple-700">{formatCurrency(report.total_sales_amount || 0)}</p></CardContent></Card>
+                                      <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Total Expenses</p><p className="text-lg font-bold text-orange-700">{formatCurrency(report.total_expenses || 0)}</p></CardContent></Card>
                                       <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Amount Paid</p><p className="text-lg font-bold text-green-700">{formatCurrency(report.amount_paid)}</p></CardContent></Card>
                                       <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Balance Due</p><p className={`text-lg font-bold ${report.balance_due > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(report.balance_due)}</p></CardContent></Card>
                                       <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Payment Date</p><p className="text-lg font-bold">{report.payment_date?.substring(0, 10) || '-'}</p></CardContent></Card>
