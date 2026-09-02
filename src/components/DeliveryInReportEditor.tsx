@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { format as formatDate } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +20,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import {
-  Truck, Calendar, User, Package, Eye, Printer, Download, Share2,
+  Truck, Calendar, CalendarIcon, User, Package, Eye, Printer, Download, Share2,
   Plus, Trash2, X, ChevronDown, ChevronUp, Save, Loader2, FileText,
   ArrowLeft, BarChart3, Edit3, Check,
 } from "lucide-react";
@@ -83,9 +86,78 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
   const [manualForm, setManualForm] = useState({ deliveryNoteNumber: '', date: new Date().toISOString().split('T')[0], customer: '', items: [{ name: '', quantity: 0, rate: 0 }] });
   const [isPrinting, setIsPrinting] = useState(false);
 
+  // Date range filter state
+  const [reportDateRange, setReportDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [reportDatePreset, setReportDatePreset] = useState<string>('all');
+  const [reportCalendarOpen, setReportCalendarOpen] = useState(false);
+
+  const handleReportDatePreset = (preset: string) => {
+    setReportDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setReportDateRange({ start: todayStr, end: todayStr });
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        setReportDateRange({ start: y.toISOString().split('T')[0], end: y.toISOString().split('T')[0] });
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setReportDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setReportDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setReportDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setReportDateRange({ start: first.toISOString().split('T')[0], end: last.toISOString().split('T')[0] });
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setReportDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'all':
+      default:
+        setReportDateRange({ start: '', end: '' });
+        break;
+    }
+  };
+
+  // Filter deliveries by date range
+  const dateFilteredDeliveries = useMemo(() => {
+    if (!reportDateRange.start && !reportDateRange.end) return editableDeliveries;
+    const startDate = reportDateRange.start ? new Date(reportDateRange.start) : null;
+    if (startDate) startDate.setHours(0, 0, 0, 0);
+    const endDate = reportDateRange.end ? new Date(reportDateRange.end) : null;
+    if (endDate) endDate.setHours(23, 59, 59, 999);
+    return editableDeliveries.filter(d => {
+      if (!d.date) return false;
+      const dd = new Date(d.date);
+      if (isNaN(dd.getTime())) return false;
+      return (!startDate || dd >= startDate) && (!endDate || dd <= endDate);
+    });
+  }, [editableDeliveries, reportDateRange]);
+
   const totals = useMemo(() => {
     let totalItems = 0, totalValue = 0, excludedCount = 0, activeCount = 0;
-    editableDeliveries.forEach(d => {
+    dateFilteredDeliveries.forEach(d => {
       if (d.excluded) { excludedCount++; return; }
       activeCount++;
       d.items.forEach(item => {
@@ -93,11 +165,11 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
       });
     });
     return { totalItems, totalValue, excludedCount, activeCount };
-  }, [editableDeliveries]);
+  }, [dateFilteredDeliveries]);
 
   const chartData = useMemo(() => {
     const byDate: Record<string, { date: string; value: number; count: number }> = {};
-    editableDeliveries.filter(d => !d.excluded).forEach(d => {
+    dateFilteredDeliveries.filter(d => !d.excluded).forEach(d => {
       const dateKey = d.date?.substring(0, 10) || 'Unknown';
       if (!byDate[dateKey]) byDate[dateKey] = { date: dateKey, value: 0, count: 0 };
       d.items.forEach(item => {
@@ -105,17 +177,17 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
       });
     });
     return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
-  }, [editableDeliveries]);
+  }, [dateFilteredDeliveries]);
 
   const sourceChartData = useMemo(() => {
     const bySource: Record<string, { source: string; value: number }> = {};
-    editableDeliveries.filter(d => !d.excluded).forEach(d => {
+    dateFilteredDeliveries.filter(d => !d.excluded).forEach(d => {
       const src = d.sourceType === 'outlet' ? 'Other Outlets' : 'Investment';
       if (!bySource[src]) bySource[src] = { source: src, value: 0 };
       d.items.forEach(item => { if (!item.excluded) bySource[src].value += item.quantity * item.rate; });
     });
     return Object.values(bySource);
-  }, [editableDeliveries]);
+  }, [dateFilteredDeliveries]);
 
   const toggleExpand = (id: string) => {
     setExpandedRows(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -166,7 +238,7 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
   };
 
   const buildReportHTML = () => {
-    const active = editableDeliveries.filter(d => !d.excluded);
+    const active = dateFilteredDeliveries.filter(d => !d.excluded);
     const rows = active.map(d => {
       const ai = d.items.filter(i => !i.excluded);
       const t = ai.reduce((s, i) => s + (i.quantity * i.rate), 0);
@@ -182,6 +254,7 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
       const pw = window.open('', '_blank');
       if (!pw) { toast({ title: "Error", description: "Allow popups", variant: "destructive" }); return; }
       const { rows, detailRows } = buildReportHTML();
+      const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
       const html = `<!DOCTYPE html><html><head><title>Deliveries In Report</title><style>
 @media print{@page{size:A4 landscape;margin:12mm}}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:11px}
 .hdr{text-align:center;margin-bottom:25px;border-bottom:3px solid #333;padding-bottom:15px}.hdr h1{font-size:22px;margin-bottom:5px}.hdr p{font-size:12px;color:#666}
@@ -190,7 +263,7 @@ h2{font-size:13px;margin:20px 0 8px;text-transform:uppercase;border-bottom:1px s
 table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#333;color:#fff}th{padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:5px 8px;border-bottom:1px solid #eee}tbody tr:nth-child(even){background:#fafafa}
 .ftr{margin-top:30px;padding-top:15px;border-top:2px solid #333;display:flex;justify-content:space-between}.sl{width:200px;border-top:1px solid #333;padding-top:5px;text-align:center;font-size:10px}
 .nc{margin-top:15px;font-size:9px;color:#999;text-align:center}</style></head><body>
-<div class="hdr"><h1>DELIVERIES IN &mdash; FINANCIAL REPORT</h1><p>${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}</p></div>
+<div class="hdr"><h1>DELIVERIES IN &mdash; FINANCIAL REPORT</h1><p>${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}${dateRangeLabel}</p></div>
 <div class="sum"><div class="si"><div class="l">Active</div><div class="v">${totals.activeCount}</div></div><div class="si"><div class="l">Items</div><div class="v">${totals.totalItems.toLocaleString()}</div></div><div class="si"><div class="l">Value</div><div class="v">${formatCurrency(totals.totalValue)}</div></div><div class="si"><div class="l">Excluded</div><div class="v">${totals.excludedCount}</div></div></div>
 <h2>Summary by Delivery</h2><table><thead><tr><th>Note #</th><th>Date</th><th>Source</th><th>Type</th><th style="text-align:right">Value</th><th>Items</th></tr></thead><tbody>${rows}</tbody></table>
 <h2>Detailed Item Breakdown</h2><table><thead><tr><th>Note #</th><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${detailRows}</tbody></table>
@@ -204,9 +277,10 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
 
   const handleDownloadPDF = () => {
     const doc = new jsPDF('l');
-    const active = editableDeliveries.filter(d => !d.excluded);
+    const active = dateFilteredDeliveries.filter(d => !d.excluded);
+    const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
     doc.setFontSize(18); doc.text('DELIVERIES IN - FINANCIAL REPORT', 14, 20);
-    doc.setFontSize(9); doc.text(`${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}`, 14, 28);
+    doc.setFontSize(9); doc.text(`${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}${dateRangeLabel}`, 14, 28);
     doc.text(`Active: ${totals.activeCount} | Items: ${totals.totalItems} | Value: ${formatCurrency(totals.totalValue)} | Excluded: ${totals.excludedCount}`, 14, 34);
     const summary = active.map(d => { const ai=d.items.filter(i=>!i.excluded); return [d.deliveryNoteNumber, d.date?.substring(0,10), d.customer, d.sourceType==='outlet'?'Outlet':d.sourceType==='manual'?'Manual':'Investment', formatCurrency(ai.reduce((s,i)=>s+i.quantity*i.rate,0))]; });
     autoTable(doc, { startY:42, head:[['Note #','Date','Source','Type','Value']], body:summary, theme:'striped', headStyles:{fillColor:[51,51,51]}, styles:{fontSize:8} });
@@ -259,9 +333,86 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
             </Card>
           </div>
 
+          {/* Date Range Picker */}
+          <Card className="border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 w-full">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="date"
+                    value={reportDateRange.start}
+                    onChange={(e) => { setReportDateRange(prev => ({ ...prev, start: e.target.value })); setReportDatePreset('custom'); }}
+                    className="w-40 h-9"
+                  />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="date"
+                    value={reportDateRange.end}
+                    onChange={(e) => { setReportDateRange(prev => ({ ...prev, end: e.target.value })); setReportDatePreset('custom'); }}
+                    className="w-40 h-9"
+                  />
+                  <Popover open={reportCalendarOpen} onOpenChange={setReportCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
+                        <CalendarIcon className="h-4 w-4 mr-1" />
+                        Calendar
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="range"
+                        selected={{
+                          from: reportDateRange.start ? new Date(reportDateRange.start) : undefined,
+                          to: reportDateRange.end ? new Date(reportDateRange.end) : undefined,
+                        }}
+                        onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                          if (range?.from) setReportDateRange(prev => ({ ...prev, start: formatDate(range.from!, "yyyy-MM-dd") }));
+                          if (range?.to) setReportDateRange(prev => ({ ...prev, end: formatDate(range.to!, "yyyy-MM-dd") }));
+                          setReportDatePreset('custom');
+                        }}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              {/* Quick Range Presets */}
+              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
+                <span className="text-sm font-medium mr-1">Quick Range:</span>
+                {[
+                  { key: 'today', label: 'Today' },
+                  { key: 'yesterday', label: 'Yesterday' },
+                  { key: 'last7', label: 'Last 7 Days' },
+                  { key: 'last30', label: 'Last 30 Days' },
+                  { key: 'thisMonth', label: 'This Month' },
+                  { key: 'lastMonth', label: 'Last Month' },
+                  { key: 'thisYear', label: 'This Year' },
+                  { key: 'all', label: 'All Time' },
+                ].map(preset => (
+                  <Button
+                    key={preset.key}
+                    size="sm"
+                    variant={reportDatePreset === preset.key ? 'default' : 'outline'}
+                    onClick={() => handleReportDatePreset(preset.key)}
+                    className={reportDatePreset === preset.key ? '' : 'text-xs'}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                {(reportDateRange.start || reportDateRange.end) && (
+                  <Button variant="ghost" size="sm" onClick={() => handleReportDatePreset('all')} className="h-7 text-xs">
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Actions Bar */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{editableDeliveries.length} deliveries loaded — click to expand, toggle to exclude</p>
+            <p className="text-sm text-muted-foreground">{dateFilteredDeliveries.length} deliveries in range — click to expand, toggle to exclude</p>
             <Button onClick={() => setShowAddDialog(true)}><Plus className="h-4 w-4 mr-1"/>Add Unregistered Delivery</Button>
           </div>
 
@@ -281,7 +432,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {editableDeliveries.map(delivery => {
+                {dateFilteredDeliveries.map(delivery => {
                   const activeItems = delivery.items.filter(i => !i.excluded);
                   const deliveryTotal = activeItems.reduce((s, i) => s + (i.quantity * i.rate), 0);
                   const isExpanded = expandedRows.has(delivery.id);
