@@ -1,26 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { format as formatDate } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import {
-  Truck, Calendar, CalendarIcon, User, Package, Eye, Printer, Download, Share2,
+  Truck, CalendarIcon, User, Package, Eye, Printer, Download, Share2,
   Plus, Trash2, X, ChevronDown, ChevronUp, Save, Loader2, FileText,
   ArrowLeft, BarChart3, Edit3, Check,
 } from "lucide-react";
@@ -51,15 +41,30 @@ interface EditableDelivery {
 }
 
 interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  trigger: number;
+  onClose: () => void;
   deliveries: DeliveryData[];
   formatCurrency: (amount: number) => string;
   outletName?: string;
 }
 
-export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatCurrency, outletName }: Props) => {
+export const DeliveryInReportEditor = ({ trigger, onClose, deliveries, formatCurrency, outletName }: Props) => {
   const { toast } = useToast();
+  const [visible, setVisible] = useState(false);
+  const prevTrigger = useRef(trigger);
+
+  // Open modal when trigger changes
+  useEffect(() => {
+    if (trigger !== prevTrigger.current && trigger > 0) {
+      setVisible(true);
+      prevTrigger.current = trigger;
+    }
+  }, [trigger]);
+
+  const handleClose = () => {
+    setVisible(false);
+    onClose();
+  };
 
   const [editableDeliveries, setEditableDeliveries] = useState<EditableDelivery[]>(() =>
     deliveries.map(d => ({
@@ -89,7 +94,6 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
   // Date range filter state
   const [reportDateRange, setReportDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [reportDatePreset, setReportDatePreset] = useState<string>('all');
-  const [reportCalendarOpen, setReportCalendarOpen] = useState(false);
 
   const handleReportDatePreset = (preset: string) => {
     setReportDatePreset(preset);
@@ -291,24 +295,30 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
     toast({ title: "Downloaded", description: "PDF report saved" });
   };
 
+  if (!visible) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[92vh] overflow-y-auto p-0">
-        <DialogHeader className="px-6 pt-5 pb-3 border-b sticky top-0 bg-background z-10">
+    <>
+      {/* Overlay - no onClick to test if stray clicks are the cause */}
+      <div className="fixed inset-0 z-[9998] bg-black/80" />
+      {/* Content */}
+      <div className="fixed inset-x-[2.5vw] top-[4vh] bottom-[4vh] z-[9999] bg-background border rounded-lg overflow-y-auto shadow-lg">
+        {/* Header */}
+        <div className="sticky top-0 bg-background border-b px-6 pt-5 pb-3 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <DialogTitle className="flex items-center gap-2 text-xl">
+              <h2 className="flex items-center gap-2 text-xl font-semibold">
                 <BarChart3 className="h-6 w-6 text-primary" />
                 Deliveries In — Financial Report Editor
-              </DialogTitle>
-              <DialogDescription className="mt-1">Adjust quantities, prices, add unregistered deliveries, or exclude duplicates before generating the final report.</DialogDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">Adjust quantities, prices, add unregistered deliveries, or exclude duplicates before generating the final report.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleDownloadPDF}><Download className="h-4 w-4 mr-1" /> PDF</Button>
               <Button variant="outline" size="sm" onClick={handlePrintReport} disabled={isPrinting}>{isPrinting ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Printer className="h-4 w-4 mr-1"/>}Print</Button>
             </div>
           </div>
-        </DialogHeader>
+        </div>
 
         <div className="px-6 py-4 space-y-5">
           {/* Summary Cards */}
@@ -352,29 +362,6 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
                     onChange={(e) => { setReportDateRange(prev => ({ ...prev, end: e.target.value })); setReportDatePreset('custom'); }}
                     className="w-40 h-9"
                   />
-                  <Popover open={reportCalendarOpen} onOpenChange={setReportCalendarOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
-                        <CalendarIcon className="h-4 w-4 mr-1" />
-                        Calendar
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <CalendarComponent
-                        mode="range"
-                        selected={{
-                          from: reportDateRange.start ? new Date(reportDateRange.start) : undefined,
-                          to: reportDateRange.end ? new Date(reportDateRange.end) : undefined,
-                        }}
-                        onSelect={(range: { from?: Date; to?: Date } | undefined) => {
-                          if (range?.from) setReportDateRange(prev => ({ ...prev, start: formatDate(range.from!, "yyyy-MM-dd") }));
-                          if (range?.to) setReportDateRange(prev => ({ ...prev, end: formatDate(range.to!, "yyyy-MM-dd") }));
-                          setReportDatePreset('custom');
-                        }}
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
                 </div>
               </div>
               {/* Quick Range Presets */}
@@ -525,13 +512,13 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
           )}
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t sticky bottom-0 bg-background">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-background border-t px-6 py-4 flex gap-2">
+          <Button variant="outline" onClick={handleClose}>Close</Button>
           <Button variant="outline" onClick={handleDownloadPDF}><Download className="h-4 w-4 mr-1"/>Download PDF</Button>
           <Button onClick={handlePrintReport} disabled={isPrinting}>{isPrinting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin"/>Printing...</> : <><Printer className="h-4 w-4 mr-1"/>Print Report</>}</Button>
-        </DialogFooter>
-      </DialogContent>
-
-    </Dialog>
+        </div>
+      </div>
+    </>
   );
 };

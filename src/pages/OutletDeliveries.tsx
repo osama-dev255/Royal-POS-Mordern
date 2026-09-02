@@ -128,7 +128,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   const [approvedByName, setApprovedByName] = useState('');
   const [approvingDelivery, setApprovingDelivery] = useState<DeliveryData | null>(null);
   const [isApprovingDelivery, setIsApprovingDelivery] = useState(false);
-  const [showReportEditor, setShowReportEditor] = useState(false);
+  const [reportTrigger, setReportTrigger] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -1957,7 +1957,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setShowReportEditor(true)}
+                onClick={() => setReportTrigger(prev => prev + 1)}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
                 <BarChart3 className="h-4 w-4 mr-1" />
@@ -3227,15 +3227,13 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       </Dialog>
 
       {/* Financial Report Editor */}
-      {sectionFilter === "in" && (
-        <DeliveryInReportEditor
-          open={showReportEditor}
-          onOpenChange={setShowReportEditor}
-          deliveries={filteredDeliveries}
-          formatCurrency={formatCurrency}
-          outletName={outlets.find(o => o.id === outletId)?.name}
-        />
-      )}
+      <DeliveryInReportEditor
+        trigger={reportTrigger}
+        onClose={() => setReportTrigger(0)}
+        deliveries={sectionFilter === "in" ? filteredDeliveries : []}
+        formatCurrency={formatCurrency}
+        outletName={outlets.find(o => o.id === outletId)?.name}
+      />
     </div>
   );
 };
