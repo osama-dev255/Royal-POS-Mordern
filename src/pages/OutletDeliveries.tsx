@@ -3626,6 +3626,31 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                                       <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Payment Date</p><p className="text-lg font-bold">{report.payment_date?.substring(0, 10) || '-'}</p></CardContent></Card>
                                     </div>
                                     {report.notes && <div className="text-sm"><span className="font-medium">Notes:</span> {report.notes}</div>}
+                                    {/* Signature Fields */}
+                                    {(report.prepared_by_name || report.checked_by_name || report.verified_by_name || report.approved_by_name) && (
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t">
+                                        {report.prepared_by_name && (
+                                          <div className="text-sm">
+                                            <span className="font-medium text-red-600">Prepared By:</span> {report.prepared_by_name}
+                                          </div>
+                                        )}
+                                        {report.checked_by_name && (
+                                          <div className="text-sm">
+                                            <span className="font-medium">Checked By:</span> {report.checked_by_name}
+                                          </div>
+                                        )}
+                                        {report.verified_by_name && (
+                                          <div className="text-sm">
+                                            <span className="font-medium">Verified By:</span> {report.verified_by_name}
+                                          </div>
+                                        )}
+                                        {report.approved_by_name && (
+                                          <div className="text-sm">
+                                            <span className="font-medium">Approved By:</span> {report.approved_by_name}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                     {/* Deliveries Breakdown */}
                                     {report.deliveries && report.deliveries.length > 0 && (
                                       <div className="border rounded-lg overflow-hidden">
