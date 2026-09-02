@@ -15,12 +15,15 @@ import {
 import {
   Truck, CalendarIcon, User, Package, Eye, Printer, Download, Share2,
   Plus, Trash2, X, ChevronDown, ChevronUp, Save, Loader2, FileText,
-  ArrowLeft, BarChart3, Edit3, Check,
+  ArrowLeft, BarChart3, Edit3, Check, DollarSign, CreditCard, Hash, ClipboardList,
 } from "lucide-react";
 import { DeliveryData } from "@/utils/deliveryUtils";
+import { saveDeliveryInReport, DeliveryReportData } from "@/utils/deliveryReportUtils";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface EditableItem {
   id: string;
@@ -51,9 +54,11 @@ interface Props {
   deliveries: DeliveryData[];
   formatCurrency: (amount: number) => string;
   outletName?: string;
+  outletId?: string;
+  onViewSaved?: () => void;
 }
 
-export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatCurrency, outletName }: Props) => {
+export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatCurrency, outletName, outletId, onViewSaved }: Props) => {
   const { toast } = useToast();
   const portalRef = useRef<HTMLDivElement | null>(null);
 
@@ -117,6 +122,16 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [manualForm, setManualForm] = useState({ deliveryNoteNumber: '', date: new Date().toISOString().split('T')[0], customer: '', items: [{ name: '', quantity: 0, rate: 0 }] });
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Payment details state
+  const [paymentDetails, setPaymentDetails] = useState({
+    amountPaid: '',
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentMethod: 'cash',
+    referenceNumber: '',
+    notes: '',
+  });
 
   // Date range filter state
   const [reportDateRange, setReportDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
@@ -287,6 +302,10 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
       if (!pw) { toast({ title: "Error", description: "Allow popups", variant: "destructive" }); return; }
       const { rows, detailRows } = buildReportHTML();
       const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
+      const amtPaid = Number(paymentDetails.amountPaid) || 0;
+      const balDue = totals.totalValue - amtPaid;
+      const paymentMethodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque', mobile_payment: 'Mobile Payment' };
+      const paymentSection = (amtPaid > 0 || paymentDetails.referenceNumber) ? `<h2>Payment Summary</h2><table style="max-width:400px;margin-bottom:15px"><tbody><tr><td style="font-weight:bold">Total Value</td><td style="text-align:right">${formatCurrency(totals.totalValue)}</td></tr><tr><td style="font-weight:bold">Amount Paid</td><td style="text-align:right">${formatCurrency(amtPaid)}</td></tr><tr><td style="font-weight:bold;border-top:2px solid #333">Balance Due</td><td style="text-align:right;border-top:2px solid #333;font-weight:bold;color:${balDue > 0 ? '#dc2626' : '#16a34a'}">${formatCurrency(balDue)}</td></tr><tr><td>Payment Date</td><td style="text-align:right">${paymentDetails.paymentDate || '-'}</td></tr><tr><td>Payment Method</td><td style="text-align:right">${paymentMethodLabel[paymentDetails.paymentMethod] || '-'}</td></tr><tr><td>Reference #</td><td style="text-align:right">${paymentDetails.referenceNumber || '-'}</td></tr></tbody></table>` : '';
       const html = `<!DOCTYPE html><html><head><title>Deliveries In Report</title><style>
 @media print{@page{size:A4 landscape;margin:12mm}}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:11px}
 .hdr{text-align:center;margin-bottom:25px;border-bottom:3px solid #333;padding-bottom:15px}.hdr h1{font-size:22px;margin-bottom:5px}.hdr p{font-size:12px;color:#666}
@@ -299,6 +318,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
 <div class="sum"><div class="si"><div class="l">Active</div><div class="v">${totals.activeCount}</div></div><div class="si"><div class="l">Items</div><div class="v">${totals.totalItems.toLocaleString()}</div></div><div class="si"><div class="l">Value</div><div class="v">${formatCurrency(totals.totalValue)}</div></div><div class="si"><div class="l">Excluded</div><div class="v">${totals.excludedCount}</div></div></div>
 <h2>Summary by Delivery</h2><table><thead><tr><th>Note #</th><th>Date</th><th>Source</th><th>Type</th><th style="text-align:right">Value</th><th>Items</th></tr></thead><tbody>${rows}</tbody></table>
 <h2>Detailed Item Breakdown</h2><table><thead><tr><th>Note #</th><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead><tbody>${detailRows}</tbody></table>
+${paymentSection}
 <div class="ftr"><div class="sl">Prepared By</div><div class="sl">Verified By</div><div class="sl">Approved By</div></div>
 <div class="nc">System-generated financial report. Manual adjustments may have been applied.</div></body></html>`;
       pw.document.write(html);
@@ -319,9 +339,71 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
     const y1 = (doc as any).lastAutoTable?.finalY || 60;
     const detail = active.flatMap(d => d.items.filter(i=>!i.excluded).map(i => [d.deliveryNoteNumber, i.name, i.quantity.toString(), formatCurrency(i.rate), formatCurrency(i.quantity*i.rate)]));
     autoTable(doc, { startY:y1+10, head:[['Note #','Item','Qty','Rate','Amount']], body:detail, theme:'striped', headStyles:{fillColor:[51,51,51]}, styles:{fontSize:8} });
+    // Payment summary in PDF
+    const amountPaid = Number(paymentDetails.amountPaid) || 0;
+    const balanceDue = totals.totalValue - amountPaid;
+    if (amountPaid > 0 || paymentDetails.referenceNumber) {
+      const y2 = (doc as any).lastAutoTable?.finalY || y1 + 40;
+      autoTable(doc, { startY: y2 + 10, head: [['Payment Summary']], body: [
+        ['Total Value', formatCurrency(totals.totalValue)],
+        ['Amount Paid', formatCurrency(amountPaid)],
+        ['Balance Due', formatCurrency(balanceDue)],
+        ['Payment Date', paymentDetails.paymentDate || '-'],
+        ['Payment Method', paymentDetails.paymentMethod || '-'],
+        ['Reference #', paymentDetails.referenceNumber || '-'],
+      ], theme: 'striped', headStyles: { fillColor: [51, 51, 51] }, styles: { fontSize: 8 } });
+    }
+
     doc.save(`deliveries-in-report-${new Date().toISOString().split('T')[0]}.pdf`);
     toast({ title: "Downloaded", description: "PDF report saved" });
   };
+
+  const handleSaveReport = async () => {
+    if (!outletId) {
+      toast({ title: "Error", description: "Outlet ID is required to save report", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const reportData: DeliveryReportData = {
+        outletId,
+        reportDate: new Date().toISOString().split('T')[0],
+        totalValue: totals.totalValue,
+        amountPaid: Number(paymentDetails.amountPaid) || 0,
+        paymentDate: paymentDetails.paymentDate,
+        paymentMethod: paymentDetails.paymentMethod,
+        referenceNumber: paymentDetails.referenceNumber,
+        notes: paymentDetails.notes,
+        preparedByName: '',
+        deliveries: dateFilteredDeliveries.map(d => ({
+          id: d.id,
+          deliveryNoteNumber: d.deliveryNoteNumber,
+          date: d.date,
+          customer: d.customer,
+          sourceType: d.sourceType,
+          status: d.status,
+          items: d.items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, rate: i.rate, excluded: i.excluded })),
+          excluded: d.excluded,
+          isManual: d.isManual,
+          driver: d.driver,
+          preparedByName: d.preparedByName,
+        })),
+      };
+      const result = await saveDeliveryInReport(reportData);
+      if (result.success) {
+        toast({ title: "Saved", description: `Report ${result.reportNumber} saved successfully` });
+      } else {
+        toast({ title: "Error", description: result.error || "Failed to save report", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error('Error saving report:', err);
+      toast({ title: "Error", description: "Failed to save report", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const balanceDue = totals.totalValue - (Number(paymentDetails.amountPaid) || 0);
 
   if (!open || !portalRef.current) return null;
 
@@ -574,13 +656,92 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
               })}
             </div>
           )}
+
+          {/* Payment Details */}
+          <Card className="border-2 border-emerald-200 bg-emerald-50/30">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2 text-emerald-800"><DollarSign className="h-4 w-4"/>Payment Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-4">
+              {/* Financial Summary Row */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Total Value of Deliveries</Label>
+                  <div className="text-2xl font-bold text-blue-700">{formatCurrency(totals.totalValue)}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Amount Paid <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="number"
+                    value={paymentDetails.amountPaid}
+                    onChange={e => setPaymentDetails(p => ({ ...p, amountPaid: e.target.value }))}
+                    className="h-10 text-lg font-bold"
+                    placeholder="0.00"
+                    min={0}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Balance Due</Label>
+                  <div className={`text-2xl font-bold ${balanceDue > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(balanceDue)}</div>
+                </div>
+              </div>
+              {/* Payment Details Row */}
+              <div className="grid grid-cols-3 gap-4 pt-3 border-t">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Payment Date</Label>
+                  <Input
+                    type="date"
+                    value={paymentDetails.paymentDate}
+                    onChange={e => setPaymentDetails(p => ({ ...p, paymentDate: e.target.value }))}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Payment Method</Label>
+                  <Select value={paymentDetails.paymentMethod} onValueChange={v => setPaymentDetails(p => ({ ...p, paymentMethod: v }))}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select method" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Reference Number</Label>
+                  <Input
+                    value={paymentDetails.referenceNumber}
+                    onChange={e => setPaymentDetails(p => ({ ...p, referenceNumber: e.target.value }))}
+                    className="h-9"
+                    placeholder="e.g. TXN-12345"
+                  />
+                </div>
+              </div>
+              {/* Notes */}
+              <div className="space-y-1 pt-3 border-t">
+                <Label className="text-xs font-medium">Notes (optional)</Label>
+                <Textarea
+                  value={paymentDetails.notes}
+                  onChange={e => setPaymentDetails(p => ({ ...p, notes: e.target.value }))}
+                  className="min-h-[60px] resize-none"
+                  placeholder="Additional notes about this payment..."
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-background border-t px-6 py-4 flex gap-2">
+        <div className="sticky bottom-0 bg-background border-t px-6 py-4 flex items-center gap-2">
           <Button variant="outline" onClick={handleClose}>Close</Button>
+          <div className="flex-1" />
+          {onViewSaved && (
+            <Button variant="outline" onClick={onViewSaved}><ClipboardList className="h-4 w-4 mr-1"/>View Saved</Button>
+          )}
           <Button variant="outline" onClick={handleDownloadPDF}><Download className="h-4 w-4 mr-1"/>Download PDF</Button>
-          <Button onClick={handlePrintReport} disabled={isPrinting}>{isPrinting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin"/>Printing...</> : <><Printer className="h-4 w-4 mr-1"/>Print Report</>}</Button>
+          <Button onClick={handlePrintReport} disabled={isPrinting} variant="outline">{isPrinting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin"/>Printing...</> : <><Printer className="h-4 w-4 mr-1"/>Print</>}</Button>
+          <Button onClick={handleSaveReport} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">{isSaving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin"/>Saving...</> : <><Save className="h-4 w-4 mr-1"/>Save Report</>}</Button>
         </div>
       </div>
     </>,

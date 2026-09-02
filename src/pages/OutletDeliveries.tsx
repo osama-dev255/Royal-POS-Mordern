@@ -52,6 +52,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getOutlets, Outlet, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
 import { DeliveryDetails } from "@/components/DeliveryDetails";
 import { DeliveryInReportEditor } from "@/components/DeliveryInReportEditor";
+import { getSavedDeliveryReports, deleteDeliveryReport, SavedDeliveryReport } from "@/utils/deliveryReportUtils";
 
 interface OutletDeliveriesProps {
   onBack: () => void;
@@ -129,6 +130,10 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
   const [approvingDelivery, setApprovingDelivery] = useState<DeliveryData | null>(null);
   const [isApprovingDelivery, setIsApprovingDelivery] = useState(false);
   const [showReportEditor, setShowReportEditor] = useState(false);
+  const [showSavedReports, setShowSavedReports] = useState(false);
+  const [savedReports, setSavedReports] = useState<SavedDeliveryReport[]>([]);
+  const [loadingSavedReports, setLoadingSavedReports] = useState(false);
+  const [expandedSavedReport, setExpandedSavedReport] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -151,6 +156,30 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       }
     }
   }, [outlets, outletId]);
+
+  const loadSavedReports = async () => {
+    if (!outletId) return;
+    setLoadingSavedReports(true);
+    try {
+      const reports = await getSavedDeliveryReports(outletId);
+      setSavedReports(reports);
+    } catch (err) {
+      console.error('Error loading saved reports:', err);
+    } finally {
+      setLoadingSavedReports(false);
+    }
+  };
+
+  const handleDeleteSavedReport = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this report?')) return;
+    const result = await deleteDeliveryReport(id);
+    if (result.success) {
+      setSavedReports(prev => prev.filter(r => r.id !== id));
+      toast({ title: "Deleted", description: "Report deleted successfully" });
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to delete report", variant: "destructive" });
+    }
+  };
 
   const loadOutlets = async () => {
     try {
@@ -1952,17 +1981,27 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
               )}
             </div>
 
-            {/* Financial Report Button (only for Deliveries In) */}
+            {/* Financial Report Buttons (only for Deliveries In) */}
             {sectionFilter === "in" && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setShowReportEditor(true)}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                <BarChart3 className="h-4 w-4 mr-1" />
-                Financial Report
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowReportEditor(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Financial Report
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowSavedReports(true); loadSavedReports(); }}
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Saved Reports
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>
@@ -3233,7 +3272,124 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
         deliveries={sectionFilter === "in" ? filteredDeliveries : []}
         formatCurrency={formatCurrency}
         outletName={outlets.find(o => o.id === outletId)?.name}
+        outletId={outletId}
+        onViewSaved={() => { setShowReportEditor(false); setShowSavedReports(true); loadSavedReports(); }}
       />
+
+      {/* Saved Delivery Reports Viewer */}
+      {showSavedReports && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-start justify-center pt-[4vh]">
+          <div className="w-[95vw] max-w-7xl bg-background border rounded-lg shadow-lg overflow-y-auto" style={{ maxHeight: '92vh' }}>
+            {/* Header */}
+            <div className="sticky top-0 bg-background border-b px-6 pt-5 pb-3 z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="flex items-center gap-2 text-xl font-semibold">
+                    <FileText className="h-6 w-6 text-emerald-600" />
+                    Saved Delivery In Reports
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">{outlets.find(o => o.id === outletId)?.name} — {savedReports.length} report(s)</p>
+                </div>
+                <Button variant="outline" onClick={() => setShowSavedReports(false)}><X className="h-4 w-4 mr-1" />Close</Button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4">
+              {loadingSavedReports ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">Loading saved reports...</p>
+                </div>
+              ) : savedReports.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-lg font-medium">No saved reports yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">Create a financial report and save it to see it here.</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-[40px]"></TableHead>
+                        <TableHead className="min-w-[140px]">Report #</TableHead>
+                        <TableHead className="w-[100px]">Date</TableHead>
+                        <TableHead className="w-[130px] text-right">Total Value</TableHead>
+                        <TableHead className="w-[130px] text-right">Amount Paid</TableHead>
+                        <TableHead className="w-[130px] text-right">Balance Due</TableHead>
+                        <TableHead className="w-[110px]">Payment Method</TableHead>
+                        <TableHead className="min-w-[120px]">Reference</TableHead>
+                        <TableHead className="w-[100px] text-center">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {savedReports.map(report => {
+                        const isExpanded = expandedSavedReport === report.id;
+                        const methodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque', mobile_payment: 'Mobile Payment' };
+                        return (
+                          <>
+                            <TableRow key={report.id}>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setExpandedSavedReport(isExpanded ? null : report.id)}>
+                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-medium">{report.report_number}</TableCell>
+                              <TableCell>{report.report_date?.substring(0, 10)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(report.total_value)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(report.amount_paid)}</TableCell>
+                              <TableCell className={`text-right font-semibold ${report.balance_due > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(report.balance_due)}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-xs">{methodLabel[report.payment_method || ''] || report.payment_method || '-'}</Badge></TableCell>
+                              <TableCell className="text-sm">{report.reference_number || '-'}</TableCell>
+                              <TableCell className="text-center">
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500" onClick={() => handleDeleteSavedReport(report.id)} title="Delete">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && (
+                              <TableRow key={`${report.id}-detail`}>
+                                <TableCell colSpan={9} className="bg-muted/20 p-4">
+                                  <div className="space-y-3">
+                                    {/* Payment Details */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                      <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Total Value</p><p className="text-lg font-bold text-blue-700">{formatCurrency(report.total_value)}</p></CardContent></Card>
+                                      <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Amount Paid</p><p className="text-lg font-bold text-green-700">{formatCurrency(report.amount_paid)}</p></CardContent></Card>
+                                      <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Balance Due</p><p className={`text-lg font-bold ${report.balance_due > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(report.balance_due)}</p></CardContent></Card>
+                                      <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground">Payment Date</p><p className="text-lg font-bold">{report.payment_date?.substring(0, 10) || '-'}</p></CardContent></Card>
+                                    </div>
+                                    {report.notes && <div className="text-sm"><span className="font-medium">Notes:</span> {report.notes}</div>}
+                                    {/* Deliveries Breakdown */}
+                                    {report.deliveries && report.deliveries.length > 0 && (
+                                      <div className="border rounded-lg overflow-hidden">
+                                        <Table>
+                                          <TableHeader>
+                                            <TableRow><TableHead>Note #</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Total</TableHead></TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {report.deliveries.filter((d: any) => !d.excluded).map((d: any) => {
+                                              const dTotal = (d.items || []).filter((i: any) => !i.excluded).reduce((s: number, i: any) => s + (i.quantity * i.rate), 0);
+                                              return <TableRow key={d.id}><TableCell className="font-medium">{d.deliveryNoteNumber}</TableCell><TableCell>{d.date?.substring(0, 10)}</TableCell><TableCell>{d.customer}</TableCell><TableCell><Badge variant="outline" className="text-xs">{d.sourceType === 'outlet' ? 'Outlet' : d.isManual ? 'Manual' : 'Investment'}</Badge></TableCell><TableCell className="text-right font-semibold">{formatCurrency(dTotal)}</TableCell></TableRow>;
+                                            })}
+                                          </TableBody>
+                                        </Table>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
