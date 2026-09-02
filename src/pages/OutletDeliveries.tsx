@@ -42,7 +42,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  BarChart3
+  BarChart3,
+  X,
+  Trash2
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
