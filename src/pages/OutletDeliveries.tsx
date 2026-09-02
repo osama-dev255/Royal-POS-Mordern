@@ -18,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { 
@@ -44,12 +45,14 @@ import {
   Clock,
   BarChart3,
   X,
-  Trash2
+  Trash2,
+  FileSpreadsheet
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ExcelUtils } from "@/utils/excelUtils";
 import { supabase } from "@/lib/supabaseClient";
 import { getOutlets, Outlet, getInventoryProductsByOutlet, InventoryProduct } from "@/services/databaseService";
 import { DeliveryDetails } from "@/components/DeliveryDetails";
@@ -180,6 +183,241 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
       toast({ title: "Deleted", description: "Report deleted successfully" });
     } else {
       toast({ title: "Error", description: result.error || "Failed to delete report", variant: "destructive" });
+    }
+  };
+
+  const handlePrintDeliveryReport = (report: any) => {
+    // Create a print-friendly version
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) {
+      toast({ title: "Error", description: "Could not open print window", variant: "destructive" });
+      return;
+    }
+
+    const html = `
+      <html>
+        <head>
+          <title>Delivery Report ${report.report_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #059669; margin-bottom: 10px; }
+            .header { margin-bottom: 20px; }
+            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+            .summary-card { border: 1px solid #ddd; padding: 10px; text-align: center; }
+            .summary-card h3 { font-size: 12px; color: #666; margin: 0 0 5px 0; }
+            .summary-card p { font-size: 18px; font-weight: bold; margin: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            .notes { margin-top: 20px; padding: 10px; background: #f9f9f9; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Delivery In Report</h1>
+            <p><strong>Report #:</strong> ${report.report_number}</p>
+            <p><strong>Date:</strong> ${report.report_date?.substring(0, 10)}</p>
+            <p><strong>Outlet:</strong> ${outlets.find(o => o.id === outletId)?.name || ''}</p>
+            ${report.prepared_by_name ? `<p><strong>Prepared By:</strong> ${report.prepared_by_name}</p>` : ''}
+          </div>
+          <div class="summary">
+            <div class="summary-card">
+              <h3>Total Value</h3>
+              <p>${formatCurrency(report.total_value)}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Amount Paid</h3>
+              <p>${formatCurrency(report.amount_paid)}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Balance Due</h3>
+              <p>${formatCurrency(report.balance_due)}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Payment Date</h3>
+              <p>${report.payment_date?.substring(0, 10) || '-'}</p>
+            </div>
+          </div>
+          ${report.payment_method ? `<p><strong>Payment Method:</strong> ${report.payment_method}</p>` : ''}
+          ${report.reference_number ? `<p><strong>Reference:</strong> ${report.reference_number}</p>` : ''}
+          ${report.notes ? `<div class="notes"><strong>Notes:</strong> ${report.notes}</div>` : ''}
+          <h2>Deliveries (${report.deliveries?.length || 0})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Delivery Note #</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Type</th>
+                <th style="text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(report.deliveries || []).map((d: any) => {
+                const dTotal = (d.items || []).reduce((s: number, i: any) => s + (i.quantity * i.rate), 0);
+                return `
+                  <tr>
+                    <td>${d.deliveryNoteNumber || '-'}</td>
+                    <td>${d.date?.substring(0, 10) || '-'}</td>
+                    <td>${d.customer || '-'}</td>
+                    <td>${d.sourceType === 'outlet' ? 'Outlet' : d.isManual ? 'Manual' : 'Investment'}</td>
+                    <td style="text-align: right;">${formatCurrency(dTotal)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
+  const handleDownloadDeliveryReportPDF = (report: any) => {
+    const doc = new jsPDF();
+    const outletName = outlets.find(o => o.id === outletId)?.name || '';
+
+    // Title
+    doc.setFontSize(18);
+    doc.setTextColor(5, 150, 105);
+    doc.text('Delivery In Report', 14, 20);
+
+    // Header info
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Report #: ${report.report_number}`, 14, 30);
+    doc.text(`Date: ${report.report_date?.substring(0, 10)}`, 14, 36);
+    doc.text(`Outlet: ${outletName}`, 14, 42);
+    if (report.prepared_by_name) {
+      doc.text(`Prepared By: ${report.prepared_by_name}`, 14, 48);
+    }
+
+    // Summary boxes
+    const yStart = 60;
+    doc.setFillColor(240, 253, 244);
+    doc.rect(14, yStart, 45, 20, 'F');
+    doc.rect(63, yStart, 45, 20, 'F');
+    doc.rect(112, yStart, 45, 20, 'F');
+    doc.rect(161, yStart, 45, 20, 'F');
+
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Total Value', 36.5, yStart + 6, { align: 'center' });
+    doc.text('Amount Paid', 85.5, yStart + 6, { align: 'center' });
+    doc.text('Balance Due', 134.5, yStart + 6, { align: 'center' });
+    doc.text('Payment Date', 183.5, yStart + 6, { align: 'center' });
+
+    doc.setFontSize(14);
+    doc.setTextColor(5, 150, 105);
+    doc.text(formatCurrency(report.total_value), 36.5, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.amount_paid), 85.5, yStart + 14, { align: 'center' });
+    doc.text(formatCurrency(report.balance_due), 134.5, yStart + 14, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    doc.text(report.payment_date?.substring(0, 10) || '-', 183.5, yStart + 14, { align: 'center' });
+
+    // Payment details
+    let yPos = 90;
+    if (report.payment_method) {
+      doc.setFontSize(10);
+      doc.text(`Payment Method: ${report.payment_method}`, 14, yPos);
+      yPos += 6;
+    }
+    if (report.reference_number) {
+      doc.text(`Reference: ${report.reference_number}`, 14, yPos);
+      yPos += 6;
+    }
+    if (report.notes) {
+      doc.text(`Notes: ${report.notes}`, 14, yPos);
+      yPos += 6;
+    }
+
+    // Deliveries table
+    const tableData = (report.deliveries || []).map((d: any) => {
+      const dTotal = (d.items || []).reduce((s: number, i: any) => s + (i.quantity * i.rate), 0);
+      return [
+        d.deliveryNoteNumber || '-',
+        d.date?.substring(0, 10) || '-',
+        d.customer || '-',
+        d.sourceType === 'outlet' ? 'Outlet' : d.isManual ? 'Manual' : 'Investment',
+        formatCurrency(dTotal)
+      ];
+    });
+
+    autoTable(doc, {
+      startY: yPos + 5,
+      head: [['Delivery Note #', 'Date', 'Customer', 'Type', 'Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [5, 150, 105] },
+      styles: { fontSize: 9 },
+    });
+
+    doc.save(`delivery-report-${report.report_number}.pdf`);
+    toast({ title: "Success", description: "PDF downloaded successfully" });
+  };
+
+  const handleExportDeliveryReportXLS = (report: any) => {
+    const data = (report.deliveries || []).map((d: any) => {
+      const dTotal = (d.items || []).reduce((s: number, i: any) => s + (i.quantity * i.rate), 0);
+      return {
+        'Delivery Note #': d.deliveryNoteNumber || '-',
+        'Date': d.date?.substring(0, 10) || '-',
+        'Customer': d.customer || '-',
+        'Type': d.sourceType === 'outlet' ? 'Outlet' : d.isManual ? 'Manual' : 'Investment',
+        'Total': dTotal
+      };
+    });
+
+    const summary = [
+      { 'Field': 'Report Number', 'Value': report.report_number },
+      { 'Field': 'Report Date', 'Value': report.report_date?.substring(0, 10) },
+      { 'Field': 'Outlet', 'Value': outlets.find(o => o.id === outletId)?.name || '' },
+      { 'Field': 'Prepared By', 'Value': report.prepared_by_name || '' },
+      { 'Field': 'Total Value', 'Value': report.total_value },
+      { 'Field': 'Amount Paid', 'Value': report.amount_paid },
+      { 'Field': 'Balance Due', 'Value': report.balance_due },
+      { 'Field': 'Payment Date', 'Value': report.payment_date?.substring(0, 10) || '' },
+      { 'Field': 'Payment Method', 'Value': report.payment_method || '' },
+      { 'Field': 'Reference Number', 'Value': report.reference_number || '' },
+      { 'Field': 'Notes', 'Value': report.notes || '' },
+    ];
+
+    ExcelUtils.exportToExcel(data, `Delivery Report ${report.report_number}`, {
+      sheetName: 'Deliveries',
+      summaryData: summary,
+      summarySheetName: 'Summary'
+    });
+
+    toast({ title: "Success", description: "Excel file exported successfully" });
+  };
+
+  const handleShareDeliveryReport = async (report: any) => {
+    const outletName = outlets.find(o => o.id === outletId)?.name || '';
+    const text = `Delivery In Report\n\nReport #: ${report.report_number}\nDate: ${report.report_date?.substring(0, 10)}\nOutlet: ${outletName}\n\nSummary:\n- Total Value: ${formatCurrency(report.total_value)}\n- Amount Paid: ${formatCurrency(report.amount_paid)}\n- Balance Due: ${formatCurrency(report.balance_due)}\n- Payment Date: ${report.payment_date?.substring(0, 10) || '-'}\n\nDeliveries: ${report.deliveries?.length || 0} item(s)`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Delivery Report ${report.report_number}`,
+          text: text
+        });
+        toast({ title: "Success", description: "Report shared successfully" });
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          // Fallback to clipboard
+          await navigator.clipboard.writeText(text);
+          toast({ title: "Copied to Clipboard", description: "Report details copied to clipboard" });
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Copied to Clipboard", description: "Report details copied to clipboard" });
     }
   };
 
@@ -3344,9 +3582,36 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                               <TableCell><Badge variant="outline" className="text-xs">{methodLabel[report.payment_method || ''] || report.payment_method || '-'}</Badge></TableCell>
                               <TableCell className="text-sm">{report.reference_number || '-'}</TableCell>
                               <TableCell className="text-center">
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500" onClick={() => handleDeleteSavedReport(report.id)} title="Delete">
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handlePrintDeliveryReport(report)}>
+                                      <Printer className="h-4 w-4 mr-2" />
+                                      Print
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDownloadDeliveryReportPDF(report)}>
+                                      <Download className="h-4 w-4 mr-2" />
+                                      Download PDF
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleExportDeliveryReportXLS(report)}>
+                                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                                      Export XLS
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleShareDeliveryReport(report)}>
+                                      <Share2 className="h-4 w-4 mr-2" />
+                                      Share
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleDeleteSavedReport(report.id)} className="text-red-600">
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </TableCell>
                             </TableRow>
                             {isExpanded && (
