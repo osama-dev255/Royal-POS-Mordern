@@ -478,7 +478,7 @@ table{width:100%;border-collapse:collapse;margin-bottom:15px}thead{background:#3
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-end"><Button onClick={handleAddManualDelivery}><Plus className="h-4 w-4 mr-1"/>Add to Report</Button></div>
+                <div className="flex justify-end"><Button type="button" onClick={handleAddManualDelivery}><Plus className="h-4 w-4 mr-1"/>Add to Report</Button></div>
               </CardContent>
             </Card>
           )}
