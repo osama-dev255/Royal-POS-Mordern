@@ -80,8 +80,10 @@ export interface GRNData {
   checkedDate: string;
   approvedBy: string;
   approvedDate: string;
+  rejectedBy: string;
+  rejectedDate: string;
   receivedDate: string;
-  status?: "draft" | "pending" | "received" | "checked" | "approved" | "completed" | "cancelled";
+  status?: "draft" | "pending" | "received" | "checked" | "approved" | "completed" | "rejected" | "cancelled";
   receivingCosts: Array<{ description: string; amount: number }>;
   // Godown integration fields
   destinationGodownId?: string; // ID of destination godown
@@ -202,6 +204,8 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       checked_date: grn.data.checkedDate ? new Date(grn.data.checkedDate).toISOString().split('T')[0] : null,
       approved_by: grn.data.approvedBy || '',
       approved_date: grn.data.approvedDate ? new Date(grn.data.approvedDate).toISOString().split('T')[0] : null,
+      rejected_by: grn.data.rejectedBy || '',
+      rejected_date: grn.data.rejectedDate ? new Date(grn.data.rejectedDate).toISOString().split('T')[0] : null,
       received_date: grn.data.receivedDate ? new Date(grn.data.receivedDate).toISOString().split('T')[0] : null,
       status: grn.data.status || 'pending',
       total_amount: totalAmount,
@@ -471,6 +475,8 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             checkedDate: dbGRN.checked_date ? dbGRN.checked_date.toString() : '',
             approvedBy: dbGRN.approved_by || '',
             approvedDate: dbGRN.approved_date ? dbGRN.approved_date.toString() : '',
+            rejectedBy: dbGRN.rejected_by || '',
+            rejectedDate: dbGRN.rejected_date ? dbGRN.rejected_date.toString() : '',
             receivedDate: dbGRN.received_date ? dbGRN.received_date.toString() : '',
             status: dbGRN.status || 'pending',
             receivingCosts: receivingCosts,
@@ -636,6 +642,8 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
         checked_date: updatedGRN.data.checkedDate ? new Date(updatedGRN.data.checkedDate).toISOString().split('T')[0] : null,
         approved_by: updatedGRN.data.approvedBy || '',
         approved_date: updatedGRN.data.approvedDate ? new Date(updatedGRN.data.approvedDate).toISOString().split('T')[0] : null,
+        rejected_by: updatedGRN.data.rejectedBy || '',
+        rejected_date: updatedGRN.data.rejectedDate ? new Date(updatedGRN.data.rejectedDate).toISOString().split('T')[0] : null,
         received_date: updatedGRN.data.receivedDate ? new Date(updatedGRN.data.receivedDate).toISOString().split('T')[0] : null,
         status: updatedGRN.data.status || 'completed',
         total_amount: totalAmount,

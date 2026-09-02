@@ -7,7 +7,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Search, Package, Filter, Download, Upload, Calendar, SortAsc, SortDesc, X } from "lucide-react";
 import { GRNInventoryCard } from "./GRNInventoryCard";
-import { SavedGRN } from "@/utils/grnUtils";
+import { GRNStatusDialog } from "./GRNStatusDialog";
+import { SavedGRN, updateGRN } from "@/utils/grnUtils";
+
+// Helper: parse "YYYY-MM-DD" as local midnight (avoids UTC timezone shift)
+const parseLocalDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+// Helper: format Date as "YYYY-MM-DD" in local time (avoids UTC timezone shift)
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 interface GRNInventoryCardsProps {
   grns: SavedGRN[];
@@ -15,6 +30,7 @@ interface GRNInventoryCardsProps {
   onGRNPrint: (grn: SavedGRN) => void;
   onGRNDownload: (grn: SavedGRN) => void;
   onGRNDelete: (grn: SavedGRN) => void;
+  onGRNStatusUpdate?: () => void;
 }
 
 export const GRNInventoryCards = ({
@@ -22,7 +38,8 @@ export const GRNInventoryCards = ({
   onGRNView,
   onGRNPrint,
   onGRNDownload,
-  onGRNDelete
+  onGRNDelete,
+  onGRNStatusUpdate
 }: GRNInventoryCardsProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -30,11 +47,13 @@ export const GRNInventoryCards = ({
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [datePreset, setDatePreset] = useState("all");
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [statusDialogGRN, setStatusDialogGRN] = useState<SavedGRN | null>(null);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
 
   const handleDatePreset = (preset: string) => {
     setDatePreset(preset);
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatLocalDate(today);
     switch (preset) {
       case 'today':
         setDateRange({ from: todayStr, to: todayStr });
@@ -42,35 +61,35 @@ export const GRNInventoryCards = ({
       case 'yesterday': {
         const y = new Date(today);
         y.setDate(y.getDate() - 1);
-        const yStr = y.toISOString().split('T')[0];
+        const yStr = formatLocalDate(y);
         setDateRange({ from: yStr, to: yStr });
         break;
       }
       case 'last7': {
         const d = new Date(today);
         d.setDate(d.getDate() - 7);
-        setDateRange({ from: d.toISOString().split('T')[0], to: todayStr });
+        setDateRange({ from: formatLocalDate(d), to: todayStr });
         break;
       }
       case 'last30': {
         const d = new Date(today);
         d.setDate(d.getDate() - 30);
-        setDateRange({ from: d.toISOString().split('T')[0], to: todayStr });
+        setDateRange({ from: formatLocalDate(d), to: todayStr });
         break;
       }
       case 'thisMonth': {
-        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const first = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
         setDateRange({ from: first, to: todayStr });
         break;
       }
       case 'lastMonth': {
-        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const last = new Date(today.getFullYear(), today.getMonth(), 0);
-        setDateRange({ from: first.toISOString().split('T')[0], to: last.toISOString().split('T')[0] });
+        const first = formatLocalDate(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+        const last = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 0));
+        setDateRange({ from: first, to: last });
         break;
       }
       case 'thisYear': {
-        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        const first = formatLocalDate(new Date(today.getFullYear(), 0, 1));
         setDateRange({ from: first, to: todayStr });
         break;
       }
@@ -95,12 +114,19 @@ export const GRNInventoryCards = ({
       const grnStatus = grn.data?.status || 'pending';
       const matchesStatus = statusFilter === "all" || grnStatus === statusFilter;
       
-      // Date range filter
+      // Date range filter — use local-time parsing to avoid UTC timezone shifts
       let matchesDateRange = true;
       if (dateRange.from || dateRange.to) {
         const grnDate = new Date(grn.createdAt);
-        if (dateRange.from && grnDate < new Date(dateRange.from)) matchesDateRange = false;
-        if (dateRange.to && grnDate > new Date(dateRange.to)) matchesDateRange = false;
+        if (dateRange.from) {
+          const fromLocal = parseLocalDate(dateRange.from);
+          if (grnDate < fromLocal) matchesDateRange = false;
+        }
+        if (dateRange.to) {
+          const toLocal = parseLocalDate(dateRange.to);
+          toLocal.setHours(23, 59, 59, 999); // include the entire "to" day
+          if (grnDate > toLocal) matchesDateRange = false;
+        }
       }
       
       return matchesSearch && matchesStatus && matchesDateRange;
@@ -190,6 +216,7 @@ export const GRNInventoryCards = ({
                   <SelectItem value="checked">Checked</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -290,12 +317,12 @@ export const GRNInventoryCards = ({
                 <CalendarComponent
                   mode="range"
                   selected={{
-                    from: dateRange.from ? new Date(dateRange.from) : undefined,
-                    to: dateRange.to ? new Date(dateRange.to) : undefined,
+                    from: dateRange.from ? parseLocalDate(dateRange.from) : undefined,
+                    to: dateRange.to ? parseLocalDate(dateRange.to) : undefined,
                   }}
                   onSelect={(range: { from?: Date; to?: Date } | undefined) => {
-                    if (range?.from) setDateRange(prev => ({ ...prev, from: range.from!.toISOString().split('T')[0] }));
-                    if (range?.to) setDateRange(prev => ({ ...prev, to: range.to!.toISOString().split('T')[0] }));
+                    if (range?.from) setDateRange(prev => ({ ...prev, from: formatLocalDate(range.from!) }));
+                    if (range?.to) setDateRange(prev => ({ ...prev, to: formatLocalDate(range.to!) }));
                     setDatePreset('custom');
                   }}
                   numberOfMonths={2}
@@ -360,10 +387,13 @@ export const GRNInventoryCards = ({
                 items: grn.data?.items || [],
                 total: (grn.data?.items?.reduce((sum: number, item: any) => sum + (item.totalWithReceivingCost || 0), 0) || 0),
                 status: grn.data?.status === 'cancelled' ? 'pending' : 
-                  ['completed', 'pending', 'received', 'checked', 'approved', 'draft'].includes(grn.data?.status) ? 
+                  ['completed', 'pending', 'received', 'checked', 'approved', 'rejected', 'draft'].includes(grn.data?.status) ? 
                   grn.data?.status : 'pending',
+                approvedBy: grn.data?.approvedBy || '',
+                rejectedBy: grn.data?.rejectedBy || '',
                 createdAt: grn.createdAt
               }}
+              onStatusClick={() => { setStatusDialogGRN(grn); setStatusDialogOpen(true); }}
               onViewDetails={() => onGRNView(grn)}
               onPrintGRN={() => onGRNPrint(grn)}
               onDownloadGRN={() => onGRNDownload(grn)}
@@ -399,6 +429,38 @@ export const GRNInventoryCards = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* GRN Status Change Dialog */}
+      {statusDialogGRN && (
+        <GRNStatusDialog
+          open={statusDialogOpen}
+          onOpenChange={setStatusDialogOpen}
+          grn={statusDialogGRN}
+          onSave={async (grnId, newStatus, approvedBy, rejectedBy) => {
+            // Find the GRN and update its status
+            const targetGRN = grns.find(g => g.id === grnId);
+            if (!targetGRN) return;
+
+            const updatedGRN: SavedGRN = {
+              ...targetGRN,
+              data: {
+                ...targetGRN.data,
+                status: newStatus as any,
+                approvedBy: newStatus === 'approved' ? approvedBy : (targetGRN.data.approvedBy || ''),
+                rejectedBy: newStatus === 'rejected' ? rejectedBy : (targetGRN.data.rejectedBy || ''),
+                approvedDate: newStatus === 'approved' ? new Date().toISOString().split('T')[0] : (targetGRN.data.approvedDate || ''),
+                rejectedDate: newStatus === 'rejected' ? new Date().toISOString().split('T')[0] : (targetGRN.data.rejectedDate || ''),
+              },
+              updatedAt: new Date().toISOString()
+            };
+
+            await updateGRN(updatedGRN);
+
+            // Notify parent to refresh
+            if (onGRNStatusUpdate) onGRNStatusUpdate();
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getSavedGRNs, SavedGRN, deleteGRN } from "@/utils/grnUtils";
-import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer, Truck } from "lucide-react";
+import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer, Truck, XCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -63,6 +63,7 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
   const totalValue = grns.reduce((sum, grn) => sum + (grn.total || 0), 0);
   const pendingGRNs = grns.filter(grn => grn.data?.status === "pending" || grn.data?.status === "draft").length;
   const completedGRNs = grns.filter(grn => grn.data?.status === "completed" || grn.data?.status === "approved").length;
+  const rejectedGRNs = grns.filter(grn => grn.data?.status === "rejected").length;
   const recentGRNs = grns.slice(0, 5); // Last 5 GRNs
 
   const handleGRNView = (grn: SavedGRN) => {
@@ -191,7 +192,7 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
         {activeTab === "grn" ? (
           <>
             {/* Dashboard Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total GRNs</CardTitle>
@@ -235,6 +236,17 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
                   <p className="text-xs text-muted-foreground">Fully processed</p>
                 </CardContent>
               </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Rejected GRNs</CardTitle>
+                  <XCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">{rejectedGRNs}</div>
+                  <p className="text-xs text-muted-foreground">Rejected items</p>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Recent GRNs Summary */}
@@ -273,6 +285,7 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
               onGRNPrint={handleGRNPrint}
               onGRNDownload={handleGRNDownload}
               onGRNDelete={handleGRNDelete}
+              onGRNStatusUpdate={loadGRNs}
             />
           </>
         ) : (

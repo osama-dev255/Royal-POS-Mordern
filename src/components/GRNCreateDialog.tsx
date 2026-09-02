@@ -83,8 +83,10 @@ const initialGRNData: GRNData = {
   checkedDate: new Date().toISOString().split('T')[0],
   approvedBy: "Warehouse Manager",
   approvedDate: new Date().toISOString().split('T')[0],
+  rejectedBy: "",
+  rejectedDate: new Date().toISOString().split('T')[0],
   receivedDate: new Date().toISOString().split('T')[0],
-  status: "completed"
+  status: "pending"
 };
 
 export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateDialogProps) => {
@@ -274,7 +276,7 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
         items: grnData.items.length,
         total: totalAmount,
         poNumber: grnData.poNumber,
-        status: "completed",
+        status: grnData.status || "pending",
         data: grnData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -859,6 +861,38 @@ export const GRNCreateDialog = ({ open, onOpenChange, onGRNCreated }: GRNCreateD
                 onChange={(e) => setGrnData(prev => ({ ...prev, approvedDate: e.target.value }))}
               />
             </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          <div>
+            <h3 className="font-bold text-lg mb-3">Rejected By</h3>
+            <div className="space-y-2">
+              <Input
+                value={grnData.rejectedBy}
+                onChange={(e) => setGrnData(prev => ({ ...prev, rejectedBy: e.target.value }))}
+                placeholder="Name"
+              />
+              <Input
+                type="date"
+                value={grnData.rejectedDate}
+                onChange={(e) => setGrnData(prev => ({ ...prev, rejectedDate: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <h3 className="font-bold text-lg mb-3">Status</h3>
+            <Select value={grnData.status || 'pending'} onValueChange={(val) => setGrnData(prev => ({ ...prev, status: val as any }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

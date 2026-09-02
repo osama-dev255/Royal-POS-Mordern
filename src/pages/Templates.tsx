@@ -607,8 +607,10 @@ interface GRNData {
   checkedDate: string;
   approvedBy: string;
   approvedDate: string;
+  rejectedBy: string;
+  rejectedDate: string;
   receivedDate: string;
-  status?: "received" | "checked" | "approved" | "completed";
+  status?: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft" | "cancelled";
   timestamp?: string;
   // Godown integration fields
   destinationGodownId?: string;
@@ -2188,6 +2190,8 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       checkedDate: new Date().toISOString().split('T')[0],
       approvedBy: "Warehouse Manager",
       approvedDate: new Date().toISOString().split('T')[0],
+      rejectedBy: "",
+      rejectedDate: new Date().toISOString().split('T')[0],
       receivedDate: new Date().toISOString().split('T')[0],
       status: "completed",
       timestamp: new Date().toLocaleString()
@@ -2396,8 +2400,10 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       checkedDate: grnData.checkedDate,
       approvedBy: grnData.approvedBy,
       approvedDate: grnData.approvedDate,
+      rejectedBy: grnData.rejectedBy || '',
+      rejectedDate: grnData.rejectedDate || '',
       receivedDate: grnData.receivedDate,
-      status: grnData.status === 'received' || grnData.status === 'checked' || grnData.status === 'approved' ? 'completed' : (grnData.status || 'completed'),
+      status: grnData.status || 'completed',
       receivingCosts: grnData.receivingCosts,
       // Godown integration fields
       destinationGodownId: grnData.destinationGodownId,
@@ -3142,6 +3148,8 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     checkedDate: new Date().toISOString().split('T')[0],
     approvedBy: "Warehouse Manager",
     approvedDate: new Date().toISOString().split('T')[0],
+    rejectedBy: "",
+    rejectedDate: new Date().toISOString().split('T')[0],
     receivedDate: new Date().toISOString().split('T')[0],
     status: "completed",
     timestamp: new Date().toLocaleString()

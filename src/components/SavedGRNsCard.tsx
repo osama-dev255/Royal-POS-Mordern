@@ -13,7 +13,7 @@ interface SavedGRN {
   items: number;
   total: number;
   poNumber: string;
-  status: "received" | "checked" | "approved" | "completed";
+  status: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft" | "cancelled";
 }
 
 interface SavedGRNsCardProps {
@@ -43,7 +43,12 @@ export const SavedGRNsCard = ({
       case "checked": 
         return "secondary";
       case "received": 
+      case "pending":
         return "outline";
+      case "rejected":
+      case "draft":
+      case "cancelled":
+        return "destructive";
       default: 
         return "default";
     }

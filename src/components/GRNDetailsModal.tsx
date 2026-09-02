@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  FileText
+  FileText,
+  XCircle
 } from "lucide-react";
 import { SavedGRN } from "@/utils/grnUtils";
 import { formatCurrency } from "@/lib/currency";
@@ -48,6 +49,8 @@ export const GRNDetailsModal = ({
       case "received":
       case "pending":
         return <Clock className="h-4 w-4 text-yellow-500" />;
+      case "rejected":
+        return <XCircle className="h-4 w-4 text-red-500" />;
       case "draft":
         return <FileText className="h-4 w-4 text-gray-500" />;
       default:
@@ -65,6 +68,8 @@ export const GRNDetailsModal = ({
       case "received":
       case "pending":
         return "outline";
+      case "rejected":
+        return "destructive";
       case "draft":
         return "destructive";
       default:
@@ -342,6 +347,24 @@ export const GRNDetailsModal = ({
                         <p className="text-sm">
                           <span className="text-muted-foreground">Checked By:</span>{" "}
                           <span className="font-medium">{grn.data.checkedBy}</span>
+                        </p>
+                      )}
+                      {grn.data.approvedBy && (
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Approved By:</span>{" "}
+                          <span className="font-medium text-green-600">{grn.data.approvedBy}</span>
+                          {grn.data.approvedDate && (
+                            <span className="text-xs text-muted-foreground ml-2">({new Date(grn.data.approvedDate).toLocaleDateString()})</span>
+                          )}
+                        </p>
+                      )}
+                      {grn.data.rejectedBy && (
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Rejected By:</span>{" "}
+                          <span className="font-medium text-red-600">{grn.data.rejectedBy}</span>
+                          {grn.data.rejectedDate && (
+                            <span className="text-xs text-muted-foreground ml-2">({new Date(grn.data.rejectedDate).toLocaleDateString()})</span>
+                          )}
                         </p>
                       )}
                     </div>

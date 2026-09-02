@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer, AlertTriangle } from "lucide-react";
+import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 
 interface GRNItem {
   id?: string;
@@ -36,13 +36,16 @@ interface GRNInventoryCardProps {
     supplier: string;
     items: GRNItem[];
     total: number;
-    status: "received" | "checked" | "approved" | "completed" | "pending" | "draft";
+    status: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft";
+    approvedBy?: string;
+    rejectedBy?: string;
     createdAt: string;
   };
   onViewDetails: () => void;
   onPrintGRN: () => void;
   onDownloadGRN: () => void;
   onDeleteGRN: () => void;
+  onStatusClick?: () => void;
   className?: string;
 }
 
@@ -52,6 +55,7 @@ export const GRNInventoryCard = ({
   onPrintGRN,
   onDownloadGRN,
   onDeleteGRN,
+  onStatusClick,
   className 
 }: GRNInventoryCardProps) => {
   const getStatusVariant = (status: string) => {
@@ -64,6 +68,8 @@ export const GRNInventoryCard = ({
       case "received": 
       case "pending":
         return "outline";
+      case "rejected":
+        return "destructive";
       case "draft":
         return "destructive";
       default: 
@@ -93,10 +99,30 @@ export const GRNInventoryCard = ({
             <CardTitle className="text-lg font-semibold">{grn.name}</CardTitle>
             <p className="text-sm text-muted-foreground">GRN #{grn.grnNumber}</p>
           </div>
-          <Badge variant={getStatusVariant(grn.status)}>
-            {grn.status.charAt(0).toUpperCase() + grn.status.slice(1)}
+          <Badge 
+            variant={getStatusVariant(grn.status)} 
+            className={onStatusClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+            onClick={onStatusClick}
+          >
+            {grn.status === 'rejected' ? (
+              <div className="flex items-center gap-1"><XCircle className="h-3 w-3" />Rejected</div>
+            ) : grn.status === 'approved' ? (
+              <div className="flex items-center gap-1"><CheckCircle className="h-3 w-3" />Approved</div>
+            ) : (
+              grn.status.charAt(0).toUpperCase() + grn.status.slice(1)
+            )}
           </Badge>
         </div>
+        {(grn.approvedBy || grn.rejectedBy) && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {grn.status === 'rejected' && grn.rejectedBy && (
+              <span>Rejected by: <span className="font-medium">{grn.rejectedBy}</span></span>
+            )}
+            {grn.status === 'approved' && grn.approvedBy && (
+              <span>Approved by: <span className="font-medium">{grn.approvedBy}</span></span>
+            )}
+          </p>
+        )}
         <div className="flex items-center text-sm text-muted-foreground mt-1">
           <Calendar className="h-4 w-4 mr-1" />
           <span>{formatDate(grn.date)}</span>

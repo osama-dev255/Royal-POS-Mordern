@@ -668,7 +668,7 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
                       items: grn.data.items.reduce((sum, item) => sum + (item.receivedQuantity || item.delivered || 0), 0),
                       total: grn.total || grn.data.items.reduce((sum, item) => sum + (item.totalWithReceivingCost || 0), 0),
                       poNumber: grn.data.poNumber,
-                      status: (grn.data.status === "pending" || grn.data.status === "cancelled" || grn.data.status === "draft") ? "received" : (grn.data.status === "received" || grn.data.status === "checked" || grn.data.status === "approved" || grn.data.status === "completed" ? grn.data.status : "received")
+                      status: (grn.data.status || "received") as any
                     }}
                     onViewDetails={() => handleViewGRN(grn)}
                     onPrintGRN={() => handlePrintGRN(grn)}
