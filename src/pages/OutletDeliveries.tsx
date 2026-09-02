@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -3329,8 +3329,8 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                         const isExpanded = expandedSavedReport === report.id;
                         const methodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque', mobile_payment: 'Mobile Payment' };
                         return (
-                          <>
-                            <TableRow key={report.id}>
+                          <Fragment key={report.id}>
+                            <TableRow>
                               <TableCell>
                                 <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setExpandedSavedReport(isExpanded ? null : report.id)}>
                                   {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -3381,7 +3381,7 @@ export const OutletDeliveries = ({ onBack, outletId }: OutletDeliveriesProps) =>
                                 </TableCell>
                               </TableRow>
                             )}
-                          </>
+                          </Fragment>
                         );
                       })}
                     </TableBody>
