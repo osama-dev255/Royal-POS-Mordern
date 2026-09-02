@@ -27,6 +27,8 @@ export interface DeliveryReportData {
   reportDate: string;
   totalValue: number;
   amountPaid: number;
+  totalSalesAmount: number;
+  totalExpenses: number;
   paymentDate: string;
   paymentMethod: string;
   referenceNumber: string;
@@ -45,6 +47,8 @@ export interface SavedDeliveryReport {
   report_date: string;
   total_value: number;
   amount_paid: number;
+  total_sales_amount: number;
+  total_expenses: number;
   balance_due: number;
   payment_date: string | null;
   payment_method: string | null;
@@ -82,6 +86,8 @@ export const saveDeliveryInReport = async (
       report_date: data.reportDate || new Date().toISOString().split('T')[0],
       total_value: data.totalValue || 0,
       amount_paid: data.amountPaid || 0,
+      total_sales_amount: data.totalSalesAmount || 0,
+      total_expenses: data.totalExpenses || 0,
       balance_due: balanceDue,
       payment_date: data.paymentDate || null,
       payment_method: data.paymentMethod || null,
@@ -136,6 +142,8 @@ export const getSavedDeliveryReports = async (
       report_date: row.report_date,
       total_value: row.total_value,
       amount_paid: row.amount_paid,
+      total_sales_amount: row.total_sales_amount || 0,
+      total_expenses: row.total_expenses || 0,
       balance_due: row.balance_due,
       payment_date: row.payment_date,
       payment_method: row.payment_method,

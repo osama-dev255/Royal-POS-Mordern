@@ -127,6 +127,8 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
   // Payment details state
   const [paymentDetails, setPaymentDetails] = useState({
     amountPaid: '',
+    totalSalesAmount: '',
+    totalExpenses: '',
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'cash',
     referenceNumber: '',
@@ -307,9 +309,11 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
       const { rows, detailRows } = buildReportHTML();
       const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
       const amtPaid = Number(paymentDetails.amountPaid) || 0;
+      const totalSales = Number(paymentDetails.totalSalesAmount) || 0;
+      const totalExp = Number(paymentDetails.totalExpenses) || 0;
       const balDue = totals.totalValue - amtPaid;
       const paymentMethodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque', mobile_payment: 'Mobile Payment' };
-      const paymentSection = (amtPaid > 0 || paymentDetails.referenceNumber) ? `<h2>Payment Summary</h2><table style="max-width:400px;margin-bottom:15px"><tbody><tr><td style="font-weight:bold">Total Value</td><td style="text-align:right">${formatCurrency(totals.totalValue)}</td></tr><tr><td style="font-weight:bold">Amount Paid</td><td style="text-align:right">${formatCurrency(amtPaid)}</td></tr><tr><td style="font-weight:bold;border-top:2px solid #333">Balance Due</td><td style="text-align:right;border-top:2px solid #333;font-weight:bold;color:${balDue > 0 ? '#dc2626' : '#16a34a'}">${formatCurrency(balDue)}</td></tr><tr><td>Payment Date</td><td style="text-align:right">${paymentDetails.paymentDate || '-'}</td></tr><tr><td>Payment Method</td><td style="text-align:right">${paymentMethodLabel[paymentDetails.paymentMethod] || '-'}</td></tr><tr><td>Reference #</td><td style="text-align:right">${paymentDetails.referenceNumber || '-'}</td></tr></tbody></table>` : '';
+      const paymentSection = `<h2>Payment Summary</h2><table style="max-width:400px;margin-bottom:15px"><tbody><tr><td style="font-weight:bold">Total Value</td><td style="text-align:right">${formatCurrency(totals.totalValue)}</td></tr><tr><td style="font-weight:bold">Total Sales Amount</td><td style="text-align:right">${formatCurrency(totalSales)}</td></tr><tr><td style="font-weight:bold">Total Expenses</td><td style="text-align:right">${formatCurrency(totalExp)}</td></tr><tr><td style="font-weight:bold">Amount Paid</td><td style="text-align:right">${formatCurrency(amtPaid)}</td></tr><tr><td style="font-weight:bold;border-top:2px solid #333">Balance Due</td><td style="text-align:right;border-top:2px solid #333;font-weight:bold;color:${balDue > 0 ? '#dc2626' : '#16a34a'}">${formatCurrency(balDue)}</td></tr><tr><td>Payment Date</td><td style="text-align:right">${paymentDetails.paymentDate || '-'}</td></tr><tr><td>Payment Method</td><td style="text-align:right">${paymentMethodLabel[paymentDetails.paymentMethod] || '-'}</td></tr><tr><td>Reference #</td><td style="text-align:right">${paymentDetails.referenceNumber || '-'}</td></tr></tbody></table>`;
       const html = `<!DOCTYPE html><html><head><title>Deliveries In Report</title><style>
 @media print{@page{size:A4 landscape;margin:12mm}}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:11px}
 .hdr{text-align:center;margin-bottom:25px;border-bottom:3px solid #333;padding-bottom:15px}.hdr h1{font-size:22px;margin-bottom:5px}.hdr p{font-size:12px;color:#666}
@@ -345,11 +349,15 @@ ${paymentSection}
     autoTable(doc, { startY:y1+10, head:[['Note #','Item','Qty','Rate','Amount']], body:detail, theme:'striped', headStyles:{fillColor:[51,51,51]}, styles:{fontSize:8} });
     // Payment summary in PDF
     const amountPaid = Number(paymentDetails.amountPaid) || 0;
+    const totalSales = Number(paymentDetails.totalSalesAmount) || 0;
+    const totalExp = Number(paymentDetails.totalExpenses) || 0;
     const balanceDue = totals.totalValue - amountPaid;
-    if (amountPaid > 0 || paymentDetails.referenceNumber) {
+    if (amountPaid > 0 || totalSales > 0 || totalExp > 0 || paymentDetails.referenceNumber) {
       const y2 = (doc as any).lastAutoTable?.finalY || y1 + 40;
       autoTable(doc, { startY: y2 + 10, head: [['Payment Summary']], body: [
         ['Total Value', formatCurrency(totals.totalValue)],
+        ['Total Sales Amount', formatCurrency(totalSales)],
+        ['Total Expenses', formatCurrency(totalExp)],
         ['Amount Paid', formatCurrency(amountPaid)],
         ['Balance Due', formatCurrency(balanceDue)],
         ['Payment Date', paymentDetails.paymentDate || '-'],
@@ -367,6 +375,10 @@ ${paymentSection}
       toast({ title: "Error", description: "Outlet ID is required to save report", variant: "destructive" });
       return;
     }
+    if (!paymentDetails.totalSalesAmount.trim()) {
+      toast({ title: "Validation Error", description: "Total Sales Amount is required", variant: "destructive" });
+      return;
+    }
     if (!paymentDetails.preparedByName.trim()) {
       toast({ title: "Validation Error", description: "Prepared By field is required", variant: "destructive" });
       return;
@@ -378,6 +390,8 @@ ${paymentSection}
         reportDate: new Date().toISOString().split('T')[0],
         totalValue: totals.totalValue,
         amountPaid: Number(paymentDetails.amountPaid) || 0,
+        totalSalesAmount: Number(paymentDetails.totalSalesAmount) || 0,
+        totalExpenses: Number(paymentDetails.totalExpenses) || 0,
         paymentDate: paymentDetails.paymentDate,
         paymentMethod: paymentDetails.paymentMethod,
         referenceNumber: paymentDetails.referenceNumber,
@@ -675,10 +689,32 @@ ${paymentSection}
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-4">
               {/* Financial Summary Row */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">Total Value of Deliveries</Label>
                   <div className="text-2xl font-bold text-blue-700">{formatCurrency(totals.totalValue)}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Total Sales Amount <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="number"
+                    value={paymentDetails.totalSalesAmount}
+                    onChange={e => setPaymentDetails(p => ({ ...p, totalSalesAmount: e.target.value }))}
+                    className="h-10 text-lg font-bold"
+                    placeholder="0.00"
+                    min={0}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Total Expenses</Label>
+                  <Input
+                    type="number"
+                    value={paymentDetails.totalExpenses}
+                    onChange={e => setPaymentDetails(p => ({ ...p, totalExpenses: e.target.value }))}
+                    className="h-10 text-lg font-bold"
+                    placeholder="0.00"
+                    min={0}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">Amount Paid <span className="text-red-500">*</span></Label>
