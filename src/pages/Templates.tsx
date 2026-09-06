@@ -16513,27 +16513,6 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                                 Link from Inventory
                               </div>
-                              <div
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setSpnItemShowProductDropdown(prev => ({ ...prev, [spnActiveItemDropdown.itemId]: false }));
-                                  setSpnNewProductItemId(spnActiveItemDropdown.itemId);
-                                  setSpnNewProductForm({
-                                    name: spnItemProductSearch[spnActiveItemDropdown.itemId] || activeItem.description || '',
-                                    unit_of_measure: activeItem.unit || '',
-                                    cost_price: activeItem.unitPrice || 0,
-                                    selling_price: 0,
-                                    category_id: '',
-                                    quantity: activeItem.quantity || 0
-                                  });
-                                  setSpnShowNewProductDialog(true);
-                                  setSpnActiveItemDropdown(null);
-                                }}
-                                className="cursor-pointer py-2 px-3 hover:bg-emerald-50 border-t bg-emerald-100/50 text-emerald-800 font-medium text-sm flex items-center gap-2"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                                Register New Product
-                              </div>
                             </div>,
                             document.body
                           );
