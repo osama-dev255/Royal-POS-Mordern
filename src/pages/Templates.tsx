@@ -1451,6 +1451,10 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
   const [spnNewProductItemId, setSpnNewProductItemId] = useState<string>('');
   const [spnAllProducts, setSpnAllProducts] = useState<Product[]>([]);
   const [spnLoadingAllProducts, setSpnLoadingAllProducts] = useState<boolean>(false);
+  const [spnShowLinkProductDialog, setSpnShowLinkProductDialog] = useState<boolean>(false);
+  const [spnLinkProductSearch, setSpnLinkProductSearch] = useState<string>('');
+  const [spnLinkProductItemId, setSpnLinkProductItemId] = useState<string>('');
+  const [spnLinkingProduct, setSpnLinkingProduct] = useState<boolean>(false);
 
   // Map of product name -> Map of godownId -> total quantity available
   const [productGodownMap, setProductGodownMap] = useState<Map<string, Map<string, number>>>(new Map());
@@ -1764,6 +1768,23 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       }
     };
     loadAllProducts();
+  }, []);
+
+  // Load all products for SPN "Link from Inventory" feature
+  useEffect(() => {
+    const loadSpnAllProducts = async () => {
+      setSpnLoadingAllProducts(true);
+      try {
+        const data = await getProducts();
+        setSpnAllProducts(data);
+      } catch (error) {
+        console.error('Error loading SPN products:', error);
+        setSpnAllProducts([]);
+      } finally {
+        setSpnLoadingAllProducts(false);
+      }
+    };
+    loadSpnAllProducts();
   }, []);
 
   // Load ALL zones on mount (needed for per-row zone name resolution across multiple godowns)
@@ -16482,6 +16503,20 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   setSpnItemShowProductDropdown(prev => ({ ...prev, [spnActiveItemDropdown.itemId]: false }));
+                                  setSpnLinkProductItemId(spnActiveItemDropdown.itemId);
+                                  setSpnLinkProductSearch('');
+                                  setSpnShowLinkProductDialog(true);
+                                  setSpnActiveItemDropdown(null);
+                                }}
+                                className="cursor-pointer py-2 px-3 hover:bg-blue-50 border-t bg-blue-100/50 text-blue-800 font-medium text-sm flex items-center gap-2"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                Link from Inventory
+                              </div>
+                              <div
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setSpnItemShowProductDropdown(prev => ({ ...prev, [spnActiveItemDropdown.itemId]: false }));
                                   setSpnNewProductItemId(spnActiveItemDropdown.itemId);
                                   setSpnNewProductForm({
                                     name: spnItemProductSearch[spnActiveItemDropdown.itemId] || activeItem.description || '',
@@ -19562,6 +19597,120 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                 ) : (
                   "Register & Add to Items"
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link from Inventory Dialog */}
+      {spnShowLinkProductDialog && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Link Product from Inventory</h3>
+              <button
+                onClick={() => {
+                  setSpnShowLinkProductDialog(false);
+                  setSpnLinkProductItemId('');
+                  setSpnLinkProductSearch('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-4 border-b shrink-0">
+              <Input
+                placeholder="Search products by name..."
+                value={spnLinkProductSearch}
+                onChange={(e) => setSpnLinkProductSearch(e.target.value)}
+                className="text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {spnLoadingAllProducts ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Loading products...</div>
+              ) : (
+                <div>
+                  {spnAllProducts
+                    .filter(p => {
+                      const search = spnLinkProductSearch.toLowerCase();
+                      if (!search) return true;
+                      return p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                    })
+                    .map((product) => {
+                      const isAlreadyLinked = spnSupplierProducts.some(sp => sp.id === product.id);
+                      return (
+                        <div
+                          key={product.id}
+                          onClick={async () => {
+                            if (spnLinkingProduct) return;
+                            setSpnLinkingProduct(true);
+                            try {
+                              // Link product to current supplier if not already linked
+                              if (supplierPurchaseNoteData.supplierId && !isAlreadyLinked) {
+                                await linkProductToSupplier(product.id, supplierPurchaseNoteData.supplierId);
+                                setSpnSupplierProducts(prev => [...prev, product]);
+                              }
+                              // Fill the item row with the product data
+                              if (spnLinkProductItemId) {
+                                handleSupplierPurchaseItemChange(spnLinkProductItemId, 'description', product.name);
+                                handleSupplierPurchaseItemChange(spnLinkProductItemId, 'unit', product.unit_of_measure || '');
+                                handleSupplierPurchaseItemChange(spnLinkProductItemId, 'unitPrice', product.cost_price || 0);
+                                handleSupplierPurchaseItemChange(spnLinkProductItemId, 'sellingPrice', product.selling_price || 0);
+                                setSpnItemProductSearch(prev => ({ ...prev, [spnLinkProductItemId]: product.name }));
+                              }
+                              setSpnShowLinkProductDialog(false);
+                              setSpnLinkProductItemId('');
+                              setSpnLinkProductSearch('');
+                              toast({ title: "Success", description: `Product "${product.name}" linked and added to items` });
+                            } catch (error) {
+                              console.error("Error linking product:", error);
+                              toast({ title: "Error", description: "Failed to link product: " + (error as Error).message, variant: "destructive" });
+                            } finally {
+                              setSpnLinkingProduct(false);
+                            }
+                          }}
+                          className={`cursor-pointer py-3 px-4 border-b last:border-b-0 ${isAlreadyLinked ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'} ${spnLinkingProduct ? 'opacity-50 cursor-wait' : ''}`}
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{product.name}</span>
+                              {isAlreadyLinked && (
+                                <span className="text-[10px] bg-green-200 text-green-800 px-1.5 py-0.5 rounded font-medium">LINKED</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {product.unit_of_measure && <span>Unit: {product.unit_of_measure}</span>}
+                              <span>Cost: {formatCurrency(product.cost_price || 0)}</span>
+                              {product.selling_price ? <span>Sell: {formatCurrency(product.selling_price)}</span> : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {spnAllProducts.filter(p => {
+                    const search = spnLinkProductSearch.toLowerCase();
+                    if (!search) return true;
+                    return p.name.toLowerCase().includes(search) || (p.unit_of_measure || '').toLowerCase().includes(search);
+                  }).length === 0 && (
+                    <div className="p-6 text-center text-sm text-muted-foreground">No products found matching "{spnLinkProductSearch}"</div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end p-4 border-t shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSpnShowLinkProductDialog(false);
+                  setSpnLinkProductItemId('');
+                  setSpnLinkProductSearch('');
+                }}
+              >
+                Cancel
               </Button>
             </div>
           </div>
