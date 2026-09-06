@@ -680,6 +680,58 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
       } else {
         console.log('✅ GRN updated in database');
       }
+
+      // Update supplier_ledger table directly to ensure ledger reflects changes
+      // (Database trigger may not be applied or may have issues)
+      try {
+        const supplierName = updatedGRN.data.supplierName || '';
+        
+        // Delete old ledger entry for this GRN
+        await supabase
+          .from('supplier_ledger')
+          .delete()
+          .eq('reference_id', updatedGRN.id)
+          .eq('transaction_type', 'grn_received');
+        
+        // Insert new ledger entry with updated amounts
+        const { data: ledgerEntry, error: ledgerError } = await supabase
+          .from('supplier_ledger')
+          .insert({
+            supplier_id: supplierName,
+            supplier_name: supplierName,
+            transaction_type: 'grn_received',
+            reference_id: updatedGRN.id,
+            reference_number: updatedGRN.data.grnNumber || '',
+            debit_amount: 0,
+            credit_amount: totalAmount,
+            running_balance: 0,
+            transaction_date: updatedGRN.data.receivedDate || new Date().toISOString(),
+            description: `GRN Received - ${updatedGRN.data.grnNumber || ''} from ${supplierName}`,
+            payment_method: null,
+            notes: updatedGRN.data.qualityCheckNotes || '',
+            created_by: user.id
+          })
+          .select();
+        
+        if (ledgerError) {
+          console.error('Error updating supplier ledger:', ledgerError);
+        } else {
+          console.log('✅ Supplier ledger updated for GRN:', updatedGRN.id);
+          
+          // Recalculate running balance for this supplier
+          try {
+            await supabase.rpc('recalculate_supplier_ledger_balance', {
+              p_supplier_name: supplierName
+            });
+            console.log('✅ Supplier ledger balance recalculated for:', supplierName);
+          } catch (balanceError) {
+            console.warn('Could not recalculate ledger balance:', balanceError);
+          }
+        }
+      } catch (ledgerError) {
+        console.error('Error updating supplier ledger for GRN:', ledgerError);
+        // Don't throw - ledger update failure shouldn't block GRN save
+      }
     }
   } catch (error) {
     console.error('Error updating GRN:', error);
