@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown, Eye, Loader2, Receipt } from "lucide-react";
+import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown, Eye, EyeOff, Loader2, Receipt } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -60,6 +60,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [showSupplierBreakdown, setShowSupplierBreakdown] = useState(true);
   const [dateRange, setDateRange] = useState({
     start: '2020-01-01',
     end: '2099-12-31'
@@ -725,40 +726,62 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
         {supplierSummaries.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Supplier Breakdown
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Supplier Breakdown
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSupplierBreakdown(!showSupplierBreakdown)}
+                  className="h-8"
+                >
+                  {showSupplierBreakdown ? (
+                    <>
+                      <EyeOff className="h-4 w-4 mr-1" />
+                      Hide
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4 mr-1" />
+                      Show
+                    </>
+                  )}
+                </Button>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead className="text-right">Total CR (Owed)</TableHead>
-                    <TableHead className="text-right">Total DR (Paid)</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-center">Entries</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {supplierSummaries.map((s, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{s.supplier_name}</TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">{formatCurrency(s.total_credit)}</TableCell>
-                      <TableCell className="text-right text-red-600 font-medium">{formatCurrency(s.total_debit)}</TableCell>
-                      <TableCell className={`text-right font-bold ${s.balance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        {formatCurrency(Math.abs(s.balance))}
-                        {s.balance >= 0 ? ' CR' : ' DR'}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{s.entry_count}</Badge>
-                      </TableCell>
+            {showSupplierBreakdown && (
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead className="text-right">Total CR (Owed)</TableHead>
+                      <TableHead className="text-right">Total DR (Paid)</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-center">Entries</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
+                  </TableHeader>
+                  <TableBody>
+                    {supplierSummaries.map((s, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{s.supplier_name}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">{formatCurrency(s.total_credit)}</TableCell>
+                        <TableCell className="text-right text-red-600 font-medium">{formatCurrency(s.total_debit)}</TableCell>
+                        <TableCell className={`text-right font-bold ${s.balance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                          {formatCurrency(Math.abs(s.balance))}
+                          {s.balance >= 0 ? ' CR' : ' DR'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary">{s.entry_count}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            )}
           </Card>
         )}
 
