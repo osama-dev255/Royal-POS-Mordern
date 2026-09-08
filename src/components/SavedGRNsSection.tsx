@@ -3,9 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Download, Printer, Eye, Pencil, Calendar, FileSpreadsheet, Share2, ChevronDown, FileText, Loader2, ExternalLink } from "lucide-react";
+import { Search, Package, Download, Printer, Eye, Pencil, Calendar, FileSpreadsheet, Share2, ChevronDown, FileText, Loader2, ExternalLink, Calendar as CalendarIcon } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format as formatDate } from "date-fns";
 import { SavedGRNsCard } from "./SavedGRNsCard";
 import { getSavedGRNs, deleteGRN, SavedGRN as SavedGRNType } from "@/utils/grnUtils";
 import { PrintUtils } from "@/utils/printUtils";
@@ -29,10 +32,119 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
   const [loading, setLoading] = useState(true);
   const [selectedGRN, setSelectedGRN] = useState<SavedGRNType | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "history">("list");
+  // Card view date range state
+  const [cardDateRange, setCardDateRange] = useState({ start: '', end: '' });
+  const [cardDatePreset, setCardDatePreset] = useState<string>('all');
+  const [cardCalendarOpen, setCardCalendarOpen] = useState(false);
+  // History view date range state
   const [historyDateRange, setHistoryDateRange] = useState({ start: '2020-01-01', end: '2099-12-31' });
+  const [historyDatePreset, setHistoryDatePreset] = useState<string>('all');
+  const [historyCalendarOpen, setHistoryCalendarOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatus, setHistoryStatus] = useState("all");
   const { toast } = useToast();
+
+  // Quick range presets for card view (standard professional date range picker pattern)
+  const handleCardDatePreset = (preset: string) => {
+    setCardDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setCardDateRange({ start: todayStr, end: todayStr });
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split('T')[0];
+        setCardDateRange({ start: yStr, end: yStr });
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setCardDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setCardDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setCardDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setCardDateRange({ start: first.toISOString().split('T')[0], end: last.toISOString().split('T')[0] });
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setCardDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'all':
+      default:
+        setCardDateRange({ start: '', end: '' });
+        break;
+    }
+  };
+
+  // Quick range presets for history view (standard professional date range picker pattern)
+  const handleHistoryDatePreset = (preset: string) => {
+    setHistoryDatePreset(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    switch (preset) {
+      case 'today':
+        setHistoryDateRange({ start: todayStr, end: todayStr });
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = y.toISOString().split('T')[0];
+        setHistoryDateRange({ start: yStr, end: yStr });
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setHistoryDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setHistoryDateRange({ start: d.toISOString().split('T')[0], end: todayStr });
+        break;
+      }
+      case 'thisMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        setHistoryDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'lastMonth': {
+        const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const last = new Date(today.getFullYear(), today.getMonth(), 0);
+        setHistoryDateRange({ start: first.toISOString().split('T')[0], end: last.toISOString().split('T')[0] });
+        break;
+      }
+      case 'thisYear': {
+        const first = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        setHistoryDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'all':
+      default:
+        setHistoryDateRange({ start: '2020-01-01', end: '2099-12-31' });
+        break;
+    }
+  };
 
   // Function to distribute receiving costs among items based on quantity
   const distributeReceivingCosts = (items: any[], receivingCosts: Array<{ description: string; amount: number }>) => {
@@ -102,13 +214,24 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
     return () => window.removeEventListener('grnSaved', handleGRNSaved as EventListener);
   }, []);
 
-  // Filter GRNs based on search term
-  const filteredGRNs = grns.filter(grn => 
-    grn.data.grnNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    grn.data.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    grn.data.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    grn.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter GRNs based on search term and date range (card view)
+  const filteredGRNs = grns.filter(grn => {
+    // Search filter
+    const matchesSearch = grn.data.grnNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grn.data.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grn.data.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grn.id.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Date range filter
+    let matchesDate = true;
+    if (cardDateRange.start || cardDateRange.end) {
+      const gDate = new Date(grn.data.date);
+      if (cardDateRange.start && gDate < new Date(cardDateRange.start)) matchesDate = false;
+      if (cardDateRange.end && gDate > new Date(cardDateRange.end + 'T23:59:59')) matchesDate = false;
+    }
+    
+    return matchesSearch && matchesDate;
+  });
 
   const handleDeleteGRN = (grnId: string) => {
     try {
@@ -515,18 +638,150 @@ export const SavedGRNsSection = ({ onBack, onLogout, username, onEditGRN }: Save
               </div>
             </div>
 
+            {/* Card View Date Range Picker */}
+            {viewMode === "list" && (
+              <div className="flex flex-wrap gap-3 items-center mb-6">
+                {/* Date Range Picker */}
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="date"
+                      value={cardDateRange.start}
+                      onChange={(e) => { setCardDateRange(prev => ({ ...prev, start: e.target.value })); setCardDatePreset('custom'); }}
+                      className="w-40"
+                    />
+                    <span className="text-muted-foreground">to</span>
+                    <Input
+                      type="date"
+                      value={cardDateRange.end}
+                      onChange={(e) => { setCardDateRange(prev => ({ ...prev, end: e.target.value })); setCardDatePreset('custom'); }}
+                      className="w-40"
+                    />
+                    <Popover open={cardCalendarOpen} onOpenChange={setCardCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
+                          <CalendarIcon className="h-4 w-4 mr-1" />
+                          Calendar
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="end">
+                        <CalendarComponent
+                          mode="range"
+                          selected={{
+                            from: cardDateRange.start ? new Date(cardDateRange.start) : undefined,
+                            to: cardDateRange.end ? new Date(cardDateRange.end) : undefined,
+                          }}
+                          onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                            if (range?.from) setCardDateRange(prev => ({ ...prev, start: formatDate(range.from!, "yyyy-MM-dd") }));
+                            if (range?.to) setCardDateRange(prev => ({ ...prev, end: formatDate(range.to!, "yyyy-MM-dd") }));
+                            setCardDatePreset('custom');
+                          }}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+                {/* Quick Range Presets */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { key: 'today', label: 'Today' },
+                    { key: 'yesterday', label: 'Yesterday' },
+                    { key: 'last7', label: 'Last 7 Days' },
+                    { key: 'last30', label: 'Last 30 Days' },
+                    { key: 'thisMonth', label: 'This Month' },
+                    { key: 'lastMonth', label: 'Last Month' },
+                    { key: 'thisYear', label: 'This Year' },
+                    { key: 'all', label: 'All Time' },
+                  ].map(preset => (
+                    <Button
+                      key={preset.key}
+                      size="sm"
+                      variant={cardDatePreset === preset.key ? 'default' : 'outline'}
+                      onClick={() => handleCardDatePreset(preset.key)}
+                      className={cardDatePreset === preset.key ? '' : 'text-xs'}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {viewMode === "history" ? (
               <>
                 {/* Filters Bar */}
                 <div className="flex flex-wrap gap-3 items-center mb-6">
+                  {/* Date Range Picker */}
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <Input type="date" value={historyDateRange.start} onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))} className="w-40" />
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        type="date"
+                        value={historyDateRange.start}
+                        onChange={(e) => { setHistoryDateRange(prev => ({ ...prev, start: e.target.value })); setHistoryDatePreset('custom'); }}
+                        className="w-40"
+                      />
+                      <span className="text-muted-foreground">to</span>
+                      <Input
+                        type="date"
+                        value={historyDateRange.end}
+                        onChange={(e) => { setHistoryDateRange(prev => ({ ...prev, end: e.target.value })); setHistoryDatePreset('custom'); }}
+                        className="w-40"
+                      />
+                      <Popover open={historyCalendarOpen} onOpenChange={setHistoryCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-9 whitespace-nowrap">
+                            <CalendarIcon className="h-4 w-4 mr-1" />
+                            Calendar
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <CalendarComponent
+                            mode="range"
+                            selected={{
+                              from: historyDateRange.start ? new Date(historyDateRange.start) : undefined,
+                              to: historyDateRange.end ? new Date(historyDateRange.end) : undefined,
+                            }}
+                            onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+                              if (range?.from) setHistoryDateRange(prev => ({ ...prev, start: formatDate(range.from!, "yyyy-MM-dd") }));
+                              if (range?.to) setHistoryDateRange(prev => ({ ...prev, end: formatDate(range.to!, "yyyy-MM-dd") }));
+                              setHistoryDatePreset('custom');
+                            }}
+                            numberOfMonths={2}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
-                  <span className="text-muted-foreground">to</span>
-                  <div className="flex items-center gap-2">
-                    <Input type="date" value={historyDateRange.end} onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))} className="w-40" />
+                  {/* Quick Range Presets */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'today', label: 'Today' },
+                      { key: 'yesterday', label: 'Yesterday' },
+                      { key: 'last7', label: 'Last 7 Days' },
+                      { key: 'last30', label: 'Last 30 Days' },
+                      { key: 'thisMonth', label: 'This Month' },
+                      { key: 'lastMonth', label: 'Last Month' },
+                      { key: 'thisYear', label: 'This Year' },
+                      { key: 'all', label: 'All Time' },
+                    ].map(preset => (
+                      <Button
+                        key={preset.key}
+                        size="sm"
+                        variant={historyDatePreset === preset.key ? 'default' : 'outline'}
+                        onClick={() => handleHistoryDatePreset(preset.key)}
+                        className={historyDatePreset === preset.key ? '' : 'text-xs'}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
                   </div>
+                </div>
+
+                {/* Search and Status Filters */}
+                <div className="flex flex-wrap gap-3 items-center mb-6">
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Search GRN #, supplier, PO..." className="pl-8 w-56" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} />
