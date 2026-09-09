@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown, Eye, EyeOff, Loader2, Receipt } from "lucide-react";
+import { Search, Plus, Wallet, Calendar, CreditCard, TrendingUp, TrendingDown, ArrowRightLeft, RefreshCw, Printer, Download, Share2, FileText, ChevronDown, Eye, EyeOff, Loader2, Receipt, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -19,6 +19,7 @@ import {
   getSupplierLedgerSummary,
   getUniqueSuppliers,
   recordSupplierLedgerEntry,
+  deleteSupplierLedgerEntry,
   type SupplierLedgerEntry,
   type SupplierLedgerSummary,
 } from "@/utils/supplierLedgerUtils";
@@ -191,6 +192,33 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       });
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  // ── Delete Handler ─────────────────────────────────────────────────────────
+
+  const handleDeleteEntry = async (entry: SupplierLedgerEntry) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this ledger entry?\n\n` +
+      `Supplier: ${entry.supplier_name}\n` +
+      `Type: ${transactionTypeLabels[entry.transaction_type] || entry.transaction_type}\n` +
+      `Reference: ${entry.reference_number || '-'}\n` +
+      `Amount: ${formatCurrency(Math.abs(Number(entry.debit_amount) || Number(entry.credit_amount) || 0))}\n\n` +
+      `This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    if (!entry.id) {
+      toast({ title: "Error", description: "Cannot delete entry: missing ID", variant: "destructive" });
+      return;
+    }
+
+    const success = await deleteSupplierLedgerEntry(entry.id);
+    if (success) {
+      toast({ title: "Deleted", description: "Ledger entry has been removed" });
+      fetchLedger();
+    } else {
+      toast({ title: "Error", description: "Failed to delete ledger entry", variant: "destructive" });
     }
   };
 
@@ -805,18 +833,19 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                   <TableHead className="text-right">Debit (DR)</TableHead>
                   <TableHead className="text-right">Credit (CR)</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
+                  <TableHead className="text-center w-12">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Loading ledger entries...
                     </TableCell>
                   </TableRow>
                 ) : filteredEntries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No ledger entries found. GRN receipts and inventory payments will appear here automatically.
                     </TableCell>
                   </TableRow>
@@ -872,6 +901,17 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                         {formatCurrency(Math.abs(Number(entry.running_balance) || 0))}
                         {Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDeleteEntry(entry)}
+                          title="Delete entry"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -881,7 +921,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
               {filteredEntries.length > 0 && (
                 <tfoot>
                   <TableRow className="border-t-2 font-bold bg-muted/50">
-                    <TableCell colSpan={5}>TOTALS</TableCell>
+                    <TableCell colSpan={6}>TOTALS</TableCell>
                     <TableCell className="text-right text-red-600">{formatCurrency(totalDebit)}</TableCell>
                     <TableCell className="text-right text-green-600">{formatCurrency(totalCredit)}</TableCell>
                     <TableCell className={`text-right ${outstandingBalance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
