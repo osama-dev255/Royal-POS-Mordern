@@ -149,6 +149,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [approvalDateTo, setApprovalDateTo] = useState<string>("");
   const [approvalDatePreset, setApprovalDatePreset] = useState<string>("all");
   const [approvalCalendarOpen, setApprovalCalendarOpen] = useState(false);
+    const [approvalStatusFilter, setApprovalStatusFilter] = useState<string>('all');
   const [pendingApprovals, setPendingApprovals] = useState<Expense[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -1485,7 +1486,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     const expDate = new Date(exp.expense_date);
     const matchesFrom = !approvalDateFrom || expDate >= new Date(approvalDateFrom);
     const matchesTo = !approvalDateTo || expDate <= new Date(approvalDateTo + 'T23:59:59');
-    return matchesFrom && matchesTo;
+    const matchesStatus = approvalStatusFilter === 'all' || exp.approval_status === approvalStatusFilter;
+    return matchesFrom && matchesTo && matchesStatus;
   });
   const pendingApprovalCount = pendingApprovals.filter(exp => exp.approval_status === 'pending').length;
 
@@ -3074,6 +3076,21 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <X className="h-4 w-4 mr-1" />
                     Clear
                   </Button>
+                  {/* Status Filter */}
+                  <div className="ml-2">
+                    <label className="text-sm font-medium mb-1 block">Status</label>
+                    <Select value={approvalStatusFilter} onValueChange={setApprovalStatusFilter}>
+                      <SelectTrigger className="w-36 h-9">
+                        <SelectValue placeholder="All Statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               {(approvalDateFrom || approvalDateTo) && (
