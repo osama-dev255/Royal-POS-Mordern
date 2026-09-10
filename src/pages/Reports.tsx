@@ -1259,6 +1259,9 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         const exemptCount = filteredGRNsPreview.length - vatableCount;
         const tinImplementedCount = filteredGRNsPreview.filter((grn: any) => grn.data?.supplierTinNumber || grn.data?.businessTin).length;
         const totalComplianceAmount = filteredGRNsPreview.reduce((sum: number, grn: any) => sum + (grn.total || 0), 0);
+        const vatableTotal = filteredGRNsPreview.filter((grn: any) => grn.data?.isVatable).reduce((sum: number, grn: any) => sum + (grn.total || 0), 0);
+        const exemptTotal = filteredGRNsPreview.filter((grn: any) => !grn.data?.isVatable).reduce((sum: number, grn: any) => sum + (grn.total || 0), 0);
+        const tinTotal = filteredGRNsPreview.filter((grn: any) => grn.data?.supplierTinNumber || grn.data?.businessTin).reduce((sum: number, grn: any) => sum + (grn.total || 0), 0);
         
         return (
           <div>
@@ -1272,6 +1275,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                 <CardContent>
                   <div className="text-2xl font-bold">{filteredGRNsPreview.length}</div>
                   <p className="text-xs text-muted-foreground">Compliance records</p>
+                  <p className="text-sm font-semibold mt-1">{formatCurrency(totalComplianceAmount)}</p>
                 </CardContent>
               </Card>
               
@@ -1283,6 +1287,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">{vatableCount}</div>
                   <p className="text-xs text-muted-foreground">Taxable purchases</p>
+                  <p className="text-sm font-semibold mt-1 text-green-700">{formatCurrency(vatableTotal)}</p>
                 </CardContent>
               </Card>
               
@@ -1294,6 +1299,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                 <CardContent>
                   <div className="text-2xl font-bold text-orange-600">{exemptCount}</div>
                   <p className="text-xs text-muted-foreground">Tax-exempt purchases</p>
+                  <p className="text-sm font-semibold mt-1 text-orange-700">{formatCurrency(exemptTotal)}</p>
                 </CardContent>
               </Card>
               
@@ -1305,6 +1311,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">{tinImplementedCount}</div>
                   <p className="text-xs text-muted-foreground">With TIN numbers</p>
+                  <p className="text-sm font-semibold mt-1 text-blue-700">{formatCurrency(tinTotal)}</p>
                 </CardContent>
               </Card>
             </div>

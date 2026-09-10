@@ -2707,6 +2707,46 @@ export class PrintUtils {
                 </div>
               </div>
             `;
+          } else if (reportData.title.toLowerCase().includes('compliance')) {
+            const totalGRNs = reportData.data.length;
+            const totalAmount = reportData.data.reduce((sum: number, item: any) => {
+              const amountValue = item.totalAmountRaw !== undefined ? item.totalAmountRaw : 0;
+              if (typeof amountValue === 'number') return sum + amountValue;
+              return sum;
+            }, 0);
+            const vatableCount = reportData.data.filter((item: any) => item.stockType === 'Vatable').length;
+            const exemptCount = reportData.data.filter((item: any) => item.stockType === 'Exempt').length;
+            const vatableAmount = reportData.data.filter((item: any) => item.stockType === 'Vatable').reduce((sum: number, item: any) => sum + (item.totalAmountRaw || 0), 0);
+            const exemptAmount = reportData.data.filter((item: any) => item.stockType === 'Exempt').reduce((sum: number, item: any) => sum + (item.totalAmountRaw || 0), 0);
+            const tinCount = reportData.data.filter((item: any) => item.tinImplemented === 'Yes').length;
+            const tinAmount = reportData.data.filter((item: any) => item.tinImplemented === 'Yes').reduce((sum: number, item: any) => sum + (item.totalAmountRaw || 0), 0);
+            const fmt = (val: number) => new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(val);
+            summaryInfo = `
+              <div class="summary">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                  <div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <div style="font-size: 12px; color: #666;">Total GRNs</div>
+                    <div style="font-size: 20px; font-weight: bold;">${totalGRNs}</div>
+                    <div style="font-size: 13px; font-weight: 600;">${fmt(totalAmount)}</div>
+                  </div>
+                  <div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <div style="font-size: 12px; color: #666;">Vatable</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #16a34a;">${vatableCount}</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #15803d;">${fmt(vatableAmount)}</div>
+                  </div>
+                  <div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <div style="font-size: 12px; color: #666;">Exempt</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #ea580c;">${exemptCount}</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #c2410c;">${fmt(exemptAmount)}</div>
+                  </div>
+                  <div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <div style="font-size: 12px; color: #666;">TIN Implemented</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #2563eb;">${tinCount}</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #1d4ed8;">${fmt(tinAmount)}</div>
+                  </div>
+                </div>
+              </div>
+            `;
           } else {
             // For other report types, just show the count
             summaryInfo = `
