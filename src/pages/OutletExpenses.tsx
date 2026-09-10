@@ -308,6 +308,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [verifyExpense, setVerifyExpense] = useState<Expense | null>(null);
   const [verifyName, setVerifyName] = useState('');
   const [verifyingLoading, setVerifyingLoading] = useState(false);
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalExpense, setApprovalExpense] = useState<Expense | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'rejected'>('approved');
+  const [approvalName, setApprovalName] = useState('');
+  const [approvalLoading, setApprovalLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   
   // Vendor states
@@ -1047,38 +1052,31 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     }
   };
 
-  const handleApproveExpense = async (id: string, status: 'approved' | 'rejected') => {
+  const handleApproveExpense = async (id: string, status: 'approved' | 'rejected', approverName: string) => {
+    if (!approverName.trim()) {
+      toast({ title: "Validation Error", description: "Please enter the approver's name", variant: "destructive" });
+      return;
+    }
+    setApprovalLoading(true);
     try {
-      // Get current authenticated user
       const { supabase } = await import('@/lib/supabaseClient');
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) {
-        toast({ 
-          title: "Authentication Error", 
-          description: "You must be logged in to approve expenses", 
-          variant: "destructive" 
-        });
-        return;
-      }
-
-      const result = await approveOutletExpense(id, status, user.id);
+      const result = await approveOutletExpense(id, status, user?.id || 'manual', approverName.trim());
       if (result) {
-        toast({ 
-          title: "Success", 
-          description: `Expense ${status} successfully` 
-        });
+        toast({ title: "Success", description: `Expense ${status} successfully by ${approverName.trim()}` });
+        setIsApprovalDialogOpen(false);
+        setApprovalExpense(null);
+        setApprovalName('');
         loadData();
       } else {
         toast({ title: "Error", description: `Failed to ${status} expense`, variant: "destructive" });
       }
     } catch (error: any) {
       console.error('Error in handleApproveExpense:', error);
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to approve expense", 
-        variant: "destructive" 
-      });
+      toast({ title: "Error", description: error.message || `Failed to ${status} expense`, variant: "destructive" });
+    } finally {
+      setApprovalLoading(false);
     }
   };
 
@@ -3106,6 +3104,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <TableHead>Vendor</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Prepared By</TableHead>
+                    <TableHead>Approved By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -3119,6 +3118,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       <TableCell>{expense.vendor_name || '-'}</TableCell>
                       <TableCell className="text-right font-medium">{formatTZS(expense.amount)}</TableCell>
                       <TableCell>{expense.prepared_by_name || '-'}</TableCell>
+                      <TableCell>{expense.approved_by_name || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -3132,7 +3132,12 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                           <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700"
-                            onClick={() => handleApproveExpense(expense.id!, 'approved')}
+                            onClick={() => {
+                              setApprovalExpense(expense);
+                              setApprovalStatus('approved');
+                              setApprovalName('');
+                              setIsApprovalDialogOpen(true);
+                            }}
                           >
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Approve
@@ -3141,7 +3146,12 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                             size="sm"
                             variant="outline"
                             className="text-red-600"
-                            onClick={() => handleApproveExpense(expense.id!, 'rejected')}
+                            onClick={() => {
+                              setApprovalExpense(expense);
+                              setApprovalStatus('rejected');
+                              setApprovalName('');
+                              setIsApprovalDialogOpen(true);
+                            }}
                           >
                             <XCircle className="h-4 w-4 mr-2" />
                             Reject
@@ -4549,6 +4559,85 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verifying...</>
               ) : (
                 <><ShieldCheck className="h-4 w-4 mr-2" /> Verify Expense</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval/Rejection Dialog */}
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalStatus === 'approved' ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600" />
+              )}
+              {approvalStatus === 'approved' ? 'Approve' : 'Reject'} Expense
+            </DialogTitle>
+          </DialogHeader>
+          {approvalExpense && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Category:</span>
+                  <span className="font-medium">{approvalExpense.category}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="font-medium">{formatTZS(approvalExpense.amount)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Date:</span>
+                  <span className="font-medium">{new Date(approvalExpense.expense_date).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Prepared By:</span>
+                  <span className="font-medium">{approvalExpense.prepared_by_name || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Action:</span>
+                  <Badge className={approvalStatus === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                    {approvalStatus === 'approved' ? 'APPROVE' : 'REJECT'}
+                  </Badge>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="approvalName">Your Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="approvalName"
+                  value={approvalName}
+                  onChange={(e) => setApprovalName(e.target.value)}
+                  placeholder="Enter your name as the approver"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && approvalName.trim() && approvalExpense.id) {
+                      handleApproveExpense(approvalExpense.id, approvalStatus, approvalName);
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This will {approvalStatus === 'approved' ? 'approve' : 'reject'} the expense and record your name as the approver.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsApprovalDialogOpen(false); setApprovalExpense(null); setApprovalName(''); }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => approvalExpense?.id && handleApproveExpense(approvalExpense.id, approvalStatus, approvalName)}
+              disabled={approvalLoading || !approvalName.trim()}
+              className={approvalStatus === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+            >
+              {approvalLoading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
+              ) : approvalStatus === 'approved' ? (
+                <><CheckCircle className="h-4 w-4 mr-2" /> Approve Expense</>
+              ) : (
+                <><XCircle className="h-4 w-4 mr-2" /> Reject Expense</>
               )}
             </Button>
           </DialogFooter>

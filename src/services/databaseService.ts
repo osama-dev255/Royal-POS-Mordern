@@ -2998,6 +2998,7 @@ export const approveOutletExpense = async (
   expenseId: string,
   status: 'approved' | 'rejected',
   approvedBy: string,
+  approvedByName?: string,
   notes?: string
 ): Promise<boolean> => {
   try {
@@ -3006,6 +3007,7 @@ export const approveOutletExpense = async (
       .update({
         approval_status: status,
         approved_by: approvedBy,
+        approved_by_name: approvedByName || '',
         approval_date: new Date().toISOString(),
         approval_notes: notes,
         updated_at: new Date().toISOString()
