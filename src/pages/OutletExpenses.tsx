@@ -1487,6 +1487,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     const matchesTo = !approvalDateTo || expDate <= new Date(approvalDateTo + 'T23:59:59');
     return matchesFrom && matchesTo;
   });
+  const pendingApprovalCount = pendingApprovals.filter(exp => exp.approval_status === 'pending').length;
 
   const handleDatePreset = (preset: string) => {
     setDatePreset(preset);
@@ -1946,8 +1947,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           <TabsTrigger value="budgets">Budgets</TabsTrigger>
           <TabsTrigger value="approvals">
             Approvals
-            {pendingApprovals.length > 0 && (
-              <Badge variant="destructive" className="ml-2">{pendingApprovals.length}</Badge>
+            {pendingApprovalCount > 0 && (
+              <Badge variant="destructive" className="ml-2">{pendingApprovalCount}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="recurring">
@@ -2106,8 +2107,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{pendingApprovals.length}</div>
-                <p className="text-xs text-muted-foreground">Requires attention</p>
+                <div className="text-2xl font-bold">{pendingApprovalCount}</div>
+                <p className="text-xs text-muted-foreground">Awaiting approval</p>
               </CardContent>
             </Card>
           </div>
@@ -2387,7 +2388,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {pendingApprovals.length} expense(s) awaiting approval
+                  {pendingApprovalCount} expense(s) awaiting approval
                 </p>
               </CardContent>
             </Card>
@@ -3080,7 +3081,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   <Badge variant="secondary" className="text-xs">
                     {approvalDatePreset !== 'custom' ? approvalDatePreset.replace(/([A-Z])/g, ' $1').trim() : 'Custom'}: {approvalDateFrom || '...'} → {approvalDateTo || '...'}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">{filteredApprovals.length} of {pendingApprovals.length} expense(s)</span>
+                  <span className="text-xs text-muted-foreground">{filteredApprovals.length} expense(s) shown ({pendingApprovalCount} pending)</span>
                 </div>
               )}
             </CardContent>
@@ -3090,7 +3091,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             <CardHeader>
               <CardTitle>Approval Management</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {filteredApprovals.length} expense(s) in approval workflow{filteredApprovals.length !== pendingApprovals.length ? ` (${pendingApprovals.length} total)` : ''}
+                {filteredApprovals.length} expense(s) in approval workflow ({pendingApprovalCount} pending)
               </p>
             </CardHeader>
             <CardContent>
