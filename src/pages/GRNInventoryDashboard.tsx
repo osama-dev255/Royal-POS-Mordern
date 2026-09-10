@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getSavedGRNs, SavedGRN, deleteGRN } from "@/utils/grnUtils";
-import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer, Truck, XCircle } from "lucide-react";
+import { Package, TrendingUp, AlertTriangle, CheckCircle, Clock, Download, Printer, Truck, XCircle, Eye, EyeOff } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -18,6 +18,7 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
   const [selectedGRN, setSelectedGRN] = useState<SavedGRN | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"grn" | "inventory">("grn");
+  const [showRecentGRNs, setShowRecentGRNs] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -253,28 +254,44 @@ export const GRNInventoryDashboard = ({ username, onBack, onLogout, onNavigate }
             {recentGRNs.length > 0 && (
               <Card className="mb-8">
                 <CardHeader>
-                  <CardTitle>Recent GRNs</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {recentGRNs.map((grn) => (
-                      <div key={grn.id} className="flex justify-between items-center p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium">{grn.data.grnNumber || grn.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {grn.data.supplierName || "Unknown Supplier"} • {new Date(grn.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatCurrency(grn.total || 0)}</p>
-                          <Button size="sm" variant="outline" onClick={() => handleGRNView(grn)}>
-                            View Details
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Recent GRNs</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowRecentGRNs(!showRecentGRNs)}
+                      title={showRecentGRNs ? "Hide recent GRNs" : "Show recent GRNs"}
+                    >
+                      {showRecentGRNs ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                </CardContent>
+                </CardHeader>
+                {showRecentGRNs && (
+                  <CardContent>
+                    <div className="space-y-4">
+                      {recentGRNs.map((grn) => (
+                        <div key={grn.id} className="flex justify-between items-center p-4 border rounded-lg">
+                          <div>
+                            <h3 className="font-medium">{grn.data.grnNumber || grn.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {grn.data.supplierName || "Unknown Supplier"} • {new Date(grn.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">{formatCurrency(grn.total || 0)}</p>
+                            <Button size="sm" variant="outline" onClick={() => handleGRNView(grn)}>
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
 
