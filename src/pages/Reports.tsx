@@ -19,7 +19,8 @@ import {
   FileSpreadsheet,
   TruckIcon,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
+  ShieldCheck
 } from "lucide-react";
 import { ExportUtils } from '@/utils/exportUtils';
 import { PrintUtils } from '@/utils/printUtils';
@@ -28,6 +29,7 @@ import { getSavedInvoices } from "@/utils/invoiceUtils";
 import { getSavedSettlements } from "@/utils/customerSettlementUtils";
 import { getSavedDeliveries } from '@/utils/deliveryUtils';
 import { getProducts, getInventoryStats } from '@/services/databaseService';
+import { getSavedGRNs } from '@/utils/grnUtils';
 import { formatCurrency } from '@/lib/currency';
 
 interface ReportsProps {
@@ -84,6 +86,8 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
   const [loadingSavedSettlements, setLoadingSavedSettlements] = useState(false);
   const [loadingSavedDeliveries, setLoadingSavedDeliveries] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [savedGRNs, setSavedGRNs] = useState<any[]>([]);
+  const [loadingSavedGRNs, setLoadingSavedGRNs] = useState(false);
 
   // Helper function to format dates
   const formatDate = (dateValue: string | Date | undefined): string => {
@@ -207,7 +211,13 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
     }
     
     const filtered = data.filter(item => {
-      const dateValue = item[dateField];
+      // Support dot-notation for nested fields (e.g. 'data.date' -> item.data.date)
+      let dateValue: any;
+      if (dateField.includes('.')) {
+        dateValue = dateField.split('.').reduce((obj: any, key: string) => obj?.[key], item);
+      } else {
+        dateValue = item[dateField];
+      }
       const isInRange = isDateInRange(dateValue);
       if (!isInRange && dateValue) {
         console.log('Item filtered out:', { 
@@ -279,6 +289,23 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       };
       
       loadDeliveries();
+    } else if (reportType === "compliance") {
+      setLoadingSavedGRNs(true);
+      const loadGRNs = async () => {
+        try {
+          const grns = await getSavedGRNs();
+          console.log('=== LOADED SAVED GRNs FOR COMPLIANCE ===');
+          console.log('Total GRNs loaded:', grns.length);
+          setSavedGRNs(grns);
+        } catch (error) {
+          console.error('Error loading saved GRNs:', error);
+          setSavedGRNs([]);
+        } finally {
+          setLoadingSavedGRNs(false);
+        }
+      };
+      
+      loadGRNs();
     } else if (reportType === "inventory") {
       setLoadingProducts(true);
       const loadInventoryData = async () => {
@@ -321,6 +348,8 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         outOfStockItems: 0
       });
       setLoadingProducts(false);
+      setSavedGRNs([]);
+      setLoadingSavedGRNs(false);
     }
   }, [reportType]);
 
@@ -404,6 +433,24 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
         if (format === "csv") ExportUtils.exportToCSV(exportData, filename);
         else if (format === "excel") ExcelUtils.exportToExcel(exportData, filename);
         else if (format === "pdf") ExportUtils.exportToPDF(exportData, filename, "Saved Deliveries Report");
+        break;
+      case "compliance":
+        const filteredGRNsForExport = filterDataByDateRange(savedGRNs, 'data.date');
+        const complianceExportData = filteredGRNsForExport.map((grn: any) => ({
+          grnNumber: grn.data?.grnNumber || 'N/A',
+          date: formatDate(grn.data?.date),
+          supplierName: grn.data?.supplierName || 'N/A',
+          stockType: grn.data?.isVatable ? 'Vatable' : 'Exempt',
+          tinImplemented: grn.data?.isVatable ? 'Yes' : 'No',
+          supplierTIN: grn.data?.supplierTinNumber || 'N/A',
+          businessTIN: grn.data?.businessTin || 'N/A',
+          poNumber: grn.data?.poNumber || 'N/A',
+          deliveryNoteNumber: grn.data?.deliveryNoteNumber || 'N/A',
+          totalAmount: grn.total || 0
+        }));
+        if (format === "csv") ExportUtils.exportToCSV(complianceExportData, filename);
+        else if (format === "excel") ExcelUtils.exportToExcel(complianceExportData, filename);
+        else if (format === "pdf") ExportUtils.exportToPDF(complianceExportData, filename, "Compliance Report");
         break;
     }
   };
@@ -563,6 +610,28 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
           };
           console.log('Formatted Saved Deliveries Report Data:', reportData);
           break;
+        case "compliance":
+          const filteredGRNsForPrint = filterDataByDateRange(savedGRNs, 'data.date');
+          console.log('Saved GRNs Data for Compliance Print:', filteredGRNsForPrint);
+          reportData = {
+            title: "Compliance Report",
+            period: `${dateRange} (${new Date().toLocaleDateString()})`,
+            data: filteredGRNsForPrint.map((grn: any) => ({
+              grnNumber: grn.data?.grnNumber || 'N/A',
+              date: formatDate(grn.data?.date),
+              supplierName: grn.data?.supplierName || 'N/A',
+              stockType: grn.data?.isVatable ? 'Vatable' : 'Exempt',
+              tinImplemented: grn.data?.isVatable ? 'Yes' : 'No',
+              supplierTIN: grn.data?.supplierTinNumber || 'N/A',
+              businessTIN: grn.data?.businessTin || 'N/A',
+              poNumber: grn.data?.poNumber || 'N/A',
+              deliveryNoteNumber: grn.data?.deliveryNoteNumber || 'N/A',
+              totalAmount: formatCurrency(grn.total || 0),
+              totalAmountRaw: grn.total || 0
+            }))
+          };
+          console.log('Formatted Compliance Report Data:', reportData);
+          break;
       }
         
       // Validate that we have data to print
@@ -595,6 +664,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       case "saved-invoices": return "Saved Invoices Report";
       case "saved-customer-settlements": return "Saved Customer Settlements Report";
       case "saved-deliveries": return "Saved Deliveries Report";
+      case "compliance": return "Compliance Report";
       default: return "Sales Report";
     }
   };
@@ -1158,6 +1228,140 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
             </div>
           </div>
         );
+      case "compliance":
+        if (loadingSavedGRNs) {
+          return (
+            <div className="flex justify-center items-center h-64">
+              <p>Loading compliance data...</p>
+            </div>
+          );
+        }
+        
+        // Apply date filtering to saved GRNs
+        const filteredGRNsPreview = filterDataByDateRange(savedGRNs, 'data.date');
+        
+        if (filteredGRNsPreview.length === 0) {
+          return (
+            <div className="text-center py-12">
+              <ShieldCheck className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No Compliance Data Found</h3>
+              <p className="text-muted-foreground mb-4">
+                No GRN compliance records found for the selected date range.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Compliance data is sourced from Saved Goods Received Notes.
+              </p>
+            </div>
+          );
+        }
+        
+        const vatableCount = filteredGRNsPreview.filter((grn: any) => grn.data?.isVatable).length;
+        const exemptCount = filteredGRNsPreview.length - vatableCount;
+        const tinImplementedCount = filteredGRNsPreview.filter((grn: any) => grn.data?.supplierTinNumber || grn.data?.businessTin).length;
+        const totalComplianceAmount = filteredGRNsPreview.reduce((sum: number, grn: any) => sum + (grn.total || 0), 0);
+        
+        return (
+          <div>
+            {/* Compliance Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total GRNs</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{filteredGRNsPreview.length}</div>
+                  <p className="text-xs text-muted-foreground">Compliance records</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Vatable</CardTitle>
+                  <ShieldCheck className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{vatableCount}</div>
+                  <p className="text-xs text-muted-foreground">Taxable purchases</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Exempt</CardTitle>
+                  <ShieldCheck className="h-4 w-4 text-orange-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">{exemptCount}</div>
+                  <p className="text-xs text-muted-foreground">Tax-exempt purchases</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">TIN Implemented</CardTitle>
+                  <FileText className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">{tinImplementedCount}</div>
+                  <p className="text-xs text-muted-foreground">With TIN numbers</p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Total Compliance Amount */}
+            <div className="mb-6 p-4 bg-muted rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total Compliance Amount ({dateRange}):</span>
+                <span className="text-xl font-bold">{formatCurrency(totalComplianceAmount)}</span>
+              </div>
+            </div>
+            
+            {/* Compliance Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b">
+                    <th className="pb-2">GRN #</th>
+                    <th className="pb-2">Date</th>
+                    <th className="pb-2">Supplier</th>
+                    <th className="pb-2">Stock Type</th>
+                    <th className="pb-2">TIN Implemented</th>
+                    <th className="pb-2">Supplier TIN</th>
+                    <th className="pb-2">Business TIN</th>
+                    <th className="pb-2 text-right">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredGRNsPreview.map((grn: any) => (
+                    <tr key={grn.id} className="border-b">
+                      <td className="py-2 font-medium">{grn.data?.grnNumber || 'N/A'}</td>
+                      <td className="py-2">{formatDate(grn.data?.date)}</td>
+                      <td className="py-2">{grn.data?.supplierName || 'N/A'}</td>
+                      <td className="py-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          grn.data?.isVatable ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                        }`}>
+                          {grn.data?.isVatable ? 'Vatable' : 'Exempt'}
+                        </span>
+                      </td>
+                      <td className="py-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          grn.data?.isVatable ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {grn.data?.isVatable ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="py-2">{grn.data?.supplierTinNumber || 'N/A'}</td>
+                      <td className="py-2">{grn.data?.businessTin || 'N/A'}</td>
+                      <td className="py-2 text-right font-bold">{formatCurrency(grn.total || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
     }
   };
 
@@ -1242,6 +1446,12 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
                         <div className="flex items-center gap-2">
                           <TruckIcon className="h-4 w-4" />
                           Saved Deliveries Report
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="compliance">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4" />
+                          Compliance Report
                         </div>
                       </SelectItem>
                     </SelectContent>
