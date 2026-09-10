@@ -270,12 +270,15 @@ export interface Expense {
   is_business_related?: boolean;
   notes?: string;
   // Approval workflow
-  approval_status?: string; // pending, approved, rejected
+  approval_status?: string; // pending, approved, rejected, verified
   prepared_by_name?: string; // Person who created the expense (text name)
   approved_by?: string; // UUID foreign key to users table
   approved_by_name?: string; // Person who approved (text name)
   approval_date?: string;
   approval_notes?: string;
+  // Verification workflow
+  verified_by_name?: string; // Person who verified the expense
+  verified_date?: string; // Date of verification
   // Advanced tracking
   is_recurring?: boolean;
   recurring_frequency?: string; // daily, weekly, monthly, yearly
@@ -3025,6 +3028,30 @@ export const approveOutletExpense = async (
     return true;
   } catch (error) {
     console.error('Error approving expense:', error);
+    return false;
+  }
+};
+
+// Verify expense
+export const verifyOutletExpense = async (
+  expenseId: string,
+  verifiedByName: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('expenses')
+      .update({
+        approval_status: 'verified',
+        verified_by_name: verifiedByName,
+        verified_date: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', expenseId);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error verifying expense:', error);
     return false;
   }
 };

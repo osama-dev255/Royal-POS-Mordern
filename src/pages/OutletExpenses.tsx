@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -62,7 +63,8 @@ import {
   Printer,
   CreditCard,
   Smartphone,
-  Landmark
+  Landmark,
+  ShieldCheck
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -104,6 +106,7 @@ import {
   createVendorType,
   deleteVendorType,
   getSuppliers,
+  verifyOutletExpense,
   Expense,
   ExpenseBudget,
   ExpenseAnalytics,
@@ -301,6 +304,10 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [viewingExpense, setViewingExpense] = useState<Expense | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [verifyExpense, setVerifyExpense] = useState<Expense | null>(null);
+  const [verifyName, setVerifyName] = useState('');
+  const [verifyingLoading, setVerifyingLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   
   // Vendor states
@@ -1075,6 +1082,30 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     }
   };
 
+  const handleVerifyExpense = async () => {
+    if (!verifyExpense || !verifyName.trim()) {
+      toast({ title: "Validation Error", description: "Please enter the verifier's name", variant: "destructive" });
+      return;
+    }
+    setVerifyingLoading(true);
+    try {
+      const result = await verifyOutletExpense(verifyExpense.id!, verifyName.trim());
+      if (result) {
+        toast({ title: "Success", description: "Expense verified successfully" });
+        setIsVerifyDialogOpen(false);
+        setVerifyExpense(null);
+        setVerifyName('');
+        loadData();
+      } else {
+        toast({ title: "Error", description: "Failed to verify expense", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to verify expense", variant: "destructive" });
+    } finally {
+      setVerifyingLoading(false);
+    }
+  };
+
   const handleCreateBudget = async () => {
     if (!outletId || !budgetData.category || !budgetData.budget_amount) {
       toast({
@@ -1420,6 +1451,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       case 'approved': return 'bg-green-100 text-green-800';
       case 'rejected': return 'bg-red-100 text-red-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'verified': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -2527,6 +2559,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="approved">Approved</SelectItem>
                     <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="verified">Verified</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
@@ -2710,6 +2743,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <TableHead>Status</TableHead>
                     <TableHead>Prepared By</TableHead>
                     <TableHead>Approved By</TableHead>
+                    <TableHead>Verified By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2752,12 +2786,30 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                         ) : '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(expense.approval_status || 'pending')}>
+                        <Badge 
+                          className={`${getStatusColor(expense.approval_status || 'pending')} cursor-pointer hover:opacity-80 transition-opacity`}
+                          onClick={() => {
+                            setVerifyExpense(expense);
+                            setVerifyName('');
+                            setIsVerifyDialogOpen(true);
+                          }}
+                          title="Click to update verification status"
+                        >
                           {expense.approval_status?.toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell>{expense.prepared_by_name || '-'}</TableCell>
                       <TableCell>{expense.approved_by_name || '-'}</TableCell>
+                      <TableCell>
+                        {expense.verified_by_name ? (
+                          <div>
+                            <div className="font-medium text-blue-700">{expense.verified_by_name}</div>
+                            {expense.verified_date && (
+                              <div className="text-xs text-muted-foreground">{new Date(expense.verified_date).toLocaleDateString()}</div>
+                            )}
+                          </div>
+                        ) : '-'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button 
@@ -4424,6 +4476,81 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           )}
           <DialogFooter>
             <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Verify Expense Dialog */}
+      <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-blue-600" />
+              Verify Expense
+            </DialogTitle>
+          </DialogHeader>
+          {verifyExpense && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Category:</span>
+                  <span className="font-medium">{verifyExpense.category}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="font-medium">{formatTZS(verifyExpense.amount)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Date:</span>
+                  <span className="font-medium">{new Date(verifyExpense.expense_date).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Current Status:</span>
+                  <Badge className={getStatusColor(verifyExpense.approval_status || 'pending')}>
+                    {verifyExpense.approval_status?.toUpperCase()}
+                  </Badge>
+                </div>
+                {verifyExpense.verified_by_name && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Previously Verified By:</span>
+                    <span className="font-medium text-blue-700">{verifyExpense.verified_by_name}</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="verifyName">Verifier's Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="verifyName"
+                  value={verifyName}
+                  onChange={(e) => setVerifyName(e.target.value)}
+                  placeholder="Enter your name to verify this expense"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && verifyName.trim()) {
+                      handleVerifyExpense();
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This will mark the expense as verified and record your name as the verifier.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsVerifyDialogOpen(false); setVerifyExpense(null); setVerifyName(''); }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleVerifyExpense} 
+              disabled={verifyingLoading || !verifyName.trim()}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {verifyingLoading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verifying...</>
+              ) : (
+                <><ShieldCheck className="h-4 w-4 mr-2" /> Verify Expense</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
