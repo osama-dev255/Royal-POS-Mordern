@@ -3088,9 +3088,9 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
           <Card>
             <CardHeader>
-              <CardTitle>Pending Approvals</CardTitle>
+              <CardTitle>Approval Management</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {filteredApprovals.length} expense(s) awaiting your approval{filteredApprovals.length !== pendingApprovals.length ? ` (${pendingApprovals.length} total)` : ''}
+                {filteredApprovals.length} expense(s) in approval workflow{filteredApprovals.length !== pendingApprovals.length ? ` (${pendingApprovals.length} total)` : ''}
               </p>
             </CardHeader>
             <CardContent>
@@ -3104,6 +3104,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                     <TableHead>Vendor</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Prepared By</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Approved By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -3118,6 +3119,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       <TableCell>{expense.vendor_name || '-'}</TableCell>
                       <TableCell className="text-right font-medium">{formatTZS(expense.amount)}</TableCell>
                       <TableCell>{expense.prepared_by_name || '-'}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(expense.approval_status || 'pending')}>
+                          {(expense.approval_status || 'pending').toUpperCase()}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{expense.approved_by_name || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -3165,7 +3171,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               {filteredApprovals.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-600" />
-                  <p>{pendingApprovals.length === 0 ? 'All expenses have been reviewed' : 'No expenses match the selected date range'}</p>
+                  <p>{pendingApprovals.length === 0 ? 'No expenses in the approval workflow' : 'No expenses match the selected date range'}</p>
                 </div>
               )}
             </CardContent>

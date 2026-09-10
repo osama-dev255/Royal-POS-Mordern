@@ -3081,7 +3081,7 @@ export const getPendingExpenseApprovals = async (outletId: string): Promise<Expe
       .from('expenses')
       .select('*')
       .eq('outlet_id', outletId)
-      .eq('approval_status', 'pending')
+      .in('approval_status', ['pending', 'approved', 'rejected'])
       .order('expense_date', { ascending: false });
       
     if (error) throw error;
