@@ -82,8 +82,10 @@ export interface GRNData {
   approvedDate: string;
   rejectedBy: string;
   rejectedDate: string;
+  verifiedBy: string;
+  verifiedDate: string;
   receivedDate: string;
-  status?: "draft" | "pending" | "received" | "checked" | "approved" | "completed" | "rejected" | "cancelled";
+  status?: "draft" | "pending" | "received" | "checked" | "approved" | "completed" | "rejected" | "cancelled" | "verified";
   receivingCosts: Array<{ description: string; amount: number }>;
   // Godown integration fields
   destinationGodownId?: string; // ID of destination godown
@@ -477,6 +479,8 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             approvedDate: dbGRN.approved_date ? dbGRN.approved_date.toString() : '',
             rejectedBy: dbGRN.rejected_by || '',
             rejectedDate: dbGRN.rejected_date ? dbGRN.rejected_date.toString() : '',
+            verifiedBy: dbGRN.verified_by || '',
+            verifiedDate: dbGRN.verified_date ? dbGRN.verified_date.toString() : '',
             receivedDate: dbGRN.received_date ? dbGRN.received_date.toString() : '',
             status: dbGRN.status || 'pending',
             receivingCosts: receivingCosts,

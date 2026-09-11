@@ -5,21 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertCircle, ShieldCheck } from "lucide-react";
 import { SavedGRN } from "@/utils/grnUtils";
 
 interface GRNStatusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   grn: SavedGRN;
-  onSave: (grnId: string, newStatus: string, approvedBy: string, rejectedBy: string) => Promise<void>;
+  onSave: (grnId: string, newStatus: string, approvedBy: string, rejectedBy: string, verifiedBy: string) => Promise<void>;
 }
 
 export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDialogProps) => {
   const currentStatus = grn.data?.status || "pending";
-  const [newStatus, setNewStatus] = useState(currentStatus);
+  const [newStatus, setNewStatus] = useState<string>(currentStatus);
   const [approvedBy, setApprovedBy] = useState(grn.data?.approvedBy || "");
   const [rejectedBy, setRejectedBy] = useState(grn.data?.rejectedBy || "");
+  const [verifiedBy, setVerifiedBy] = useState(grn.data?.verifiedBy || "");
   const [saving, setSaving] = useState(false);
 
   // Reset state when dialog opens with a new GRN
@@ -28,13 +29,14 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
       setNewStatus(grn.data?.status || "pending");
       setApprovedBy(grn.data?.approvedBy || "");
       setRejectedBy(grn.data?.rejectedBy || "");
+      setVerifiedBy(grn.data?.verifiedBy || "");
     }
   }, [open, grn]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(grn.id, newStatus, approvedBy, rejectedBy);
+      await onSave(grn.id, newStatus, approvedBy, rejectedBy, verifiedBy);
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating GRN status:", error);
@@ -47,6 +49,7 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
     switch (status) {
       case "completed":
       case "approved":
+      case "verified":
         return "default" as const;
       case "checked":
         return "secondary" as const;
@@ -65,6 +68,8 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
       case "completed":
       case "approved":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "verified":
+        return <ShieldCheck className="h-4 w-4 text-blue-500" />;
       case "rejected":
         return <XCircle className="h-4 w-4 text-red-500" />;
       case "pending":
@@ -103,6 +108,9 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
             {currentStatus === "rejected" && grn.data?.rejectedBy && (
               <span className="text-xs text-muted-foreground">by {grn.data.rejectedBy}</span>
             )}
+            {currentStatus === "verified" && grn.data?.verifiedBy && (
+              <span className="text-xs text-muted-foreground">by {grn.data.verifiedBy}</span>
+            )}
           </div>
 
           {/* New Status Selection */}
@@ -123,6 +131,12 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     Approved
+                  </div>
+                </SelectItem>
+                <SelectItem value="verified">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-blue-500" />
+                    Verified
                   </div>
                 </SelectItem>
                 <SelectItem value="rejected">
@@ -167,6 +181,19 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
             </div>
           )}
 
+          {/* Verified By — shown when status is verified */}
+          {newStatus === "verified" && (
+            <div className="space-y-2">
+              <Label htmlFor="verified-by">Verified By</Label>
+              <Input
+                id="verified-by"
+                value={verifiedBy}
+                onChange={(e) => setVerifiedBy(e.target.value)}
+                placeholder="Enter name of verifier"
+              />
+            </div>
+          )}
+
           {/* Preview of what will be saved */}
           {newStatus !== currentStatus && (
             <div className="flex items-center gap-2 p-3 rounded-lg border border-primary/30 bg-primary/5">
@@ -178,6 +205,7 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
                 <span className="font-semibold">{newStatus}</span>
                 {newStatus === "approved" && approvedBy && ` (approved by ${approvedBy})`}
                 {newStatus === "rejected" && rejectedBy && ` (rejected by ${rejectedBy})`}
+                {newStatus === "verified" && verifiedBy && ` (verified by ${verifiedBy})`}
               </p>
             </div>
           )}

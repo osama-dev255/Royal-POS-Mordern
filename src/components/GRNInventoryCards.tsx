@@ -436,7 +436,7 @@ export const GRNInventoryCards = ({
           open={statusDialogOpen}
           onOpenChange={setStatusDialogOpen}
           grn={statusDialogGRN}
-          onSave={async (grnId, newStatus, approvedBy, rejectedBy) => {
+          onSave={async (grnId, newStatus, approvedBy, rejectedBy, verifiedBy) => {
             // Find the GRN and update its status
             const targetGRN = grns.find(g => g.id === grnId);
             if (!targetGRN) return;
@@ -448,8 +448,10 @@ export const GRNInventoryCards = ({
                 status: newStatus as any,
                 approvedBy: newStatus === 'approved' ? approvedBy : (targetGRN.data.approvedBy || ''),
                 rejectedBy: newStatus === 'rejected' ? rejectedBy : (targetGRN.data.rejectedBy || ''),
+                verifiedBy: newStatus === 'verified' ? verifiedBy : (targetGRN.data.verifiedBy || ''),
                 approvedDate: newStatus === 'approved' ? new Date().toISOString().split('T')[0] : (targetGRN.data.approvedDate || ''),
                 rejectedDate: newStatus === 'rejected' ? new Date().toISOString().split('T')[0] : (targetGRN.data.rejectedDate || ''),
+                verifiedDate: newStatus === 'verified' ? new Date().toISOString().split('T')[0] : (targetGRN.data.verifiedDate || ''),
               },
               updatedAt: new Date().toISOString()
             };
