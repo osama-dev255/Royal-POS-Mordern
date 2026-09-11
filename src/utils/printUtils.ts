@@ -3116,6 +3116,143 @@ export class PrintUtils {
     }, 250);
   }
 
+  // Print COGS report
+  static printCOGSReport(data: any) {
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) return;
+
+    const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+    const purchaseRows = (data.purchaseBreakdown || []).map((e: any) => `
+      <tr>
+        <td>${e.source}</td>
+        <td>${e.supplierName}</td>
+        <td>${e.date ? new Date(e.date).toLocaleDateString() : 'N/A'}</td>
+        <td class="text-right">${e.itemCount || '-'}</td>
+        <td class="text-right">${fmt(e.totalCost)}</td>
+      </tr>
+    `).join('');
+
+    const directCostRows = (data.directCostBreakdown || []).map((e: any) => `
+      <tr>
+        <td>${e.grnNumber || '-'}</td>
+        <td>${e.supplierName}</td>
+        <td>${e.date ? new Date(e.date).toLocaleDateString() : 'N/A'}</td>
+        <td>${e.description}</td>
+        <td class="text-right">${fmt(e.amount)}</td>
+      </tr>
+    `).join('');
+
+    const returnRows = (data.returnsBreakdown || []).map((e: any) => `
+      <tr>
+        <td>${e.returnDate ? new Date(e.returnDate).toLocaleDateString() : 'N/A'}</td>
+        <td>${e.reason}</td>
+        <td class="text-right">${fmt(e.totalAmount)}</td>
+      </tr>
+    `).join('');
+
+    const reportContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cost of Goods Sold (COGS) Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #333; font-size: 13px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .business-name { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+            .report-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+            .report-period { font-size: 14px; color: #666; margin-bottom: 20px; }
+            .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+            .summary-table th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #333; font-weight: 700; }
+            .summary-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+            .text-right { text-align: right; }
+            .formula-box { background: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 24px; text-align: center; font-family: monospace; font-size: 13px; }
+            .section-title { font-size: 15px; font-weight: bold; margin: 20px 0 8px 0; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+            .detail-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+            .detail-table th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-weight: 700; font-size: 12px; }
+            .detail-table td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 12px; }
+            .total-row td { font-weight: bold; border-top: 1px solid #333; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #999; }
+            @media print { body { margin: 10mm; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="business-name">POS Business</div>
+            <div class="report-title">COST OF GOODS SOLD (COGS)</div>
+            <div class="report-period">${data.period || 'Current Period'}</div>
+          </div>
+
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th class="text-right">Amount (TZS)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Opening Inventory</td><td class="text-right">${fmt(data.openingInventory)}</td></tr>
+              <tr><td>+ Net Purchases</td><td class="text-right">${fmt(data.netPurchases)}</td></tr>
+              <tr><td>+ Direct Costs</td><td class="text-right">${fmt(data.directCosts)}</td></tr>
+              <tr><td>- Returns</td><td class="text-right">${fmt(data.returns)}</td></tr>
+              <tr><td>- Closing Inventory</td><td class="text-right">${fmt(data.closingInventory)}</td></tr>
+              <tr class="total-row"><td><strong>= COGS</strong></td><td class="text-right"><strong>${fmt(data.cogs)}</strong></td></tr>
+            </tbody>
+          </table>
+
+          <div class="formula-box">
+            COGS = Opening Inventory + Net Purchases + Direct Costs - Returns - Closing Inventory<br/>
+            ${fmt(data.cogs)} = ${fmt(data.openingInventory)} + ${fmt(data.netPurchases)} + ${fmt(data.directCosts)} - ${fmt(data.returns)} - ${fmt(data.closingInventory)}
+          </div>
+
+          <div class="section-title">Purchase Costs</div>
+          ${purchaseRows ? `<table class="detail-table">
+            <thead><tr><th>Source</th><th>Supplier</th><th>Date</th><th class="text-right">Items</th><th class="text-right">Total (TZS)</th></tr></thead>
+            <tbody>${purchaseRows}
+              <tr class="total-row"><td colspan="4">Total Purchases</td><td class="text-right">${fmt(data.netPurchases)}</td></tr>
+            </tbody></table>` : '<p style="color:#999;">No purchase records for this period.</p>'}
+
+          <div class="section-title">Direct Costs</div>
+          ${directCostRows ? `<table class="detail-table">
+            <thead><tr><th>GRN #</th><th>Supplier</th><th>Date</th><th>Description</th><th class="text-right">Amount (TZS)</th></tr></thead>
+            <tbody>${directCostRows}
+              <tr class="total-row"><td colspan="4">Total Direct Costs</td><td class="text-right">${fmt(data.directCosts)}</td></tr>
+            </tbody></table>` : '<p style="color:#999;">No direct costs for this period.</p>'}
+
+          <div class="section-title">Returns</div>
+          ${returnRows ? `<table class="detail-table">
+            <thead><tr><th>Date</th><th>Reason</th><th class="text-right">Amount (TZS)</th></tr></thead>
+            <tbody>${returnRows}
+              <tr class="total-row"><td colspan="2">Total Returns</td><td class="text-right">${fmt(data.returns)}</td></tr>
+            </tbody></table>` : '<p style="color:#999;">No returns for this period.</p>'}
+
+          <div class="section-title">Inventory Valuation</div>
+          <table class="detail-table">
+            <thead><tr><th>Valuation</th><th class="text-right">Amount (TZS)</th></tr></thead>
+            <tbody>
+              <tr><td>Opening Inventory</td><td class="text-right">${fmt(data.openingInventory)}</td></tr>
+              <tr><td>Closing Inventory</td><td class="text-right">${fmt(data.closingInventory)}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+            <p>Confidential - For Internal Use Only</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    reportWindow.document.write(reportContent);
+    reportWindow.document.close();
+    reportWindow.focus();
+
+    setTimeout(() => {
+      reportWindow.print();
+      reportWindow.close();
+    }, 250);
+  }
+
   // Print delivery note in template format
   static printDeliveryNote(delivery: any) {
     // Show loading indicator

@@ -12,7 +12,8 @@ import {
   PackageCheck,
   CreditCard,
   ClipboardList,
-  Link2
+  Link2,
+  DollarSign
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
 
@@ -133,6 +134,13 @@ export const PurchaseDashboard = ({ username, onBack, onLogout, onNavigate }: Pu
       title: "Supplier Products",
       description: "View and manage products linked to suppliers",
       icon: Link2,
+      color: "bg-white border border-gray-200"
+    },
+    {
+      id: "cogs",
+      title: "Cost of Goods Sold",
+      description: "Track and analyze cost of goods sold with inventory and purchase breakdown",
+      icon: DollarSign,
       color: "bg-white border border-gray-200"
     }
   ];

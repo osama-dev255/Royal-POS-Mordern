@@ -60,6 +60,7 @@ import { SavedSupplierSettlementsSection } from "@/components/SavedSupplierSettl
 import { SupplierPurchaseNoteSection } from "@/components/SupplierPurchaseNoteSection";
 import { PurchaseOrderSection } from "@/components/PurchaseOrderSection";
 import { SupplierProductsSection } from "@/components/SupplierProductsSection";
+import { CostOfGoodsSold } from "@/pages/CostOfGoodsSold";
 import { GRNInventoryDashboard } from "@/pages/GRNInventoryDashboard";
 import { RegisteredOutlets } from "@/pages/RegisteredOutlets";
 import { OutletDetails } from "@/pages/OutletDetails";
@@ -553,6 +554,9 @@ export const Index = () => {
       case "supplier-products":
         setCurrentView("purchase");
         break;
+      case "cogs":
+        setCurrentView("purchase");
+        break;
       default:
         setCurrentView("comprehensive");
     }
@@ -607,7 +611,7 @@ export const Index = () => {
     "discounts", "audit", "access-logs", "statements-reports", "register",
     "settings", "scanner", "automated", "payables-receivables",
     "customer-stock", "monetary-assets", "templates", "saved-grns", "saved-supplier-settlements",
-    "saved-supplier-purchase-notes", "supplier-products", "saved-purchase-orders",
+    "saved-supplier-purchase-notes", "supplier-products", "saved-purchase-orders", "cogs",
     "inventory", "grn-inventory-dashboard", "registered-outlets", "outlet-expenses",
     "godowns", "stock-transfers", "stock-movements"
   ];
@@ -1560,6 +1564,7 @@ export const Index = () => {
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}
+                  onNavigate={handleNavigate}
                 />
               );
             case "test":
@@ -2695,6 +2700,15 @@ export const Index = () => {
               console.log("Rendering SupplierProductsSection");
               return (
                 <SupplierProductsSection
+                  username={user?.email || "admin"}
+                  onBack={handleBack}
+                  onLogout={handleLogout}
+                />
+              );
+            case "cogs":
+              console.log("Rendering CostOfGoodsSold");
+              return (
+                <CostOfGoodsSold
                   username={user?.email || "admin"}
                   onBack={handleBack}
                   onLogout={handleLogout}

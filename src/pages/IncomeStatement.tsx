@@ -7,7 +7,8 @@ import {
   Download, 
   ArrowLeft,
   Loader2,
-  Eye
+  Eye,
+  ExternalLink
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PrintUtils } from "@/utils/printUtils";
@@ -18,6 +19,7 @@ import {
   getReturns
 } from "@/services/databaseService";
 import { Sale, PurchaseOrder, Expense, Return } from "@/services/databaseService";
+import { calculateCOGS } from "@/pages/CostOfGoodsSold";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +32,7 @@ interface IncomeStatementProps {
   username: string;
   onBack: () => void;
   onLogout: () => void;
+  onNavigate?: (module: string) => void;
 }
 
 interface IncomeStatementData {
@@ -60,7 +63,7 @@ interface DetailInfo {
   dataSources: string[];
 }
 
-export const IncomeStatement = ({ username, onBack, onLogout }: IncomeStatementProps) => {
+export const IncomeStatement = ({ username, onBack, onLogout, onNavigate }: IncomeStatementProps) => {
   const { toast } = useToast();
   const [period, setPeriod] = useState("January 2024");
   const [isLoading, setIsLoading] = useState(true);
@@ -215,8 +218,9 @@ export const IncomeStatement = ({ username, onBack, onLogout }: IncomeStatementP
         const totalReturns = returns.reduce((sum, returnItem) => sum + (returnItem.total_amount || 0), 0);
         const revenue = totalSales - totalReturns;
 
-        // Calculate COGS (cost of goods sold) - based on purchase orders
-        const cogs = purchases.reduce((sum, purchase) => sum + (purchase.total_amount || 0), 0);
+        // Calculate COGS using the full formula from the COGS module
+        const cogsResult = await calculateCOGS();
+        const cogs = cogsResult.cogs;
 
         // Calculate gross profit
         const grossProfit = revenue - cogs;
@@ -423,6 +427,17 @@ export const IncomeStatement = ({ username, onBack, onLogout }: IncomeStatementP
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
+                  {onNavigate && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onNavigate("cogs")}
+                      className="h-6 w-6"
+                      title="View COGS Details"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
                 <div className="text-right font-semibold">({incomeStatementData.cogs.toLocaleString()})</div>
                 <div className="text-right font-semibold">{incomeStatementData.cogsVat.toLocaleString()}</div>

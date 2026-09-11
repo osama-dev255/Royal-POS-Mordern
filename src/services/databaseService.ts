@@ -2130,7 +2130,7 @@ export const getPurchaseOrders = async (): Promise<PurchaseOrder[]> => {
     const { data, error } = await supabase
       .from('purchase_orders')
       .select('*')
-      .order('order_date', { ascending: false });
+      .order('date', { ascending: false });
       
     if (error) throw error;
     return data || [];
