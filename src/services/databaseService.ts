@@ -74,6 +74,7 @@ export interface Supplier {
   tax_id?: string;
   payment_terms?: string;
   is_active?: boolean;
+  registered_by?: string;
   created_at?: string;
   updated_at?: string;
 }

@@ -53,7 +53,8 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
     contact_person: "",
     email: "",
     phone: "",
-    tax_id: ""
+    tax_id: "",
+    registered_by: ""
   });
   const [completedPurchaseOrder, setCompletedPurchaseOrder] = useState<any>(null); // Store completed purchase order for printing
   const { toast } = useToast();
@@ -292,6 +293,15 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
       return;
     }
 
+    if (!newSupplier.registered_by) {
+      toast({
+        title: "Error",
+        description: "Registered By is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const supplierData = {
         name: newSupplier.name,
@@ -299,6 +309,7 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
         email: newSupplier.email || "",
         phone: newSupplier.phone || "",
         tax_id: newSupplier.tax_id || "",
+        registered_by: newSupplier.registered_by,
         is_active: true
       };
 
@@ -330,7 +341,8 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
           contact_person: "",
           email: "",
           phone: "",
-          tax_id: ""
+          tax_id: "",
+          registered_by: ""
         });
         
         toast({
@@ -688,7 +700,8 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
               contact_person: "",
               email: "",
               phone: "",
-              tax_id: ""
+              tax_id: "",
+              registered_by: ""
             });
           }
         }}>
@@ -757,6 +770,17 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
                     className="border-blue-200"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="registeredBy">Registered By *</Label>
+                  <Input
+                    id="registeredBy"
+                    value={newSupplier.registered_by}
+                    onChange={(e) => setNewSupplier({...newSupplier, registered_by: e.target.value})}
+                    placeholder="Enter your name"
+                    className="border-blue-200"
+                  />
+                </div>
                 
                 <div className="flex justify-end gap-2">
                   <Button 
@@ -769,7 +793,8 @@ export const PurchaseTerminal = ({ username, onBack, onLogout }: { username: str
                         contact_person: "",
                         email: "",
                         phone: "",
-                        tax_id: ""
+                        tax_id: "",
+                        registered_by: ""
                       });
                     }}
                   >

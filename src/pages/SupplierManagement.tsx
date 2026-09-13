@@ -26,6 +26,7 @@ interface Supplier {
   tax_id: string;
   payment_terms: string;
   status: "active" | "inactive";
+  registeredBy: string;
   created_at?: string;
 }
 
@@ -47,7 +48,8 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
     country: "",
     tax_id: "",
     payment_terms: "",
-    status: "active"
+    status: "active",
+    registeredBy: ""
   });
   const { toast } = useToast();
 
@@ -70,6 +72,7 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           tax_id: supplier.tax_id || '',
           payment_terms: supplier.payment_terms || '',
           status: supplier.is_active ? "active" as const : "inactive" as const,
+          registeredBy: supplier.registered_by || '',
           created_at: supplier.created_at,
         }));
         setSuppliers(formattedSuppliers);
@@ -89,10 +92,10 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
   }, []);
 
   const handleAddSupplier = async () => {
-    if (!newSupplier.name || !newSupplier.contactPerson) {
+    if (!newSupplier.name || !newSupplier.contactPerson || !newSupplier.registeredBy) {
       toast({
         title: "Error",
-        description: "Please fill in required fields",
+        description: "Please fill in all required fields (Company Name, Contact Person, Registered By)",
         variant: "destructive"
       });
       return;
@@ -111,7 +114,8 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         country: newSupplier.country,
         tax_id: newSupplier.tax_id,
         payment_terms: newSupplier.payment_terms,
-        is_active: newSupplier.status === "active"
+        is_active: newSupplier.status === "active",
+        registered_by: newSupplier.registeredBy
       };
 
       const createdSupplier = await createSupplier(supplierData);
@@ -131,6 +135,7 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           tax_id: createdSupplier.tax_id || '',
           payment_terms: createdSupplier.payment_terms || '',
           status: createdSupplier.is_active ? "active" as const : "inactive" as const,
+          registeredBy: createdSupplier.registered_by || '',
           created_at: createdSupplier.created_at,
         };
 
@@ -198,6 +203,7 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           tax_id: updatedSupplier.tax_id || '',
           payment_terms: updatedSupplier.payment_terms || '',
           status: updatedSupplier.is_active ? "active" as const : "inactive" as const,
+          registeredBy: updatedSupplier.registered_by || '',
         };
 
         setSuppliers(suppliers.map(s => s.id === editingSupplier.id ? formattedSupplier : s));
@@ -272,7 +278,8 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
       country: "",
       tax_id: "",
       payment_terms: "",
-      status: "active"
+      status: "active",
+      registeredBy: ""
     });
     setEditingSupplier(null);
   };
@@ -305,6 +312,7 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         tax_id: supplier.tax_id || '',
         payment_terms: supplier.payment_terms || '',
         status: supplier.is_active ? "active" as const : "inactive" as const,
+        registeredBy: supplier.registered_by || '',
       }));
       setSuppliers(formattedSuppliers);
       toast({
@@ -411,6 +419,22 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
                               : setNewSupplier({...newSupplier, contactPerson: e.target.value})
                           }
                           placeholder="Enter contact person name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="registeredBy">Registered By *</Label>
+                        <Input
+                          id="registeredBy"
+                          value={editingSupplier ? editingSupplier.registeredBy : newSupplier.registeredBy}
+                          onChange={(e) => 
+                            editingSupplier 
+                              ? setEditingSupplier({...editingSupplier, registeredBy: e.target.value}) 
+                              : setNewSupplier({...newSupplier, registeredBy: e.target.value})
+                          }
+                          placeholder="Enter name of person registering"
                         />
                       </div>
                     </div>
@@ -653,6 +677,14 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
                       <span className="text-muted-foreground">Contact:</span>
                       <span className="font-medium">{supplier.contactPerson || "N/A"}</span>
                     </div>
+
+                    {supplier.registeredBy && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Registered By:</span>
+                        <span className="font-medium text-primary">{supplier.registeredBy}</span>
+                      </div>
+                    )}
                     
                     {supplier.email && (
                       <div className="flex items-center gap-2">

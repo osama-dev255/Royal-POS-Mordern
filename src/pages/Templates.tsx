@@ -1420,14 +1420,14 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
   const [showSupplierDropdown, setShowSupplierDropdown] = useState<boolean>(false);
   const [loadingSuppliers, setLoadingSuppliers] = useState<boolean>(false);
   const [showNewSupplierDialog, setShowNewSupplierDialog] = useState<boolean>(false);
-  const [newSupplierForm, setNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+  const [newSupplierForm, setNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', registered_by: '' });
   const [savingNewSupplier, setSavingNewSupplier] = useState<boolean>(false);
 
   // SPN Supplier dropdown state
   const [spnSupplierSearch, setSpnSupplierSearch] = useState<string>('');
   const [spnShowSupplierDropdown, setSpnShowSupplierDropdown] = useState<boolean>(false);
   const [spnShowNewSupplierDialog, setSpnShowNewSupplierDialog] = useState<boolean>(false);
-  const [spnNewSupplierForm, setSpnNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+  const [spnNewSupplierForm, setSpnNewSupplierForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', registered_by: '' });
   const [spnSavingNewSupplier, setSpnSavingNewSupplier] = useState<boolean>(false);
 
   // PO Supplier dropdown state
@@ -19218,6 +19218,15 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                   className="mt-1 text-sm"
                 />
               </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Registered By <span className="text-red-500">*</span></label>
+                <Input
+                  value={newSupplierForm.registered_by}
+                  onChange={(e) => setNewSupplierForm(prev => ({ ...prev, registered_by: e.target.value }))}
+                  placeholder="Enter your name"
+                  className="mt-1 text-sm"
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <Button
@@ -19233,6 +19242,10 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                     toast({ title: "Error", description: "Please fill in Supplier Name and Contact Person", variant: "destructive" });
                     return;
                   }
+                  if (!newSupplierForm.registered_by) {
+                    toast({ title: "Error", description: "Please enter your name (Registered By)", variant: "destructive" });
+                    return;
+                  }
                   setSavingNewSupplier(true);
                   try {
                     const created = await createSupplier({
@@ -19242,6 +19255,7 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                       email: newSupplierForm.email,
                       address: newSupplierForm.address,
                       tax_id: newSupplierForm.tax_id,
+                      registered_by: newSupplierForm.registered_by,
                       is_active: true
                     });
                     if (created) {
@@ -19268,7 +19282,7 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                       }
                       setGrnData(prev => ({ ...prev, suppliers: updatedSuppliers }));
                       setShowNewSupplierDialog(false);
-                      setNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                      setNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', registered_by: '' });
                       toast({ title: "Success", description: "Supplier registered successfully" });
                     } else {
                       throw new Error("Failed to create supplier");
@@ -19363,6 +19377,15 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                   className="mt-1 text-sm"
                 />
               </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Registered By <span className="text-red-500">*</span></label>
+                <Input
+                  value={spnNewSupplierForm.registered_by}
+                  onChange={(e) => setSpnNewSupplierForm(prev => ({ ...prev, registered_by: e.target.value }))}
+                  placeholder="Enter your name"
+                  className="mt-1 text-sm"
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <Button
@@ -19378,6 +19401,10 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                     toast({ title: "Error", description: "Please fill in Supplier Name and Contact Person", variant: "destructive" });
                     return;
                   }
+                  if (!spnNewSupplierForm.registered_by) {
+                    toast({ title: "Error", description: "Please enter your name (Registered By)", variant: "destructive" });
+                    return;
+                  }
                   setSpnSavingNewSupplier(true);
                   try {
                     const created = await createSupplier({
@@ -19387,6 +19414,7 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                       email: spnNewSupplierForm.email,
                       address: spnNewSupplierForm.address,
                       tax_id: spnNewSupplierForm.tax_id,
+                      registered_by: spnNewSupplierForm.registered_by,
                       is_active: true
                     });
                     if (created) {
@@ -19410,7 +19438,7 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                       handlePurchaseOrderChange('supplierEmail', created.email || '');
                       handlePurchaseOrderChange('supplierAddress', created.address || '');
                       setSpnShowNewSupplierDialog(false);
-                      setSpnNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '' });
+                      setSpnNewSupplierForm({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', registered_by: '' });
                       setSpnSupplierProducts([]);
                       toast({ title: "Success", description: "Supplier registered and selected successfully" });
                     } else {
