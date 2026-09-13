@@ -85,6 +85,9 @@ const initialGRNData: GRNData = {
   approvedDate: new Date().toISOString().split('T')[0],
   rejectedBy: "",
   rejectedDate: new Date().toISOString().split('T')[0],
+  rejectedReason: "",
+  verifiedBy: "",
+  verifiedDate: "",
   receivedDate: new Date().toISOString().split('T')[0],
   status: "pending"
 };

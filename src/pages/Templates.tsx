@@ -609,8 +609,11 @@ interface GRNData {
   approvedDate: string;
   rejectedBy: string;
   rejectedDate: string;
+  rejectedReason: string;
+  verifiedBy: string;
+  verifiedDate: string;
   receivedDate: string;
-  status?: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft" | "cancelled";
+  status?: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft" | "cancelled" | "verified";
   timestamp?: string;
   // Godown integration fields
   destinationGodownId?: string;
@@ -2213,6 +2216,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       approvedDate: new Date().toISOString().split('T')[0],
       rejectedBy: "",
       rejectedDate: new Date().toISOString().split('T')[0],
+      rejectedReason: "",
+      verifiedBy: "",
+      verifiedDate: "",
       receivedDate: new Date().toISOString().split('T')[0],
       status: "completed",
       timestamp: new Date().toLocaleString()
@@ -2423,6 +2429,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
       approvedDate: grnData.approvedDate,
       rejectedBy: grnData.rejectedBy || '',
       rejectedDate: grnData.rejectedDate || '',
+      rejectedReason: grnData.rejectedReason || '',
       receivedDate: grnData.receivedDate,
       status: grnData.status || 'completed',
       receivingCosts: grnData.receivingCosts,
@@ -3171,6 +3178,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     approvedDate: new Date().toISOString().split('T')[0],
     rejectedBy: "",
     rejectedDate: new Date().toISOString().split('T')[0],
+    rejectedReason: "",
+    verifiedBy: "",
+    verifiedDate: "",
     receivedDate: new Date().toISOString().split('T')[0],
     status: "completed",
     timestamp: new Date().toLocaleString()

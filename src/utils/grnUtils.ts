@@ -82,6 +82,7 @@ export interface GRNData {
   approvedDate: string;
   rejectedBy: string;
   rejectedDate: string;
+  rejectedReason: string;
   verifiedBy: string;
   verifiedDate: string;
   receivedDate: string;
@@ -208,6 +209,7 @@ export const saveGRN = async (grn: SavedGRN): Promise<void> => {
       approved_date: grn.data.approvedDate ? new Date(grn.data.approvedDate).toISOString().split('T')[0] : null,
       rejected_by: grn.data.rejectedBy || '',
       rejected_date: grn.data.rejectedDate ? new Date(grn.data.rejectedDate).toISOString().split('T')[0] : null,
+      rejected_reason: grn.data.rejectedReason || '',
       received_date: grn.data.receivedDate ? new Date(grn.data.receivedDate).toISOString().split('T')[0] : null,
       status: grn.data.status || 'pending',
       total_amount: totalAmount,
@@ -479,6 +481,7 @@ export const getSavedGRNs = async (): Promise<SavedGRN[]> => {
             approvedDate: dbGRN.approved_date ? dbGRN.approved_date.toString() : '',
             rejectedBy: dbGRN.rejected_by || '',
             rejectedDate: dbGRN.rejected_date ? dbGRN.rejected_date.toString() : '',
+            rejectedReason: dbGRN.rejected_reason || '',
             verifiedBy: dbGRN.verified_by || '',
             verifiedDate: dbGRN.verified_date ? dbGRN.verified_date.toString() : '',
             receivedDate: dbGRN.received_date ? dbGRN.received_date.toString() : '',
@@ -648,6 +651,7 @@ export const updateGRN = async (updatedGRN: SavedGRN): Promise<void> => {
         approved_date: updatedGRN.data.approvedDate ? new Date(updatedGRN.data.approvedDate).toISOString().split('T')[0] : null,
         rejected_by: updatedGRN.data.rejectedBy || '',
         rejected_date: updatedGRN.data.rejectedDate ? new Date(updatedGRN.data.rejectedDate).toISOString().split('T')[0] : null,
+        rejected_reason: updatedGRN.data.rejectedReason || '',
         received_date: updatedGRN.data.receivedDate ? new Date(updatedGRN.data.receivedDate).toISOString().split('T')[0] : null,
         status: updatedGRN.data.status || 'completed',
         total_amount: totalAmount,

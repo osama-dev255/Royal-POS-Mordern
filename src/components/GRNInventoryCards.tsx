@@ -9,6 +9,8 @@ import { Search, Package, Filter, Download, Upload, Calendar, SortAsc, SortDesc,
 import { GRNInventoryCard } from "./GRNInventoryCard";
 import { GRNStatusDialog } from "./GRNStatusDialog";
 import { SavedGRN, updateGRN } from "@/utils/grnUtils";
+import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/currency";
 
 // Helper: parse "YYYY-MM-DD" as local midnight (avoids UTC timezone shift)
 const parseLocalDate = (dateStr: string): Date => {
@@ -49,6 +51,7 @@ export const GRNInventoryCards = ({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [statusDialogGRN, setStatusDialogGRN] = useState<SavedGRN | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleDatePreset = (preset: string) => {
     setDatePreset(preset);
@@ -162,6 +165,57 @@ export const GRNInventoryCards = ({
     setSortBy("date-desc");
     setDateRange({ from: "", to: "" });
     setDatePreset("all");
+  };
+
+  const handleShareGRN = async (grn: SavedGRN) => {
+    const data = grn.data;
+    const grnNumber = data?.grnNumber || `GRN-${grn.id.substring(0, 8)}`;
+    const totalValue = data?.items?.reduce((sum: number, item: any) => sum + (item.totalWithReceivingCost || item.total || 0), 0) || 0;
+
+    let shareText = `GOODS RECEIVED NOTE\n\n`;
+    shareText += `GRN #: ${grnNumber}\n`;
+    shareText += `Date: ${new Date(grn.createdAt).toLocaleDateString()}\n`;
+    shareText += `Supplier: ${data?.supplierName || 'N/A'}\n`;
+    shareText += `PO Number: ${data?.poNumber || 'N/A'}\n`;
+    shareText += `Delivery Note #: ${data?.deliveryNoteNumber || 'N/A'}\n`;
+    shareText += `Status: ${(data?.status || 'pending').toUpperCase()}\n\n`;
+
+    if (data?.items?.length) {
+      shareText += `ITEMS\n`;
+      shareText += `${'─'.repeat(50)}\n`;
+      data.items.forEach((item: any, idx: number) => {
+        shareText += `${idx + 1}. ${item.description || 'Item'}\n`;
+        shareText += `   Qty: ${item.delivered || 0} ${item.unit || ''} @ ${formatCurrency(item.unitCost || 0)} = ${formatCurrency(item.totalWithReceivingCost || item.total || 0)}\n`;
+      });
+      shareText += `\n`;
+    }
+
+    if (data?.receivingCosts?.length) {
+      shareText += `RECEIVING COSTS\n`;
+      data.receivingCosts.forEach((cost: any) => {
+        shareText += `  ${cost.description}: ${formatCurrency(cost.amount || 0)}\n`;
+      });
+      shareText += `\n`;
+    }
+
+    shareText += `TOTAL: ${formatCurrency(totalValue)}\n`;
+
+    if (data?.qualityCheckNotes) shareText += `\nQuality Notes: ${data.qualityCheckNotes}`;
+    if (data?.discrepancies) shareText += `\nDiscrepancies: ${data.discrepancies}`;
+    if (data?.rejectedBy) shareText += `\nRejected By: ${data.rejectedBy}${data.rejectedReason ? ` — ${data.rejectedReason}` : ''}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `GRN ${grnNumber}`, text: shareText });
+      } catch { /* user cancelled */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast({ title: 'Copied', description: 'GRN details copied to clipboard' });
+      } catch {
+        toast({ title: 'Share failed', description: 'Could not copy to clipboard', variant: 'destructive' });
+      }
+    }
   };
 
   const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || sortBy !== "date-desc" || dateRange.from !== "" || dateRange.to !== "";
@@ -387,16 +441,18 @@ export const GRNInventoryCards = ({
                 items: grn.data?.items || [],
                 total: (grn.data?.items?.reduce((sum: number, item: any) => sum + (item.totalWithReceivingCost || 0), 0) || 0),
                 status: grn.data?.status === 'cancelled' ? 'pending' : 
-                  ['completed', 'pending', 'received', 'checked', 'approved', 'rejected', 'draft'].includes(grn.data?.status) ? 
+                  ['completed', 'pending', 'received', 'checked', 'approved', 'rejected', 'draft', 'verified'].includes(grn.data?.status) ? 
                   grn.data?.status : 'pending',
                 approvedBy: grn.data?.approvedBy || '',
                 rejectedBy: grn.data?.rejectedBy || '',
+                rejectedReason: grn.data?.rejectedReason || '',
                 createdAt: grn.createdAt
               }}
               onStatusClick={() => { setStatusDialogGRN(grn); setStatusDialogOpen(true); }}
               onViewDetails={() => onGRNView(grn)}
               onPrintGRN={() => onGRNPrint(grn)}
               onDownloadGRN={() => onGRNDownload(grn)}
+              onShareGRN={() => handleShareGRN(grn)}
               onDeleteGRN={() => onGRNDelete(grn)}
             />
           ))}
@@ -436,7 +492,7 @@ export const GRNInventoryCards = ({
           open={statusDialogOpen}
           onOpenChange={setStatusDialogOpen}
           grn={statusDialogGRN}
-          onSave={async (grnId, newStatus, approvedBy, rejectedBy, verifiedBy) => {
+          onSave={async (grnId, newStatus, approvedBy, rejectedBy, verifiedBy, rejectedReason) => {
             // Find the GRN and update its status
             const targetGRN = grns.find(g => g.id === grnId);
             if (!targetGRN) return;
@@ -448,6 +504,7 @@ export const GRNInventoryCards = ({
                 status: newStatus as any,
                 approvedBy: newStatus === 'approved' ? approvedBy : (targetGRN.data.approvedBy || ''),
                 rejectedBy: newStatus === 'rejected' ? rejectedBy : (targetGRN.data.rejectedBy || ''),
+                rejectedReason: newStatus === 'rejected' ? rejectedReason : '',
                 verifiedBy: newStatus === 'verified' ? verifiedBy : (targetGRN.data.verifiedBy || ''),
                 approvedDate: newStatus === 'approved' ? new Date().toISOString().split('T')[0] : (targetGRN.data.approvedDate || ''),
                 rejectedDate: newStatus === 'rejected' ? new Date().toISOString().split('T')[0] : (targetGRN.data.rejectedDate || ''),

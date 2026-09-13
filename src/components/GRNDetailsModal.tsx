@@ -367,6 +367,12 @@ export const GRNDetailsModal = ({
                           )}
                         </p>
                       )}
+                      {grn.data.rejectedReason && (
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Rejection Reason:</span>{" "}
+                          <span className="font-medium text-red-600">{grn.data.rejectedReason}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>

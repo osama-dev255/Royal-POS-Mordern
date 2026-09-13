@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer, AlertTriangle, CheckCircle, XCircle, Share2 } from "lucide-react";
 
 interface GRNItem {
   id?: string;
@@ -36,14 +36,16 @@ interface GRNInventoryCardProps {
     supplier: string;
     items: GRNItem[];
     total: number;
-    status: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft";
+    status: "received" | "checked" | "approved" | "completed" | "pending" | "rejected" | "draft" | "verified";
     approvedBy?: string;
     rejectedBy?: string;
+    rejectedReason?: string;
     createdAt: string;
   };
   onViewDetails: () => void;
   onPrintGRN: () => void;
   onDownloadGRN: () => void;
+  onShareGRN: () => void;
   onDeleteGRN: () => void;
   onStatusClick?: () => void;
   className?: string;
@@ -54,6 +56,7 @@ export const GRNInventoryCard = ({
   onViewDetails,
   onPrintGRN,
   onDownloadGRN,
+  onShareGRN,
   onDeleteGRN,
   onStatusClick,
   className 
@@ -116,7 +119,7 @@ export const GRNInventoryCard = ({
         {(grn.approvedBy || grn.rejectedBy) && (
           <p className="text-xs text-muted-foreground mt-1">
             {grn.status === 'rejected' && grn.rejectedBy && (
-              <span>Rejected by: <span className="font-medium">{grn.rejectedBy}</span></span>
+              <span>Rejected by: <span className="font-medium">{grn.rejectedBy}</span>{grn.rejectedReason && <span className="italic"> — {grn.rejectedReason}</span>}</span>
             )}
             {grn.status === 'approved' && grn.approvedBy && (
               <span>Approved by: <span className="font-medium">{grn.approvedBy}</span></span>
@@ -207,6 +210,9 @@ export const GRNInventoryCard = ({
             </Button>
             <Button variant="outline" size="sm" onClick={onDownloadGRN}>
               <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={onShareGRN}>
+              <Share2 className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={onDeleteGRN} className="text-destructive hover:text-destructive">
               <Trash2 className="h-4 w-4" />

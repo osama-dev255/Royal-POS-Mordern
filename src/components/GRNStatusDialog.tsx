@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, XCircle, Clock, AlertCircle, ShieldCheck } from "lucide-react";
 import { SavedGRN } from "@/utils/grnUtils";
@@ -12,7 +13,7 @@ interface GRNStatusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   grn: SavedGRN;
-  onSave: (grnId: string, newStatus: string, approvedBy: string, rejectedBy: string, verifiedBy: string) => Promise<void>;
+  onSave: (grnId: string, newStatus: string, approvedBy: string, rejectedBy: string, verifiedBy: string, rejectedReason: string) => Promise<void>;
 }
 
 export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDialogProps) => {
@@ -21,6 +22,7 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
   const [approvedBy, setApprovedBy] = useState(grn.data?.approvedBy || "");
   const [rejectedBy, setRejectedBy] = useState(grn.data?.rejectedBy || "");
   const [verifiedBy, setVerifiedBy] = useState(grn.data?.verifiedBy || "");
+  const [rejectedReason, setRejectedReason] = useState(grn.data?.rejectedReason || "");
   const [saving, setSaving] = useState(false);
 
   // Reset state when dialog opens with a new GRN
@@ -30,13 +32,14 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
       setApprovedBy(grn.data?.approvedBy || "");
       setRejectedBy(grn.data?.rejectedBy || "");
       setVerifiedBy(grn.data?.verifiedBy || "");
+      setRejectedReason(grn.data?.rejectedReason || "");
     }
   }, [open, grn]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(grn.id, newStatus, approvedBy, rejectedBy, verifiedBy);
+      await onSave(grn.id, newStatus, approvedBy, rejectedBy, verifiedBy, rejectedReason);
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating GRN status:", error);
@@ -106,7 +109,7 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
               <span className="text-xs text-muted-foreground">by {grn.data.approvedBy}</span>
             )}
             {currentStatus === "rejected" && grn.data?.rejectedBy && (
-              <span className="text-xs text-muted-foreground">by {grn.data.rejectedBy}</span>
+              <span className="text-xs text-muted-foreground">by {grn.data.rejectedBy}{grn.data?.rejectedReason ? `: ${grn.data.rejectedReason}` : ''}</span>
             )}
             {currentStatus === "verified" && grn.data?.verifiedBy && (
               <span className="text-xs text-muted-foreground">by {grn.data.verifiedBy}</span>
@@ -170,15 +173,27 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
 
           {/* Rejected By — shown when status is rejected */}
           {newStatus === "rejected" && (
-            <div className="space-y-2">
-              <Label htmlFor="rejected-by">Rejected By</Label>
-              <Input
-                id="rejected-by"
-                value={rejectedBy}
-                onChange={(e) => setRejectedBy(e.target.value)}
-                placeholder="Enter name of rejecter"
-              />
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="rejected-by">Rejected By</Label>
+                <Input
+                  id="rejected-by"
+                  value={rejectedBy}
+                  onChange={(e) => setRejectedBy(e.target.value)}
+                  placeholder="Enter name of rejecter"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rejected-reason">Rejection Reason <span className="text-red-500">*</span></Label>
+                <Textarea
+                  id="rejected-reason"
+                  value={rejectedReason}
+                  onChange={(e) => setRejectedReason(e.target.value)}
+                  placeholder="Enter reason for rejection"
+                  rows={3}
+                />
+              </div>
+            </>
           )}
 
           {/* Verified By — shown when status is verified */}
@@ -204,7 +219,7 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
                 {" "}to{" "}
                 <span className="font-semibold">{newStatus}</span>
                 {newStatus === "approved" && approvedBy && ` (approved by ${approvedBy})`}
-                {newStatus === "rejected" && rejectedBy && ` (rejected by ${rejectedBy})`}
+                {newStatus === "rejected" && rejectedBy && ` (rejected by ${rejectedBy}${rejectedReason ? `: ${rejectedReason}` : ''})`}
                 {newStatus === "verified" && verifiedBy && ` (verified by ${verifiedBy})`}
               </p>
             </div>
@@ -215,7 +230,10 @@ export const GRNStatusDialog = ({ open, onOpenChange, grn, onSave }: GRNStatusDi
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button 
+            onClick={handleSave} 
+            disabled={saving || (newStatus === "rejected" && (!rejectedBy.trim() || !rejectedReason.trim()))}
+          >
             {saving ? "Saving..." : "Update Status"}
           </Button>
         </DialogFooter>
