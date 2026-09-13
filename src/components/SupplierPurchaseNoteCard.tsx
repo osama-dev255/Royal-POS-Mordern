@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { FileText, Calendar, User, Eye, Download, Trash2, Printer, Share2 } from "lucide-react";
+import { FileText, Calendar, User, Eye, Download, Trash2, Printer, Share2, CheckCircle, XCircle, Clock, ShieldCheck } from "lucide-react";
 
 interface SupplierPurchaseNote {
   id: string;
@@ -11,7 +11,10 @@ interface SupplierPurchaseNote {
   supplierName: string;
   items: number;
   total: number;
-  status: "draft" | "completed" | "cancelled";
+  status: "draft" | "pending" | "approved" | "rejected" | "verified" | "completed" | "cancelled";
+  approvedBy?: string;
+  rejectedBy?: string;
+  verifiedBy?: string;
 }
 
 interface SupplierPurchaseNoteCardProps {
@@ -21,6 +24,7 @@ interface SupplierPurchaseNoteCardProps {
   onDownload: () => void;
   onShare: () => void;
   onDelete: () => void;
+  onStatusClick?: () => void;
   className?: string;
 }
 
@@ -31,18 +35,40 @@ export const SupplierPurchaseNoteCard = ({
   onDownload,
   onShare,
   onDelete,
+  onStatusClick,
   className 
 }: SupplierPurchaseNoteCardProps) => {
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "completed": 
+      case "completed":
+      case "approved":
+      case "verified":
         return "default";
-      case "cancelled": 
+      case "cancelled":
+      case "rejected":
         return "destructive";
-      case "draft": 
+      case "draft":
+      case "pending":
         return "secondary";
       default: 
         return "default";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+      case "approved":
+        return <CheckCircle className="h-3 w-3" />;
+      case "verified":
+        return <ShieldCheck className="h-3 w-3" />;
+      case "rejected":
+        return <XCircle className="h-3 w-3" />;
+      case "pending":
+      case "draft":
+        return <Clock className="h-3 w-3" />;
+      default:
+        return null;
     }
   };
 
@@ -64,8 +90,15 @@ export const SupplierPurchaseNoteCard = ({
               {formatDate(note.date)}
             </p>
           </div>
-          <Badge variant={getStatusVariant(note.status)}>
-            {note.status.charAt(0).toUpperCase() + note.status.slice(1)}
+          <Badge 
+            variant={getStatusVariant(note.status)}
+            className={onStatusClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+            onClick={onStatusClick}
+          >
+            <div className="flex items-center gap-1">
+              {getStatusIcon(note.status)}
+              {note.status.charAt(0).toUpperCase() + note.status.slice(1)}
+            </div>
           </Badge>
         </div>
       </CardHeader>
@@ -76,6 +109,20 @@ export const SupplierPurchaseNoteCard = ({
             <User className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm truncate">{note.supplierName || 'No supplier'}</span>
           </div>
+
+          {(note.approvedBy || note.rejectedBy || note.verifiedBy) && (
+            <p className="text-xs text-muted-foreground">
+              {note.status === 'approved' && note.approvedBy && (
+                <span>Approved by: <span className="font-medium text-green-600">{note.approvedBy}</span></span>
+              )}
+              {note.status === 'rejected' && note.rejectedBy && (
+                <span>Rejected by: <span className="font-medium text-red-600">{note.rejectedBy}</span></span>
+              )}
+              {note.status === 'verified' && note.verifiedBy && (
+                <span>Verified by: <span className="font-medium text-blue-600">{note.verifiedBy}</span></span>
+              )}
+            </p>
+          )}
           
           <div className="flex justify-between items-center pt-2">
             <div className="flex items-center gap-2">

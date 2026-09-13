@@ -56,7 +56,7 @@ export interface SupplierPurchaseNoteData {
   destinationDetails: DestinationDetail[];
   stockType: string;
   receiptIssued: string;
-  status: 'draft' | 'completed' | 'cancelled';
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'verified' | 'completed' | 'cancelled';
   outletId?: string;
   createdAt?: string;
 }
@@ -87,6 +87,10 @@ export interface SavedSupplierPurchaseNote {
   deliveredDate: string;
   approvedBy: string;
   approvedDate: string;
+  rejectedBy: string;
+  rejectedDate: string;
+  verifiedBy: string;
+  verifiedDate: string;
   modeOfPayment: string;
   paymentBreakdown: PaymentBreakdownEntry[];
   destination: string;
@@ -95,7 +99,7 @@ export interface SavedSupplierPurchaseNote {
   destinationDetails: DestinationDetail[];
   stockType: string;
   receiptIssued: string;
-  status: 'draft' | 'completed' | 'cancelled';
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'verified' | 'completed' | 'cancelled';
   outletId?: string;
   createdAt: string;
   data: SupplierPurchaseNoteData;
@@ -137,6 +141,10 @@ export const saveSupplierPurchaseNote = async (
       delivered_date: noteData.deliveredDate || null,
       approved_by: noteData.approvedBy || '',
       approved_date: noteData.approvedDate || null,
+      rejected_by: (noteData as any).rejectedBy || '',
+      rejected_date: (noteData as any).rejectedDate || null,
+      verified_by: (noteData as any).verifiedBy || '',
+      verified_date: (noteData as any).verifiedDate || null,
       mode_of_payment: noteData.modeOfPayment || '',
       payment_breakdown: noteData.paymentBreakdown || [],
       destination: noteData.destination || '',
@@ -215,6 +223,10 @@ export const getSavedSupplierPurchaseNotes = async (
       deliveredDate: dbNote.delivered_date || '',
       approvedBy: dbNote.approved_by || '',
       approvedDate: dbNote.approved_date || '',
+      rejectedBy: dbNote.rejected_by || '',
+      rejectedDate: dbNote.rejected_date || '',
+      verifiedBy: dbNote.verified_by || '',
+      verifiedDate: dbNote.verified_date || '',
       modeOfPayment: dbNote.mode_of_payment || '',
       paymentBreakdown: dbNote.payment_breakdown || [],
       destination: dbNote.destination || '',
@@ -251,6 +263,10 @@ export const getSavedSupplierPurchaseNotes = async (
         deliveredDate: dbNote.delivered_date || '',
         approvedBy: dbNote.approved_by || '',
         approvedDate: dbNote.approved_date || '',
+        rejectedBy: dbNote.rejected_by || '',
+        rejectedDate: dbNote.rejected_date || '',
+        verifiedBy: dbNote.verified_by || '',
+        verifiedDate: dbNote.verified_date || '',
         modeOfPayment: dbNote.mode_of_payment || '',
         paymentBreakdown: dbNote.payment_breakdown || [],
         destination: dbNote.destination || '',
@@ -324,6 +340,10 @@ export const updateSupplierPurchaseNote = async (
     if (noteData.deliveredDate !== undefined) updateData.delivered_date = noteData.deliveredDate;
     if (noteData.approvedBy !== undefined) updateData.approved_by = noteData.approvedBy;
     if (noteData.approvedDate !== undefined) updateData.approved_date = noteData.approvedDate;
+    if ((noteData as any).rejectedBy !== undefined) updateData.rejected_by = (noteData as any).rejectedBy;
+    if ((noteData as any).rejectedDate !== undefined) updateData.rejected_date = (noteData as any).rejectedDate;
+    if ((noteData as any).verifiedBy !== undefined) updateData.verified_by = (noteData as any).verifiedBy;
+    if ((noteData as any).verifiedDate !== undefined) updateData.verified_date = (noteData as any).verifiedDate;
     if (noteData.modeOfPayment !== undefined) updateData.mode_of_payment = noteData.modeOfPayment;
     if (noteData.paymentBreakdown !== undefined) updateData.payment_breakdown = noteData.paymentBreakdown;
     if (noteData.destination !== undefined) updateData.destination = noteData.destination;

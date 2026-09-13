@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil, Calendar, Share2 } from "lucide-react";
+import { Search, FileText, Download, Printer, Eye, EyeOff, Pencil, Calendar, Share2, X } from "lucide-react";
 import { SupplierPurchaseNoteCard } from "./SupplierPurchaseNoteCard";
-import { getSavedSupplierPurchaseNotes, deleteSupplierPurchaseNote, SavedSupplierPurchaseNote } from "@/utils/supplierPurchaseNoteUtils";
+import { SPNStatusDialog } from "./SPNStatusDialog";
+import { getSavedSupplierPurchaseNotes, deleteSupplierPurchaseNote, updateSupplierPurchaseNote, SavedSupplierPurchaseNote } from "@/utils/supplierPurchaseNoteUtils";
 import { PrintUtils } from "@/utils/printUtils";
 import { formatCurrency } from "@/lib/currency";
 import { toast } from "@/components/ui/use-toast";
@@ -24,25 +25,29 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
   const [showSellingPrice, setShowSellingPrice] = useState(false);
   const [showProjectedProfit, setShowProjectedProfit] = useState(false);
   const [printFontSize, setPrintFontSize] = useState(11);
+  const [statusDialogNote, setStatusDialogNote] = useState<SavedSupplierPurchaseNote | null>(null);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+  const [datePreset, setDatePreset] = useState("last30");
+
+  // Reload notes from database
+  const loadNotes = async () => {
+    try {
+      setLoading(true);
+      const savedNotes = await getSavedSupplierPurchaseNotes();
+      setNotes(savedNotes);
+    } catch (error) {
+      console.error("Error loading saved supplier purchase notes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load saved supplier purchase notes from database
   useEffect(() => {
-    const loadNotes = async () => {
-      try {
-        setLoading(true);
-        const savedNotes = await getSavedSupplierPurchaseNotes();
-        setNotes(savedNotes);
-      } catch (error) {
-        console.error("Error loading saved supplier purchase notes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadNotes();
 
     // Listen for custom save events to update notes in real-time
@@ -55,12 +60,84 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
     return () => window.removeEventListener('supplierPurchaseNoteSaved', handleNoteSaved as EventListener);
   }, []);
 
+  // Helper: parse "YYYY-MM-DD" as local midnight (avoids UTC timezone shift)
+  const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  // Helper: format Date as "YYYY-MM-DD" in local time
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    const today = new Date();
+    const todayStr = formatLocalDate(today);
+    switch (preset) {
+      case 'today':
+        setDateRange({ start: todayStr, end: todayStr });
+        break;
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        const yStr = formatLocalDate(y);
+        setDateRange({ start: yStr, end: yStr });
+        break;
+      }
+      case 'last7': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        setDateRange({ start: formatLocalDate(d), end: todayStr });
+        break;
+      }
+      case 'last30': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        setDateRange({ start: formatLocalDate(d), end: todayStr });
+        break;
+      }
+      case 'thisMonth': {
+        const first = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
+        setDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'lastMonth': {
+        const first = formatLocalDate(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+        const last = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 0));
+        setDateRange({ start: first, end: last });
+        break;
+      }
+      case 'thisYear': {
+        const first = formatLocalDate(new Date(today.getFullYear(), 0, 1));
+        setDateRange({ start: first, end: todayStr });
+        break;
+      }
+      case 'all':
+      default:
+        setDateRange({ start: "", end: "" });
+        break;
+    }
+  };
+
   // Filter notes based on search term and date range
   const isInDateRange = (dateString: string) => {
-    const date = new Date(dateString);
-    const startDate = new Date(dateRange.start);
-    const endDate = new Date(dateRange.end);
-    return date >= startDate && date <= endDate;
+    if (!dateRange.start && !dateRange.end) return true;
+    const date = parseLocalDate(dateString.split('T')[0]);
+    if (dateRange.start) {
+      const startDate = parseLocalDate(dateRange.start);
+      if (date < startDate) return false;
+    }
+    if (dateRange.end) {
+      const endDate = parseLocalDate(dateRange.end);
+      endDate.setHours(23, 59, 59, 999); // include the entire "to" day
+      if (date > endDate) return false;
+    }
+    return true;
   };
 
   const filteredNotes = notes.filter(note => {
@@ -220,6 +297,36 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
     }
   };
 
+  const handleStatusSave = async (
+    noteId: string,
+    newStatus: string,
+    approvedBy: string,
+    rejectedBy: string,
+    verifiedBy: string,
+    rejectedReason: string
+  ) => {
+    const targetNote = notes.find(n => n.id === noteId);
+    if (!targetNote) return;
+
+    const updatePayload: any = {
+      status: newStatus as any,
+      approvedBy: newStatus === 'approved' ? approvedBy : (targetNote.approvedBy || ''),
+      approvedDate: newStatus === 'approved' ? new Date().toISOString().split('T')[0] : (targetNote.approvedDate || ''),
+      rejectedBy: newStatus === 'rejected' ? rejectedBy : '',
+      rejectedDate: newStatus === 'rejected' ? new Date().toISOString().split('T')[0] : '',
+      verifiedBy: newStatus === 'verified' ? verifiedBy : '',
+      verifiedDate: newStatus === 'verified' ? new Date().toISOString().split('T')[0] : '',
+    };
+
+    const result = await updateSupplierPurchaseNote(noteId, updatePayload);
+    if (result.success) {
+      toast({ title: 'Status Updated', description: `SPN status changed to ${newStatus}` });
+      await loadNotes();
+    } else {
+      toast({ title: 'Update Failed', description: result.error || 'Could not update status', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {selectedNote ? (
@@ -311,7 +418,11 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-semibold uppercase text-gray-600">Status</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded ${selectedNote.status === 'completed' ? 'bg-green-100 text-green-800' : selectedNote.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                  selectedNote.status === 'completed' || selectedNote.status === 'approved' || selectedNote.status === 'verified' ? 'bg-green-100 text-green-800'
+                  : selectedNote.status === 'cancelled' || selectedNote.status === 'rejected' ? 'bg-red-100 text-red-800'
+                  : 'bg-yellow-100 text-yellow-800'
+                }`}>
                   {selectedNote.status.toUpperCase()}
                 </span>
               </div>
@@ -320,6 +431,32 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                 <span className="text-xs font-bold">{selectedNote.preparedBy || 'N/A'}</span>
               </div>
             </div>
+
+            {/* Status Tracking Info */}
+            {(selectedNote.rejectedBy || selectedNote.verifiedBy) && (
+              <div className="px-6 pb-3">
+                <div className="bg-gray-50 p-3 rounded border space-y-1">
+                  {selectedNote.status === 'rejected' && selectedNote.rejectedBy && (
+                    <p className="text-xs">
+                      <span className="text-muted-foreground">Rejected By:</span>{' '}
+                      <span className="font-semibold text-red-600">{selectedNote.rejectedBy}</span>
+                      {selectedNote.rejectedDate && (
+                        <span className="text-muted-foreground ml-2">({new Date(selectedNote.rejectedDate).toLocaleDateString()})</span>
+                      )}
+                    </p>
+                  )}
+                  {selectedNote.status === 'verified' && selectedNote.verifiedBy && (
+                    <p className="text-xs">
+                      <span className="text-muted-foreground">Verified By:</span>{' '}
+                      <span className="font-semibold text-blue-600">{selectedNote.verifiedBy}</span>
+                      {selectedNote.verifiedDate && (
+                        <span className="text-muted-foreground ml-2">({new Date(selectedNote.verifiedDate).toLocaleDateString()})</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Party Sections */}
             <div className="px-6 py-3 flex gap-4">
@@ -632,7 +769,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                     <Input
                       type="date"
                       value={dateRange.start}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                      onChange={(e) => { setDateRange(prev => ({ ...prev, start: e.target.value })); setDatePreset('custom'); }}
                       className="w-40"
                     />
                   </div>
@@ -641,9 +778,37 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                     <Input
                       type="date"
                       value={dateRange.end}
-                      onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                      onChange={(e) => { setDateRange(prev => ({ ...prev, end: e.target.value })); setDatePreset('custom'); }}
                       className="w-40"
                     />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium mr-1">Quick:</span>
+                    {[
+                      { key: 'today', label: 'Today' },
+                      { key: 'last7', label: '7 Days' },
+                      { key: 'last30', label: '30 Days' },
+                      { key: 'thisMonth', label: 'This Month' },
+                      { key: 'lastMonth', label: 'Last Month' },
+                      { key: 'thisYear', label: 'This Year' },
+                      { key: 'all', label: 'All' },
+                    ].map(preset => (
+                      <Button
+                        key={preset.key}
+                        size="sm"
+                        variant={datePreset === preset.key ? 'default' : 'outline'}
+                        onClick={() => handleDatePreset(preset.key)}
+                        className={datePreset === preset.key ? '' : 'text-xs'}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                    {(dateRange.start || dateRange.end) && (
+                      <Button variant="ghost" size="sm" onClick={() => handleDatePreset('all')} className="h-8">
+                        <X className="h-3 w-3 mr-1" />
+                        Clear
+                      </Button>
+                    )}
                   </div>
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -685,18 +850,32 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                       supplierName: note.supplierName,
                       items: note.items.length,
                       total: note.total,
-                      status: note.status
+                      status: note.status,
+                      approvedBy: note.approvedBy || '',
+                      rejectedBy: note.rejectedBy || '',
+                      verifiedBy: note.verifiedBy || ''
                     }}
                     onViewDetails={() => handleViewNote(note)}
                     onPrint={() => handlePrintNote(note)}
                     onDownload={() => handleDownloadNote(note)}
                     onShare={() => handleShareNote(note)}
                     onDelete={() => handleDeleteNote(note.id)}
+                    onStatusClick={() => { setStatusDialogNote(note); setStatusDialogOpen(true); }}
                   />
                 ))}
               </div>
             )}
           </main>
+
+          {/* SPN Status Dialog */}
+          {statusDialogNote && (
+            <SPNStatusDialog
+              open={statusDialogOpen}
+              onOpenChange={setStatusDialogOpen}
+              note={statusDialogNote}
+              onSave={handleStatusSave}
+            />
+          )}
         </>
       )}
     </div>
