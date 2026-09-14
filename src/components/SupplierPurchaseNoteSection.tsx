@@ -176,8 +176,10 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
     try {
       const data = note;
       const items = Array.isArray(data.items) ? data.items : [];
+      const receivingCosts = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
+      const receivingCostsTotal = receivingCosts.reduce((sum: number, cost: any) => sum + Number(cost.amount || 0), 0);
       const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
-      const total = subtotal;
+      const total = data.total || (subtotal + receivingCostsTotal);
       const fmtCurrency = (amount: number) => {
         const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
         return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -234,6 +236,14 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       lines.push(`📊 JUMLA IDADI: ${totalQuantity}`);
       lines.push('');
       lines.push(`💰 JUMLA MANUNUZI: ${fmtCurrency(total)}`);
+      if (receivingCosts.length > 0) {
+        lines.push('');
+        lines.push('📦 GHARAMA ZA KUPOKEA:');
+        receivingCosts.forEach((cost: any) => {
+          lines.push(`  • ${cost.description || 'Cost'}: ${fmtCurrency(cost.amount || 0)}`);
+        });
+        lines.push(`  Jumla Gharama: ${fmtCurrency(receivingCostsTotal)}`);
+      }
       if (showSellingPrice) {
         const totalSales = items.reduce((s: number, i: any) => s + ((i.sellingPrice || 0) * (i.quantity || 0)), 0);
         lines.push(`💵 JUMLA MAUZO: ${fmtCurrency(totalSales)}`);

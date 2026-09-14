@@ -20097,8 +20097,10 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                 if (spnSavedData) {
                   const data = spnSavedData;
                   const items = Array.isArray(data.items) ? data.items : [];
+                  const receivingCosts = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
+                  const receivingCostsTotal = receivingCosts.reduce((sum: number, cost: any) => sum + Number(cost.amount || 0), 0);
                   const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
-                  const total = subtotal;
+                  const total = data.total || (subtotal + receivingCostsTotal);
                   const fmtCurrency = (amount: number) => {
                     const businessCurrency = localStorage.getItem('businessCurrency') || 'TSh';
                     return `${businessCurrency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -20182,6 +20184,14 @@ ${data.notes ? `<div style="padding:0 24px 8px;"><div style="font-weight:700;tex
                   lines.push(`Total Items: ${items.length}`);
                   lines.push(`Total Quantity: ${totalQty}`);
                   lines.push(`Grand Total: ${fmtCurrency(total)}`);
+                  if (receivingCosts.length > 0) {
+                    lines.push('');
+                    lines.push('─── RECEIVING COSTS ───');
+                    receivingCosts.forEach((cost: any) => {
+                      lines.push(`  • ${cost.description || 'Cost'}: ${fmtCurrency(cost.amount || 0)}`);
+                    });
+                    lines.push(`  Total Receiving Costs: ${fmtCurrency(receivingCostsTotal)}`);
+                  }
                   if (data.deliveredDate) lines.push(`Delivered Date: ${new Date(data.deliveredDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`);
                   if (data.approvedBy) lines.push(`Approved By: ${data.approvedBy}`);
                   lines.push('');
