@@ -674,6 +674,7 @@ interface SupplierPurchaseNoteData {
   destinationDetails: { godownName: string; zoneId: string; zoneName: string; quantity: number }[];
   stockType: string;
   receiptIssued: string;
+  receivingCosts: { id: string; description: string; amount: number }[];
   status: 'draft' | 'completed' | 'cancelled';
 }
 
@@ -3262,6 +3263,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     destinationZoneId: '',
     destinationZoneName: '',
     destinationDetails: [],
+    receivingCosts: [],
     status: 'draft'
   });
 
@@ -3311,6 +3313,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
         destinationZoneId: data.destinationZoneId || '',
         destinationZoneName: data.destinationZoneName || '',
         destinationDetails: data.destinationDetails || [],
+        receivingCosts: data.receivingCosts || [],
         status: data.status || 'draft'
       });
       // Store the note ID for update
@@ -3484,6 +3487,34 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     }));
   };
 
+  // SPN Receiving Costs handlers
+  const handleSPNReceivingCostChange = (costId: string, field: 'description' | 'amount', value: string | number) => {
+    setSupplierPurchaseNoteData(prev => ({
+      ...prev,
+      receivingCosts: prev.receivingCosts.map(cost =>
+        cost.id === costId ? { ...cost, [field]: value } : cost
+      )
+    }));
+  };
+
+  const handleAddSPNReceivingCost = () => {
+    setSupplierPurchaseNoteData(prev => ({
+      ...prev,
+      receivingCosts: [...prev.receivingCosts, { id: Date.now().toString(), description: '', amount: 0 }]
+    }));
+  };
+
+  const handleRemoveSPNReceivingCost = (costId: string) => {
+    setSupplierPurchaseNoteData(prev => ({
+      ...prev,
+      receivingCosts: prev.receivingCosts.filter(cost => cost.id !== costId)
+    }));
+  };
+
+  const calculateSPNTotalReceivingCosts = () => {
+    return supplierPurchaseNoteData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+  };
+
   const handleSaveSupplierPurchaseNote = async () => {
     if (!supplierPurchaseNoteData.preparedBy.trim()) {
       toast({ title: 'Validation Error', description: 'Prepared By is required', variant: 'destructive' });
@@ -3508,13 +3539,16 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     }
     setIsSavingSPN(true);
     try {
-      const subtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
-      const total = subtotal;
+      const itemsSubtotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+      const receivingCostsTotal = supplierPurchaseNoteData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+      const subtotal = itemsSubtotal;
+      const total = itemsSubtotal + receivingCostsTotal;
 
       const noteData = {
         ...supplierPurchaseNoteData,
         subtotal,
         total,
+        receivingCostsTotal,
         modeOfPayment: supplierPurchaseNoteData.paymentBreakdown.map(p => p.method).join(', '),
         stockType: spnStockType,
         receiptIssued: spnReceiptIssued,
@@ -3537,6 +3571,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
           ...supplierPurchaseNoteData,
           subtotal,
           total,
+          receivingCostsTotal,
           status: 'completed' as const,
           id: result.id || editingSPNId || Date.now().toString()
         };
@@ -9361,6 +9396,34 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     </table>
   </div>
 
+  ${data.receivingCosts && data.receivingCosts.length > 0 ? `<!-- RECEIVING COSTS -->
+  <div style="padding: 0 24px 8px;">
+    <div class="section-title">Receiving Costs</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead>
+        <tr>
+          <th style="background:#f9fafb;padding:6px 10px;text-align:left;font-weight:700;border:1px solid #d1d5db;text-transform:uppercase;letter-spacing:0.3px;font-size:11px;">Description</th>
+          <th style="background:#f9fafb;padding:6px 10px;text-align:right;font-weight:700;border:1px solid #d1d5db;text-transform:uppercase;letter-spacing:0.3px;font-size:11px;width:160px;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.receivingCosts.map((cost: any) => `
+        <tr>
+          <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;">${cost.description || ''}</td>
+          <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;">${formatCurrency(cost.amount || 0)}</td>
+        </tr>
+        `).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td style="padding:6px 10px;border:1px solid #d1d5db;font-weight:700;text-align:right;background:#f3f4f6;text-transform:uppercase;letter-spacing:0.3px;">Total Receiving Costs</td>
+          <td style="padding:6px 10px;border:1px solid #d1d5db;text-align:right;font-weight:800;background:#f3f4f6;">${formatCurrency(data.receivingCosts.reduce((s: number, c: any) => s + (c.amount || 0), 0))}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  ` : ''}
+
   <!-- PAYMENT + NOTES -->
   <div class="bottom-section">
     <div class="left-column">
@@ -9483,7 +9546,8 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const totalPackages = items.filter(item => item.unit && item.quantity).length;
     const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-    const total = subtotal;
+    const receivingCostsTotal = supplierPurchaseNoteData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+    const total = subtotal + receivingCostsTotal;
     
     return buildSupplierPurchaseNotePrintHTML(
       supplierPurchaseNoteData,
@@ -16456,6 +16520,61 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                           </Button>
                         </div>
 
+                        {/* Receiving Costs */}
+                        <div>
+                          <h3 className="font-bold mb-2">RECEIVING COSTS</h3>
+                          <div className="overflow-x-auto border rounded-md">
+                            <table className="w-full border-collapse border border-gray-300 text-sm">
+                              <thead>
+                                <tr className="bg-indigo-50 border-b-2 border-indigo-300">
+                                  <th className="text-left p-2">Description</th>
+                                  <th className="text-right p-2 w-36">Amount</th>
+                                  <th className="p-2 w-10"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {supplierPurchaseNoteData.receivingCosts.map((cost) => (
+                                  <tr key={cost.id} className="border-b">
+                                    <td className="p-2">
+                                      <Input
+                                        value={cost.description}
+                                        onChange={(e) => handleSPNReceivingCostChange(cost.id, 'description', e.target.value)}
+                                        className="p-1 h-8 text-sm w-full"
+                                        placeholder="Cost description"
+                                      />
+                                    </td>
+                                    <td className="p-2">
+                                      <div className="flex">
+                                        <span className="inline-flex items-center px-3 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-300 rounded-l-md">TZS</span>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          value={cost.amount}
+                                          onChange={(e) => handleSPNReceivingCostChange(cost.id, 'amount', parseFloat(e.target.value) || 0)}
+                                          className="p-1 h-8 text-sm w-full rounded-l-none text-right"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="p-2">
+                                      <Button onClick={() => handleRemoveSPNReceivingCost(cost.id)} variant="outline" size="sm" className="p-1 h-8">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="flex justify-between items-center mt-2">
+                            <Button onClick={handleAddSPNReceivingCost} variant="outline" size="sm" className="mt-2">
+                              <Plus className="h-4 w-4 mr-1" /> Add Cost
+                            </Button>
+                            <div className="text-sm font-medium mt-2">
+                              Total Receiving Costs: {formatCurrency(calculateSPNTotalReceivingCosts())}
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Product Dropdown Portal - rendered outside overflow container */}
                         {spnActiveItemDropdown && spnItemShowProductDropdown[spnActiveItemDropdown.itemId] && (() => {
                           const activeItem = supplierPurchaseNoteData.items.find(i => i.id === spnActiveItemDropdown.itemId);
@@ -16752,7 +16871,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                               </div>
                             )}
                             {supplierPurchaseNoteData.paymentBreakdown.length > 0 && (() => {
-                              const grandTotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0);
+                              const grandTotal = supplierPurchaseNoteData.items.reduce((sum, item) => sum + (item.total || 0), 0) + supplierPurchaseNoteData.receivingCosts.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
                               const totalPaid = supplierPurchaseNoteData.paymentBreakdown.reduce((s, p) => s + (p.amount || 0), 0);
                               const balance = grandTotal - totalPaid;
                               return balance !== 0 ? (

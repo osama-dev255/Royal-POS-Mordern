@@ -22,6 +22,12 @@ export interface DestinationDetail {
   quantity: number;
 }
 
+export interface ReceivingCostEntry {
+  id: string;
+  description: string;
+  amount: number;
+}
+
 export interface SupplierPurchaseNoteData {
   id?: string;
   purchaseNoteNumber: string;
@@ -56,6 +62,7 @@ export interface SupplierPurchaseNoteData {
   destinationDetails: DestinationDetail[];
   stockType: string;
   receiptIssued: string;
+  receivingCosts: ReceivingCostEntry[];
   status: 'draft' | 'pending' | 'approved' | 'rejected' | 'verified' | 'completed' | 'cancelled';
   outletId?: string;
   createdAt?: string;
@@ -100,6 +107,7 @@ export interface SavedSupplierPurchaseNote {
   destinationDetails: DestinationDetail[];
   stockType: string;
   receiptIssued: string;
+  receivingCosts: ReceivingCostEntry[];
   status: 'draft' | 'pending' | 'approved' | 'rejected' | 'verified' | 'completed' | 'cancelled';
   outletId?: string;
   createdAt: string;
@@ -155,6 +163,7 @@ export const saveSupplierPurchaseNote = async (
       destination_details: JSON.stringify(noteData.destinationDetails || []),
       stock_type: noteData.stockType || '',
       receipt_issued: noteData.receiptIssued === 'yes',
+      receiving_costs: JSON.stringify(noteData.receivingCosts || []),
       status: noteData.status || 'draft',
       outlet_id: noteData.outletId || null,
       updated_at: new Date().toISOString()
@@ -238,6 +247,7 @@ export const getSavedSupplierPurchaseNotes = async (
       destinationDetails: (() => { try { return typeof dbNote.destination_details === 'string' ? JSON.parse(dbNote.destination_details) : (dbNote.destination_details || []); } catch { return []; } })(),
       stockType: dbNote.stock_type || '',
       receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
+      receivingCosts: (() => { try { return typeof dbNote.receiving_costs === 'string' ? JSON.parse(dbNote.receiving_costs) : (dbNote.receiving_costs || []); } catch { return []; } })(),
       status: dbNote.status || 'draft',
       outletId: dbNote.outlet_id || '',
       createdAt: dbNote.created_at || new Date().toISOString(),
@@ -279,6 +289,7 @@ export const getSavedSupplierPurchaseNotes = async (
         destinationDetails: (() => { try { return typeof dbNote.destination_details === 'string' ? JSON.parse(dbNote.destination_details) : (dbNote.destination_details || []); } catch { return []; } })(),
         stockType: dbNote.stock_type || '',
         receiptIssued: dbNote.receipt_issued ? 'yes' : 'no',
+        receivingCosts: (() => { try { return typeof dbNote.receiving_costs === 'string' ? JSON.parse(dbNote.receiving_costs) : (dbNote.receiving_costs || []); } catch { return []; } })(),
         status: dbNote.status || 'draft',
         outletId: dbNote.outlet_id || ''
       }
@@ -357,6 +368,7 @@ export const updateSupplierPurchaseNote = async (
     if (noteData.destinationDetails !== undefined) updateData.destination_details = JSON.stringify(noteData.destinationDetails);
     if (noteData.stockType !== undefined) updateData.stock_type = noteData.stockType;
     if (noteData.receiptIssued !== undefined) updateData.receipt_issued = noteData.receiptIssued === 'yes';
+    if (noteData.receivingCosts !== undefined) updateData.receiving_costs = JSON.stringify(noteData.receivingCosts);
     if (noteData.status) updateData.status = noteData.status;
 
     const { error } = await supabase

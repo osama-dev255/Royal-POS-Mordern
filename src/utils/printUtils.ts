@@ -5332,7 +5332,9 @@ export class PrintUtils {
     const data = note.data || note;
     const items = Array.isArray(data.items) ? data.items : [];
     const subtotal = data.subtotal || items.reduce((sum: number, item: any) => sum + (item.total || 0), 0);
-    const total = subtotal;
+    const receivingCosts = Array.isArray(data.receivingCosts) ? data.receivingCosts : [];
+    const receivingCostsTotal = data.receivingCostsTotal || receivingCosts.reduce((sum: number, cost: any) => sum + Number(cost.amount || 0), 0);
+    const total = data.total || (subtotal + receivingCostsTotal);
     const totalItems = items.length;
     const totalQuantity = items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
     const totalPackages = items.filter((item: any) => item.unit && item.quantity).length;
@@ -5685,6 +5687,34 @@ export class PrintUtils {
       </tfoot>
     </table>
   </div>
+
+  ${receivingCosts.length > 0 ? `<!-- RECEIVING COSTS -->
+  <div style="padding: 0 24px 8px;">
+    <div class="section-title">Receiving Costs</div>
+    <table style="width:100%;border-collapse:collapse;font-size:${fontSize}px;">
+      <thead>
+        <tr>
+          <th style="background:#f9fafb;padding:6px 10px;text-align:left;font-weight:700;border:1px solid #d1d5db;text-transform:uppercase;letter-spacing:0.3px;font-size:${fontSize}px;">Description</th>
+          <th style="background:#f9fafb;padding:6px 10px;text-align:right;font-weight:700;border:1px solid #d1d5db;text-transform:uppercase;letter-spacing:0.3px;font-size:${fontSize}px;width:160px;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${receivingCosts.map((cost: any) => `
+        <tr>
+          <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;">${cost.description || ''}</td>
+          <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;">${fmtCurrency(cost.amount || 0)}</td>
+        </tr>
+        `).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td style="padding:6px 10px;border:1px solid #d1d5db;font-weight:700;text-align:right;background:#f3f4f6;text-transform:uppercase;letter-spacing:0.3px;">Total Receiving Costs</td>
+          <td style="padding:6px 10px;border:1px solid #d1d5db;text-align:right;font-weight:800;background:#f3f4f6;">${fmtCurrency(receivingCostsTotal)}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  ` : ''}
 
   <!-- PAYMENT + NOTES -->
   <div class="bottom-section">

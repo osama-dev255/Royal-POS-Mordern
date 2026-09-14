@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/currency";
-import { Package, Calendar, User, Truck, Eye, Download, Trash2, Printer, AlertTriangle, CheckCircle, XCircle, Share2 } from "lucide-react";
+import { Package, Calendar, User, Truck, Eye, Download, Printer, AlertTriangle, CheckCircle, XCircle, Share2 } from "lucide-react";
 
 interface GRNItem {
   id?: string;
@@ -213,9 +213,6 @@ export const GRNInventoryCard = ({
             </Button>
             <Button variant="outline" size="sm" onClick={onShareGRN}>
               <Share2 className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={onDeleteGRN} className="text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
