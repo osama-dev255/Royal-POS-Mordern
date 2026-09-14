@@ -14,6 +14,7 @@ interface SupplierPurchaseNote {
   status: "draft" | "pending" | "approved" | "rejected" | "verified" | "completed" | "cancelled";
   approvedBy?: string;
   rejectedBy?: string;
+  rejectedReason?: string;
   verifiedBy?: string;
 }
 
@@ -116,7 +117,7 @@ export const SupplierPurchaseNoteCard = ({
                 <span>Approved by: <span className="font-medium text-green-600">{note.approvedBy}</span></span>
               )}
               {note.status === 'rejected' && note.rejectedBy && (
-                <span>Rejected by: <span className="font-medium text-red-600">{note.rejectedBy}</span></span>
+                <span>Rejected by: <span className="font-medium text-red-600">{note.rejectedBy}</span>{note.rejectedReason && <span className="italic"> — {note.rejectedReason}</span>}</span>
               )}
               {note.status === 'verified' && note.verifiedBy && (
                 <span>Verified by: <span className="font-medium text-blue-600">{note.verifiedBy}</span></span>

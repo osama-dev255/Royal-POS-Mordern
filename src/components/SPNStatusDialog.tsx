@@ -29,7 +29,7 @@ export const SPNStatusDialog = ({ open, onOpenChange, note, onSave }: SPNStatusD
   const [approvedBy, setApprovedBy] = useState(note.approvedBy || "");
   const [rejectedBy, setRejectedBy] = useState(note.rejectedBy || "");
   const [verifiedBy, setVerifiedBy] = useState(note.verifiedBy || "");
-  const [rejectedReason, setRejectedReason] = useState((note as any).rejectedReason || "");
+  const [rejectedReason, setRejectedReason] = useState(note.rejectedReason || "");
   const [saving, setSaving] = useState(false);
 
   // Reset state when dialog opens with a new note
@@ -39,7 +39,7 @@ export const SPNStatusDialog = ({ open, onOpenChange, note, onSave }: SPNStatusD
       setApprovedBy(note.approvedBy || "");
       setRejectedBy(note.rejectedBy || "");
       setVerifiedBy(note.verifiedBy || "");
-      setRejectedReason((note as any).rejectedReason || "");
+      setRejectedReason(note.rejectedReason || "");
     }
   }, [open, note]);
 
@@ -116,7 +116,7 @@ export const SPNStatusDialog = ({ open, onOpenChange, note, onSave }: SPNStatusD
               <span className="text-xs text-muted-foreground">by {note.approvedBy}</span>
             )}
             {currentStatus === "rejected" && note.rejectedBy && (
-              <span className="text-xs text-muted-foreground">by {note.rejectedBy}{(note as any).rejectedReason ? `: ${(note as any).rejectedReason}` : ''}</span>
+              <span className="text-xs text-muted-foreground">by {note.rejectedBy}{note.rejectedReason ? `: ${note.rejectedReason}` : ''}</span>
             )}
             {currentStatus === "verified" && note.verifiedBy && (
               <span className="text-xs text-muted-foreground">by {note.verifiedBy}</span>

@@ -89,6 +89,7 @@ export interface SavedSupplierPurchaseNote {
   approvedDate: string;
   rejectedBy: string;
   rejectedDate: string;
+  rejectedReason: string;
   verifiedBy: string;
   verifiedDate: string;
   modeOfPayment: string;
@@ -143,6 +144,7 @@ export const saveSupplierPurchaseNote = async (
       approved_date: noteData.approvedDate || null,
       rejected_by: (noteData as any).rejectedBy || '',
       rejected_date: (noteData as any).rejectedDate || null,
+      rejected_reason: (noteData as any).rejectedReason || '',
       verified_by: (noteData as any).verifiedBy || '',
       verified_date: (noteData as any).verifiedDate || null,
       mode_of_payment: noteData.modeOfPayment || '',
@@ -225,6 +227,7 @@ export const getSavedSupplierPurchaseNotes = async (
       approvedDate: dbNote.approved_date || '',
       rejectedBy: dbNote.rejected_by || '',
       rejectedDate: dbNote.rejected_date || '',
+      rejectedReason: dbNote.rejected_reason || '',
       verifiedBy: dbNote.verified_by || '',
       verifiedDate: dbNote.verified_date || '',
       modeOfPayment: dbNote.mode_of_payment || '',
@@ -265,6 +268,7 @@ export const getSavedSupplierPurchaseNotes = async (
         approvedDate: dbNote.approved_date || '',
         rejectedBy: dbNote.rejected_by || '',
         rejectedDate: dbNote.rejected_date || '',
+        rejectedReason: dbNote.rejected_reason || '',
         verifiedBy: dbNote.verified_by || '',
         verifiedDate: dbNote.verified_date || '',
         modeOfPayment: dbNote.mode_of_payment || '',
@@ -341,9 +345,10 @@ export const updateSupplierPurchaseNote = async (
     if (noteData.approvedBy !== undefined) updateData.approved_by = noteData.approvedBy;
     if (noteData.approvedDate !== undefined) updateData.approved_date = noteData.approvedDate;
     if ((noteData as any).rejectedBy !== undefined) updateData.rejected_by = (noteData as any).rejectedBy;
-    if ((noteData as any).rejectedDate !== undefined) updateData.rejected_date = (noteData as any).rejectedDate;
+    if ((noteData as any).rejectedDate !== undefined) updateData.rejected_date = (noteData as any).rejectedDate || null;
+    if ((noteData as any).rejectedReason !== undefined) updateData.rejected_reason = (noteData as any).rejectedReason;
     if ((noteData as any).verifiedBy !== undefined) updateData.verified_by = (noteData as any).verifiedBy;
-    if ((noteData as any).verifiedDate !== undefined) updateData.verified_date = (noteData as any).verifiedDate;
+    if ((noteData as any).verifiedDate !== undefined) updateData.verified_date = (noteData as any).verifiedDate || null;
     if (noteData.modeOfPayment !== undefined) updateData.mode_of_payment = noteData.modeOfPayment;
     if (noteData.paymentBreakdown !== undefined) updateData.payment_breakdown = noteData.paymentBreakdown;
     if (noteData.destination !== undefined) updateData.destination = noteData.destination;

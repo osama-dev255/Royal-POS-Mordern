@@ -311,11 +311,12 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
     const updatePayload: any = {
       status: newStatus as any,
       approvedBy: newStatus === 'approved' ? approvedBy : (targetNote.approvedBy || ''),
-      approvedDate: newStatus === 'approved' ? new Date().toISOString().split('T')[0] : (targetNote.approvedDate || ''),
+      approvedDate: newStatus === 'approved' ? new Date().toISOString().split('T')[0] : (targetNote.approvedDate || null),
       rejectedBy: newStatus === 'rejected' ? rejectedBy : '',
-      rejectedDate: newStatus === 'rejected' ? new Date().toISOString().split('T')[0] : '',
+      rejectedDate: newStatus === 'rejected' ? new Date().toISOString().split('T')[0] : null,
+      rejectedReason: newStatus === 'rejected' ? rejectedReason : '',
       verifiedBy: newStatus === 'verified' ? verifiedBy : '',
-      verifiedDate: newStatus === 'verified' ? new Date().toISOString().split('T')[0] : '',
+      verifiedDate: newStatus === 'verified' ? new Date().toISOString().split('T')[0] : null,
     };
 
     const result = await updateSupplierPurchaseNote(noteId, updatePayload);
@@ -442,6 +443,9 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                       <span className="font-semibold text-red-600">{selectedNote.rejectedBy}</span>
                       {selectedNote.rejectedDate && (
                         <span className="text-muted-foreground ml-2">({new Date(selectedNote.rejectedDate).toLocaleDateString()})</span>
+                      )}
+                      {selectedNote.rejectedReason && (
+                        <span className="block mt-1 text-muted-foreground italic">Reason: {selectedNote.rejectedReason}</span>
                       )}
                     </p>
                   )}
@@ -853,6 +857,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
                       status: note.status,
                       approvedBy: note.approvedBy || '',
                       rejectedBy: note.rejectedBy || '',
+                      rejectedReason: note.rejectedReason || '',
                       verifiedBy: note.verifiedBy || ''
                     }}
                     onViewDetails={() => handleViewNote(note)}
