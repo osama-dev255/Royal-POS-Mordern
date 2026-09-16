@@ -79,6 +79,21 @@ export interface Supplier {
   updated_at?: string;
 }
 
+export interface SupplierBankAccount {
+  id?: string;
+  supplier_id: string;
+  bank_name: string;
+  account_number: string;
+  account_name?: string;
+  branch?: string;
+  swift_code?: string;
+  iban?: string;
+  account_type?: string;
+  is_default?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Outlet {
   id?: string;
   name: string;
@@ -1479,6 +1494,72 @@ export const deleteSupplier = async (id: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('Error deleting supplier:', error);
+    return false;
+  }
+};
+
+// Supplier Bank Account operations
+export const getSupplierBankAccounts = async (supplierId: string): Promise<SupplierBankAccount[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('supplier_bank_accounts')
+      .select('*')
+      .eq('supplier_id', supplierId)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching supplier bank accounts:', error);
+    return [];
+  }
+};
+
+export const createSupplierBankAccount = async (account: Omit<SupplierBankAccount, 'id'>): Promise<SupplierBankAccount | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('supplier_bank_accounts')
+      .insert([{ ...account, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating supplier bank account:', error);
+    return null;
+  }
+};
+
+export const updateSupplierBankAccount = async (id: string, account: Partial<SupplierBankAccount>): Promise<SupplierBankAccount | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('supplier_bank_accounts')
+      .update({ ...account, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating supplier bank account:', error);
+    return null;
+  }
+};
+
+export const deleteSupplierBankAccount = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('supplier_bank_accounts')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting supplier bank account:', error);
     return false;
   }
 };

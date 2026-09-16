@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Edit, Trash2, Truck, Phone, Mail, MapPin, User, RefreshCw, Building2, Globe } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Truck, Phone, Mail, MapPin, User, RefreshCw, Building2, Globe, Landmark, CreditCard, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from "@/services/databaseService";
+import { getSuppliers, createSupplier, updateSupplier, deleteSupplier, getSupplierBankAccounts, createSupplierBankAccount, deleteSupplierBankAccount } from "@/services/databaseService";
+import type { SupplierBankAccount } from "@/services/databaseService";
 
 interface Supplier {
   id: string;
@@ -28,6 +29,18 @@ interface Supplier {
   status: "active" | "inactive";
   registeredBy: string;
   created_at?: string;
+  bankAccounts?: SupplierBankAccount[];
+}
+
+interface BankAccountForm {
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  branch: string;
+  swift_code: string;
+  iban: string;
+  account_type: string;
+  is_default: boolean;
 }
 
 export const SupplierManagement = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
@@ -51,6 +64,18 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
     status: "active",
     registeredBy: ""
   });
+  const [bankAccounts, setBankAccounts] = useState<SupplierBankAccount[]>([]);
+  const [newBankAccount, setNewBankAccount] = useState<BankAccountForm>({
+    bank_name: "",
+    account_number: "",
+    account_name: "",
+    branch: "",
+    swift_code: "",
+    iban: "",
+    account_type: "checking",
+    is_default: false,
+  });
+  const [showBankForm, setShowBankForm] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -74,7 +99,14 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           status: supplier.is_active ? "active" as const : "inactive" as const,
           registeredBy: supplier.registered_by || '',
           created_at: supplier.created_at,
+          bankAccounts: [],
         }));
+
+        // Load bank accounts for each supplier
+        for (const s of formattedSuppliers) {
+          s.bankAccounts = await getSupplierBankAccounts(s.id);
+        }
+
         setSuppliers(formattedSuppliers);
       } catch (error) {
         console.error("Error loading suppliers:", error);
@@ -137,7 +169,28 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           status: createdSupplier.is_active ? "active" as const : "inactive" as const,
           registeredBy: createdSupplier.registered_by || '',
           created_at: createdSupplier.created_at,
+          bankAccounts: [],
         };
+
+        // Save any pending bank accounts
+        for (const acct of bankAccounts) {
+          if (!acct.id) {
+            await createSupplierBankAccount({
+              supplier_id: formattedSupplier.id,
+              bank_name: acct.bank_name,
+              account_number: acct.account_number,
+              account_name: acct.account_name,
+              branch: acct.branch,
+              swift_code: acct.swift_code,
+              iban: acct.iban,
+              account_type: acct.account_type,
+              is_default: acct.is_default,
+            });
+          }
+        }
+
+        // Reload bank accounts for this supplier
+        formattedSupplier.bankAccounts = await getSupplierBankAccounts(formattedSupplier.id);
 
         setSuppliers([...suppliers, formattedSupplier]);
         resetForm();
@@ -204,7 +257,28 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
           payment_terms: updatedSupplier.payment_terms || '',
           status: updatedSupplier.is_active ? "active" as const : "inactive" as const,
           registeredBy: updatedSupplier.registered_by || '',
+          bankAccounts: [],
         };
+
+        // Save any new bank accounts (those without an id)
+        for (const acct of bankAccounts) {
+          if (!acct.id) {
+            await createSupplierBankAccount({
+              supplier_id: formattedSupplier.id,
+              bank_name: acct.bank_name,
+              account_number: acct.account_number,
+              account_name: acct.account_name,
+              branch: acct.branch,
+              swift_code: acct.swift_code,
+              iban: acct.iban,
+              account_type: acct.account_type,
+              is_default: acct.is_default,
+            });
+          }
+        }
+
+        // Reload bank accounts for this supplier
+        formattedSupplier.bankAccounts = await getSupplierBankAccounts(formattedSupplier.id);
 
         setSuppliers(suppliers.map(s => s.id === editingSupplier.id ? formattedSupplier : s));
         resetForm();
@@ -281,17 +355,90 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
       status: "active",
       registeredBy: ""
     });
+    setBankAccounts([]);
+    setNewBankAccount({
+      bank_name: "",
+      account_number: "",
+      account_name: "",
+      branch: "",
+      swift_code: "",
+      iban: "",
+      account_type: "checking",
+      is_default: false,
+    });
+    setShowBankForm(false);
     setEditingSupplier(null);
   };
 
-  const openEditDialog = (supplier: Supplier) => {
+  const openEditDialog = async (supplier: Supplier) => {
     setEditingSupplier(supplier);
+    // Load existing bank accounts for this supplier
+    const accounts = await getSupplierBankAccounts(supplier.id);
+    setBankAccounts(accounts);
     setIsDialogOpen(true);
   };
 
   const openAddDialog = () => {
     resetForm();
     setIsDialogOpen(true);
+  };
+
+  const handleAddBankAccount = () => {
+    if (!newBankAccount.bank_name || !newBankAccount.account_number) {
+      toast({
+        title: "Error",
+        description: "Bank Name and Account Number are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const acct: SupplierBankAccount = {
+      supplier_id: editingSupplier?.id || '',
+      bank_name: newBankAccount.bank_name,
+      account_number: newBankAccount.account_number,
+      account_name: newBankAccount.account_name || undefined,
+      branch: newBankAccount.branch || undefined,
+      swift_code: newBankAccount.swift_code || undefined,
+      iban: newBankAccount.iban || undefined,
+      account_type: newBankAccount.account_type,
+      is_default: newBankAccount.is_default,
+    };
+
+    // If this is set as default, un-default the others
+    const updatedAccounts = newBankAccount.is_default
+      ? bankAccounts.map(a => ({ ...a, is_default: false }))
+      : bankAccounts;
+
+    setBankAccounts([...updatedAccounts, acct]);
+    setNewBankAccount({
+      bank_name: "",
+      account_number: "",
+      account_name: "",
+      branch: "",
+      swift_code: "",
+      iban: "",
+      account_type: "checking",
+      is_default: false,
+    });
+    setShowBankForm(false);
+  };
+
+  const handleRemoveBankAccount = async (index: number) => {
+    const acct = bankAccounts[index];
+    // If it has an id, it's persisted — delete from DB
+    if (acct.id) {
+      const success = await deleteSupplierBankAccount(acct.id);
+      if (!success) {
+        toast({
+          title: "Error",
+          description: "Failed to remove bank account",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    setBankAccounts(bankAccounts.filter((_, i) => i !== index));
   };
 
   const refreshSuppliers = async () => {
@@ -313,7 +460,13 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
         payment_terms: supplier.payment_terms || '',
         status: supplier.is_active ? "active" as const : "inactive" as const,
         registeredBy: supplier.registered_by || '',
+        bankAccounts: [],
       }));
+
+      for (const s of formattedSuppliers) {
+        s.bankAccounts = await getSupplierBankAccounts(s.id);
+      }
+
       setSuppliers(formattedSuppliers);
       toast({
         title: "Success",
@@ -614,6 +767,184 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
                       </Select>
                     </div>
                   </div>
+
+                  {/* Bank Details */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-primary border-b pb-2 flex items-center gap-2">
+                      <Landmark className="h-4 w-4" />
+                      Bank Details
+                    </h3>
+
+                    {/* Existing bank accounts list */}
+                    {bankAccounts.length > 0 && (
+                      <div className="space-y-2">
+                        {bankAccounts.map((acct, index) => (
+                          <div key={acct.id || index} className="flex items-start justify-between rounded-lg border p-3 bg-muted/30">
+                            <div className="space-y-1 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="font-medium">{acct.bank_name}</span>
+                                {acct.is_default && (
+                                  <Badge variant="outline" className="text-xs text-primary border-primary">Default</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <CreditCard className="h-3.5 w-3.5" />
+                                <span>{acct.account_number}</span>
+                                {acct.account_name && <span>— {acct.account_name}</span>}
+                              </div>
+                              {acct.branch && (
+                                <div className="text-xs text-muted-foreground">Branch: {acct.branch}</div>
+                              )}
+                              {(acct.swift_code || acct.iban) && (
+                                <div className="text-xs text-muted-foreground">
+                                  {acct.swift_code && <span>SWIFT: {acct.swift_code}</span>}
+                                  {acct.swift_code && acct.iban && <span> | </span>}
+                                  {acct.iban && <span>IBAN: {acct.iban}</span>}
+                                </div>
+                              )}
+                              {acct.account_type && (
+                                <Badge variant="secondary" className="text-xs">{acct.account_type}</Badge>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveBankAccount(index)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add new bank account form */}
+                    {showBankForm ? (
+                      <div className="rounded-lg border p-4 space-y-3 bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">New Bank Account</span>
+                          <Button variant="ghost" size="sm" onClick={() => setShowBankForm(false)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="bank_name" className="text-xs">Bank Name *</Label>
+                            <Input
+                              id="bank_name"
+                              value={newBankAccount.bank_name}
+                              onChange={(e) => setNewBankAccount({...newBankAccount, bank_name: e.target.value})}
+                              placeholder="e.g. Commercial Bank"
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="account_number" className="text-xs">Account Number *</Label>
+                            <Input
+                              id="account_number"
+                              value={newBankAccount.account_number}
+                              onChange={(e) => setNewBankAccount({...newBankAccount, account_number: e.target.value})}
+                              placeholder="Enter account number"
+                              className="h-9"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="account_name" className="text-xs">Account Name</Label>
+                            <Input
+                              id="account_name"
+                              value={newBankAccount.account_name}
+                              onChange={(e) => setNewBankAccount({...newBankAccount, account_name: e.target.value})}
+                              placeholder="Name on the account"
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="branch" className="text-xs">Branch</Label>
+                            <Input
+                              id="branch"
+                              value={newBankAccount.branch}
+                              onChange={(e) => setNewBankAccount({...newBankAccount, branch: e.target.value})}
+                              placeholder="Branch name"
+                              className="h-9"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="swift_code" className="text-xs">SWIFT / BIC Code</Label>
+                            <Input
+                              id="swift_code"
+                              value={newBankAccount.swift_code}
+                              onChange={(e) => setNewBankAccount({...newBankAccount, swift_code: e.target.value})}
+                              placeholder="e.g. BOFAUS3N"
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="iban" className="text-xs">IBAN</Label>
+                            <Input
+                              id="iban"
+                              value={newBankAccount.iban}
+                              onChange={(e) => setNewBankAccount({...newBankAccount, iban: e.target.value})}
+                              placeholder="International Bank Account Number"
+                              className="h-9"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="account_type" className="text-xs">Account Type</Label>
+                            <Select
+                              value={newBankAccount.account_type}
+                              onValueChange={(value) => setNewBankAccount({...newBankAccount, account_type: value})}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="checking">Checking</SelectItem>
+                                <SelectItem value="savings">Savings</SelectItem>
+                                <SelectItem value="current">Current</SelectItem>
+                                <SelectItem value="fixed">Fixed Deposit</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Default Account</Label>
+                            <div className="flex items-center gap-2 h-9">
+                              <input
+                                type="checkbox"
+                                checked={newBankAccount.is_default}
+                                onChange={(e) => setNewBankAccount({...newBankAccount, is_default: e.target.checked})}
+                                className="h-4 w-4"
+                              />
+                              <span className="text-sm text-muted-foreground">Set as default bank account</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <Button size="sm" onClick={handleAddBankAccount}>
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            Add Account
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => setShowBankForm(true)} className="w-full">
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add Bank Account
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="flex justify-end gap-2">
@@ -733,6 +1064,32 @@ export const SupplierManagement = ({ username, onBack, onLogout }: { username: s
                             <Badge variant="outline">{supplier.payment_terms.replace('_', ' ').toUpperCase()}</Badge>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bank Accounts */}
+                  {supplier.bankAccounts && supplier.bankAccounts.length > 0 && (
+                    <div className="border-t pt-3">
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Landmark className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground font-medium">Bank Accounts ({supplier.bankAccounts.length})</span>
+                        </div>
+                        {supplier.bankAccounts.map((acct, idx) => (
+                          <div key={acct.id || idx} className="pl-6 space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-xs">{acct.bank_name}</span>
+                              {acct.is_default && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 text-primary border-primary">Default</Badge>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {acct.account_number}
+                              {acct.account_name && ` — ${acct.account_name}`}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
