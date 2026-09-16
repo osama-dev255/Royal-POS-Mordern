@@ -150,6 +150,9 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const [approvalDatePreset, setApprovalDatePreset] = useState<string>("all");
   const [approvalCalendarOpen, setApprovalCalendarOpen] = useState(false);
     const [approvalStatusFilter, setApprovalStatusFilter] = useState<string>('all');
+  const [approvalVendorFilter, setApprovalVendorFilter] = useState<string>('all');
+  const [approvalCategoryFilter, setApprovalCategoryFilter] = useState<string>('all');
+  const [approvalPreparedByFilter, setApprovalPreparedByFilter] = useState<string>('all');
   const [pendingApprovals, setPendingApprovals] = useState<Expense[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -1481,14 +1484,22 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     return matchesSearch && matchesCategory && matchesStatus && matchesPayment && matchesCostClassification && matchesExpenseType && matchesVendor && matchesRecurring && matchesTaxDeductible && matchesDateFrom && matchesDateTo;
   });
 
-  // Filtered approvals based on date range
+  // Filtered approvals based on date range and dropdown filters
   const filteredApprovals = pendingApprovals.filter(exp => {
     const expDate = new Date(exp.expense_date);
     const matchesFrom = !approvalDateFrom || expDate >= new Date(approvalDateFrom);
     const matchesTo = !approvalDateTo || expDate <= new Date(approvalDateTo + 'T23:59:59');
     const matchesStatus = approvalStatusFilter === 'all' || exp.approval_status === approvalStatusFilter;
-    return matchesFrom && matchesTo && matchesStatus;
+    const matchesVendor = approvalVendorFilter === 'all' || exp.vendor_name === approvalVendorFilter;
+    const matchesCategory = approvalCategoryFilter === 'all' || exp.category === approvalCategoryFilter;
+    const matchesPreparedBy = approvalPreparedByFilter === 'all' || exp.prepared_by_name === approvalPreparedByFilter;
+    return matchesFrom && matchesTo && matchesStatus && matchesVendor && matchesCategory && matchesPreparedBy;
   });
+
+  // Derive unique dropdown options from pendingApprovals
+  const approvalVendorOptions = [...new Set(pendingApprovals.map(e => e.vendor_name).filter(Boolean))].sort();
+  const approvalCategoryOptions = [...new Set(pendingApprovals.map(e => e.category).filter(Boolean))].sort();
+  const approvalPreparedByOptions = [...new Set(pendingApprovals.map(e => e.prepared_by_name).filter(Boolean))].sort();
   const pendingApprovalCount = pendingApprovals.filter(exp => exp.approval_status === 'pending').length;
 
   const handleDatePreset = (preset: string) => {
@@ -3007,11 +3018,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           {/* Advanced Date Range Picker */}
           <Card>
             <CardContent className="pt-4">
-              <div className="flex flex-col md:flex-row md:items-end gap-4">
+              <div className="flex flex-wrap items-end gap-3">
                 {/* Preset Buttons */}
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Quick Range</label>
-                  <div className="flex flex-wrap gap-2">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Quick Range</label>
+                  <div className="flex flex-wrap gap-1.5">
                     {[
                       { key: 'today', label: 'Today' },
                       { key: 'yesterday', label: 'Yesterday' },
@@ -3035,16 +3046,17 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                   </div>
                 </div>
                 {/* Custom Date Inputs */}
-                <div className="flex gap-2 items-end">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">From</label>
-                    <Input type="date" value={approvalDateFrom} onChange={(e) => { setApprovalDateFrom(e.target.value); setApprovalDatePreset('custom'); }} className="w-40" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">To</label>
-                    <Input type="date" value={approvalDateTo} onChange={(e) => { setApprovalDateTo(e.target.value); setApprovalDatePreset('custom'); }} className="w-40" />
-                  </div>
-                  {/* Calendar Popover */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">From</label>
+                  <Input type="date" value={approvalDateFrom} onChange={(e) => { setApprovalDateFrom(e.target.value); setApprovalDatePreset('custom'); }} className="w-40 h-9" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">To</label>
+                  <Input type="date" value={approvalDateTo} onChange={(e) => { setApprovalDateTo(e.target.value); setApprovalDatePreset('custom'); }} className="w-40 h-9" />
+                </div>
+                {/* Calendar Popover */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">&nbsp;</label>
                   <Popover open={approvalCalendarOpen} onOpenChange={setApprovalCalendarOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="h-9">
@@ -3072,25 +3084,73 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">&nbsp;</label>
                   <Button variant="ghost" size="sm" onClick={() => handleApprovalDatePreset('all')} className="h-9">
                     <X className="h-4 w-4 mr-1" />
                     Clear
                   </Button>
-                  {/* Status Filter */}
-                  <div className="ml-2">
-                    <label className="text-sm font-medium mb-1 block">Status</label>
-                    <Select value={approvalStatusFilter} onValueChange={setApprovalStatusFilter}>
-                      <SelectTrigger className="w-36 h-9">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                </div>
+                {/* Status Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Status</label>
+                  <Select value={approvalStatusFilter} onValueChange={setApprovalStatusFilter}>
+                    <SelectTrigger className="w-36 h-9">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Vendor Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Vendor</label>
+                  <Select value={approvalVendorFilter} onValueChange={setApprovalVendorFilter}>
+                    <SelectTrigger className="w-40 h-9">
+                      <SelectValue placeholder="All Vendors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Vendors</SelectItem>
+                      {approvalVendorOptions.map(v => (
+                        <SelectItem key={v} value={v}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Category Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Category</label>
+                  <Select value={approvalCategoryFilter} onValueChange={setApprovalCategoryFilter}>
+                    <SelectTrigger className="w-40 h-9">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {approvalCategoryOptions.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Prepared By Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Prepared By</label>
+                  <Select value={approvalPreparedByFilter} onValueChange={setApprovalPreparedByFilter}>
+                    <SelectTrigger className="w-40 h-9">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {approvalPreparedByOptions.map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               {(approvalDateFrom || approvalDateTo) && (
