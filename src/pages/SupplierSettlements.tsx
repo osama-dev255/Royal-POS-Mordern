@@ -20,8 +20,10 @@ import {
   getUniqueSuppliers,
   recordSupplierLedgerEntry,
   deleteSupplierLedgerEntry,
+  getDerivedLedgerStatuses,
   type SupplierLedgerEntry,
   type SupplierLedgerSummary,
+  type DerivedLedgerStatus,
 } from "@/utils/supplierLedgerUtils";
 import { getSavedGRNById } from "@/utils/grnUtils";
 import { getSupplierPaymentVoucherById } from "@/utils/supplierPaymentVoucherUtils";
@@ -52,15 +54,49 @@ const transactionTypeBadgeVariant: Record<string, "default" | "secondary" | "des
   refund: "default",
 };
 
+const statusLabels: Record<string, string> = {
+  pending: 'Pending',
+  complete: 'Complete',
+  completed: 'Completed',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  verified: 'Verified',
+  received: 'Received',
+  checked: 'Checked',
+  cancelled: 'Cancelled',
+  draft: 'Draft',
+};
+
+const statusColorClass: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  complete: 'bg-blue-100 text-blue-800 border-blue-300',
+  completed: 'bg-green-100 text-green-800 border-green-300',
+  approved: 'bg-green-100 text-green-800 border-green-300',
+  rejected: 'bg-red-100 text-red-800 border-red-300',
+  verified: 'bg-purple-100 text-purple-800 border-purple-300',
+  received: 'bg-blue-100 text-blue-800 border-blue-300',
+  checked: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  cancelled: 'bg-gray-100 text-gray-800 border-gray-300',
+  draft: 'bg-gray-100 text-gray-600 border-gray-300',
+};
+
+const getStatusColor = (status: string): string =>
+  statusColorClass[status] || 'bg-gray-100 text-gray-800 border-gray-300';
+
+const getStatusLabel = (status: string): string =>
+  statusLabels[status] || status.charAt(0).toUpperCase() + status.slice(1);
+
 export const SupplierSettlements = ({ username, onBack, onLogout }: { username: string; onBack: () => void; onLogout: () => void }) => {
   const [ledgerEntries, setLedgerEntries] = useState<SupplierLedgerEntry[]>([]);
   const [supplierSummaries, setSupplierSummaries] = useState<SupplierLedgerSummary[]>([]);
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [derivedStatuses, setDerivedStatuses] = useState<Map<string, DerivedLedgerStatus>>(new Map());
 
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showSupplierBreakdown, setShowSupplierBreakdown] = useState(true);
   const [dateRange, setDateRange] = useState({
     start: '2020-01-01',
@@ -111,6 +147,10 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       setLedgerEntries(entries);
       setSupplierSummaries(summaries);
       setSuppliers(uniqueSuppliers);
+
+      // Derive statuses from source documents
+      const statuses = await getDerivedLedgerStatuses(entries);
+      setDerivedStatuses(statuses);
     } catch (error) {
       console.error('Error fetching ledger data:', error);
     } finally {
@@ -140,8 +180,10 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       (entry.supplier_name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType = typeFilter === "all" || entry.transaction_type === typeFilter;
+    const derived = entry.id ? derivedStatuses.get(entry.id) : undefined;
+    const matchesStatus = statusFilter === "all" || (derived?.status || 'n/a') === statusFilter;
 
-    return matchesSearch && matchesType;
+    return matchesSearch && matchesType && matchesStatus;
   });
 
   // ── Totals ─────────────────────────────────────────────────────────────────
@@ -235,6 +277,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
         <td style="padding:8px;border:1px solid #ddd;">${entry.description || '-'}</td>
         <td style="padding:8px;border:1px solid #ddd;">${entry.supplier_name}</td>
         <td style="padding:8px;border:1px solid #ddd;">${transactionTypeLabels[entry.transaction_type] || entry.transaction_type}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;">${getStatusLabel(derivedStatuses.get(entry.id || '')?.status || 'n/a')}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-'}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-'}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${formatCurrency(Math.abs(Number(entry.running_balance) || 0))}${Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}</td>
@@ -267,14 +310,14 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
         <table>
           <thead>
             <tr>
-              <th>Date</th><th>Reference</th><th>Description</th><th>Supplier</th><th>Type</th>
+              <th>Date</th><th>Reference</th><th>Description</th><th>Supplier</th><th>Type</th><th>Status</th>
               <th style="text-align:right;">Debit (DR)</th><th style="text-align:right;">Credit (CR)</th><th style="text-align:right;">Balance</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
             <tr class="total-row">
-              <td colspan="5" style="text-align:right;padding:8px;border:1px solid #ddd;">TOTALS</td>
+              <td colspan="6" style="text-align:right;padding:8px;border:1px solid #ddd;">TOTALS</td>
               <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#dc2626;">${formatCurrency(totalDebit)}</td>
               <td style="padding:8px;border:1px solid #ddd;text-align:right;color:#16a34a;">${formatCurrency(totalCredit)}</td>
               <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${formatCurrency(Math.abs(outstandingBalance))}${outstandingBalance >= 0 ? ' CR' : ' DR'}</td>
@@ -304,6 +347,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
       entry.reference_number || '-',
       entry.supplier_name,
       transactionTypeLabels[entry.transaction_type] || entry.transaction_type,
+      getStatusLabel(derivedStatuses.get(entry.id || '')?.status || 'n/a'),
       Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-',
       Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-',
       `${formatCurrency(Math.abs(Number(entry.running_balance) || 0))}${Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}`,
@@ -311,7 +355,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
 
     autoTable(doc, {
       startY: 50,
-      head: [['Date', 'Reference', 'Supplier', 'Type', 'Debit (DR)', 'Credit (CR)', 'Balance']],
+      head: [['Date', 'Reference', 'Supplier', 'Type', 'Status', 'Debit (DR)', 'Credit (CR)', 'Balance']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [245, 158, 11] },
@@ -322,11 +366,11 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
   };
 
   const handleExportXLS = () => {
-    let csvContent = "Date,Reference,Description,Supplier,Type,Debit (DR),Credit (CR),Balance\n";
+    let csvContent = "Date,Reference,Description,Supplier,Type,Status,Debit (DR),Credit (CR),Balance\n";
     filteredEntries.forEach(entry => {
-      csvContent += `${new Date(entry.transaction_date).toLocaleDateString()},${entry.reference_number || '-'},"${(entry.description || '').replace(/"/g, '""')}",${entry.supplier_name},${transactionTypeLabels[entry.transaction_type] || entry.transaction_type},${Number(entry.debit_amount) || 0},${Number(entry.credit_amount) || 0},${Number(entry.running_balance) || 0}\n`;
+      csvContent += `${new Date(entry.transaction_date).toLocaleDateString()},${entry.reference_number || '-'},"${(entry.description || '').replace(/"/g, '""')}",${entry.supplier_name},${transactionTypeLabels[entry.transaction_type] || entry.transaction_type},${getStatusLabel(derivedStatuses.get(entry.id || '')?.status || 'n/a')},${Number(entry.debit_amount) || 0},${Number(entry.credit_amount) || 0},${Number(entry.running_balance) || 0}\n`;
     });
-    csvContent += `\nTOTALS,,,,,${totalDebit},${totalCredit},${outstandingBalance}\n`;
+    csvContent += `\nTOTALS,,,,,,${totalDebit},${totalCredit},${outstandingBalance}\n`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -351,6 +395,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
         entry.reference_number || '-',
         entry.supplier_name,
         transactionTypeLabels[entry.transaction_type] || entry.transaction_type,
+        getStatusLabel(derivedStatuses.get(entry.id || '')?.status || 'n/a'),
         Number(entry.debit_amount) > 0 ? formatCurrency(entry.debit_amount) : '-',
         Number(entry.credit_amount) > 0 ? formatCurrency(entry.credit_amount) : '-',
         `${formatCurrency(Math.abs(Number(entry.running_balance) || 0))}${Number(entry.running_balance) >= 0 ? ' CR' : ' DR'}`,
@@ -358,7 +403,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
 
       autoTable(doc, {
         startY: 50,
-        head: [['Date', 'Reference', 'Supplier', 'Type', 'Debit (DR)', 'Credit (CR)', 'Balance']],
+        head: [['Date', 'Reference', 'Supplier', 'Type', 'Status', 'Debit (DR)', 'Credit (CR)', 'Balance']],
         body: tableData,
         theme: 'striped',
         headStyles: { fillColor: [245, 158, 11] },
@@ -706,6 +751,20 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                   <SelectItem value="refund">Refund</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {Array.from(new Set(
+                    filteredEntries.map(e => derivedStatuses.get(e.id || '')?.status || 'n/a')
+                  )).sort().map(s => (
+                    <SelectItem key={s} value={s}>{getStatusLabel(s)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -830,6 +889,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                   <TableHead>Description</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Debit (DR)</TableHead>
                   <TableHead className="text-right">Credit (CR)</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -839,13 +899,13 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading ledger entries...
                     </TableCell>
                   </TableRow>
                 ) : filteredEntries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No ledger entries found. GRN receipts and inventory payments will appear here automatically.
                     </TableCell>
                   </TableRow>
@@ -864,6 +924,24 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                         <Badge variant={transactionTypeBadgeVariant[entry.transaction_type] || "outline"}>
                           {transactionTypeLabels[entry.transaction_type] || entry.transaction_type}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const ds = entry.id ? derivedStatuses.get(entry.id) : undefined;
+                          const st = ds?.status || 'n/a';
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${getStatusColor(st)}`}>
+                                {getStatusLabel(st)}
+                              </span>
+                              {ds?.source && (
+                                <span className="text-[10px] text-muted-foreground" title={`Source: ${ds.source}`}>
+                                  {ds.source}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className={`text-right font-medium ${Number(entry.debit_amount) > 0 ? 'text-red-600' : ''}`}>
                         {Number(entry.debit_amount) > 0 ? (
@@ -921,7 +999,7 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
               {filteredEntries.length > 0 && (
                 <tfoot>
                   <TableRow className="border-t-2 font-bold bg-muted/50">
-                    <TableCell colSpan={6}>TOTALS</TableCell>
+                    <TableCell colSpan={7}>TOTALS</TableCell>
                     <TableCell className="text-right text-red-600">{formatCurrency(totalDebit)}</TableCell>
                     <TableCell className="text-right text-green-600">{formatCurrency(totalCredit)}</TableCell>
                     <TableCell className={`text-right ${outstandingBalance >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
@@ -981,6 +1059,25 @@ export const SupplierSettlements = ({ username, onBack, onLogout }: { username: 
                   <div>
                     <p className="text-sm text-muted-foreground">Payment Method</p>
                     <p className="font-medium">{viewEntry.payment_method || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const ds = viewEntry.id ? derivedStatuses.get(viewEntry.id) : undefined;
+                        const st = ds?.status || 'n/a';
+                        return (
+                          <>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${getStatusColor(st)}`}>
+                              {getStatusLabel(st)}
+                            </span>
+                            {ds?.source && (
+                              <span className="text-xs text-muted-foreground">from {ds.source}</span>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Running Balance</p>
