@@ -398,6 +398,10 @@ export const GRNDetailsModal = ({
                     const hasIssues = (item.damaged && item.damaged > 0) || 
                                     (item.rejectedOut && item.rejectedOut > 0) ||
                                     (item.rejectionIn && item.rejectionIn > 0);
+
+                    // Original unit cost: use the stored value, otherwise derive it
+                    // by stripping the allocated receiving cost from the current unit cost
+                    const originalUnitCost = Number(item.originalUnitCost || (item.unitCost || 0) - (item.receivingCostPerUnit || 0) || 0);
                     
                     return (
                       <TableRow key={index} className={hasIssues ? "bg-yellow-50" : ""}>
@@ -419,10 +423,10 @@ export const GRNDetailsModal = ({
                         <TableCell className="text-right">{item.quantity || 0}</TableCell>
                         <TableCell className="text-right">{item.delivered || 0}</TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(item.receivingCostPerUnit || item.unitCost || 0)}
+                          {formatCurrency(originalUnitCost)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(item.totalWithReceivingCost || item.total || 0)}
+                          {formatCurrency(originalUnitCost * (item.delivered || item.quantity || 0))}
                         </TableCell>
                         <TableCell>
                           {hasIssues ? (
