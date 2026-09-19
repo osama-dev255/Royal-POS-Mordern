@@ -7,7 +7,8 @@ import {
   FileText,
   Save,
   Users,
-  ClipboardCheck
+  ClipboardCheck,
+  Undo2
 } from "lucide-react";
 
 interface OutletSalesManagementProps {
@@ -59,6 +60,13 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
       description: "View and manage saved stock take records",
       icon: <ClipboardCheck className="h-8 w-8" />,
       route: outletId ? `#/outlet-saved-stock-takes/${outletId}` : "#/saved-stock-takes"
+    },
+    {
+      id: "customer-returns",
+      title: "Customer Returns",
+      description: "Record and manage goods returned by customers",
+      icon: <Undo2 className="h-8 w-8" />,
+      route: outletId ? `#/outlet-returns/${outletId}` : "#/returns"
     }
   ];
 
@@ -80,7 +88,7 @@ export const OutletSalesManagement = ({ onBack, outletId }: OutletSalesManagemen
       </div>
 
       {/* Navigation Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         {navigationCards.map((card) => (
           <Card 
             key={card.id}

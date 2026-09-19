@@ -2006,6 +2006,61 @@ export const incrementSoldQuantity = async (
   }
 };
 
+// Decrement sold_quantity when goods are returned by a customer (restocked)
+// Mirror of incrementSoldQuantity, clamped at 0 so it can never go negative
+export const decrementSoldQuantity = async (
+  outletId: string,
+  productName: string,
+  quantity: number
+): Promise<boolean> => {
+  try {
+    // Skip if product name is empty or whitespace
+    if (!productName || !productName.trim()) {
+      return false;
+    }
+
+    // First, get the current sold_quantity
+    const { data: current, error: fetchError } = await supabase
+      .from('inventory_products')
+      .select('sold_quantity')
+      .eq('outlet_id', outletId)
+      .eq('name', productName)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching current sold_quantity:', fetchError);
+      return false;
+    }
+
+    if (!current) {
+      console.warn(`⚠️ Product "${productName}" not found in inventory_products`);
+      return false;
+    }
+
+    // Clamp at 0 so a return can never make sold_quantity negative
+    const newSoldQty = Math.max(0, (current.sold_quantity || 0) - quantity);
+
+    const { error: updateError } = await supabase
+      .from('inventory_products')
+      .update({
+        sold_quantity: newSoldQty,
+        updated_at: new Date().toISOString()
+      })
+      .eq('outlet_id', outletId)
+      .eq('name', productName);
+
+    if (updateError) {
+      console.error('Error updating sold_quantity:', updateError);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error decrementing sold quantity:', error);
+    return false;
+  }
+};
+
 // Get available inventory for an outlet (respecting sold quantities)
 export const getAvailableInventoryByOutlet = async (outletId: string): Promise<InventoryProduct[]> => {
   try {
@@ -5798,6 +5853,412 @@ export const approveOutletDebt = async (
   } catch (error) {
     console.error('Error approving outlet debt:', error);
     return false;
+  }
+};
+
+// ==========================================
+// OUTLET CUSTOMER RETURNS (Sales Management -> Customer Returns)
+// ==========================================
+
+export interface OutletCustomerReturnItem {
+  id?: string;
+  return_id?: string;
+  product_id?: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  restock?: boolean; // TRUE = sellable (RETURN movement), FALSE = damaged/unsellable (DAMAGE movement)
+  created_at?: string;
+}
+
+export interface OutletCustomerReturn {
+  id?: string;
+  outlet_id: string;
+  customer_id?: string | null;
+  return_number: string;
+  return_date?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  source_type: 'cash_sale' | 'card_sale' | 'mobile_sale' | 'debt' | 'walk_in';
+  source_id?: string | null;
+  source_invoice_number?: string | null;
+  reason: string;
+  refund_method: 'cash' | 'credit_note';
+  total_amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  received_by?: string | null;
+  approved_by_name?: string | null;
+  approved_at?: string | null;
+  rejected_reason?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Create a new customer return (status 'pending') together with its line items
+export const createOutletCustomerReturn = async (
+  returnData: Omit<OutletCustomerReturn, 'id'>,
+  items: Omit<OutletCustomerReturnItem, 'id' | 'return_id'>[]
+): Promise<OutletCustomerReturn | null> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from('outlet_customer_returns')
+      .insert([{
+        ...returnData,
+        status: 'pending',
+        created_by: user?.id || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    if (items.length > 0) {
+      const { error: itemsError } = await supabase
+        .from('outlet_customer_return_items')
+        .insert(items.map(item => ({
+          ...item,
+          return_id: data.id,
+          line_total: (item.quantity || 0) * (item.unit_price || 0)
+        })));
+
+      if (itemsError) throw itemsError;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error creating customer return:', error);
+    return null;
+  }
+};
+
+// Fetch all customer returns for an outlet (newest first)
+export const getOutletCustomerReturnsByOutletId = async (outletId: string): Promise<OutletCustomerReturn[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customer_returns')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching customer returns:', error);
+    return [];
+  }
+};
+
+// Fetch line items for a return
+export const getOutletCustomerReturnItemsByReturnId = async (returnId: string): Promise<OutletCustomerReturnItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customer_return_items')
+      .select('*')
+      .eq('return_id', returnId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching customer return items:', error);
+    return [];
+  }
+};
+
+// Update a pending return (header + optional full item replacement)
+export const updateOutletCustomerReturn = async (
+  id: string,
+  updates: Partial<OutletCustomerReturn>,
+  items?: Omit<OutletCustomerReturnItem, 'id' | 'return_id'>[]
+): Promise<OutletCustomerReturn | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_customer_returns')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (items) {
+      const { error: deleteError } = await supabase
+        .from('outlet_customer_return_items')
+        .delete()
+        .eq('return_id', id);
+
+      if (deleteError) throw deleteError;
+
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('outlet_customer_return_items')
+          .insert(items.map(item => ({
+            ...item,
+            return_id: id,
+            line_total: (item.quantity || 0) * (item.unit_price || 0)
+          })));
+
+        if (itemsError) throw itemsError;
+      }
+    }
+
+    return data || null;
+  } catch (error) {
+    console.error('Error updating customer return:', error);
+    return null;
+  }
+};
+
+// Delete a return; safely reverses approval side effects first if it was approved
+export const deleteOutletCustomerReturn = async (id: string): Promise<boolean> => {
+  try {
+    const { data: existing } = await supabase
+      .from('outlet_customer_returns')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (existing && existing.status === 'approved') {
+      // Flip to pending first: the DB trigger removes the ledger refund entry
+      // and restores the source debt's remaining_amount
+      await supabase
+        .from('outlet_customer_returns')
+        .update({ status: 'pending', updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      // Remove the return's stock movements and put sold_quantity back
+      const items = await getOutletCustomerReturnItemsByReturnId(id);
+      const { deleteStockMovementsByReference } = await import('@/utils/stockMovementUtils');
+      await deleteStockMovementsByReference('RETURN', existing.return_number);
+      for (const item of items.filter(i => i.restock)) {
+        await incrementSoldQuantity(existing.outlet_id, item.product_name, item.quantity);
+      }
+    }
+
+    const { error } = await supabase
+      .from('outlet_customer_returns')
+      .delete()
+      .eq('id', id); // items cascade
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting customer return:', error);
+    return false;
+  }
+};
+
+// Approve a return: applies all side effects
+//  - DB trigger writes the customer_ledger 'refund' credit entry (credit_note only)
+//    and offsets the source debt's remaining_amount
+//  - here: record RETURN/DAMAGE stock movements + decrement sold_quantity for restocked items
+export const approveOutletCustomerReturn = async (
+  id: string,
+  approverName: string
+): Promise<boolean> => {
+  try {
+    const { data: existing } = await supabase
+      .from('outlet_customer_returns')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      console.error('Return not found:', id);
+      return false;
+    }
+
+    if (existing.status === 'approved') {
+      console.warn('Return is already approved:', id);
+      return false;
+    }
+
+    // Update status (trigger handles ledger + debt offset)
+    const { error: updateError } = await supabase
+      .from('outlet_customer_returns')
+      .update({
+        status: 'approved',
+        approved_by_name: approverName,
+        approved_at: new Date().toISOString(),
+        rejected_reason: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+
+    // Idempotency guard: skip stock side effects if movements already exist (re-approval)
+    const { data: existingMovements } = await supabase
+      .from('stock_movements')
+      .select('id')
+      .eq('reference_id', id)
+      .limit(1);
+
+    if (existingMovements && existingMovements.length > 0) {
+      return true;
+    }
+
+    const items = await getOutletCustomerReturnItemsByReturnId(id);
+    if (items.length > 0) {
+      const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+      const movements = items.map(item => ({
+        product_id: item.product_id || undefined,
+        product_name: item.product_name,
+        outlet_id: existing.outlet_id,
+        movement_type: (item.restock ? 'RETURN' : 'DAMAGE') as 'RETURN' | 'DAMAGE',
+        quantity: item.quantity,
+        reference_type: 'RETURN' as const,
+        reference_id: id,
+        reference_number: existing.return_number,
+        unit_cost: item.unit_price || 0,
+        total_cost: (item.unit_price || 0) * item.quantity,
+        notes: item.restock
+          ? `Customer return ${existing.return_number}`
+          : `Customer return ${existing.return_number} (damaged/unsellable)`
+      }));
+
+      await recordStockMovements(movements);
+
+      // Put sellable goods back into available stock
+      for (const item of items.filter(i => i.restock)) {
+        await decrementSoldQuantity(existing.outlet_id, item.product_name, item.quantity);
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error approving customer return:', error);
+    return false;
+  }
+};
+
+// Reject a pending return, or revert an approved/rejected return (approved <-> rejected)
+// Reverting an approved return reverses: ledger refund entry + debt offset (DB trigger),
+// stock movements and sold_quantity (here)
+export const reviewOutletCustomerReturn = async (
+  id: string,
+  action: 'reject' | 'revert',
+  reviewerName?: string,
+  rejectedReason?: string
+): Promise<boolean> => {
+  try {
+    const { data: existing } = await supabase
+      .from('outlet_customer_returns')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      console.error('Return not found:', id);
+      return false;
+    }
+
+    const wasApproved = existing.status === 'approved';
+
+    // If it was approved, reverse the stock side effects
+    // (the DB trigger reverses the ledger entry + debt offset on the status update below)
+    if (wasApproved) {
+      const items = await getOutletCustomerReturnItemsByReturnId(id);
+      const { deleteStockMovementsByReference } = await import('@/utils/stockMovementUtils');
+      await deleteStockMovementsByReference('RETURN', existing.return_number);
+      for (const item of items.filter(i => i.restock)) {
+        await incrementSoldQuantity(existing.outlet_id, item.product_name, item.quantity);
+      }
+    }
+
+    const newStatus = action === 'reject' ? 'rejected' : 'pending';
+
+    const { error: updateError } = await supabase
+      .from('outlet_customer_returns')
+      .update({
+        status: newStatus,
+        rejected_reason: action === 'reject' ? (rejectedReason || null) : null,
+        approved_by_name: action === 'reject' ? (reviewerName || existing.approved_by_name) : null,
+        approved_at: action === 'reject' ? existing.approved_at : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+
+    return true;
+  } catch (error) {
+    console.error('Error reviewing customer return:', error);
+    return false;
+  }
+};
+
+// Fetch the original sale/debt + its items for a linked return (auto-fill + quantity validation)
+export interface ReturnSourceSale {
+  id: string;
+  invoice_number: string;
+  date?: string;
+  customer_id?: string;
+  customer_name?: string;
+  total_amount: number;
+  payment_status?: string;
+  items: { product_id?: string; product_name: string; quantity: number; unit_price: number }[];
+}
+
+export const getOutletSaleForReturn = async (
+  outletId: string,
+  sourceType: 'cash_sale' | 'card_sale' | 'mobile_sale' | 'debt',
+  sourceId: string
+): Promise<ReturnSourceSale | null> => {
+  try {
+    const table = sourceType === 'debt' ? 'outlet_debts' : `outlet_${sourceType.replace('_sale', '')}_sales`;
+    const itemsTable = sourceType === 'debt' ? 'outlet_debt_items' : `outlet_${sourceType.replace('_sale', '')}_sale_items`;
+    const foreignKey = sourceType === 'debt' ? 'debt_id' : 'sale_id';
+    const dateColumn = sourceType === 'debt' ? 'debt_date' : 'sale_date';
+
+    const { data: sale, error: saleError } = await supabase
+      .from(table)
+      .select('*')
+      .eq('id', sourceId)
+      .eq('outlet_id', outletId)
+      .single();
+
+    if (saleError || !sale) {
+      console.error('Error fetching source sale for return:', saleError);
+      return null;
+    }
+
+    const { data: items, error: itemsError } = await supabase
+      .from(itemsTable)
+      .select('*')
+      .eq(foreignKey, sourceId);
+
+    if (itemsError) throw itemsError;
+
+    return {
+      id: sale.id,
+      invoice_number: sale.invoice_number,
+      date: sale[dateColumn] || sale.created_at,
+      customer_id: sale.customer_id,
+      customer_name: sale.customer_name,
+      total_amount: sale.total_amount,
+      payment_status: sale.payment_status,
+      items: (items || []).map((item: Record<string, unknown>) => ({
+        product_id: (item.product_id as string) || undefined,
+        product_name: (item.product_name as string) || '',
+        quantity: (item.quantity as number) || 0,
+        unit_price: (item.unit_price as number) || 0
+      }))
+    };
+  } catch (error) {
+    console.error('Error fetching source sale for return:', error);
+    return null;
   }
 };
 
