@@ -389,6 +389,8 @@ export const GRNDetailsModal = ({
                     <TableHead className="text-right">Ordered</TableHead>
                     <TableHead className="text-right">Delivered</TableHead>
                     <TableHead className="text-right">Unit Price</TableHead>
+                    <TableHead className="text-right">Receiving Cost Per Unit</TableHead>
+                    <TableHead className="text-right">New Unit Cost</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -424,6 +426,12 @@ export const GRNDetailsModal = ({
                         <TableCell className="text-right">{item.delivered || 0}</TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(originalUnitCost)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(item.receivingCostPerUnit || 0)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(originalUnitCost + (item.receivingCostPerUnit || 0))}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(originalUnitCost * (item.delivered || item.quantity || 0))}
