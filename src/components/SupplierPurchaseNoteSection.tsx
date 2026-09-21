@@ -250,7 +250,7 @@ export const SupplierPurchaseNoteSection = ({ onBack, onLogout, username, onEdit
       }
       lines.push('');
       if (showProjectedProfit) {
-        const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0);
+        const totalProjectedProfit = items.reduce((s: number, i: any) => s + ((i.quantity || 0) * ((i.sellingPrice || 0) - (i.unitPrice || 0))), 0) - receivingCostsTotal;
         lines.push(`*📈 FAIDA INAYOTARAJIWA: ${fmtCurrency(totalProjectedProfit)}*`);
         lines.push('');
       }
