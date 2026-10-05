@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   Home, 
@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getOutletById } from "@/services/databaseService";
+import { setActiveOutletInfo, clearActiveOutletInfo } from "@/utils/outletBusinessInfo";
 
 interface OutletLayoutProps {
   children: React.ReactNode;
@@ -53,6 +55,27 @@ export const OutletLayout = ({
   console.log("OutletLayout rendered with outletId:", outletId);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [resolvedOutletName, setResolvedOutletName] = useState<string>(outletName);
+
+  // Resolve and cache the active outlet's real identity for documents and display
+  useEffect(() => {
+    let cancelled = false;
+    getOutletById(outletId).then((outlet) => {
+      if (cancelled || !outlet) return;
+      setActiveOutletInfo({
+        id: outlet.id!,
+        name: outlet.name,
+        location: outlet.location,
+        phone: outlet.phone,
+        email: outlet.email
+      });
+      setResolvedOutletName(outlet.name);
+    });
+    return () => {
+      cancelled = true;
+      clearActiveOutletInfo();
+    };
+  }, [outletId]);
 
   // Outlet-specific menu items - All Quick Actions
   const menuItems: MenuItem[] = [
@@ -202,7 +225,7 @@ export const OutletLayout = ({
                     <Store className="h-6 w-6 text-primary-foreground" />
                   </div>
                   <div>
-                    <h1 className="text-lg font-bold truncate max-w-[140px]">{outletName}</h1>
+                    <h1 className="text-lg font-bold truncate max-w-[140px]">{resolvedOutletName}</h1>
                     <p className="text-xs text-muted-foreground">Outlet Dashboard</p>
                   </div>
                 </motion.div>
@@ -282,7 +305,7 @@ export const OutletLayout = ({
             <Store className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold">{outletName}</h1>
+            <h1 className="font-bold">{resolvedOutletName}</h1>
             <p className="text-xs text-muted-foreground">Outlet Dashboard</p>
           </div>
         </div>

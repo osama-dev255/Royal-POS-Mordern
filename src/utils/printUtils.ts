@@ -1,4 +1,5 @@
 import { getTemplateConfig, generateCustomReceipt, getPurchaseTemplateConfig, generateCustomPurchaseReceipt } from "@/utils/templateUtils";
+import { getDocumentBusinessName } from "@/utils/outletBusinessInfo";
 
 // Remove the dynamic import approach and use a CDN-based solution instead
 // This avoids build-time dependency resolution issues with Vite/Rollup
@@ -1028,7 +1029,7 @@ export class PrintUtils {
     // Use a new window approach for better PDF export control
     setTimeout(() => {
       // Use the same settlement content generation as desktop
-      const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+      const businessName = getDocumentBusinessName();
       const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
       const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
       const businessEmail = localStorage.getItem('businessEmail') || '';
@@ -4028,7 +4029,7 @@ export class PrintUtils {
       return;
     }
     
-    const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+    const businessName = getDocumentBusinessName();
     const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
     const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
     const businessEmail = localStorage.getItem('businessEmail') || '';
@@ -4476,7 +4477,7 @@ export class PrintUtils {
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) return;
     
-    const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+    const businessName = getDocumentBusinessName();
     const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
     const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
     const businessEmail = localStorage.getItem('businessEmail') || 'kilangogroup1@gmail.com';

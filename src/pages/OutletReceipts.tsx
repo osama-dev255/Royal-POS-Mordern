@@ -52,6 +52,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getOutletSalesByOutletAndPaymentMethod, OutletSale, getOutletCustomerById, getOutletSaleItemsBySaleId, getOutletCustomers, getOutletDebtsByCustomerId, getOutletDebtsByOutletId, updateOutletDebt, updateOutletSale, createCommissionReceipt, getCommissionReceiptsByOutletId, createOtherReceipt, getOtherReceiptsByOutletId, createOutletCustomerSettlement, getOutletCustomerSettlementsByOutletId, updateOutletCustomerSettlement, getCustomerLedgerBalance, getPendingSettlementApprovals, approveOutletCustomerSettlement, reviewOutletCustomerSettlement, OutletCustomerSettlement } from "@/services/databaseService";
 import { PrintUtils } from "@/utils/printUtils";
 import { ExportUtils } from "@/utils/exportUtils";
+import { getDocumentBusinessName } from "@/utils/outletBusinessInfo";
 import WhatsAppUtils from "@/utils/whatsappUtils";
 import jsPDF from "jspdf";
 
@@ -730,7 +731,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         const pageWidth = doc.internal.pageSize.getWidth();
         
         // Get business info
-        const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+        const businessName = getDocumentBusinessName();
         const businessAddress = localStorage.getItem('businessAddress') || 'P Box 64, Tanganyika Street, Muheza - Tanga';
         const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
         
@@ -994,7 +995,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
     const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
     const totalNewBalance = filteredReceipts.reduce((sum, r) => sum + ((r.previousBalance || 0) - r.amountPaid), 0);
-    const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+    const businessName = getDocumentBusinessName();
     
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -1083,7 +1084,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     const totalAmount = filteredReceipts.reduce((sum, r) => sum + r.amountPaid, 0);
     const totalPrevious = filteredReceipts.reduce((sum, r) => sum + (r.previousBalance || 0), 0);
     const totalNewBalance = filteredReceipts.reduce((sum, r) => sum + ((r.previousBalance || 0) - r.amountPaid), 0);
-    const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+    const businessName = getDocumentBusinessName();
     
     // Create HTML table format that Excel can open as native .xls
     const htmlTable = `
@@ -1255,7 +1256,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    const businessName = localStorage.getItem('businessName') || 'KILANGO GROUP LTD';
+    const businessName = getDocumentBusinessName();
     const businessAddress = localStorage.getItem('businessAddress') || 'P Box 64, Tanganyika Street, Muheza - Tanga';
     const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
     

@@ -1,6 +1,7 @@
 // Utility functions for exporting data
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getDocumentBusinessName } from '@/utils/outletBusinessInfo';
 
 export class ExportUtils {
   // Export data to CSV
@@ -62,7 +63,7 @@ export class ExportUtils {
   static exportToPDF(data: any[], filename: string, title: string) {
     if (!data || data.length === 0) return;
 
-    const businessName = localStorage.getItem('businessName') || 'Kilango Group LTD';
+    const businessName = getDocumentBusinessName();
     const businessAddress = localStorage.getItem('businessAddress') || 'P.O.Box 64, Tanganyika Street, Muheza - Tanga';
     const businessPhone = localStorage.getItem('businessPhone') || '0717 058 266';
 
