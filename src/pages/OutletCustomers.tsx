@@ -30,7 +30,12 @@ import {
   LayoutGrid,
   List,
   Pencil,
-  RefreshCw
+  RefreshCw,
+  Printer,
+  Download,
+  Share2,
+  FileText,
+  ChevronDown
 } from "lucide-react";
 import {
   Table,
@@ -44,6 +49,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getOutletCustomers, createOutletCustomer, updateOutletCustomer, deleteOutletCustomer, getOutletDebtsByOutletId, OutletCustomer, getOutletCustomerSettlementsByOutletId, getOutletCashSalesByOutletId, getOutletCardSalesByOutletId, getOutletMobileSalesByOutletId, getCustomerLedgerBalance } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import { CustomerLedger } from "@/components/CustomerLedger";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface OutletCustomersProps {
   onBack: () => void;
@@ -447,6 +455,161 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
   const totalCustomerCredit = Object.values(customerBalances).reduce((sum, balance) => sum + (balance < 0 ? balance : 0), 0);
   const customersWithCredit = Object.values(customerBalances).filter(balance => balance < 0).length;
 
+  // ── Export Handlers ────────────────────────────────────────────────────────
+
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const rowsHtml = filteredCustomers.map(customer => `
+      <tr>
+        <td style="padding:8px;border:1px solid #ddd;">${customer.first_name} ${customer.last_name}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${customer.phone || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${customer.email || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${customer.address || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${customer.district_ward || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${(customer.loyalty_points || 0).toLocaleString()}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(customer.credit_limit || 0)}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;">${formatCurrency(customerBalances[customer.id!] || 0)}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;">${customer.is_active !== false ? 'active' : 'inactive'}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '-'}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Outlet Customers Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; color: #333; }
+          .summary { display: flex; justify-content: space-between; margin: 20px 0; }
+          .summary-box { padding: 10px 20px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+          th { background: #f59e0b; color: white; padding: 10px; text-align: left; }
+          .total-row { font-weight: bold; background: #f9f9f9; }
+          @page { size: A4 landscape; margin: 10mm; }
+          @media print { body { padding: 0; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <h1>Outlet Customers</h1>
+        <div class="summary">
+          <div class="summary-box"><strong>Total Customers:</strong> ${totalCustomers}</div>
+          <div class="summary-box"><strong>Active:</strong> ${activeCustomers}</div>
+          <div class="summary-box"><strong>Outstanding Balance:</strong> ${formatCurrency(totalOutstandingBalance > 0 ? totalOutstandingBalance : 0)}</div>
+          <div class="summary-box"><strong>Customer Credit:</strong> ${formatCurrency(Math.abs(totalCustomerCredit))}</div>
+          <div class="summary-box"><strong>Loyalty Points:</strong> ${totalLoyaltyPoints.toLocaleString()}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>District/Ward</th>
+              <th style="text-align:right;">Loyalty Points</th><th style="text-align:right;">Credit Limit</th><th style="text-align:right;">Balance</th>
+              <th style="text-align:center;">Status</th><th>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr class="total-row">
+              <td colspan="6" style="padding:8px;border:1px solid #ddd;text-align:right;">TOTALS (${filteredCustomers.length} customers)</td>
+              <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(filteredCustomers.reduce((sum, c) => sum + (c.credit_limit || 0), 0))}</td>
+              <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(filteredCustomers.reduce((sum, c) => sum + (customerBalances[c.id!] || 0), 0))}</td>
+              <td style="padding:8px;border:1px solid #ddd;" colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:20px;text-align:center;" class="no-print">
+          <button onclick="window.print()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:5px;cursor:pointer;">Print</button>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const buildCustomersPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    doc.setFontSize(18);
+    doc.text('Outlet Customers', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Total Customers: ${totalCustomers}`, 14, 30);
+    doc.text(`Active: ${activeCustomers}`, 14, 36);
+    doc.text(`Outstanding Balance: ${formatCurrency(totalOutstandingBalance > 0 ? totalOutstandingBalance : 0)}`, 14, 42);
+    doc.text(`Customer Credit: ${formatCurrency(Math.abs(totalCustomerCredit))}`, 14, 48);
+    doc.text(`Loyalty Points: ${totalLoyaltyPoints.toLocaleString()}`, 14, 54);
+
+    const tableData = filteredCustomers.map(customer => [
+      `${customer.first_name} ${customer.last_name}`,
+      customer.phone || '-',
+      customer.email || '-',
+      customer.address || '-',
+      customer.district_ward || '-',
+      (customer.loyalty_points || 0).toLocaleString(),
+      formatCurrency(customer.credit_limit || 0),
+      formatCurrency(customerBalances[customer.id!] || 0),
+      customer.is_active !== false ? 'active' : 'inactive',
+      customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '-',
+    ]);
+
+    autoTable(doc, {
+      startY: 58,
+      head: [['Name', 'Phone', 'Email', 'Address', 'District/Ward', 'Loyalty', 'Credit Limit', 'Balance', 'Status', 'Joined']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+
+    return doc;
+  };
+
+  const handleDownloadPDF = () => {
+    const doc = buildCustomersPDF();
+    doc.save('Outlet_Customers.pdf');
+    toast({ title: "Download Started", description: "Downloading outlet customers as PDF" });
+  };
+
+  const handleExportXLS = () => {
+    let csvContent = "Name,Phone,Email,Address,District/Ward,Loyalty Points,Credit Limit,Balance,Status,Joined\n";
+    filteredCustomers.forEach(customer => {
+      csvContent += `"${`${customer.first_name} ${customer.last_name}`.replace(/"/g, '""')}",${customer.phone || '-'},${customer.email || '-'},"${(customer.address || '-').replace(/"/g, '""')}","${(customer.district_ward || '-').replace(/"/g, '""')}",${customer.loyalty_points || 0},${customer.credit_limit || 0},${customerBalances[customer.id!] || 0},${customer.is_active !== false ? 'active' : 'inactive'},${customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '-'}\n`;
+    });
+    csvContent += `\nTOTALS,,,,,,${filteredCustomers.reduce((sum, c) => sum + (c.credit_limit || 0), 0)},${filteredCustomers.reduce((sum, c) => sum + (customerBalances[c.id!] || 0), 0)},,\n`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Outlet_Customers.csv';
+    link.click();
+    toast({ title: "Export Started", description: "Exporting outlet customers as CSV" });
+  };
+
+  const handleSharePDF = async () => {
+    try {
+      const doc = buildCustomersPDF();
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], 'Outlet_Customers.pdf', { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Outlet Customers Report',
+          text: `Outlet customers list with ${filteredCustomers.length} customers`
+        });
+        toast({ title: "Shared Successfully", description: "Outlet customers list has been shared" });
+      } else {
+        handleDownloadPDF();
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return; // User cancelled the share dialog
+      }
+      console.error('Share error:', error);
+      handleDownloadPDF();
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-6 px-4">
@@ -481,6 +644,34 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-2" />
+                Actions
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handlePrintReport}>
+                <Printer className="h-4 w-4 mr-2" />
+                <span>Print</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportXLS}>
+                <FileText className="h-4 w-4 mr-2" />
+                <span>Export .xls</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>Download .pdf</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSharePDF}>
+                <Share2 className="h-4 w-4 mr-2" />
+                <span>Share</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {/* Refresh Button */}
           <Button variant="outline" size="sm" onClick={loadCustomers} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
