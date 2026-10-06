@@ -27,6 +27,7 @@ import {
   Calendar
 } from "lucide-react";
 import { getAvailableInventoryByOutlet, InventoryProduct, getOutletSalesByOutletId, getOutletSaleItemsBySaleId, OutletSale, OutletSaleItem, getOutletCustomerSettlementsByOutletId } from "@/services/databaseService";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 
 interface OutletReportsProps {
@@ -359,6 +360,53 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
     lowStock: inventoryData.filter(item => item.status === 'low-stock').length,
     outOfStock: inventoryData.filter(item => item.status === 'out-of-stock').length
   };
+
+  // Chart data derivations for Inventory Products Statistics
+  const truncateName = (name: string, max = 18) =>
+    name.length > max ? `${name.substring(0, max - 1)}…` : name;
+
+  const formatCurrencyShort = (amount: number) => {
+    if (Math.abs(amount) >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+    if (Math.abs(amount) >= 1000) return `${Math.round(amount / 1000)}K`;
+    return `${Math.round(amount)}`;
+  };
+
+  const totalUnits = filteredInventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const totalUnitsSold = filteredInventory.reduce((sum, item) => sum + (item.sold_quantity || 0), 0);
+
+  const categoryStats = Object.entries(
+    filteredInventory.reduce((acc, item) => {
+      const category = item.category || 'Uncategorized';
+      if (!acc[category]) {
+        acc[category] = { quantity: 0, value: 0, sellingValue: 0 };
+      }
+      acc[category].quantity += item.quantity || 0;
+      acc[category].value += (item.unit_cost || 0) * (item.quantity || 0);
+      acc[category].sellingValue += (item.selling_price || 0) * (item.quantity || 0);
+      return acc;
+    }, {} as Record<string, { quantity: number; value: number; sellingValue: number }>)
+  );
+
+  const statusData = [
+    { name: 'In Stock', value: inventoryStats.inStock },
+    { name: 'Low Stock', value: inventoryStats.lowStock },
+    { name: 'Out of Stock', value: inventoryStats.outOfStock }
+  ].filter(status => status.value > 0);
+
+  const categoryValueData = categoryStats
+    .map(([name, data]) => ({ name: truncateName(name), costValue: data.value, sellingValue: data.sellingValue }))
+    .sort((a, b) => b.costValue - a.costValue)
+    .slice(0, 8);
+
+  const topQuantityData = [...filteredInventory]
+    .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
+    .slice(0, 10)
+    .map(item => ({ name: truncateName(item.name), quantity: item.quantity || 0 }));
+
+  const topSoldData = [...filteredInventory]
+    .sort((a, b) => (b.sold_quantity || 0) - (a.sold_quantity || 0))
+    .slice(0, 10)
+    .map(item => ({ name: truncateName(item.name), sold: item.sold_quantity || 0 }));
   
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -794,6 +842,146 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                   )}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Inventory Products Statistics Section */}
+      {selectedReport === 'inventory' && filteredInventory.length > 0 && (
+        <div className="mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+                Inventory Products Statistics
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Visual analytics of products, stock levels, valuation and movement for this outlet
+              </p>
+            </CardHeader>
+            <CardContent>
+              {/* Summary Chips */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Categories</p>
+                    <p className="text-2xl font-bold text-blue-600">{categoryStats.length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Units in Stock</p>
+                    <p className="text-2xl font-bold">{totalUnits.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Units Sold</p>
+                    <p className="text-2xl font-bold text-orange-600">{totalUnitsSold.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">Potential Margin</p>
+                    <p className="text-2xl font-bold text-green-600">{formatCurrency(inventoryStats.totalSellingValue - inventoryStats.totalValue)}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Row 1: Stock Status Pie + Category Value Bars */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Stock Status Distribution</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={95}
+                            label
+                          >
+                            <Cell fill="#22c55e" />
+                            <Cell fill="#eab308" />
+                            <Cell fill="#ef4444" />
+                          </Pie>
+                          <Tooltip formatter={(value, name) => [`${value} items`, name]} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Cost vs Selling Value by Category (Top 8)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categoryValueData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-25} textAnchor="end" height={70} interval={0} />
+                          <YAxis tickFormatter={(value) => formatCurrencyShort(Number(value))} />
+                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                          <Legend />
+                          <Bar dataKey="costValue" name="Cost Value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="sellingValue" name="Selling Value" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Row 2: Top Products by Quantity + Top Sold Products */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Top 10 Products by Stock Quantity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topQuantityData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" />
+                          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="quantity" name="Units in Stock" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Top 10 Products by Units Sold</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topSoldData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" />
+                          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="sold" name="Units Sold" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </CardContent>
           </Card>
         </div>
