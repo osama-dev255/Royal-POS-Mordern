@@ -1508,7 +1508,14 @@ export const OutletReports = ({ onBack, outletId }: OutletReportsProps) => {
                             <CardContent>
                               <div className="h-64 flex items-end gap-1">
                                 {chartData.map((data, index) => (
-                                  <div key={index} className="flex-1 flex flex-col items-center gap-1">
+                                  <div 
+                                    key={index} 
+                                    className="flex-1 flex flex-col items-center gap-1"
+                                    title={`${data.label}: ${formatCurrency(data.sales)} (${data.count} sales)`}
+                                  >
+                                    <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap tabular-nums">
+                                      {formatCurrencyShort(data.sales)}
+                                    </span>
                                     <div 
                                       className="w-full bg-green-600/80 rounded-t-md hover:bg-green-600 transition-colors"
                                       style={{ height: `${(data.sales / maxChartValue) * 200}px` }}
