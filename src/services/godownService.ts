@@ -48,7 +48,7 @@ export interface GodownStock {
   max_stock_level?: number;
   last_updated?: string;
   // Joined property from Supabase queries
-  products?: { name: string; sku?: string; barcode?: string };
+  products?: { name: string; sku?: string; barcode?: string; selling_price?: number; cost_price?: number };
   godown_zones?: { zone_name: string };
 }
 
@@ -247,7 +247,7 @@ export const getGodownStock = async (productId?: string, godownId?: string): Pro
       .from('godown_stock')
       .select(`
         *,
-        products (name, sku, barcode),
+        products (name, sku, barcode, selling_price, cost_price),
         godowns (name, code),
         godown_zones (zone_name, zone_code)
       `);
@@ -304,26 +304,36 @@ export const updateGodownStock = async (
       
       if (newQuantity <= 0) {
         // Delete the record when quantity reaches 0 or below (no ghost entries)
-        const { error: deleteError } = await supabase
+        const { data: deleted, error: deleteError } = await supabase
           .from('godown_stock')
           .delete()
-          .eq('id', existingStock.id);
+          .eq('id', existingStock.id)
+          .select('id');
         
         if (deleteError) throw deleteError;
+        // RLS-blocked deletes affect 0 rows without raising an error - treat as failure
+        if (!deleted || deleted.length === 0) {
+          throw new Error(`godown_stock delete affected 0 rows (id: ${existingStock.id}) - check RLS policies`);
+        }
       } else {
-        const { error: updateError } = await supabase
+        const { data: updated, error: updateError } = await supabase
           .from('godown_stock')
           .update({ 
             quantity: newQuantity,
             last_updated: new Date().toISOString()
           })
-          .eq('id', existingStock.id);
+          .eq('id', existingStock.id)
+          .select('id');
         
         if (updateError) throw updateError;
+        // RLS-blocked updates affect 0 rows without raising an error - treat as failure
+        if (!updated || updated.length === 0) {
+          throw new Error(`godown_stock update affected 0 rows (id: ${existingStock.id}) - check RLS policies`);
+        }
       }
     } else {
       // Create new stock record
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('godown_stock')
         .insert([{
           product_id: productId,
@@ -333,9 +343,13 @@ export const updateGodownStock = async (
           reserved_quantity: 0,
           min_stock_level: 0,
           max_stock_level: 10000
-        }]);
+        }])
+        .select('id');
       
       if (insertError) throw insertError;
+      if (!inserted || inserted.length === 0) {
+        throw new Error('godown_stock insert returned no row - check RLS policies');
+      }
     }
   } catch (error) {
     console.error('Error updating godown stock:', error);

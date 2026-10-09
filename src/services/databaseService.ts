@@ -296,8 +296,6 @@ export interface Expense {
   verified_by_name?: string; // Person who verified the expense
   verified_date?: string; // Date of verification
   // Advanced tracking
-  is_recurring?: boolean;
-  recurring_frequency?: string; // daily, weekly, monthly, yearly
   vendor_name?: string;
   vendor_contact?: string;
   tax_deductible?: boolean;
@@ -2057,6 +2055,75 @@ export const decrementSoldQuantity = async (
     return true;
   } catch (error) {
     console.error('Error decrementing sold quantity:', error);
+    return false;
+  }
+};
+
+// Add fetched stock from a godown into an outlet's inventory (fetch-from-warehouse flow)
+// Increments quantity when the product already exists at the outlet, otherwise creates the row
+// Sold quantity is untouched so availability (quantity - sold_quantity) reflects the fetched stock
+export const addStockToOutletInventory = async (
+  outletId: string,
+  item: { name: string; sku?: string; unit_cost: number; selling_price: number },
+  quantity: number
+): Promise<boolean> => {
+  try {
+    // Skip if product name is empty or the quantity is not positive
+    if (!item.name || !item.name.trim() || quantity <= 0) {
+      console.warn('⚠️ Skipping outlet inventory update: invalid name or quantity');
+      return false;
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('inventory_products')
+      .select('id, quantity, unit_cost')
+      .eq('outlet_id', outletId)
+      .eq('name', item.name)
+      .maybeSingle();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error fetching outlet inventory row:', fetchError);
+      return false;
+    }
+
+    if (existing) {
+      // Increment the stock quantity; backfill a missing cost so COGS stays accurate
+      const updates: Partial<InventoryProduct> = {
+        quantity: (existing.quantity || 0) + quantity,
+        updated_at: new Date().toISOString()
+      };
+      if (!existing.unit_cost && item.unit_cost) {
+        updates.unit_cost = item.unit_cost;
+      }
+
+      const { error: updateError } = await supabase
+        .from('inventory_products')
+        .update(updates)
+        .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('Error adding fetched stock to outlet inventory:', updateError);
+        return false;
+      }
+      return true;
+    }
+
+    // Create the inventory row for a product not yet stocked at this outlet
+    const created = await createInventoryProduct({
+      outlet_id: outletId,
+      name: item.name,
+      sku: item.sku,
+      category: 'General',
+      quantity,
+      sold_quantity: 0,
+      min_stock: 0,
+      max_stock: 0,
+      unit_cost: item.unit_cost || 0,
+      selling_price: item.selling_price || 0
+    });
+    return !!created;
+  } catch (error) {
+    console.error('Error adding stock to outlet inventory:', error);
     return false;
   }
 };

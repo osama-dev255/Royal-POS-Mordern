@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingCart, Search, User, Percent, CreditCard, Wallet, Scan, Star, Printer, Download, ClipboardCheck, Loader2, Check, ChevronsUpDown, Warehouse } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
@@ -24,6 +24,7 @@ import { getProducts, getCustomers, updateProductStock, createCustomer, createCu
 import { canCreateSales, getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDeliveriesByOutletId } from "@/utils/deliveryUtils";
+import { FetchFromWarehouseDialog } from "@/components/FetchFromWarehouseDialog";
 
 interface CartItem {
   id: string;
@@ -82,6 +83,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
   const [isProcessing, setIsProcessing] = useState(false);
   const [amountReceived, setAmountReceived] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isFetchWarehouseOpen, setIsFetchWarehouseOpen] = useState(false);
   const [transactionId, setTransactionId] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -289,6 +291,39 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
 
     loadData();
   }, [outletId]);
+
+  // Reload the outlet's products from inventory_products (availability = quantity - sold_quantity)
+  // Used after sales and after fetching stock from a godown
+  const refreshOutletProducts = async () => {
+    if (!outletId) return;
+    const dbInventory = await getAvailableInventoryByOutlet(outletId);
+    const outletProducts: Product[] = [];
+
+    dbInventory.forEach(item => {
+      const productId = `${item.outlet_id}-${item.name}`;
+      const existingProduct = outletProducts.find(p => p.name === item.name);
+      if (existingProduct) {
+        existingProduct.stock_quantity += item.available_quantity || 0;
+      } else {
+        outletProducts.push({
+          id: productId,
+          name: item.name,
+          selling_price: item.selling_price,
+          cost_price: item.unit_cost,
+          stock_quantity: item.available_quantity || 0,
+          barcode: '',
+          sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+          category: item.category || 'General',
+          unit: 'pcs',
+          vat_rate: 18,
+          is_active: true
+        } as Product);
+      }
+    });
+
+    setProducts(outletProducts);
+    console.log(`Loaded ${outletProducts.length} products for outlet ${outletId}`);
+  };
 
   const filteredProducts = products.filter(product => 
     (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -1125,31 +1160,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       // Reload products to get updated stock quantities
       if (outletId) {
         // Reload outlet products with updated sold quantities from database
-        const dbInventory = await getAvailableInventoryByOutlet(outletId);
-        
-        const updatedProducts: Product[] = [];
-        dbInventory.forEach(item => {
-          const productId = `${item.outlet_id}-${item.name}`;
-          const existingProduct = updatedProducts.find(p => p.name === item.name);
-          if (existingProduct) {
-            existingProduct.stock_quantity += item.available_quantity || 0;
-          } else {
-            updatedProducts.push({
-              id: productId,
-              name: item.name,
-              selling_price: item.selling_price,
-              cost_price: item.unit_cost,
-              stock_quantity: item.available_quantity || 0,
-              barcode: '',
-              sku: item.sku || `SKU-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-              category: item.category || 'General',
-              unit: 'pcs',
-              vat_rate: 18,
-              is_active: true
-            } as Product);
-          }
-        });
-        setProducts(updatedProducts);
+        await refreshOutletProducts();
       } else {
         // Reload general products
         const updatedProducts = await getProducts();
@@ -1474,7 +1485,7 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="flex flex-col xs:flex-row gap-2 xs:gap-3 mb-4">
+                <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2 xs:gap-3 mb-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1501,6 +1512,16 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
                     >
                       <ClipboardCheck className="h-4 w-4 xs:h-5 xs:w-5 mr-1 xs:mr-2" />
                       <span className="hidden xs:inline">Stock Take</span>
+                    </Button>
+                  )}
+                  {outletId && (
+                    <Button 
+                      onClick={() => setIsFetchWarehouseOpen(true)} 
+                      variant="outline"
+                      className="btn-touch px-3 xs:px-4"
+                    >
+                      <Warehouse className="h-4 w-4 xs:h-5 xs:w-5 mr-1 xs:mr-2" />
+                      <span className="hidden xs:inline">Fetch from Warehouse</span>
                     </Button>
                   )}
                 </div>
@@ -2447,6 +2468,17 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
           />
         </DialogContent>
       </Dialog>
+
+      {/* Fetch from Warehouse - outlet mode only */}
+      {outletId && (
+        <FetchFromWarehouseDialog
+          open={isFetchWarehouseOpen}
+          onOpenChange={setIsFetchWarehouseOpen}
+          outletId={outletId}
+          outletName={outletName}
+          onFetched={refreshOutletProducts}
+        />
+      )}
     </div>
   );
 };
