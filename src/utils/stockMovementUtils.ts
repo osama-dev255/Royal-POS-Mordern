@@ -361,6 +361,59 @@ export const deleteStockMovementsByReference = async (
 };
 
 /**
+ * Resolve the "Prepared By" name assigned on the source transaction document
+ * (GRN, Delivery Note, Internal Consumption) for a movement record.
+ * Returns null when the source document has no prepared-by name or is not resolvable.
+ */
+export const getMovementPreparedBy = async (
+  movement: Pick<StockMovement, 'reference_type' | 'reference_number'>
+): Promise<string | null> => {
+  const refType = movement.reference_type;
+  const refNumber = movement.reference_number;
+  if (!refType || !refNumber) return null;
+
+  try {
+    switch (refType) {
+      case 'GRN': {
+        const { data, error } = await supabase
+          .from('saved_grns')
+          .select('prepared_by')
+          .eq('grn_number', refNumber)
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        return data?.prepared_by || null;
+      }
+      case 'DELIVERY_NOTE': {
+        const { data, error } = await supabase
+          .from('saved_delivery_notes')
+          .select('prepared_by_name')
+          .eq('delivery_note_number', refNumber)
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        return data?.prepared_by_name || null;
+      }
+      case 'INTERNAL_CONSUMPTION': {
+        const { data, error } = await supabase
+          .from('saved_internal_consumption_notes')
+          .select('prepared_by')
+          .eq('note_number', refNumber)
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        return data?.prepared_by || null;
+      }
+      default:
+        return null;
+    }
+  } catch (err) {
+    console.error('Error resolving prepared by for movement:', err);
+    return null;
+  }
+};
+
+/**
  * Update stock movements for a transaction (delete old + create new)
  * Used when editing a transaction to reflect changes in the Movement Ledger
  */

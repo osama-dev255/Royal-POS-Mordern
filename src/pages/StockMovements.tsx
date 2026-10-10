@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, ArrowUpDown, ArrowDown, ArrowUp, Package, Filter, RefreshCw, Loader2, Printer, Download, Share2, FileText, ChevronDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, ArrowUpDown, ArrowDown, ArrowUp, Package, Filter, RefreshCw, Loader2, Printer, Download, Share2, FileText, ChevronDown, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
-import { getStockMovements, getStockMovementSummary, getMovedProductNames, StockMovementWithDetails, StockMovementSummary } from "@/utils/stockMovementUtils";
+import { getStockMovements, getStockMovementSummary, getMovedProductNames, getMovementPreparedBy, StockMovementWithDetails, StockMovementSummary } from "@/utils/stockMovementUtils";
 import { getOutlets, Outlet } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
@@ -60,6 +61,23 @@ const getReferenceIcon = (refType: string) => {
   }
 };
 
+const getReferenceLabel = (refType?: string) => {
+  switch (refType) {
+    case "GRN": return "Goods Received Note";
+    case "DELIVERY_NOTE": return "Delivery Note";
+    case "SALE": return "POS Sale";
+    case "STOCK_TAKE": return "Stock Take";
+    case "TRANSFER": return "Transfer";
+    case "ADJUSTMENT": return "Adjustment";
+    case "RETURN": return "Return";
+    case "INTERNAL_CONSUMPTION": return "Internal Consumption";
+    default: return refType || "-";
+  }
+};
+
+const isDecreaseMovement = (type: string) =>
+  type.includes('OUT') || type === 'SOLD' || type === 'DAMAGE';
+
 export const StockMovements = ({ username, onBack, onLogout }: StockMovementsProps) => {
   const [movements, setMovements] = useState<StockMovementWithDetails[]>([]);
   const [summaries, setSummaries] = useState<StockMovementSummary[]>([]);
@@ -67,6 +85,13 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
   const [productNames, setProductNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"movements" | "summary">("movements");
+
+  // View transaction dialog
+  const [selectedMovement, setSelectedMovement] = useState<StockMovementWithDetails | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+
+  // "Prepared By" name resolved from the source transaction (shown in the viewer)
+  const [preparedByInfo, setPreparedByInfo] = useState<{ movementId: string; name: string | null; loading: boolean } | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -98,6 +123,19 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
       console.error("Error loading stock movements:", error);
     }
     setLoading(false);
+  };
+
+  const handleViewMovement = async (movement: StockMovementWithDetails) => {
+    setSelectedMovement(movement);
+    setIsViewDialogOpen(true);
+    const movementId = movement.id || '';
+    setPreparedByInfo({ movementId, name: null, loading: true });
+
+    const name = await getMovementPreparedBy(movement);
+    // Ignore stale responses if the user opened another movement meanwhile
+    setPreparedByInfo(prev =>
+      prev && prev.movementId !== movementId ? prev : { movementId, name, loading: false }
+    );
   };
 
   const filteredMovements = movements.filter(m => {
@@ -531,12 +569,13 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                         <TableHead className="text-xs">Godown</TableHead>
                         <TableHead className="text-xs">Zone</TableHead>
                         <TableHead className="text-xs">Notes</TableHead>
+                        <TableHead className="text-xs text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredMovements.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                             No stock movements found
                           </TableCell>
                         </TableRow>
@@ -555,7 +594,7 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-xs text-right font-mono">
-                                {movement.movement_type.includes('OUT') || movement.movement_type === 'SOLD' || movement.movement_type === 'DAMAGE' ? '-' : '+'}
+                                {isDecreaseMovement(movement.movement_type) ? '-' : '+'}
                                 {Number(movement.quantity).toLocaleString()}
                               </TableCell>
                               <TableCell className="text-xs text-right font-mono">
@@ -570,6 +609,16 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
                               <TableCell className="text-xs">{movement.zone_name || '-'}</TableCell>
                               <TableCell className="text-xs max-w-[150px] truncate" title={movement.notes || ''}>
                                 {movement.notes || '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewMovement(movement)}
+                                  title="View transaction details"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                               </TableCell>
                             </TableRow>
                           );
@@ -647,6 +696,101 @@ export const StockMovements = ({ username, onBack, onLogout }: StockMovementsPro
             </CardContent>
           </Card>
         )}
+
+        {/* View Transaction Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            {selectedMovement && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center justify-between gap-2 pr-6">
+                    <span className="truncate">{selectedMovement.product_name}</span>
+                    <Badge
+                      variant={getMovementBadge(selectedMovement.movement_type).variant}
+                      className={`text-[10px] ${getMovementBadge(selectedMovement.movement_type).className}`}
+                    >
+                      {getMovementBadge(selectedMovement.movement_type).label}
+                    </Badge>
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div className="space-y-3">
+                    <p>
+                      <span className="text-muted-foreground">Date/Time: </span>
+                      <span className="font-medium">{selectedMovement.created_at ? new Date(selectedMovement.created_at).toLocaleString() : '-'}</span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Prepared By: </span>
+                      {preparedByInfo && preparedByInfo.movementId === selectedMovement.id ? (
+                        preparedByInfo.loading ? (
+                          <span className="text-muted-foreground">Loading...</span>
+                        ) : (
+                          <span className="font-medium">{preparedByInfo.name || '-'}</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">Loading...</span>
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Quantity: </span>
+                      <span className={`font-mono font-medium ${isDecreaseMovement(selectedMovement.movement_type) ? 'text-red-600' : 'text-green-600'}`}>
+                        {isDecreaseMovement(selectedMovement.movement_type) ? '-' : '+'}
+                        {Number(selectedMovement.quantity).toLocaleString()}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Unit Cost: </span>
+                      <span className="font-mono">{formatCurrency(Number(selectedMovement.unit_cost || 0))}</span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Total Cost: </span>
+                      <span className="font-mono">
+                        {formatCurrency(Number(selectedMovement.total_cost) || Number(selectedMovement.unit_cost || 0) * Number(selectedMovement.quantity))}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Batch Number: </span>
+                      <span className="font-mono">{selectedMovement.batch_number || '-'}</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p>
+                      <span className="text-muted-foreground">Reference: </span>
+                      <span>{getReferenceIcon(selectedMovement.reference_type || '')} {getReferenceLabel(selectedMovement.reference_type)}</span>
+                      {selectedMovement.reference_number && (
+                        <span className="font-mono text-xs ml-1">({selectedMovement.reference_number})</span>
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Outlet: </span>
+                      <span>{selectedMovement.outlet_name || '-'}</span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Godown: </span>
+                      <span>{selectedMovement.godown_name || '-'}</span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Zone: </span>
+                      <span>{selectedMovement.zone_name || '-'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground mb-1">Notes</p>
+                    <p className="whitespace-pre-wrap">{selectedMovement.notes || '-'}</p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-mono break-all">
+                    Movement ID: {selectedMovement.id}
+                  </p>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
