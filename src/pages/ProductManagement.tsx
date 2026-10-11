@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse, X, MapPin } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Scan, AlertTriangle, TrendingUp, ShoppingCart, FileBarChart, Filter, SortAsc, Eye, Download, FileText, FileSpreadsheet, FileJson, Printer, MoreVertical, Warehouse, X, MapPin, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 import { ExportUtils } from "@/utils/exportUtils";
@@ -94,9 +94,14 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   const [godownStockList, setGodownStockList] = useState<GodownStockWithDetails[]>([]);
   const [selectedGodownId, setSelectedGodownId] = useState<string>("");
   const [selectedZoneId, setSelectedZoneId] = useState<string>("none");
+  // Tracks whether the user explicitly interacted with the Zone dropdown ("All Zones" default is untouched)
+  const [zoneTouched, setZoneTouched] = useState(false);
   const [godownQuantity, setGodownQuantity] = useState<number>(0);
   const [loadingGodowns, setLoadingGodowns] = useState(false);
   const [savingGodownStock, setSavingGodownStock] = useState(false);
+  const [showAssignNameDialog, setShowAssignNameDialog] = useState(false);
+  const [assignByName, setAssignByName] = useState("");
+  const [isUpdatingProduct, setIsUpdatingProduct] = useState(false);
 
   // Load products and categories from Supabase on component mount
   useEffect(() => {
@@ -182,6 +187,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
       setZones([]);
     }
     setSelectedZoneId("none");
+    setZoneTouched(false);
   }, [selectedGodownId]);
 
   // Get godown name from joined data, fallback to local state
@@ -193,6 +199,45 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   const getZoneName = (stock: GodownStockWithDetails) => {
     if (!stock.zone_id) return "All Zones";
     return stock.godown_zones?.zone_name || zones.find(z => z.id === stock.zone_id)?.zone_name || "Unknown Zone";
+  };
+
+  // Open the name confirmation popup before saving a warehouse assignment
+  // (the assignment is recorded with this name in the Movement Ledger)
+  const handleAssignClick = () => {
+    if (!editingProduct?.id || !selectedGodownId || godownQuantity <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select a godown and enter a valid quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+    // A zone must be explicitly selected before assigning when the godown has zones
+    // (godowns without zones keep "All Zones" as their only valid target)
+    if (zones.length > 0 && !zoneTouched) {
+      const godownName = godowns.find(g => g.id === selectedGodownId)?.name || "this godown";
+      toast({
+        title: "Zone Required",
+        description: `Please select a zone for ${godownName} before assigning stock. Choose a specific zone or "All Zones" to continue.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowAssignNameDialog(true);
+  };
+
+  // Confirm the assignment popup: the name is required, otherwise the process breaks
+  const handleConfirmAssignName = async () => {
+    if (!assignByName.trim()) {
+      toast({
+        title: "Error",
+        description: "Your name is required before saving this warehouse assignment",
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowAssignNameDialog(false);
+    await handleSaveGodownStock();
   };
 
   // Save godown stock
@@ -224,11 +269,35 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
         await updateProductStockBasedOnDelivered([{ description: editingProduct.name, delivered: -stockDelta }]);
         // Reflect the change in the form so saving the product won't restore a stale value
         setEditingProduct(prev => prev ? { ...prev, stock_quantity: Math.max(0, (prev.stock_quantity || 0) + stockDelta) } : prev);
+        // Record the assignment in the Movement Ledger so it stays auditable with the preparer's name
+        try {
+          const { recordStockMovement } = await import("@/utils/stockMovementUtils");
+          const godownLabel = godowns.find(g => g.id === selectedGodownId)?.name || "warehouse";
+          const zoneLabel = zoneId ? (zones.find(z => z.id === zoneId)?.zone_name || "") : "";
+          const movementResult = await recordStockMovement({
+            product_id: editingProduct.id,
+            product_name: editingProduct.name,
+            godown_id: selectedGodownId,
+            zone_id: zoneId || undefined,
+            movement_type: stockDelta > 0 ? "IN" : "OUT",
+            quantity: Math.abs(stockDelta),
+            reference_type: "ADJUSTMENT",
+            reference_number: `ASSIGNMENT-${Date.now()}`,
+            unit_cost: editingProduct.cost_price || 0,
+            notes: `Prepared by: ${assignByName.trim()} — Manual warehouse assignment to ${godownLabel}${zoneLabel ? ` / ${zoneLabel}` : ""} (${stockDelta > 0 ? "+" : ""}${stockDelta})`
+          });
+          if (!movementResult.success) {
+            console.warn("Failed to record assignment stock movement:", movementResult.error);
+          }
+        } catch (movementError) {
+          console.warn("Error recording assignment stock movement (non-critical):", movementError);
+        }
       }
 
       toast({ title: "Success", description: "Godown stock updated successfully" });
       setSelectedGodownId("");
       setSelectedZoneId("none");
+      setZoneTouched(false);
       setGodownQuantity(0);
       if (editingProduct?.id) await loadGodownData(editingProduct.id);
     } catch (error) {
@@ -319,6 +388,10 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   };
 
   const handleUpdateProduct = async () => {
+    // Prevent double submission while the update is in progress
+    if (isUpdatingProduct) {
+      return;
+    }
     if (!editingProduct || !editingProduct.name || editingProduct.selling_price < 0) {
       toast({
         title: "Error",
@@ -328,6 +401,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
       return;
     }
 
+    setIsUpdatingProduct(true);
     try {
       if (editingProduct.id) {
         const updatedProduct = await updateProduct(editingProduct.id, editingProduct);
@@ -351,6 +425,8 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
         description: "Failed to update product",
         variant: "destructive"
       });
+    } finally {
+      setIsUpdatingProduct(false);
     }
   };
 
@@ -1063,10 +1139,13 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                                   </div>
 
                                   <div className="space-y-2">
-                                    <Label className="text-xs text-muted-foreground">Zone (Optional)</Label>
+                                    <Label className="text-xs text-muted-foreground">Zone {zones.length > 0 ? (<span className="text-red-500">*</span>) : ("(Optional)")}</Label>
                                     <Select
                                       value={selectedZoneId}
-                                      onValueChange={setSelectedZoneId}
+                                      onValueChange={(v) => {
+                                        setSelectedZoneId(v);
+                                        setZoneTouched(true);
+                                      }}
                                       disabled={!selectedGodownId || zones.length === 0}
                                     >
                                       <SelectTrigger>
@@ -1096,7 +1175,7 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                                     />
                                   </div>
                                   <Button
-                                    onClick={handleSaveGodownStock}
+                                    onClick={handleAssignClick}
                                     disabled={savingGodownStock || !selectedGodownId || godownQuantity <= 0}
                                     size="sm"
                                   >
@@ -1192,8 +1271,18 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                       <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                         Cancel
                       </Button>
-                      <Button onClick={editingProduct ? handleUpdateProduct : handleAddProduct}>
-                        {editingProduct ? "Update Product" : "Add Product"}
+                      <Button 
+                        onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
+                        disabled={editingProduct ? isUpdatingProduct : false}
+                      >
+                        {editingProduct ? (
+                          isUpdatingProduct ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : "Update Product"
+                        ) : "Add Product"}
                       </Button>
                     </div>
                   )}
@@ -1210,6 +1299,56 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                       </Button>
                     </div>
                   )}
+                </DialogContent>
+              </Dialog>
+              {/* Warehouse assignment name confirmation popup */}
+              <Dialog open={showAssignNameDialog} onOpenChange={setShowAssignNameDialog}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Confirm Warehouse Assignment</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Please enter your name before saving this warehouse assignment. Your name will be recorded with the stock movement for accountability.
+                    </p>
+                    <div className="border rounded-lg p-3 space-y-1 text-sm bg-muted/30">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Godown</span>
+                        <span className="font-medium">{godowns.find(g => g.id === selectedGodownId)?.name || "—"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Zone</span>
+                        <span className="font-medium">
+                          {selectedZoneId === "none" ? "All Zones" : (zones.find(z => z.id === selectedZoneId)?.zone_name || "—")}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Quantity</span>
+                        <span className="font-medium">{godownQuantity}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="assign_by_name">Your Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="assign_by_name"
+                        value={assignByName}
+                        onChange={(e) => setAssignByName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleConfirmAssignName();
+                        }}
+                        placeholder="Enter your name"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setShowAssignNameDialog(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleConfirmAssignName}>
+                        Confirm & Save
+                      </Button>
+                    </div>
+                  </div>
                 </DialogContent>
               </Dialog>
               <DropdownMenu>
