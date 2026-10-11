@@ -935,6 +935,8 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                             }
                             placeholder="0"
                             readOnly={viewOnlyMode}
+                            disabled={!!editingProduct}
+                            title={editingProduct ? "Current stock is managed through stock movements (GRN, deliveries, transfers, stock takes)" : undefined}
                             className={viewOnlyMode ? "bg-muted" : ""}
                           />
                         </div>
@@ -1022,14 +1024,6 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
                                           <Badge variant={stock.quantity > 0 ? "default" : "secondary"}>
                                             {stock.quantity} units
                                           </Badge>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleRemoveGodownStock(stock)}
-                                            className="text-destructive hover:text-destructive h-7 w-7 p-0"
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                          </Button>
                                         </div>
                                       </div>
                                     ))}
