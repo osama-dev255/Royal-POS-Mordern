@@ -357,6 +357,73 @@ export const updateGodownStock = async (
   }
 };
 
+/**
+ * Apply a physical stock take variance to godown inventory so stock matches
+ * the physical count.
+ *
+ * The variance (physical count - system qty) is applied to the stock records
+ * the count covers:
+ * - a zone UUID: that zone's record
+ * - '__no_zone__' or null: records without a zone (godown level)
+ * - '' (no zone selected): all records of the product in the godown
+ *
+ * A surplus is added to the biggest record; a shortage draws records down
+ * until the variance is absorbed, so records never go negative and the
+ * godown total always ends up matching the physical count. Zero variances
+ * are ignored and records that reach zero are removed by updateGodownStock.
+ */
+export const applyStockTakeVariance = async (
+  productId: string,
+  godownId: string,
+  zoneId: string | null | undefined,
+  variance: number
+): Promise<void> => {
+  if (!productId || !godownId || !variance) return;
+
+  try {
+    const stockRecords = await getGodownStock(productId, godownId);
+
+    let candidates = stockRecords;
+    let createZone: string | null = null;
+    if (zoneId === null || zoneId === undefined || zoneId === '__no_zone__') {
+      candidates = stockRecords.filter(r => !r.zone_id);
+    } else if (zoneId !== '') {
+      candidates = stockRecords.filter(r => r.zone_id === zoneId);
+      createZone = zoneId;
+    }
+
+    if (candidates.length === 0) {
+      // Nothing to decrease; a surplus creates the record in the counted zone
+      if (variance > 0) {
+        await updateGodownStock(productId, godownId, createZone, variance);
+      }
+      return;
+    }
+
+    if (variance > 0) {
+      // Surplus: add it to the biggest record, leaving the other zones untouched
+      const target = candidates.reduce((max, r) => ((r.quantity || 0) > (max.quantity || 0) ? r : max));
+      await updateGodownStock(productId, godownId, target.zone_id || null, variance);
+      return;
+    }
+
+    // Shortage: draw records down (biggest first) until the variance is absorbed
+    const biggestFirst = [...candidates].sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
+    let remaining = variance;
+    for (const record of biggestFirst) {
+      if (remaining >= 0) break;
+      const quantity = record.quantity || 0;
+      if (quantity <= 0) continue;
+      const draw = Math.min(quantity, -remaining);
+      await updateGodownStock(productId, godownId, record.zone_id || null, -draw);
+      remaining += draw;
+    }
+  } catch (error) {
+    console.error('Error applying stock take variance:', error);
+    throw error;
+  }
+};
+
 // ==================== STOCK TRANSFER OPERATIONS ====================
 
 export const getStockTransfers = async (status?: string): Promise<StockTransfer[]> => {

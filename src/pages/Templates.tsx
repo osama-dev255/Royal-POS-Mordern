@@ -56,7 +56,7 @@ import { saveDelivery, DeliveryData } from '@/utils/deliveryUtils';
 import { saveSalesOrder, SalesOrderData as SavedSalesOrderData } from '@/utils/salesOrderUtils';
 import { saveCustomerSettlement, CustomerSettlementData as SavedCustomerSettlementData } from '@/utils/customerSettlementUtils';
 import { saveGRN, SavedGRN as UtilsSavedGRN, getSavedGRNs } from '@/utils/grnUtils';
-import { getGodowns, getZones, getGodownStock, Godown, GodownZone, GodownStock } from '@/services/godownService';
+import { getGodowns, getZones, getGodownStock, applyStockTakeVariance, Godown, GodownZone, GodownStock } from '@/services/godownService';
 import { getSuppliers, createSupplier, Supplier as DBSupplier } from '@/services/databaseService';
 import { uploadFile } from '@/utils/fileUploadUtils';
 import { updateGRNQuantitiesFromInvoice, updateGRNQuantitiesFromDeliveryNote, updateGRNQuantitiesBasedOnDelivered, updateProductStockBasedOnDelivered, checkItemAvailability } from '@/utils/consumptionUtils';
@@ -1414,6 +1414,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     const [editingGRNId, setEditingGRNId] = useState<string | null>(null);
     const [isSavingSPN, setIsSavingSPN] = useState<boolean>(false);
       const [isSavingEV, setIsSavingEV] = useState<boolean>(false);
+      const [isSavingStockTake, setIsSavingStockTake] = useState<boolean>(false);
 
   // Registered suppliers state
   const [registeredSuppliers, setRegisteredSuppliers] = useState<DBSupplier[]>([]);
@@ -11383,9 +11384,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                       />
                     ) : null}
                     <Button 
-                      disabled={isSavingDeliveryNote || isSavingGRN || isSavingPO}
+                      disabled={isSavingDeliveryNote || isSavingGRN || isSavingPO || isSavingStockTake}
                       onClick={async () => {
-                        if (isSavingDeliveryNote || isSavingGRN || isSavingPO) {
+                        if (isSavingDeliveryNote || isSavingGRN || isSavingPO || isSavingStockTake) {
                           console.warn('⚠️ Save already in progress...');
                           return;
                         }
@@ -11537,8 +11538,12 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                         await handleSaveSalesOrder();
                       } else if (currentTemplate?.type === "stock-take") {
                         // Save stock take to database
+                        setIsSavingStockTake(true);
                         try {
                           const { data: { user } } = await supabase.auth.getUser();
+
+                          // Variances collected while saving, applied to godown inventory afterwards
+                          const inventoryUpdates: Array<{ productId: string; productName: string; godownId: string; zoneId: string | null; variance: number }> = [];
 
                           if (batchMode) {
                             // BATCH MODE: Save all godowns as one combined record
@@ -11573,6 +11578,18 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                               alert("Please add at least one product with a physical count across all godowns.");
                               return;
                             }
+                            // Collect variances to apply to godown inventory after saving
+                            allItems.forEach(item => {
+                              if (item.variance !== 0) {
+                                inventoryUpdates.push({
+                                  productId: item.product_id,
+                                  productName: item.product_name,
+                                  godownId: item.godown_id,
+                                  zoneId: item.zone_id,
+                                  variance: item.variance,
+                                });
+                              }
+                            });
                             const totals = batchTotals();
                             const stockTakeRecord = {
                               outlet_id: null,
@@ -11622,6 +11639,20 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                             const selectedGodown = godowns.find(g => g.id === stockTakeGodownId);
                             const selectedZone = stockTakeZones.find(z => z.id === stockTakeZoneId);
                             const zoneName = stockTakeZoneId === '__no_zone__' ? 'No Zone' : (selectedZone?.zone_name || '');
+                            // Zone for the saved record: '__no_zone__' must not leak into the UUID column
+                            const recordZoneId = stockTakeZoneId === '__no_zone__' ? null : (stockTakeZoneId || null);
+                            // Collect variances to apply to godown inventory after saving
+                            filledItems.forEach(item => {
+                              if (item.variance !== 0) {
+                                inventoryUpdates.push({
+                                  productId: item.productId,
+                                  productName: item.productName,
+                                  godownId: stockTakeGodownId,
+                                  zoneId: stockTakeZoneId === '__no_zone__' ? null : stockTakeZoneId,
+                                  variance: item.variance,
+                                });
+                              }
+                            });
                             const stockTakeRecord = {
                               outlet_id: null,
                               stock_take_number: stockTakeNumber,
@@ -11637,7 +11668,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                                 product_name: item.productName,
                                 godown_id: stockTakeGodownId,
                                 godown_name: selectedGodown?.name || '',
-                                zone_id: stockTakeZoneId || null,
+                                zone_id: recordZoneId,
                                 zone_name: zoneName,
                                 system_qty: item.systemQty,
                                 physical_count: item.physicalCount,
@@ -11649,7 +11680,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                               status: 'completed',
                               godown_id: stockTakeGodownId,
                               godown_name: selectedGodown?.name || '',
-                              zone_id: stockTakeZoneId || null,
+                              zone_id: recordZoneId,
                               zone_name: zoneName,
                               take_type: 'investment',
                               total_system_qty: stockTakeTotals.totalSystemQty,
@@ -11669,11 +11700,32 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                             if (error) throw error;
                           }
 
-                          alert(`Stock Take ${stockTakeNumber} saved successfully!`);
+                          // Apply counted variances so godown inventory matches the physical counts
+                          const failedItems: string[] = [];
+                          for (const inventoryUpdate of inventoryUpdates) {
+                            try {
+                              await applyStockTakeVariance(inventoryUpdate.productId, inventoryUpdate.godownId, inventoryUpdate.zoneId, inventoryUpdate.variance);
+                              // Keep the general "Current Stock" pool in sync (mirrors delivery/fetch flows);
+                              // a negative delivered amount increases stock, so pass -variance
+                              await updateProductStockBasedOnDelivered([{ description: inventoryUpdate.productName, delivered: -inventoryUpdate.variance }]);
+                              console.log(`[Stock Take] Inventory updated: ${inventoryUpdate.productName} (${inventoryUpdate.variance > 0 ? '+' : ''}${inventoryUpdate.variance})`);
+                            } catch (inventoryError) {
+                              console.error(`[Stock Take] Failed to update inventory for ${inventoryUpdate.productName}:`, inventoryError);
+                              failedItems.push(inventoryUpdate.productName);
+                            }
+                          }
+
+                          if (failedItems.length > 0) {
+                            alert(`Stock Take ${stockTakeNumber} saved, but the inventory update failed for ${failedItems.length} item(s): ${failedItems.join(', ')}. Please adjust these products manually.`);
+                          } else {
+                            alert(`Stock Take ${stockTakeNumber} saved successfully! Inventory updated to match the physical counts.`);
+                          }
                           showStockTakeOptionsDialog();
                         } catch (error) {
                           console.error('Error saving stock take:', error);
                           alert('Error saving stock take. Please try again.');
+                        } finally {
+                          setIsSavingStockTake(false);
                         }
                       } else if (currentTemplate?.type === "salary-slip") {
                         alert(`Salary Slip for ${salarySlipData.employeeName} saved successfully!`);
@@ -11875,7 +11927,7 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                         handleSaveDeliveryNote();
                       }
                     }}>
-                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN || isSavingEV || isSavingPO) ? (
+                      {(isSavingDeliveryNote || isSavingGRN || isSavingSPN || isSavingEV || isSavingPO || isSavingStockTake) ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processing...
