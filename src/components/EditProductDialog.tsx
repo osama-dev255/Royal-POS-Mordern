@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { updateProduct, getCategories, Product, Category } from "@/services/databaseService";
 import { getGodowns, getZones, getGodownStock, updateGodownStock, Godown, GodownZone, GodownStock } from "@/services/godownService";
+import { updateProductStockBasedOnDelivered } from "@/utils/consumptionUtils";
 import { Edit3, Warehouse, Plus, Trash2, Package, X } from "lucide-react";
 
 // Extended type that includes joined data from getGodownStock query
@@ -158,16 +159,16 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
         (s.zone_id || null) === zoneId
       );
 
-      if (existingStock) {
-        // Update: calculate delta
-        const currentQty = existingStock.quantity || 0;
-        const delta = godownQuantity - currentQty;
-        if (delta !== 0) {
-          await updateGodownStock(product.id, selectedGodownId, zoneId, delta);
-        }
-      } else {
-        // Create new stock record
-        await updateGodownStock(product.id, selectedGodownId, zoneId, godownQuantity);
+      // Calculate the delta: existing record → difference, new record → full quantity
+      const stockDelta = existingStock
+        ? godownQuantity - (existingStock.quantity || 0)
+        : godownQuantity;
+      if (stockDelta !== 0) {
+        await updateGodownStock(product.id, selectedGodownId, zoneId, stockDelta);
+        // Keep the general "Current Stock" pool in sync — both pools move by the same delta
+        await updateProductStockBasedOnDelivered([{ description: product.name, delivered: -stockDelta }]);
+        // Reflect the change in the form so saving the product won't restore a stale value
+        setEditProduct(prev => ({ ...prev, stock_quantity: Math.max(0, (prev.stock_quantity || 0) + stockDelta) }));
       }
 
       toast({
@@ -196,8 +197,12 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
   const handleRemoveGodownStock = async (stock: GodownStock) => {
     if (!product?.id) return;
     try {
+      const removedQty = stock.quantity || 0;
       // Set quantity to 0 by subtracting current quantity
-      await updateGodownStock(product.id, stock.godown_id, stock.zone_id || null, -(stock.quantity || 0));
+      await updateGodownStock(product.id, stock.godown_id, stock.zone_id || null, -removedQty);
+      // Keep the general "Current Stock" pool in sync — the godown pool dropped by removedQty
+      await updateProductStockBasedOnDelivered([{ description: product.name, delivered: removedQty }]);
+      setEditProduct(prev => ({ ...prev, stock_quantity: Math.max(0, (prev.stock_quantity || 0) - removedQty) }));
       toast({
         title: "Success",
         description: "Stock removed from godown"
@@ -454,6 +459,9 @@ export const EditProductDialog = ({ product, open, onOpenChange, onProductUpdate
                     value={editProduct.stock_quantity || 0}
                     onChange={(e) => setEditProduct({...editProduct, stock_quantity: parseInt(e.target.value) || 0})}
                     placeholder="0"
+                    disabled
+                    title="Current stock is managed through stock movements (GRN, deliveries, transfers, stock takes, godown assignments)"
+                    className="bg-muted"
                   />
                 </div>
                 

@@ -7333,6 +7333,19 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
     setShowSalesOrderOptions(true);
   };
 
+  // Validate required stock take fields (COUNTED BY and VERIFIED BY must be filled)
+  const validateStockTakeRequiredFields = (): boolean => {
+    if (!countedByName.trim()) {
+      toast({ title: 'Validation Error', description: 'Counted By is required. Please enter who performed the count.', variant: 'destructive' });
+      return false;
+    }
+    if (!verifiedByName.trim()) {
+      toast({ title: 'Validation Error', description: 'Verified By (Manager) is required. Please enter the verifying manager.', variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
   // Show stock take options dialog
   const showStockTakeOptionsDialog = () => {
     setShowStockTakeOptions(true);
@@ -11537,6 +11550,10 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                         // Automatically save sales order to saved sales orders
                         await handleSaveSalesOrder();
                       } else if (currentTemplate?.type === "stock-take") {
+                        // COUNTED BY and VERIFIED BY (MANAGER) are required before saving
+                        if (!validateStockTakeRequiredFields()) {
+                          return;
+                        }
                         // Save stock take to database
                         setIsSavingStockTake(true);
                         try {
@@ -16080,13 +16097,13 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                                   </div>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
                                     <div>
-                                      <div className="font-bold mb-1">COUNTED BY</div>
+                                      <div className="font-bold mb-1">COUNTED BY <span className="text-red-500">*</span></div>
                                       <Input value={countedByName} onChange={(e) => setCountedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
                                       <div className="text-sm mt-1">Date:</div>
                                       <Input type="date" value={countedByDate} onChange={(e) => setCountedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
                                     </div>
                                     <div>
-                                      <div className="font-bold mb-1">VERIFIED BY (MANAGER)</div>
+                                      <div className="font-bold mb-1">VERIFIED BY (MANAGER) <span className="text-red-500">*</span></div>
                                       <Input value={verifiedByName} onChange={(e) => setVerifiedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
                                       <div className="text-sm mt-1">Date:</div>
                                       <Input type="date" value={verifiedByDate} onChange={(e) => setVerifiedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
@@ -16258,13 +16275,13 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
                         {/* Verification */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
                           <div>
-                            <div className="font-bold mb-1">COUNTED BY</div>
+                            <div className="font-bold mb-1">COUNTED BY <span className="text-red-500">*</span></div>
                             <Input value={countedByName} onChange={(e) => setCountedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
                             <div className="text-sm mt-1">Date:</div>
                             <Input type="date" value={countedByDate} onChange={(e) => setCountedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />
                           </div>
                           <div>
-                            <div className="font-bold mb-1">VERIFIED BY (MANAGER)</div>
+                            <div className="font-bold mb-1">VERIFIED BY (MANAGER) <span className="text-red-500">*</span></div>
                             <Input value={verifiedByName} onChange={(e) => setVerifiedByName(e.target.value)} placeholder="Name" className="text-sm p-1 h-8" />
                             <div className="text-sm mt-1">Date:</div>
                             <Input type="date" value={verifiedByDate} onChange={(e) => setVerifiedByDate(e.target.value)} className="text-sm p-1 h-8 w-full" />

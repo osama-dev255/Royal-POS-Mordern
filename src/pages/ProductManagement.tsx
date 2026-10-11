@@ -20,6 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 // Import Supabase database service
 import { getProducts, createProduct, updateProduct, deleteProduct, getCategories, Product, Category } from "@/services/databaseService";
 import { getGodowns, getZones, getGodownStock, updateGodownStock, Godown, GodownZone, GodownStock } from "@/services/godownService";
+import { updateProductStockBasedOnDelivered } from "@/utils/consumptionUtils";
 
 // Extended type for godown stock with joined data
 interface GodownStockWithDetails extends GodownStock {
@@ -213,14 +214,16 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
         (s.zone_id || null) === zoneId
       );
 
-      if (existingStock) {
-        const currentQty = existingStock.quantity || 0;
-        const delta = godownQuantity - currentQty;
-        if (delta !== 0) {
-          await updateGodownStock(editingProduct.id, selectedGodownId, zoneId, delta);
-        }
-      } else {
-        await updateGodownStock(editingProduct.id, selectedGodownId, zoneId, godownQuantity);
+      // Calculate the delta: existing record → difference, new record → full quantity
+      const stockDelta = existingStock
+        ? godownQuantity - (existingStock.quantity || 0)
+        : godownQuantity;
+      if (stockDelta !== 0) {
+        await updateGodownStock(editingProduct.id, selectedGodownId, zoneId, stockDelta);
+        // Keep the general "Current Stock" pool in sync — both pools move by the same delta
+        await updateProductStockBasedOnDelivered([{ description: editingProduct.name, delivered: -stockDelta }]);
+        // Reflect the change in the form so saving the product won't restore a stale value
+        setEditingProduct(prev => prev ? { ...prev, stock_quantity: Math.max(0, (prev.stock_quantity || 0) + stockDelta) } : prev);
       }
 
       toast({ title: "Success", description: "Godown stock updated successfully" });
@@ -240,7 +243,11 @@ export const ProductManagement = ({ username, onBack, onLogout }: { username: st
   const handleRemoveGodownStock = async (stock: GodownStockWithDetails) => {
     if (!editingProduct?.id) return;
     try {
-      await updateGodownStock(editingProduct.id, stock.godown_id, stock.zone_id || null, -(stock.quantity || 0));
+      const removedQty = stock.quantity || 0;
+      await updateGodownStock(editingProduct.id, stock.godown_id, stock.zone_id || null, -removedQty);
+      // Keep the general "Current Stock" pool in sync — the godown pool dropped by removedQty
+      await updateProductStockBasedOnDelivered([{ description: editingProduct.name, delivered: removedQty }]);
+      setEditingProduct(prev => prev ? { ...prev, stock_quantity: Math.max(0, (prev.stock_quantity || 0) - removedQty) } : prev);
       toast({ title: "Success", description: "Stock removed from godown" });
       if (editingProduct?.id) await loadGodownData(editingProduct.id);
     } catch (error) {
