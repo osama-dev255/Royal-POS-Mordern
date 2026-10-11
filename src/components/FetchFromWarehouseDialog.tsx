@@ -38,6 +38,7 @@ export const FetchFromWarehouseDialog = ({ open, onOpenChange, outletId, outletN
   const [search, setSearch] = useState("");
   const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({});
   const [fetchingKey, setFetchingKey] = useState<string | null>(null);
+  const [preparedBy, setPreparedBy] = useState("");
 
   // Unique key per stock row: a product can exist in the same godown at zone level or godown level
   const rowKey = (row: GodownStock) => `${row.product_id}::${row.zone_id || "none"}`;
@@ -75,6 +76,7 @@ export const FetchFromWarehouseDialog = ({ open, onOpenChange, outletId, outletN
       setZones([]);
       setSearch("");
       setQtyInputs({});
+      setPreparedBy("");
     }
   }, [open]);
 
@@ -143,6 +145,10 @@ export const FetchFromWarehouseDialog = ({ open, onOpenChange, outletId, outletN
     const available = row.quantity || 0;
     const productName = row.products?.name || "Product";
 
+    if (!preparedBy.trim()) {
+      toast({ title: "Error", description: "Prepared By is required", variant: "destructive" });
+      return;
+    }
     if (!requested || requested <= 0) {
       toast({ title: "Invalid quantity", description: "Enter a quantity greater than 0", variant: "destructive" });
       return;
@@ -197,7 +203,7 @@ export const FetchFromWarehouseDialog = ({ open, onOpenChange, outletId, outletN
             reference_type: "TRANSFER",
             reference_number: reference,
             unit_cost: row.products?.cost_price || 0,
-            notes: `Fetched to outlet ${outletName || outletId} from ${godownLabel}${zoneLabel ? ` / ${zoneLabel}` : ""}`
+            notes: `Prepared by: ${preparedBy.trim()} — Fetched to outlet ${outletName || outletId} from ${godownLabel}${zoneLabel ? ` / ${zoneLabel}` : ""}`
           }
         ]);
       } catch (movementError) {
@@ -267,6 +273,16 @@ export const FetchFromWarehouseDialog = ({ open, onOpenChange, outletId, outletN
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        {/* Prepared By (required) */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Prepared By <span className="text-red-500">*</span></label>
+          <Input
+            placeholder="Enter preparer's name"
+            value={preparedBy}
+            onChange={(e) => setPreparedBy(e.target.value)}
+          />
         </div>
 
         {/* Product search */}

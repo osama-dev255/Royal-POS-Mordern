@@ -365,12 +365,19 @@ export const deleteStockMovementsByReference = async (
  * (GRN, Delivery Note, Internal Consumption) for a movement record.
  * Returns null when the source document has no prepared-by name or is not resolvable.
  */
+// Prepared-by names embedded directly in movement notes (e.g. warehouse fetches
+// write "Prepared by: NAME — ..." when the transaction has no source document)
+const extractPreparedByNameFromNotes = (notes?: string): string | null => {
+  const match = (notes || '').match(/prepared by:\s*(.+?)(?:\s+—|$)/i);
+  return match ? match[1].trim() : null;
+};
+
 export const getMovementPreparedBy = async (
-  movement: Pick<StockMovement, 'reference_type' | 'reference_number'>
+  movement: Pick<StockMovement, 'reference_type' | 'reference_number' | 'notes'>
 ): Promise<string | null> => {
   const refType = movement.reference_type;
   const refNumber = movement.reference_number;
-  if (!refType || !refNumber) return null;
+  if (!refType || !refNumber) return extractPreparedByNameFromNotes(movement.notes);
 
   try {
     switch (refType) {
@@ -382,7 +389,7 @@ export const getMovementPreparedBy = async (
           .limit(1)
           .maybeSingle();
         if (error) throw error;
-        return data?.prepared_by || null;
+        return data?.prepared_by || extractPreparedByNameFromNotes(movement.notes);
       }
       case 'DELIVERY_NOTE': {
         const { data, error } = await supabase
@@ -392,7 +399,7 @@ export const getMovementPreparedBy = async (
           .limit(1)
           .maybeSingle();
         if (error) throw error;
-        return data?.prepared_by_name || null;
+        return data?.prepared_by_name || extractPreparedByNameFromNotes(movement.notes);
       }
       case 'INTERNAL_CONSUMPTION': {
         const { data, error } = await supabase
@@ -402,10 +409,10 @@ export const getMovementPreparedBy = async (
           .limit(1)
           .maybeSingle();
         if (error) throw error;
-        return data?.prepared_by || null;
+        return data?.prepared_by || extractPreparedByNameFromNotes(movement.notes);
       }
       default:
-        return null;
+        return extractPreparedByNameFromNotes(movement.notes);
     }
   } catch (err) {
     console.error('Error resolving prepared by for movement:', err);
