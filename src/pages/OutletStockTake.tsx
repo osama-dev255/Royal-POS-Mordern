@@ -12,12 +12,18 @@ import {
   Calculator,
   DollarSign,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  ListChecks,
+  Plus,
+  X
 } from "lucide-react";
 import { getDeliveriesByOutletId, DeliveryData } from "@/utils/deliveryUtils";
 import { getAvailableInventoryByOutlet, InventoryProduct, incrementSoldQuantity } from "@/services/databaseService";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface OutletStockTakeProps {
   onBack: () => void;
@@ -43,8 +49,20 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerSelectedIds, setPickerSelectedIds] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Only products explicitly selected for this stock take are counted and saved
+  const selectedItems = stockItems.filter(item => selectedIds.includes(item.id));
+  const pickerProducts = stockItems.filter(item =>
+    item.name.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+    item.sku.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+    item.category.toLowerCase().includes(pickerSearch.toLowerCase())
+  );
 
   useEffect(() => {
     loadStockData();
@@ -87,6 +105,21 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       });
       
       setStockItems(stockItemsList);
+
+      // Restore the products previously chosen for this outlet's stock take
+      const selectionKey = `outlet_${outletId}_stock_take_selection`;
+      const storedSelection = localStorage.getItem(selectionKey);
+      if (storedSelection) {
+        try {
+          const parsedSelection = JSON.parse(storedSelection);
+          if (Array.isArray(parsedSelection)) {
+            const validIds = new Set(stockItemsList.map(item => item.id));
+            setSelectedIds(parsedSelection.filter((id: string) => validIds.has(id)));
+          }
+        } catch (parseError) {
+          console.warn("Invalid stock take selection in localStorage:", parseError);
+        }
+      }
     } catch (error) {
       console.error("Error loading stock data:", error);
       toast({
@@ -122,8 +155,54 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
     }));
   };
 
+  const openProductPicker = () => {
+    setPickerSearch("");
+    setPickerSelectedIds(selectedIds);
+    setPickerOpen(true);
+  };
+
+  const togglePickerProduct = (itemId: string) => {
+    setPickerSelectedIds(prev =>
+      prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
+    );
+  };
+
+  const togglePickerSelectAll = () => {
+    const visibleIds = pickerProducts.map(item => item.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => pickerSelectedIds.includes(id));
+
+    setPickerSelectedIds(prev =>
+      allVisibleSelected
+        ? prev.filter(id => !visibleIds.includes(id))
+        : Array.from(new Set([...prev, ...visibleIds]))
+    );
+  };
+
+  const applyProductSelection = () => {
+    if (!outletId) return;
+    setSelectedIds(pickerSelectedIds);
+    localStorage.setItem(`outlet_${outletId}_stock_take_selection`, JSON.stringify(pickerSelectedIds));
+    setPickerOpen(false);
+  };
+
+  const removeSelectedProduct = (itemId: string) => {
+    if (!outletId) return;
+    const nextSelection = selectedIds.filter(id => id !== itemId);
+    setSelectedIds(nextSelection);
+    localStorage.setItem(`outlet_${outletId}_stock_take_selection`, JSON.stringify(nextSelection));
+  };
+
   const savePhysicalCounts = async () => {
     if (!outletId) return;
+
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No products selected",
+        description: "Select at least one product to include in this stock take.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Prevent duplicate saves
     if (saving) {
@@ -143,9 +222,9 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       
       // 1. Save physical counts to localStorage (for UI persistence & offline support)
       const physicalCountsKey = `outlet_${outletId}_physical_counts`;
-      const physicalCounts: Record<string, number> = {};
+      const physicalCounts: Record<string, number> = JSON.parse(localStorage.getItem(physicalCountsKey) || '{}');
         
-      stockItems.forEach(item => {
+      selectedItems.forEach(item => {
         physicalCounts[item.id] = item.physicalCount;
       });
     
@@ -160,10 +239,10 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
         
         if (user) {
           console.log('💾 Saving physical counts to database for audit trail...');
-          console.log('📊 Total items to save:', stockItems.length);
+          console.log('📊 Total items to save:', selectedItems.length);
           
           // Save individual physical counts with audit trail
-          const physicalCountRecords = stockItems.map(item => ({
+          const physicalCountRecords = selectedItems.map(item => ({
             outlet_id: outletId,
             stock_take_number: stockTakeNumber,
             product_name: item.name,
@@ -203,7 +282,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
   
       // Update sold quantities in database based on physical count
       // Formula: Sold = Available Stock - Physical Count
-      for (const item of stockItems) {
+      for (const item of selectedItems) {
         const calculatedSoldQty = Math.max(0, item.stockRemain - item.physicalCount);
           
         // Update sold_quantity in database
@@ -223,12 +302,12 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       // and stock_take_physical_counts.
   
       // Calculate totals for saving
-      const totalCalculatedSold = stockItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
-      const totalCosts = stockItems.reduce((sum, item) => {
+      const totalCalculatedSold = selectedItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
+      const totalCosts = selectedItems.reduce((sum, item) => {
         const calculatedSold = item.stockRemain - item.physicalCount;
         return sum + (calculatedSold * item.unitCost);
       }, 0);
-      const totalPrice = stockItems.reduce((sum, item) => {
+      const totalPrice = selectedItems.reduce((sum, item) => {
         const calculatedSold = item.stockRemain - item.physicalCount;
         return sum + (calculatedSold * item.unitPrice);
       }, 0);
@@ -236,7 +315,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       const avgTurnover = totalCosts > 0 ? totalPrice / totalCosts : 0;
   
       // Prepare items for JSON storage
-      const itemsJson = stockItems.map(item => ({
+      const itemsJson = selectedItems.map(item => ({
         name: item.name,
         sku: item.sku,
         category: item.category,
@@ -257,7 +336,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           outlet_id: outletId,
           stock_take_number: stockTakeNumber,
           date: new Date().toISOString().split('T')[0],
-          total_products: stockItems.length,
+          total_products: selectedItems.length,
           total_calculated_sold: totalCalculatedSold,
           total_costs: totalCosts,
           total_price: totalPrice,
@@ -290,23 +369,23 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
     }
   };
 
-  const filteredItems = stockItems.filter(item =>
+  const filteredItems = selectedItems.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalDiscrepancy = stockItems.reduce((sum, item) => sum + item.discrepancy, 0);
-  const itemsWithDiscrepancy = stockItems.filter(item => item.discrepancy !== 0).length;
-  const totalCalculatedSold = stockItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
+  const totalDiscrepancy = selectedItems.reduce((sum, item) => sum + item.discrepancy, 0);
+  const itemsWithDiscrepancy = selectedItems.filter(item => item.discrepancy !== 0).length;
+  const totalCalculatedSold = selectedItems.reduce((sum, item) => sum + (item.stockRemain - item.physicalCount), 0);
   
   // Financial calculations for sold inventory
-  const totalCosts = stockItems.reduce((sum, item) => {
+  const totalCosts = selectedItems.reduce((sum, item) => {
     const calculatedSold = item.stockRemain - item.physicalCount;
     return sum + (calculatedSold * item.unitCost);
   }, 0);
   
-  const totalPrice = stockItems.reduce((sum, item) => {
+  const totalPrice = selectedItems.reduce((sum, item) => {
     const calculatedSold = item.stockRemain - item.physicalCount;
     return sum + (calculatedSold * item.unitPrice);
   }, 0);
@@ -333,9 +412,20 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Stock Take</h1>
-          <p className="text-muted-foreground">Physical inventory count for this outlet</p>
+          <p className="text-muted-foreground">
+            Physical inventory count for this outlet • {selectedItems.length} of {stockItems.length} products selected
+          </p>
         </div>
-        <Button onClick={savePhysicalCounts} disabled={saving}>
+        <Button variant="outline" onClick={openProductPicker} disabled={saving}>
+          <ListChecks className="h-4 w-4 mr-2" />
+          Select Products
+          {selectedItems.length > 0 && (
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+              {selectedItems.length}
+            </span>
+          )}
+        </Button>
+        <Button onClick={savePhysicalCounts} disabled={saving || selectedItems.length === 0}>
           {saving ? (
             <>
               <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -356,8 +446,9 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Products</p>
-                <p className="text-2xl font-bold">{stockItems.length}</p>
+                <p className="text-sm text-muted-foreground">Products in Take</p>
+                <p className="text-2xl font-bold">{selectedItems.length}</p>
+                <p className="text-xs text-muted-foreground">of {stockItems.length} available</p>
               </div>
               <Package className="h-8 w-8 text-primary" />
             </div>
@@ -369,7 +460,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
               <div>
                 <p className="text-sm text-muted-foreground">Total Stock</p>
                 <p className="text-2xl font-bold">
-                  {stockItems.reduce((sum, item) => sum + item.stockRemain, 0)}
+                  {selectedItems.reduce((sum, item) => sum + item.stockRemain, 0)}
                 </p>
               </div>
               <Calculator className="h-8 w-8 text-blue-500" />
@@ -464,8 +555,8 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
             <div>
               <h3 className="font-semibold text-blue-800">How Stock Take Works</h3>
               <p className="text-sm text-blue-700 mt-1">
-                Enter the physical count for each product. The system will calculate: 
-                <strong> Stock Sold = Available Stock - Physical Count</strong>
+                Select the products to count, then enter the physical count for each. The system will calculate: 
+                <strong> Stock Sold = Available Stock - Physical Count</strong>. Only selected products are saved and updated.
               </p>
             </div>
           </div>
@@ -489,8 +580,12 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
 
       {/* Stock Items Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Inventory Items</CardTitle>
+          <Button variant="outline" size="sm" onClick={openProductPicker} disabled={saving}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Products
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -508,6 +603,7 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
                   <th className="text-right py-3 px-4 font-medium">Total Costs</th>
                   <th className="text-right py-3 px-4 font-medium">Unit Price</th>
                   <th className="text-right py-3 px-4 font-medium">Total Price</th>
+                  <th className="text-right py-3 px-4 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -538,6 +634,16 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
                     <td className="py-3 px-4 text-right font-semibold">{formatCurrency((item.stockRemain - item.physicalCount) * item.unitCost)}</td>
                     <td className="py-3 px-4 text-right">{formatCurrency(item.unitPrice)}</td>
                     <td className="py-3 px-4 text-right font-semibold">{formatCurrency((item.stockRemain - item.physicalCount) * item.unitPrice)}</td>
+                    <td className="py-3 px-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeSelectedProduct(item.id)}
+                        title="Remove from stock take"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -546,13 +652,112 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
           
           {filteredItems.length === 0 && (
             <div className="text-center py-12">
-              <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No products found</h3>
-              <p className="text-muted-foreground">Try adjusting your search terms</p>
+              {stockItems.length === 0 ? (
+                <>
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No products in this outlet</h3>
+                  <p className="text-muted-foreground">Products must be assigned to this outlet's inventory before a stock take can be performed.</p>
+                </>
+              ) : selectedItems.length === 0 ? (
+                <>
+                  <ListChecks className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No products selected</h3>
+                  <p className="text-muted-foreground mb-4">Choose the products you want to include in this stock take.</p>
+                  <Button onClick={openProductPicker}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Select Products
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No products found</h3>
+                  <p className="text-muted-foreground">Try adjusting your search terms</p>
+                </>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Product Selection Dialog */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Select Products for Stock Take</DialogTitle>
+            <DialogDescription>
+              Choose the products to count. Only the selected products will be included in this stock take.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products by name, SKU, or category..."
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {pickerSelectedIds.length} of {stockItems.length} products selected
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={togglePickerSelectAll}
+              disabled={pickerProducts.length === 0}
+            >
+              {pickerProducts.length > 0 && pickerProducts.every(item => pickerSelectedIds.includes(item.id))
+                ? "Unselect All"
+                : "Select All"}
+            </Button>
+          </div>
+
+          <ScrollArea className="h-[340px] rounded-md border">
+            <div className="divide-y">
+              {pickerProducts.map((item) => (
+                <label
+                  key={item.id}
+                  className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50"
+                >
+                  <Checkbox
+                    checked={pickerSelectedIds.includes(item.id)}
+                    onCheckedChange={() => togglePickerProduct(item.id)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.sku} • {item.category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{item.stockRemain}</p>
+                    <p className="text-xs text-muted-foreground">Available</p>
+                  </div>
+                </label>
+              ))}
+
+              {pickerProducts.length === 0 && (
+                <div className="text-center py-10">
+                  <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="font-medium">No products found</p>
+                  <p className="text-sm text-muted-foreground">Try adjusting your search terms</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
+            <Button onClick={applyProductSelection}>
+              {pickerSelectedIds.length > 0
+                ? `Add ${pickerSelectedIds.length} Product${pickerSelectedIds.length === 1 ? "" : "s"}`
+                : "Clear Selection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
