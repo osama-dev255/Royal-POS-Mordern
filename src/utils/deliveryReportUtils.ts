@@ -78,7 +78,8 @@ export const saveDeliveryInReport = async (
 ): Promise<{ success: boolean; id?: string; reportNumber?: string; error?: string }> => {
   try {
     const reportNumber = generateReportNumber();
-    const balanceDue = data.totalValue - data.amountPaid;
+    // Balance Due = Total Value of Deliveries - Total Sales Amount
+    const balanceDue = data.totalValue - data.totalSalesAmount;
 
     const insertData = {
       outlet_id: data.outletId,

@@ -126,7 +126,6 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
 
   // Payment details state
   const [paymentDetails, setPaymentDetails] = useState({
-    amountPaid: '',
     totalSalesAmount: '',
     totalExpenses: '',
     paymentDate: new Date().toISOString().split('T')[0],
@@ -138,6 +137,9 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
     verifiedByName: '',
     approvedByName: '',
   });
+
+  // Amount Paid is auto-calculated: Total Sales Amount - Total Expenses
+  const amountPaidComputed = (Number(paymentDetails.totalSalesAmount) || 0) - (Number(paymentDetails.totalExpenses) || 0);
 
   // Date range filter state
   const [reportDateRange, setReportDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
@@ -308,10 +310,10 @@ export const DeliveryInReportEditor = ({ open, onOpenChange, deliveries, formatC
       if (!pw) { toast({ title: "Error", description: "Allow popups", variant: "destructive" }); return; }
       const { rows, detailRows } = buildReportHTML();
       const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
-      const amtPaid = Number(paymentDetails.amountPaid) || 0;
+      const amtPaid = amountPaidComputed;
       const totalSales = Number(paymentDetails.totalSalesAmount) || 0;
       const totalExp = Number(paymentDetails.totalExpenses) || 0;
-      const balDue = totals.totalValue - amtPaid;
+      const balDue = totals.totalValue - totalSales;
       const paymentMethodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque', mobile_payment: 'Mobile Payment' };
       const paymentSection = `<h2>Payment Summary</h2><table style="max-width:400px;margin-bottom:15px"><tbody><tr><td style="font-weight:bold">Total Value</td><td style="text-align:right">${formatCurrency(totals.totalValue)}</td></tr><tr><td style="font-weight:bold">Total Sales Amount</td><td style="text-align:right">${formatCurrency(totalSales)}</td></tr><tr><td style="font-weight:bold">Total Expenses</td><td style="text-align:right">${formatCurrency(totalExp)}</td></tr><tr><td style="font-weight:bold">Amount Paid</td><td style="text-align:right">${formatCurrency(amtPaid)}</td></tr><tr><td style="font-weight:bold;border-top:2px solid #333">Balance Due</td><td style="text-align:right;border-top:2px solid #333;font-weight:bold;color:${balDue > 0 ? '#dc2626' : '#16a34a'}">${formatCurrency(balDue)}</td></tr><tr><td>Payment Date</td><td style="text-align:right">${paymentDetails.paymentDate || '-'}</td></tr><tr><td>Payment Method</td><td style="text-align:right">${paymentMethodLabel[paymentDetails.paymentMethod] || '-'}</td></tr><tr><td>Reference #</td><td style="text-align:right">${paymentDetails.referenceNumber || '-'}</td></tr></tbody></table>`;
       const html = `<!DOCTYPE html><html><head><title>Deliveries In Report</title><style>
@@ -341,6 +343,9 @@ ${paymentSection}
     const dateRangeLabel = (reportDateRange.start || reportDateRange.end) ? ` | Period: ${reportDateRange.start || '...'} to ${reportDateRange.end || '...'}` : '';
     doc.setFontSize(18); doc.text('DELIVERIES IN - FINANCIAL REPORT', 14, 20);
     doc.setFontSize(9); doc.text(`${outletName||'Outlet'} | Generated: ${new Date().toLocaleString()}${dateRangeLabel}`, 14, 28);
+    const amountPaid = amountPaidComputed;
+    const totalSales = Number(paymentDetails.totalSalesAmount) || 0;
+    const totalExp = Number(paymentDetails.totalExpenses) || 0;
     doc.text(`Active: ${totals.activeCount} | Items: ${totals.totalItems} | Value: ${formatCurrency(totals.totalValue)} | Total Sales: ${formatCurrency(totalSales)} | Total Expenses: ${formatCurrency(totalExp)} | Excluded: ${totals.excludedCount}`, 14, 34);
     const summary = active.map(d => { const ai=d.items.filter(i=>!i.excluded); return [d.deliveryNoteNumber, d.date?.substring(0,10), d.customer, d.sourceType==='outlet'?'Outlet':d.sourceType==='manual'?'Manual':'Investment', formatCurrency(ai.reduce((s,i)=>s+i.quantity*i.rate,0))]; });
     autoTable(doc, { startY:42, head:[['Note #','Date','Source','Type','Value']], body:summary, theme:'striped', headStyles:{fillColor:[51,51,51]}, styles:{fontSize:8} });
@@ -348,10 +353,7 @@ ${paymentSection}
     const detail = active.flatMap(d => d.items.filter(i=>!i.excluded).map(i => [d.deliveryNoteNumber, i.name, i.quantity.toString(), formatCurrency(i.rate), formatCurrency(i.quantity*i.rate)]));
     autoTable(doc, { startY:y1+10, head:[['Note #','Item','Qty','Rate','Amount']], body:detail, theme:'striped', headStyles:{fillColor:[51,51,51]}, styles:{fontSize:8} });
     // Payment summary in PDF
-    const amountPaid = Number(paymentDetails.amountPaid) || 0;
-    const totalSales = Number(paymentDetails.totalSalesAmount) || 0;
-    const totalExp = Number(paymentDetails.totalExpenses) || 0;
-    const balanceDue = totals.totalValue - amountPaid;
+    const balanceDue = totals.totalValue - totalSales;
     if (amountPaid > 0 || totalSales > 0 || totalExp > 0 || paymentDetails.referenceNumber) {
       const y2 = (doc as any).lastAutoTable?.finalY || y1 + 40;
       autoTable(doc, { startY: y2 + 10, head: [['Payment Summary']], body: [
@@ -389,7 +391,7 @@ ${paymentSection}
         outletId,
         reportDate: new Date().toISOString().split('T')[0],
         totalValue: totals.totalValue,
-        amountPaid: Number(paymentDetails.amountPaid) || 0,
+        amountPaid: amountPaidComputed,
         totalSalesAmount: Number(paymentDetails.totalSalesAmount) || 0,
         totalExpenses: Number(paymentDetails.totalExpenses) || 0,
         paymentDate: paymentDetails.paymentDate,
@@ -428,7 +430,8 @@ ${paymentSection}
     }
   };
 
-  const balanceDue = totals.totalValue - (Number(paymentDetails.amountPaid) || 0);
+  // Balance Due = Total Value of Deliveries - Total Sales Amount
+  const balanceDue = totals.totalValue - (Number(paymentDetails.totalSalesAmount) || 0);
 
   if (!open || !portalRef.current) return null;
 
@@ -717,15 +720,8 @@ ${paymentSection}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Amount Paid <span className="text-red-500">*</span></Label>
-                  <Input
-                    type="number"
-                    value={paymentDetails.amountPaid}
-                    onChange={e => setPaymentDetails(p => ({ ...p, amountPaid: e.target.value }))}
-                    className="h-10 text-lg font-bold"
-                    placeholder="0.00"
-                    min={0}
-                  />
+                  <Label className="text-xs font-medium">Amount collected</Label>
+                  <div className="text-2xl font-bold text-emerald-700">{formatCurrency(amountPaidComputed)}</div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">Balance Due</Label>
