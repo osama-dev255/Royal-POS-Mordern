@@ -37,6 +37,19 @@ export interface StockMovementSummary {
   net_movement: number;
 }
 
+// UUID columns in stock_movements (product_id, outlet_id, godown_id, zone_id, reference_id)
+// reject non-UUID strings with Postgres error 22P02, which fails the ENTIRE insert batch.
+// Synthetic composite IDs (e.g. outlet cart items use "outlet_id-name") are dropped to
+// null instead of poisoning the batch, so the rest of the movements still get recorded.
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const toUuidOrNull = (field: string, value?: string): string | null => {
+  if (!value) return null;
+  if (UUID_REGEX.test(value)) return value;
+  console.warn(`⚠️ stock_movements.${field}: ignoring invalid UUID "${value}"`);
+  return null;
+};
+
 /**
  * Record a single stock movement in the ledger
  */
@@ -45,15 +58,15 @@ export const recordStockMovement = async (movement: StockMovement): Promise<{ su
     const { data: { user } } = await supabase.auth.getUser();
 
     const insertData = {
-      product_id: movement.product_id || null,
+      product_id: toUuidOrNull('product_id', movement.product_id),
       product_name: movement.product_name,
-      outlet_id: movement.outlet_id || null,
-      godown_id: movement.godown_id || null,
-      zone_id: movement.zone_id || null,
+      outlet_id: toUuidOrNull('outlet_id', movement.outlet_id),
+      godown_id: toUuidOrNull('godown_id', movement.godown_id),
+      zone_id: toUuidOrNull('zone_id', movement.zone_id),
       movement_type: movement.movement_type,
       quantity: Math.abs(movement.quantity),
       reference_type: movement.reference_type || null,
-      reference_id: movement.reference_id || null,
+      reference_id: toUuidOrNull('reference_id', movement.reference_id),
       reference_number: movement.reference_number || null,
       unit_cost: movement.unit_cost || 0,
       total_cost: movement.total_cost || (movement.unit_cost || 0) * Math.abs(movement.quantity),
@@ -88,15 +101,15 @@ export const recordStockMovements = async (movements: StockMovement[]): Promise<
     const { data: { user } } = await supabase.auth.getUser();
 
     const insertData = movements.map(m => ({
-      product_id: m.product_id || null,
+      product_id: toUuidOrNull('product_id', m.product_id),
       product_name: m.product_name,
-      outlet_id: m.outlet_id || null,
-      godown_id: m.godown_id || null,
-      zone_id: m.zone_id || null,
+      outlet_id: toUuidOrNull('outlet_id', m.outlet_id),
+      godown_id: toUuidOrNull('godown_id', m.godown_id),
+      zone_id: toUuidOrNull('zone_id', m.zone_id),
       movement_type: m.movement_type,
       quantity: Math.abs(m.quantity),
       reference_type: m.reference_type || null,
-      reference_id: m.reference_id || null,
+      reference_id: toUuidOrNull('reference_id', m.reference_id),
       reference_number: m.reference_number || null,
       unit_cost: m.unit_cost || 0,
       total_cost: m.total_cost || (m.unit_cost || 0) * Math.abs(m.quantity),

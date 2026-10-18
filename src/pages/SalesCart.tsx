@@ -1137,11 +1137,19 @@ export const SalesCart = ({ username, onBack, onLogout, outletId, outletName }: 
       // Record stock movements in the ledger (SOLD via POS)
       try {
         const { recordStockMovements } = await import('@/utils/stockMovementUtils');
+        // Outlet cart items carry synthetic "outlet_id-name" IDs (see refreshOutletProducts)
+        // which are not valid product UUIDs - resolve the real product UUID by name instead.
+        const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const generalProducts = outletId ? await getProducts() : [];
         const saleMovements = itemsWithQuantity.map(item => {
           const product = products.find(p => p.id === item.id);
+          const productName = product?.name || item.name || '';
+          const resolvedProductId = outletId
+            ? generalProducts.find(p => p.name.toLowerCase().trim() === productName.toLowerCase().trim())?.id
+            : item.id;
           return {
-            product_id: item.id,
-            product_name: product?.name || item.name || '',
+            product_id: resolvedProductId && isValidUuid.test(resolvedProductId) ? resolvedProductId : undefined,
+            product_name: productName,
             outlet_id: outletId || undefined,
             movement_type: 'SOLD' as const,
             quantity: item.quantity,
