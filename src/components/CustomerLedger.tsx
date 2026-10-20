@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,20 @@ import {
   Eye,
   ShoppingCart,
   Loader2,
-  Receipt
+  Receipt,
+  BarChart3
 } from "lucide-react";
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import {
   getCustomerLedgerByCustomerId,
   getCustomerLedgerBalance,
@@ -52,6 +64,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Dialog,
   DialogContent,
@@ -68,12 +81,22 @@ interface CustomerLedgerProps {
 interface LedgerEntry {
   id: string;
   date: string;
+  dateValue: number;
   description: string;
   debit: number;
   credit: number;
   balance: number;
   type: 'cash_sale' | 'card_sale' | 'mobile_sale' | 'credit_sale' | 'debt_payment' | 'settlement' | 'adjustment' | 'refund';
   reference: string;
+}
+
+// Trend point for the ledger trending chart (daily/monthly aggregation)
+interface TrendPoint {
+  key: string;
+  label: string;
+  debit: number;
+  credit: number;
+  balance: number;
 }
 
 export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerProps) => {
@@ -88,6 +111,8 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [filteredEntries, setFilteredEntries] = useState<LedgerEntry[]>([]);
+  // Ledger trend chart granularity (daily/monthly aggregation)
+  const [chartMode, setChartMode] = useState<'daily' | 'monthly'>('daily');
   const { toast } = useToast();
 
   // View transaction dialog state
@@ -119,6 +144,7 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
         entries.push({
           id: entry.id || `ledger-${entry.reference_id}`,
           date: new Date(entry.transaction_date).toLocaleDateString(),
+          dateValue: new Date(entry.transaction_date).getTime(),
           description: entry.description || entry.transaction_type,
           debit: entry.debit_amount || 0,
           credit: entry.credit_amount || 0,
@@ -190,6 +216,77 @@ export const CustomerLedger = ({ customer, outletId, onBack }: CustomerLedgerPro
 
     setFilteredEntries(filtered);
   }, [searchTerm, dateFrom, dateTo, ledgerEntries]);
+
+  // Compact currency formatter for chart axis ticks (matches OutletReports convention)
+  const formatCurrencyShort = (amount: number) => {
+    if (Math.abs(amount) >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+    if (Math.abs(amount) >= 1000) return `${Math.round(amount / 1000)}K`;
+    return `${Math.round(amount)}`;
+  };
+
+  // Aggregate ledger entries into daily/monthly trend points for the trending chart.
+  // Uses the date range filters (search term does not apply so the balance line stays accurate).
+  const trendData = useMemo<TrendPoint[]>(() => {
+    let endDate: Date | null = null;
+    if (dateTo) {
+      endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    const inRange = ledgerEntries.filter((entry) => {
+      if (dateFrom && entry.dateValue < dateFrom.getTime()) return false;
+      if (endDate && entry.dateValue > endDate.getTime()) return false;
+      return true;
+    });
+
+    const buckets = new Map<string, TrendPoint>();
+
+    [...inRange]
+      .sort((a, b) => a.dateValue - b.dateValue)
+      .forEach((entry) => {
+        const d = new Date(entry.dateValue);
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const key = chartMode === 'monthly'
+          ? `${d.getFullYear()}-${month}`
+          : `${d.getFullYear()}-${month}-${String(d.getDate()).padStart(2, '0')}`;
+
+        const existing = buckets.get(key);
+        if (existing) {
+          existing.debit += entry.debit;
+          existing.credit += entry.credit;
+          // The running balance of the last chronological entry is the closing balance
+          existing.balance = entry.balance;
+        } else {
+          buckets.set(key, {
+            key,
+            label: chartMode === 'monthly'
+              ? d.toLocaleDateString('en-TZ', { month: 'short', year: 'numeric' })
+              : d.toLocaleDateString('en-TZ', { month: 'short', day: 'numeric' }),
+            debit: entry.debit,
+            credit: entry.credit,
+            balance: entry.balance,
+          });
+        }
+      });
+
+    return Array.from(buckets.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [ledgerEntries, dateFrom, dateTo, chartMode]);
+
+  // Trend summary derived from the chart buckets (opening/closing balance and movement)
+  const trendSummary = useMemo(() => {
+    if (trendData.length === 0) return null;
+    const first = trendData[0];
+    const last = trendData[trendData.length - 1];
+    // Opening balance = closing balance of the first period minus its net movement
+    const opening = first.balance - (first.debit - first.credit);
+    const closing = last.balance;
+    const change = closing - opening;
+    const peak = trendData.reduce(
+      (max, point) => (Math.abs(point.balance) > Math.abs(max) ? point.balance : max),
+      0
+    );
+    return { opening, closing, change, peak };
+  }, [trendData]);
 
   // Helper: human-readable label for a transaction type
   const getTransactionTypeLabel = (type: LedgerEntry['type']): string => {
@@ -1535,6 +1632,90 @@ Generated: ${new Date().toLocaleDateString('en-TZ', { year: 'numeric', month: 'l
           </CardContent>
         </Card>
       </div>
+
+      {/* Ledger Trend Chart */}
+      {ledgerEntries.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+                Ledger Trend
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {customer.first_name}'s balance and transaction activity over time
+                {(dateFrom || dateTo) ? ' (selected period)' : ''}
+              </p>
+            </div>
+            <ToggleGroup
+              type="single"
+              value={chartMode}
+              onValueChange={(value) => value && setChartMode(value as 'daily' | 'monthly')}
+            >
+              <ToggleGroupItem value="daily">Daily</ToggleGroupItem>
+              <ToggleGroupItem value="monthly">Monthly</ToggleGroupItem>
+            </ToggleGroup>
+          </CardHeader>
+          <CardContent>
+            {trendData.length === 0 ? (
+              <div className="h-72 flex items-center justify-center text-muted-foreground">
+                No transactions in the selected period
+              </div>
+            ) : (
+              <>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} minTickGap={40} />
+                      <YAxis yAxisId="left" tickFormatter={(value) => formatCurrencyShort(Number(value))} />
+                      <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => formatCurrencyShort(Number(value))} />
+                      <Tooltip
+                        formatter={(value, name) => [formatCurrency(Number(value)), name]}
+                        labelStyle={{ fontWeight: 600 }}
+                      />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="debit" name="Debits (Sales)" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                      <Bar yAxisId="left" dataKey="credit" name="Credits (Payments)" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                      <Line yAxisId="right" dataKey="balance" name="Closing Balance" stroke="#3b82f6" strokeWidth={2} dot={trendData.length <= 2 ? { r: 3 } : false} activeDot={{ r: 4 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {trendSummary && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase">Opening Balance</p>
+                      <p className={`text-sm font-bold ${trendSummary.opening > 0 ? 'text-red-600' : trendSummary.opening < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                        {formatCurrency(Math.abs(trendSummary.opening))} {trendSummary.opening > 0 ? 'Dr' : trendSummary.opening < 0 ? 'Cr' : ''}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase">Closing Balance</p>
+                      <p className={`text-sm font-bold ${trendSummary.closing > 0 ? 'text-red-600' : trendSummary.closing < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                        {formatCurrency(Math.abs(trendSummary.closing))} {trendSummary.closing > 0 ? 'Dr' : trendSummary.closing < 0 ? 'Cr' : ''}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase">Balance Change</p>
+                      <p className={`text-sm font-bold flex items-center gap-1 ${trendSummary.change > 0 ? 'text-red-600' : trendSummary.change < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                        {trendSummary.change > 0 ? <TrendingUp className="h-4 w-4" /> : trendSummary.change < 0 ? <TrendingDown className="h-4 w-4" /> : null}
+                        {trendSummary.change > 0 ? '+' : ''}{formatCurrency(trendSummary.change)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase">Peak Balance</p>
+                      <p className={`text-sm font-bold ${trendSummary.peak > 0 ? 'text-red-600' : trendSummary.peak < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                        {formatCurrency(Math.abs(trendSummary.peak))} {trendSummary.peak > 0 ? 'Dr' : trendSummary.peak < 0 ? 'Cr' : ''}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* T-Account Ledger */}
       <Card>
