@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { getCurrentUser } from '@/services/authService';
+import { AuthErrorHandler } from '@/utils/authErrorHandler';
 
 interface AuthContextType {
   user: SupabaseUser | null;
@@ -21,17 +21,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Check active session
     const checkUser = async () => {
       try {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
+        // Note: getUser() does not throw in supabase-js v2 — the error
+        // is returned and must be checked here (e.g. invalid refresh token)
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error) {
+          if (AuthErrorHandler.isSessionInvalid(error)) {
+            // Stale/rotated refresh token: drop the local session to stop
+            // the endless 400 refresh-token loop and force a fresh login
+            console.log('Invalid refresh token, clearing local session:', error.message);
+            await AuthErrorHandler.clearInvalidSession();
+            setUser(null);
+          } else {
+            console.error('Error checking user session:', error);
+            setUser(null);
+          }
+        } else {
+          setUser(user);
+        }
       } catch (error: any) {
         console.error('Error checking user session:', error);
         // If refresh token is invalid, clear local session
-        if (error.message && error.message.includes('Refresh Token Not Found')) {
-          console.log('Refresh token not found, clearing session');
-          setUser(null);
-          // Clear any stored session data
-          localStorage.removeItem('supabase.auth.token');
+        if (AuthErrorHandler.isSessionInvalid(error)) {
+          console.log('Invalid refresh token, clearing local session');
+          await AuthErrorHandler.clearInvalidSession();
         }
+        setUser(null);
       } finally {
         setIsLoading(false);
       }

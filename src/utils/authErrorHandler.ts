@@ -14,8 +14,8 @@ export class AuthErrorHandler {
   static handleAuthError(error: any): string {
     console.error('Auth Error:', error);
     
-    // Handle refresh token errors specifically
-    if (error.message && error.message.includes('Refresh Token Not Found')) {
+    // Handle refresh token errors specifically (all Supabase v2 variants)
+    if (this.isSessionInvalid(error)) {
       this.clearInvalidSession();
       return 'Your session has expired. Please log in again.';
     }
@@ -39,16 +39,12 @@ export class AuthErrorHandler {
 
   /**
    * Clear invalid session data when refresh token fails
+   * Uses 'local' scope so no server call is attempted (the stored
+   * refresh token is unusable anyway) and storage is cleaned properly
    */
-  static clearInvalidSession(): void {
+  static async clearInvalidSession(): Promise<void> {
     try {
-      // Clear Supabase session
-      supabase.auth.signOut();
-      
-      // Clear any cached session data
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('supabase.auth.refresh-token');
-      
+      await supabase.auth.signOut({ scope: 'local' });
       console.log('Cleared invalid session data');
     } catch (err) {
       console.error('Error clearing session:', err);
@@ -60,10 +56,22 @@ export class AuthErrorHandler {
    * @returns boolean indicating if session is invalid
    */
   static isSessionInvalid(error: any): boolean {
-    return error.message && (
-      error.message.includes('Refresh Token Not Found') ||
-      error.message.includes('Invalid Refresh Token') ||
-      error.message.includes('expired')
+    const message: string = (
+      error?.message ||
+      error?.error_description ||
+      error?.code ||
+      ''
+    ).toLowerCase();
+    if (!message) return false;
+    return (
+      message.includes('refresh token not found') ||
+      message.includes('refresh_token_not_found') ||
+      message.includes('invalid refresh token') ||
+      message.includes('invalid_refresh_token') ||
+      message.includes('already used') ||
+      message.includes('session not found') ||
+      message.includes('refresh token') ||
+      message.includes('expired')
     );
   }
 
