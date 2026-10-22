@@ -143,6 +143,8 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
   const [sourceOptions, setSourceOptions] = useState<SourceOption[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState('');
   const [loadingSource, setLoadingSource] = useState(false);
+  const [sourceSearch, setSourceSearch] = useState('');
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [customers, setCustomers] = useState<OutletCustomer[]>([]);
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([]);
   const [formCustomerId, setFormCustomerId] = useState('');
@@ -275,6 +277,8 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
     setFormMode('linked');
     setSourceType('cash_sale');
     setSelectedSourceId('');
+    setSourceSearch('');
+    setShowSourceDropdown(false);
     setFormCustomerId('');
     setFormCustomerName('');
     setFormCustomerPhone('');
@@ -285,6 +289,9 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
     setFormItems([]);
     setIsFormDialogOpen(true);
     loadSourceOptions('cash_sale');
+    if (customers.length === 0) {
+      getOutletCustomers(outletId).then(setCustomers).catch(() => setCustomers([]));
+    }
     if (inventoryProducts.length === 0) {
       getInventoryProductsByOutlet(outletId).then(setInventoryProducts).catch(() => setInventoryProducts([]));
     }
@@ -373,6 +380,8 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
   // Fetch the selected invoice's items and auto-fill the form
   const handleSelectSource = async (sourceId: string) => {
     setSelectedSourceId(sourceId);
+    setSourceSearch('');
+    setShowSourceDropdown(false);
     setFormItems([]);
     if (!outletId || !sourceId) return;
 
@@ -842,6 +851,31 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
   const approvedTotal = returns.filter(r => r.status === 'approved').reduce((sum, r) => sum + r.totalAmount, 0);
   const rejectedCount = returns.filter(r => r.status === 'rejected').length;
 
+  // Searchable Original Invoice dropdown: a term matches if it appears in the
+  // customer name, invoice number, date or amount (raw and formatted forms)
+  const getCustomerNameForOption = (customerId?: string) => {
+    if (!customerId) return 'Walk-in';
+    const c = customers.find(x => x.id === customerId);
+    return c ? `${c.first_name} ${c.last_name}`.trim() : 'Customer';
+  };
+
+  const selectedSourceOption = sourceOptions.find(o => o.id === selectedSourceId);
+
+  const filteredSourceOptions = sourceOptions.filter(opt => {
+    const term = sourceSearch.trim().toLowerCase();
+    if (!term) return true;
+    const haystack = [
+      getCustomerNameForOption(opt.customerId),
+      opt.invoiceNumber,
+      opt.date,
+      formatDate(opt.date),
+      String(opt.totalAmount),
+      opt.totalAmount.toFixed(2),
+      formatCurrency(opt.totalAmount)
+    ].join(' ').toLowerCase();
+    return haystack.includes(term);
+  });
+
   return (
     <div className="container mx-auto py-6 px-4">
       {/* Header */}
@@ -1208,6 +1242,7 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
                       const type = value as 'cash_sale' | 'card_sale' | 'mobile_sale' | 'debt';
                       setSourceType(type);
                       setSelectedSourceId('');
+                      setSourceSearch('');
                       setFormItems([]);
                       loadSourceOptions(type);
                     }}
@@ -1225,16 +1260,42 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
                 </div>
                 <div className="space-y-2">
                   <Label>Original Invoice <span className="text-red-500">*</span></Label>
-                  <Select value={selectedSourceId} onValueChange={handleSelectSource}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={loadingSource ? 'Loading invoices...' : 'Select invoice'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sourceOptions.map((opt) => (
-                        <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Input
+                      value={sourceSearch || selectedSourceOption?.label || ''}
+                      onChange={(e) => {
+                        setSourceSearch(e.target.value);
+                        setShowSourceDropdown(true);
+                      }}
+                      onFocus={() => setShowSourceDropdown(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowSourceDropdown(false), 200);
+                      }}
+                      placeholder={loadingSource ? 'Loading invoices...' : 'Search by customer, invoice no, date or amount'}
+                    />
+                    {showSourceDropdown && (loadingSource || sourceOptions.length > 0) && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {loadingSource ? (
+                          <div className="p-3 text-sm text-muted-foreground">Loading invoices...</div>
+                        ) : filteredSourceOptions.length === 0 ? (
+                          <div className="p-3 text-sm text-muted-foreground">No invoices found</div>
+                        ) : (
+                          filteredSourceOptions.slice(0, 100).map((opt) => (
+                            <div
+                              key={opt.id}
+                              className={`px-3 py-2 hover:bg-muted cursor-pointer text-sm ${opt.id === selectedSourceId ? 'bg-muted' : ''}`}
+                              onMouseDown={() => handleSelectSource(opt.id)}
+                            >
+                              <div className="font-medium">{opt.invoiceNumber}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {getCustomerNameForOption(opt.customerId)} | {formatDate(opt.date)} | {formatCurrency(opt.totalAmount)}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

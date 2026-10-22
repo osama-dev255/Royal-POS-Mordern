@@ -2004,8 +2004,9 @@ export const incrementSoldQuantity = async (
   }
 };
 
-// Decrement sold_quantity when goods are returned by a customer (restocked)
-// Mirror of incrementSoldQuantity, clamped at 0 so it can never go negative
+// Decrement sold_quantity by the given amount (clamped at 0 so it can never go negative)
+// NOTE: customer returns no longer use this — approved returns restock into the
+// outlet's inventory quantity via addStockToOutletInventory instead
 export const decrementSoldQuantity = async (
   outletId: string,
   productName: string,
@@ -2124,6 +2125,55 @@ export const addStockToOutletInventory = async (
     return !!created;
   } catch (error) {
     console.error('Error adding stock to outlet inventory:', error);
+    return false;
+  }
+};
+
+// Remove stock from an outlet's inventory (reverses a customer-return restock when
+// an approved return is reverted/rejected/deleted). Quantity is clamped at 0 so a
+// reversal can never push the outlet's stock negative.
+export const removeStockFromOutletInventory = async (
+  outletId: string,
+  productName: string,
+  quantity: number
+): Promise<boolean> => {
+  try {
+    if (!productName || !productName.trim() || quantity <= 0) {
+      return false;
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('inventory_products')
+      .select('id, quantity')
+      .eq('outlet_id', outletId)
+      .eq('name', productName)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('Error fetching outlet inventory row:', fetchError);
+      return false;
+    }
+
+    // Nothing to remove when the outlet has no record of this product
+    if (!existing) {
+      return true;
+    }
+
+    const { error: updateError } = await supabase
+      .from('inventory_products')
+      .update({
+        quantity: Math.max(0, (existing.quantity || 0) - quantity),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existing.id);
+
+    if (updateError) {
+      console.error('Error removing stock from outlet inventory:', updateError);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error removing stock from outlet inventory:', error);
     return false;
   }
 };
@@ -6104,12 +6154,13 @@ export const deleteOutletCustomerReturn = async (id: string): Promise<boolean> =
         .update({ status: 'pending', updated_at: new Date().toISOString() })
         .eq('id', id);
 
-      // Remove the return's stock movements and put sold_quantity back
+      // Remove the return's stock movements and take the restocked goods
+      // back out of the outlet's inventory
       const items = await getOutletCustomerReturnItemsByReturnId(id);
       const { deleteStockMovementsByReference } = await import('@/utils/stockMovementUtils');
       await deleteStockMovementsByReference('RETURN', existing.return_number);
       for (const item of items.filter(i => i.restock)) {
-        await incrementSoldQuantity(existing.outlet_id, item.product_name, item.quantity);
+        await removeStockFromOutletInventory(existing.outlet_id, item.product_name, item.quantity);
       }
     }
 
@@ -6129,7 +6180,8 @@ export const deleteOutletCustomerReturn = async (id: string): Promise<boolean> =
 // Approve a return: applies all side effects
 //  - DB trigger writes the customer_ledger 'refund' credit entry (credit_note only)
 //    and offsets the source debt's remaining_amount
-//  - here: record RETURN/DAMAGE stock movements + decrement sold_quantity for restocked items
+//  - here: record RETURN/DAMAGE stock movements + restock sellable goods into the
+//    outlet's own inventory (inventory_products.quantity) — never the warehouse
 export const approveOutletCustomerReturn = async (
   id: string,
   approverName: string
@@ -6197,9 +6249,13 @@ export const approveOutletCustomerReturn = async (
 
       await recordStockMovements(movements);
 
-      // Put sellable goods back into available stock
+      // Return sellable goods into the outlet's own inventory stock
       for (const item of items.filter(i => i.restock)) {
-        await decrementSoldQuantity(existing.outlet_id, item.product_name, item.quantity);
+        await addStockToOutletInventory(existing.outlet_id, {
+          name: item.product_name,
+          unit_cost: 0,
+          selling_price: item.unit_price || 0
+        }, item.quantity);
       }
     }
 
@@ -6240,7 +6296,7 @@ export const reviewOutletCustomerReturn = async (
       const { deleteStockMovementsByReference } = await import('@/utils/stockMovementUtils');
       await deleteStockMovementsByReference('RETURN', existing.return_number);
       for (const item of items.filter(i => i.restock)) {
-        await incrementSoldQuantity(existing.outlet_id, item.product_name, item.quantity);
+        await removeStockFromOutletInventory(existing.outlet_id, item.product_name, item.quantity);
       }
     }
 
