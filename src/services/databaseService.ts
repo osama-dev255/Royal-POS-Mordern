@@ -3210,6 +3210,314 @@ export const createOutletExpense = async (expense: Omit<Expense, 'id'>): Promise
   }
 };
 
+// ============================================
+// PETTY CASH BOOK (Outlet Expense Management)
+// Append-only ledger: topups add cash, payments remove cash, adjustments are
+// signed corrections. Voiding marks the row and appends a contra entry —
+// ledger rows are never edited or deleted.
+// ============================================
+
+export type PettyCashTxnType = 'topup' | 'payment' | 'adjustment';
+
+export interface OutletPettyCashTransaction {
+  id?: string;
+  outlet_id: string;
+  txn_type: PettyCashTxnType;
+  amount: number; // topup/payment stored positive; adjustment signed (+ in / - out)
+  balance_after?: number;
+  txn_date?: string;
+  description: string;
+  category?: string | null;
+  payee?: string | null; // payments: paid to; topups: received from
+  received_by?: string | null;
+  prepared_by?: string | null;
+  reference_number?: string | null;
+  receipt_url?: string | null;
+  expense_id?: string | null; // set when a payment was posted to expenses
+  is_voided?: boolean;
+  void_reason?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OutletPettyCashSettings {
+  id?: string;
+  outlet_id: string;
+  imprest_limit: number; // target float; 0 = no limit / no low-balance warning
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OutletPettyCashFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  txnType?: PettyCashTxnType | 'all';
+  search?: string;
+}
+
+// Signed contribution of a row to the running balance:
+// payments are stored positive but remove cash; adjustments carry their sign
+const pettyCashSignedAmount = (t: Pick<OutletPettyCashTransaction, 'txn_type' | 'amount'>): number =>
+  t.txn_type === 'payment' ? -Math.abs(t.amount) : t.amount;
+
+// Current petty cash balance = SUM of signed amounts across the whole book
+// (voided rows stay counted; their contra entries cancel them out)
+export const getOutletPettyCashBalance = async (outletId: string): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_petty_cash_transactions')
+      .select('txn_type, amount')
+      .eq('outlet_id', outletId);
+
+    if (error) throw error;
+
+    return (data || []).reduce((sum, row) => sum + pettyCashSignedAmount(row as Pick<OutletPettyCashTransaction, 'txn_type' | 'amount'>), 0);
+  } catch (error) {
+    console.error('Error computing petty cash balance:', error);
+    return 0;
+  }
+};
+
+// Per-outlet petty cash settings; falls back to defaults when not configured
+export const getOutletPettyCashSettings = async (outletId: string): Promise<OutletPettyCashSettings> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_petty_cash_settings')
+      .select('*')
+      .eq('outlet_id', outletId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data) return data as OutletPettyCashSettings;
+    return { outlet_id: outletId, imprest_limit: 0 };
+  } catch (error) {
+    console.error('Error loading petty cash settings:', error);
+    return { outlet_id: outletId, imprest_limit: 0 };
+  }
+};
+
+export const saveOutletPettyCashSettings = async (
+  outletId: string,
+  imprestLimit: number
+): Promise<OutletPettyCashSettings | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('outlet_petty_cash_settings')
+      .upsert(
+        { outlet_id: outletId, imprest_limit: imprestLimit, updated_at: new Date().toISOString() },
+        { onConflict: 'outlet_id' }
+      )
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as OutletPettyCashSettings;
+  } catch (error) {
+    console.error('Error saving petty cash settings:', error);
+    return null;
+  }
+};
+
+// Ledger rows for the book, oldest first. balance_after is the stored historical
+// snapshot, so it stays correct even when the list is filtered.
+export const getOutletPettyCashTransactions = async (
+  outletId: string,
+  filters?: OutletPettyCashFilters
+): Promise<OutletPettyCashTransaction[]> => {
+  try {
+    let query = supabase
+      .from('outlet_petty_cash_transactions')
+      .select('*')
+      .eq('outlet_id', outletId);
+
+    if (filters?.dateFrom) query = query.gte('txn_date', filters.dateFrom);
+    if (filters?.dateTo) query = query.lte('txn_date', `${filters.dateTo}T23:59:59`);
+    if (filters?.txnType && filters.txnType !== 'all') query = query.eq('txn_type', filters.txnType);
+    if (filters?.search?.trim()) {
+      const term = `%${filters.search.trim()}%`;
+      query = query.or(`description.ilike.${term},payee.ilike.${term},reference_number.ilike.${term}`);
+    }
+
+    const { data, error } = await query
+      .order('txn_date', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as OutletPettyCashTransaction[];
+  } catch (error) {
+    console.error('Error loading petty cash transactions:', error);
+    return [];
+  }
+};
+
+// Record a topup / payment / adjustment. Computes balance_after from the full
+// book, blocks payments that would push the fund negative, and can post a
+// payment straight into the main expenses table (approved, cash).
+export const recordOutletPettyCashTransaction = async (
+  outletId: string,
+  payload: {
+    txn_type: PettyCashTxnType;
+    amount: number; // positive magnitude for topup/payment; signed for adjustment
+    description: string;
+    txn_date?: string;
+    category?: string;
+    payee?: string;
+    received_by?: string;
+    prepared_by?: string;
+    reference_number?: string;
+    receipt_url?: string;
+    post_to_expense?: boolean; // payments only
+  }
+): Promise<{ success: boolean; transaction?: OutletPettyCashTransaction; error?: string }> => {
+  try {
+    if (!payload.description || !payload.description.trim()) {
+      return { success: false, error: 'Description is required' };
+    }
+
+    const magnitude = Math.abs(payload.amount || 0);
+    const signed = payload.txn_type === 'payment'
+      ? -magnitude
+      : payload.txn_type === 'topup'
+        ? magnitude
+        : payload.amount; // adjustment keeps its sign
+
+    if (payload.txn_type === 'adjustment') {
+      if (!payload.amount || payload.amount === 0) {
+        return { success: false, error: 'Adjustment amount cannot be zero' };
+      }
+    } else if (magnitude <= 0) {
+      return { success: false, error: 'Amount must be greater than 0' };
+    }
+
+    // Payments must not push the fund negative
+    const currentBalance = await getOutletPettyCashBalance(outletId);
+    if (signed < 0 && currentBalance + signed < 0) {
+      return { success: false, error: `Insufficient petty cash: available balance is ${currentBalance.toFixed(2)}` };
+    }
+
+    // Optionally post the payment into the main expenses table so it flows into
+    // the Expenses tab, budgets and Dashboard. Cash already left the fund, so the
+    // expense is recorded as approved.
+    let expenseId: string | null = null;
+    if (payload.txn_type === 'payment' && payload.post_to_expense) {
+      const expense = await createOutletExpense({
+        outlet_id: outletId,
+        category: payload.category || 'Petty Cash',
+        description: `Petty Cash: ${payload.description.trim()}`,
+        amount: magnitude,
+        payment_method: 'cash',
+        expense_date: payload.txn_date || new Date().toISOString(),
+        approval_status: 'approved',
+        prepared_by_name: payload.prepared_by || undefined,
+        approved_by_name: payload.prepared_by || undefined,
+        approval_date: new Date().toISOString(),
+        approval_notes: 'Auto-approved: recorded from the Petty Cash Book'
+      });
+      if (expense?.id) expenseId = expense.id;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from('outlet_petty_cash_transactions')
+      .insert([{
+        outlet_id: outletId,
+        txn_type: payload.txn_type,
+        amount: payload.txn_type === 'adjustment' ? payload.amount : magnitude,
+        balance_after: currentBalance + signed,
+        txn_date: payload.txn_date || new Date().toISOString(),
+        description: payload.description.trim(),
+        category: payload.category || null,
+        payee: payload.payee || null,
+        received_by: payload.received_by || null,
+        prepared_by: payload.prepared_by || null,
+        reference_number: payload.reference_number || null,
+        receipt_url: payload.receipt_url || null,
+        expense_id: expenseId,
+        created_by: user?.id || null
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, transaction: data as OutletPettyCashTransaction };
+  } catch (error) {
+    console.error('Error recording petty cash transaction:', error);
+    return { success: false, error: 'Failed to record the transaction' };
+  }
+};
+
+// Void a ledger row: mark it voided and append a contra adjustment so the
+// balance is restored. If the row posted an expense, that expense is rejected
+// with a note so expense reports and budgets stay consistent.
+export const voidOutletPettyCashTransaction = async (
+  id: string,
+  reason: string,
+  preparedBy?: string
+): Promise<boolean> => {
+  try {
+    const { data: original, error: fetchError } = await supabase
+      .from('outlet_petty_cash_transactions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!original) {
+      console.error('Petty cash transaction not found:', id);
+      return false;
+    }
+    if (original.is_voided) {
+      console.warn('Petty cash transaction is already voided:', id);
+      return false;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Mark the original voided (it stays in the book, rendered dimmed)
+    const { error: updateError } = await supabase
+      .from('outlet_petty_cash_transactions')
+      .update({ is_voided: true, void_reason: reason || null })
+      .eq('id', id);
+    if (updateError) throw updateError;
+
+    // Reverse a linked posted expense (budget triggers react to the status change)
+    if (original.expense_id) {
+      await updateOutletExpense(original.expense_id, {
+        approval_status: 'rejected',
+        approval_notes: `Voided from Petty Cash Book: ${reason || 'no reason given'}`
+      });
+    }
+
+    // Append the contra entry so the running balance is restored
+    const currentBalance = await getOutletPettyCashBalance(original.outlet_id);
+    const contraAmount = -pettyCashSignedAmount(original as OutletPettyCashTransaction);
+
+    const { error: contraError } = await supabase
+      .from('outlet_petty_cash_transactions')
+      .insert([{
+        outlet_id: original.outlet_id,
+        txn_type: 'adjustment',
+        amount: contraAmount,
+        balance_after: currentBalance + contraAmount,
+        txn_date: new Date().toISOString(),
+        description: `Void of: ${original.description}`,
+        payee: original.payee || null,
+        prepared_by: preparedBy || null,
+        reference_number: original.id,
+        void_reason: reason || null,
+        created_by: user?.id || null
+      }]);
+    if (contraError) throw contraError;
+
+    return true;
+  } catch (error) {
+    console.error('Error voiding petty cash transaction:', error);
+    return false;
+  }
+};
+
 // Update outlet expense
 export const updateOutletExpense = async (id: string, expense: Partial<Expense>): Promise<Expense | null> => {
   try {

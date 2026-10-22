@@ -64,7 +64,9 @@ import {
   CreditCard,
   Smartphone,
   Landmark,
-  ShieldCheck
+  ShieldCheck,
+  Wallet,
+  Settings
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -107,6 +109,15 @@ import {
   deleteVendorType,
   getSuppliers,
   verifyOutletExpense,
+  getOutletPettyCashSettings,
+  saveOutletPettyCashSettings,
+  getOutletPettyCashTransactions,
+  getOutletPettyCashBalance,
+  recordOutletPettyCashTransaction,
+  voidOutletPettyCashTransaction,
+  OutletPettyCashTransaction,
+  OutletPettyCashSettings,
+  PettyCashTxnType,
   Expense,
   ExpenseBudget,
   ExpenseAnalytics,
@@ -123,7 +134,7 @@ interface OutletExpensesProps {
 }
 
 export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesProps) => {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "expenses" | "budgets" | "approvals" | "recurring">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "expenses" | "budgets" | "approvals" | "recurring" | "petty">("dashboard");
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgets, setBudgets] = useState<ExpenseBudget[]>([]);
   const [analytics, setAnalytics] = useState<ExpenseAnalytics | null>(null);
@@ -249,6 +260,49 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     monthly_total: number;
   } | null>(null);
 
+  // Petty cash book states
+  const [pettyTransactions, setPettyTransactions] = useState<OutletPettyCashTransaction[]>([]);
+  const [pettySettings, setPettySettings] = useState<OutletPettyCashSettings>({ outlet_id: '', imprest_limit: 0 });
+  const [pettyBalance, setPettyBalance] = useState(0);
+  const [pettyLoading, setPettyLoading] = useState(false);
+  const [pettySaving, setPettySaving] = useState(false);
+  const [pettyDateFrom, setPettyDateFrom] = useState("");
+  const [pettyDateTo, setPettyDateTo] = useState("");
+  const [pettyTypeFilter, setPettyTypeFilter] = useState<"all" | PettyCashTxnType>("all");
+  const [pettySearch, setPettySearch] = useState("");
+  const [isPettyPaymentDialogOpen, setIsPettyPaymentDialogOpen] = useState(false);
+  const [isPettyTopupDialogOpen, setIsPettyTopupDialogOpen] = useState(false);
+  const [isPettyAdjustmentDialogOpen, setIsPettyAdjustmentDialogOpen] = useState(false);
+  const [isPettySettingsDialogOpen, setIsPettySettingsDialogOpen] = useState(false);
+  const [isPettyVoidDialogOpen, setIsPettyVoidDialogOpen] = useState(false);
+  const [voidingPettyTxn, setVoidingPettyTxn] = useState<OutletPettyCashTransaction | null>(null);
+  const [pettyPaymentData, setPettyPaymentData] = useState({
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    payee: "",
+    category: "Petty Cash",
+    description: "",
+    prepared_by: "",
+    post_to_expense: true
+  });
+  const [pettyTopupData, setPettyTopupData] = useState({
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    source: "",
+    received_by: "",
+    prepared_by: ""
+  });
+  const [pettyAdjustmentData, setPettyAdjustmentData] = useState({
+    direction: "increase" as "increase" | "decrease",
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    reason: "",
+    prepared_by: ""
+  });
+  const [pettyVoidReason, setPettyVoidReason] = useState("");
+  const [pettyVoidName, setPettyVoidName] = useState("");
+  const [imprestLimitInput, setImprestLimitInput] = useState("0");
+
   const { toast } = useToast();
 
   // Predefined sub-categories for each main category
@@ -353,6 +407,342 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       loadData();
     }
   }, [outletId]);
+
+  // ============================================
+  // Petty Cash Book (append-only ledger with contra voids)
+  // ============================================
+  const loadPettyCash = async () => {
+    if (!outletId) return;
+    setPettyLoading(true);
+    try {
+      const [txns, settings, balance] = await Promise.all([
+        getOutletPettyCashTransactions(outletId),
+        getOutletPettyCashSettings(outletId),
+        getOutletPettyCashBalance(outletId)
+      ]);
+      setPettyTransactions(txns);
+      setPettySettings(settings);
+      setPettyBalance(balance);
+    } catch (error) {
+      console.error('Error loading petty cash:', error);
+      toast({ title: "Error", description: "Failed to load the petty cash book", variant: "destructive" });
+    } finally {
+      setPettyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Lazy-load the petty cash book the first time its tab is opened
+    if (activeTab === 'petty' && outletId) {
+      loadPettyCash();
+    }
+  }, [activeTab, outletId]);
+
+  // Signed contribution of a ledger row to the balance
+  const pettySigned = (t: OutletPettyCashTransaction) =>
+    t.txn_type === 'payment' ? -Math.abs(t.amount) : t.amount;
+
+  const pettyEffective = pettyTransactions.filter(t => !t.is_voided);
+
+  const pettyMonthIn = pettyEffective
+    .filter(t => new Date(t.txn_date || '') >= new Date(new Date().getFullYear(), new Date().getMonth(), 1) && pettySigned(t) > 0)
+    .reduce((sum, t) => sum + pettySigned(t), 0);
+
+  const pettyMonthOut = Math.abs(pettyEffective
+    .filter(t => new Date(t.txn_date || '') >= new Date(new Date().getFullYear(), new Date().getMonth(), 1) && pettySigned(t) < 0)
+    .reduce((sum, t) => sum + pettySigned(t), 0));
+
+  const filteredPettyTransactions = pettyTransactions.filter(t => {
+    if (pettyTypeFilter !== "all" && t.txn_type !== pettyTypeFilter) return false;
+    if (pettyDateFrom || pettyDateTo) {
+      const d = new Date(t.txn_date || '');
+      if (pettyDateFrom && d < new Date(pettyDateFrom)) return false;
+      if (pettyDateTo && d > new Date(pettyDateTo + 'T23:59:59')) return false;
+    }
+    if (pettySearch.trim()) {
+      const term = pettySearch.trim().toLowerCase();
+      const hay = `${t.description} ${t.payee || ''} ${t.received_by || ''} ${t.reference_number || ''} ${t.category || ''}`.toLowerCase();
+      if (!hay.includes(term)) return false;
+    }
+    return true;
+  });
+
+  const resetPettyForms = () => {
+    setPettyPaymentData({ amount: 0, date: new Date().toISOString().split('T')[0], payee: "", category: "Petty Cash", description: "", prepared_by: "", post_to_expense: true });
+    setPettyTopupData({ amount: 0, date: new Date().toISOString().split('T')[0], source: "", received_by: "", prepared_by: "" });
+    setPettyAdjustmentData({ direction: "increase", amount: 0, date: new Date().toISOString().split('T')[0], reason: "", prepared_by: "" });
+  };
+
+  const handleRecordPettyPayment = async () => {
+    if (!outletId) return;
+    if (!pettyPaymentData.amount || pettyPaymentData.amount <= 0) {
+      toast({ title: "Invalid Amount", description: "Enter an amount greater than 0", variant: "destructive" });
+      return;
+    }
+    if (!pettyPaymentData.description.trim()) {
+      toast({ title: "Description Required", description: "Describe what the payment was for", variant: "destructive" });
+      return;
+    }
+    if (!pettyPaymentData.prepared_by.trim()) {
+      toast({ title: "Prepared By Required", description: "Enter the name of the person recording the payment", variant: "destructive" });
+      return;
+    }
+    if (pettyBalance < pettyPaymentData.amount) {
+      toast({ title: "Insufficient Petty Cash", description: `Available balance is ${formatTZS(pettyBalance)}`, variant: "destructive" });
+      return;
+    }
+
+    setPettySaving(true);
+    try {
+      const result = await recordOutletPettyCashTransaction(outletId, {
+        txn_type: 'payment',
+        amount: pettyPaymentData.amount,
+        description: pettyPaymentData.description,
+        txn_date: pettyPaymentData.date,
+        category: pettyPaymentData.category,
+        payee: pettyPaymentData.payee,
+        prepared_by: pettyPaymentData.prepared_by,
+        post_to_expense: pettyPaymentData.post_to_expense
+      });
+
+      if (!result.success) {
+        toast({ title: "Cannot Record Payment", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      toast({
+        title: "Payment Recorded",
+        description: `${formatTZS(pettyPaymentData.amount)} paid out${pettyPaymentData.post_to_expense ? " and posted to Expenses" : ""}`
+      });
+      setIsPettyPaymentDialogOpen(false);
+      resetPettyForms();
+      await loadPettyCash();
+      if (pettyPaymentData.post_to_expense) {
+        loadData(); // refresh the Expenses list so the posted expense appears
+      }
+    } finally {
+      setPettySaving(false);
+    }
+  };
+
+  const handleRecordPettyTopup = async () => {
+    if (!outletId) return;
+    if (!pettyTopupData.amount || pettyTopupData.amount <= 0) {
+      toast({ title: "Invalid Amount", description: "Enter an amount greater than 0", variant: "destructive" });
+      return;
+    }
+    if (!pettyTopupData.prepared_by.trim()) {
+      toast({ title: "Prepared By Required", description: "Enter the name of the person recording the top-up", variant: "destructive" });
+      return;
+    }
+
+    setPettySaving(true);
+    try {
+      const result = await recordOutletPettyCashTransaction(outletId, {
+        txn_type: 'topup',
+        amount: pettyTopupData.amount,
+        description: `Top-up from ${pettyTopupData.source || 'main cash'}`,
+        txn_date: pettyTopupData.date,
+        payee: pettyTopupData.source,
+        received_by: pettyTopupData.received_by,
+        prepared_by: pettyTopupData.prepared_by
+      });
+
+      if (!result.success) {
+        toast({ title: "Cannot Record Top-up", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "Top-up Recorded", description: `${formatTZS(pettyTopupData.amount)} added to the petty cash fund` });
+      setIsPettyTopupDialogOpen(false);
+      resetPettyForms();
+      await loadPettyCash();
+    } finally {
+      setPettySaving(false);
+    }
+  };
+
+  const handleRecordPettyAdjustment = async () => {
+    if (!outletId) return;
+    if (!pettyAdjustmentData.amount || pettyAdjustmentData.amount <= 0) {
+      toast({ title: "Invalid Amount", description: "Enter an adjustment amount greater than 0", variant: "destructive" });
+      return;
+    }
+    if (!pettyAdjustmentData.reason.trim()) {
+      toast({ title: "Reason Required", description: "Explain why this adjustment is needed", variant: "destructive" });
+      return;
+    }
+    if (!pettyAdjustmentData.prepared_by.trim()) {
+      toast({ title: "Prepared By Required", description: "Enter your name", variant: "destructive" });
+      return;
+    }
+
+    const signedAmount = pettyAdjustmentData.direction === 'decrease'
+      ? -Math.abs(pettyAdjustmentData.amount)
+      : Math.abs(pettyAdjustmentData.amount);
+
+    if (signedAmount < 0 && pettyBalance + signedAmount < 0) {
+      toast({ title: "Insufficient Petty Cash", description: `Available balance is ${formatTZS(pettyBalance)}`, variant: "destructive" });
+      return;
+    }
+
+    setPettySaving(true);
+    try {
+      const result = await recordOutletPettyCashTransaction(outletId, {
+        txn_type: 'adjustment',
+        amount: signedAmount,
+        description: pettyAdjustmentData.reason,
+        txn_date: pettyAdjustmentData.date,
+        prepared_by: pettyAdjustmentData.prepared_by
+      });
+
+      if (!result.success) {
+        toast({ title: "Cannot Record Adjustment", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "Adjustment Recorded", description: `Balance adjusted by ${formatTZS(Math.abs(signedAmount))}` });
+      setIsPettyAdjustmentDialogOpen(false);
+      resetPettyForms();
+      await loadPettyCash();
+    } finally {
+      setPettySaving(false);
+    }
+  };
+
+  const handleSavePettySettings = async () => {
+    if (!outletId) return;
+    const limit = Number(imprestLimitInput) || 0;
+    if (limit < 0) {
+      toast({ title: "Invalid Limit", description: "The imprest limit cannot be negative", variant: "destructive" });
+      return;
+    }
+
+    setPettySaving(true);
+    try {
+      const saved = await saveOutletPettyCashSettings(outletId, limit);
+      if (!saved) {
+        toast({ title: "Save Failed", description: "Could not save the imprest limit", variant: "destructive" });
+        return;
+      }
+      setPettySettings(saved);
+      toast({ title: "Settings Saved", description: limit > 0 ? `Imprest limit set to ${formatTZS(limit)}` : "Low-balance warning disabled" });
+      setIsPettySettingsDialogOpen(false);
+    } finally {
+      setPettySaving(false);
+    }
+  };
+
+  const handleVoidPettyTxn = async () => {
+    if (!voidingPettyTxn?.id) return;
+    if (!pettyVoidReason.trim()) {
+      toast({ title: "Reason Required", description: "Explain why this entry is being voided", variant: "destructive" });
+      return;
+    }
+    if (!pettyVoidName.trim()) {
+      toast({ title: "Name Required", description: "Enter your name", variant: "destructive" });
+      return;
+    }
+
+    setPettySaving(true);
+    try {
+      const hadPostedExpense = !!voidingPettyTxn.expense_id;
+      const ok = await voidOutletPettyCashTransaction(voidingPettyTxn.id, pettyVoidReason.trim(), pettyVoidName.trim());
+      if (!ok) {
+        toast({ title: "Void Failed", description: "The entry could not be voided", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Entry Voided", description: "A contra adjustment restored the balance" });
+      setIsPettyVoidDialogOpen(false);
+      setVoidingPettyTxn(null);
+      await loadPettyCash();
+      if (hadPostedExpense) {
+        loadData(); // the linked expense was rejected — refresh the Expenses list
+      }
+    } finally {
+      setPettySaving(false);
+    }
+  };
+
+  const exportPettyCashPDF = () => {
+    if (filteredPettyTransactions.length === 0) {
+      toast({ title: "No Data", description: "No petty cash transactions to export", variant: "destructive" });
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`Petty Cash Book - ${outletName || 'Outlet'}`, 14, 15);
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()} | Balance: ${formatTZS(pettyBalance)}`, 14, 22);
+
+    autoTable(doc, {
+      startY: 27,
+      head: [['Date', 'Type', 'Description', 'Paid To / From', 'Prepared By', 'Amount', 'Balance']],
+      body: filteredPettyTransactions.map(t => [
+        new Date(t.txn_date || '').toLocaleDateString(),
+        t.txn_type === 'topup' ? 'Top-up' : t.txn_type === 'payment' ? 'Payment' : 'Adjustment',
+        t.is_voided ? `${t.description} (VOIDED)` : t.description,
+        t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-'),
+        t.prepared_by || '-',
+        pettySigned(t).toFixed(2),
+        (t.balance_after || 0).toFixed(2)
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [60, 60, 60] }
+    });
+
+    doc.save(`petty-cash-book-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const printPettyCash = () => {
+    if (filteredPettyTransactions.length === 0) {
+      toast({ title: "No Data", description: "No petty cash transactions to print", variant: "destructive" });
+      return;
+    }
+
+    const rows = filteredPettyTransactions.map(t => `
+      <tr ${t.is_voided ? 'style="color:#999;text-decoration:line-through"' : ''}>
+        <td>${new Date(t.txn_date || '').toLocaleDateString()}</td>
+        <td>${t.txn_type === 'topup' ? 'Top-up' : t.txn_type === 'payment' ? 'Payment' : 'Adjustment'}</td>
+        <td>${t.description}${t.void_reason ? ` (Voided: ${t.void_reason})` : ''}</td>
+        <td>${t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-')}</td>
+        <td>${t.prepared_by || '-'}</td>
+        <td style="text-align:right;color:${pettySigned(t) < 0 ? '#dc2626' : '#16a34a'}">${pettySigned(t) < 0 ? '-' : '+'}${formatTZS(Math.abs(pettySigned(t)))}</td>
+        <td style="text-align:right">${formatTZS(t.balance_after || 0)}</td>
+      </tr>`).join('');
+
+    const printWindow = window.open('', '_blank', 'width=950,height=650');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Petty Cash Book - ${outletName || 'Outlet'}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { font-size: 18px; margin: 0 0 4px 0; }
+            .meta { font-size: 12px; color: #555; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; }
+            th { background: #f0f0f0; text-align: left; }
+            .num { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Petty Cash Book - ${outletName || 'Outlet'}</h1>
+          <div class="meta">Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Current Balance: <b>${formatTZS(pettyBalance)}</b></div>
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Type</th><th>Description</th><th>Paid To / From</th><th>Prepared By</th><th class="num">Amount</th><th class="num">Balance</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </body>
+      </html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
 
   // Close vendor dropdown when clicking outside
   useEffect(() => {
@@ -1972,6 +2362,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="petty">Petty Cash</TabsTrigger>
         </TabsList>
 
         {/* Dashboard Tab */}
@@ -3440,6 +3831,226 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Petty Cash Tab */}
+        <TabsContent value="petty" className="space-y-6">
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Current Balance</p>
+                    <p className={`text-2xl font-bold ${pettyBalance < 0 ? 'text-red-600' : ''}`}>{formatTZS(pettyBalance)}</p>
+                  </div>
+                  <div className="p-3 rounded-full bg-green-100">
+                    <Wallet className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Imprest Limit</p>
+                <p className="text-2xl font-bold">{pettySettings.imprest_limit > 0 ? formatTZS(pettySettings.imprest_limit) : 'Not set'}</p>
+                {pettySettings.imprest_limit > 0 && (
+                  <div className="mt-2">
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${pettyBalance <= pettySettings.imprest_limit * 0.25 ? 'bg-red-500' : pettyBalance < pettySettings.imprest_limit ? 'bg-yellow-500' : 'bg-green-500'}`}
+                        style={{ width: `${Math.min(100, Math.max(0, (pettyBalance / pettySettings.imprest_limit) * 100))}%` }}
+                      />
+                    </div>
+                    {pettyBalance < pettySettings.imprest_limit && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Below imprest limit — request a top-up
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">This Month In</p>
+                    <p className="text-2xl font-bold text-green-600">{formatTZS(pettyMonthIn)}</p>
+                  </div>
+                  <div className="p-3 rounded-full bg-green-100">
+                    <TrendingUp className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">This Month Out</p>
+                    <p className="text-2xl font-bold text-red-600">{formatTZS(pettyMonthOut)}</p>
+                  </div>
+                  <div className="p-3 rounded-full bg-red-100">
+                    <TrendingDown className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters + actions */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+                <div className="flex-1">
+                  <Label className="text-xs text-muted-foreground">Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={pettySearch}
+                      onChange={(e) => setPettySearch(e.target.value)}
+                      placeholder="Description, payee, reference..."
+                      className="pl-8"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <Select value={pettyTypeFilter} onValueChange={(v) => setPettyTypeFilter(v as "all" | PettyCashTxnType)}>
+                    <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="topup">Top-ups</SelectItem>
+                      <SelectItem value="payment">Payments</SelectItem>
+                      <SelectItem value="adjustment">Adjustments</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">From</Label>
+                  <Input type="date" value={pettyDateFrom} onChange={(e) => setPettyDateFrom(e.target.value)} className="w-40" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">To</Label>
+                  <Input type="date" value={pettyDateTo} onChange={(e) => setPettyDateTo(e.target.value)} className="w-40" />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Button size="sm" onClick={() => { resetPettyForms(); setIsPettyPaymentDialogOpen(true); }}>
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                  Record Payment
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { resetPettyForms(); setIsPettyTopupDialogOpen(true); }}>
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  Record Top-up
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { resetPettyForms(); setIsPettyAdjustmentDialogOpen(true); }}>
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  Adjustment
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setImprestLimitInput(String(pettySettings.imprest_limit || 0)); setIsPettySettingsDialogOpen(true); }}>
+                  <Settings className="h-4 w-4 mr-1" />
+                  Imprest Limit
+                </Button>
+                <div className="flex-1" />
+                <Button size="sm" variant="outline" onClick={printPettyCash}>
+                  <Printer className="h-4 w-4 mr-1" />
+                  Print
+                </Button>
+                <Button size="sm" variant="outline" onClick={exportPettyCashPDF}>
+                  <Download className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ledger */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Petty Cash Book</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pettyLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredPettyTransactions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Wallet className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p>{pettyTransactions.length === 0 ? 'No petty cash transactions yet — record a top-up to open the fund' : 'No transactions match the current filters'}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Paid To / From</TableHead>
+                        <TableHead>Prepared By</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...filteredPettyTransactions].reverse().map((t) => (
+                        <TableRow key={t.id} className={t.is_voided ? 'opacity-50' : ''}>
+                          <TableCell className="whitespace-nowrap">{new Date(t.txn_date || '').toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Badge className={
+                              t.txn_type === 'topup' ? 'bg-green-100 text-green-800' :
+                              t.txn_type === 'payment' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }>
+                              {t.txn_type === 'topup' ? 'Top-up' : t.txn_type === 'payment' ? 'Payment' : 'Adjustment'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className={t.is_voided ? 'line-through' : ''}>{t.description}</span>
+                            {t.is_voided && t.void_reason && (
+                              <p className="text-xs text-muted-foreground">Voided: {t.void_reason}</p>
+                            )}
+                            {t.expense_id && !t.is_voided && (
+                              <p className="text-xs text-muted-foreground">Posted to Expenses</p>
+                            )}
+                          </TableCell>
+                          <TableCell>{t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-')}</TableCell>
+                          <TableCell>{t.prepared_by || '-'}</TableCell>
+                          <TableCell className={`text-right font-medium ${pettySigned(t) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {pettySigned(t) < 0 ? '-' : '+'}{formatTZS(Math.abs(pettySigned(t)))}
+                          </TableCell>
+                          <TableCell className="text-right">{formatTZS(t.balance_after || 0)}</TableCell>
+                          <TableCell className="text-right">
+                            {!t.is_voided && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-600 h-8 w-8 p-0"
+                                title="Void this entry"
+                                onClick={() => {
+                                  setVoidingPettyTxn(t);
+                                  setPettyVoidReason('');
+                                  setPettyVoidName('');
+                                  setIsPettyVoidDialogOpen(true);
+                                }}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Expense Dialog */}
@@ -4722,6 +5333,337 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                 <><CheckCircle className="h-4 w-4 mr-2" /> Approve Expense</>
               ) : (
                 <><XCircle className="h-4 w-4 mr-2" /> Reject Expense</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Petty Cash Payment Dialog */}
+      <Dialog open={isPettyPaymentDialogOpen} onOpenChange={setIsPettyPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-red-600" />
+              Record Petty Cash Payment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="p-3 bg-muted rounded-lg flex justify-between text-sm">
+              <span className="text-muted-foreground">Available Balance:</span>
+              <span className="font-bold">{formatTZS(pettyBalance)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Amount <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={pettyPaymentData.amount || ''}
+                  onChange={(e) => setPettyPaymentData({ ...pettyPaymentData, amount: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={pettyPaymentData.date}
+                  onChange={(e) => setPettyPaymentData({ ...pettyPaymentData, date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Paid To</Label>
+              <Input
+                value={pettyPaymentData.payee}
+                onChange={(e) => setPettyPaymentData({ ...pettyPaymentData, payee: e.target.value })}
+                placeholder="Vendor / person paid"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <Select value={pettyPaymentData.category} onValueChange={(v) => setPettyPaymentData({ ...pettyPaymentData, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {expenseCategories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Description <span className="text-red-500">*</span></Label>
+              <Input
+                value={pettyPaymentData.description}
+                onChange={(e) => setPettyPaymentData({ ...pettyPaymentData, description: e.target.value })}
+                placeholder="What was paid for?"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Prepared By <span className="text-red-500">*</span></Label>
+              <Input
+                value={pettyPaymentData.prepared_by}
+                onChange={(e) => setPettyPaymentData({ ...pettyPaymentData, prepared_by: e.target.value })}
+                placeholder="Your name"
+              />
+            </div>
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={pettyPaymentData.post_to_expense}
+                onChange={(e) => setPettyPaymentData({ ...pettyPaymentData, post_to_expense: e.target.checked })}
+                className="mt-0.5"
+              />
+              <span>Also post to Expenses — the payment appears in the Expenses tab, budgets and Dashboard as an approved cash expense</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPettyPaymentDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecordPettyPayment} disabled={pettySaving} className="bg-red-600 hover:bg-red-700">
+              {pettySaving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><CheckCircle className="h-4 w-4 mr-2" /> Record Payment</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Petty Cash Top-up Dialog */}
+      <Dialog open={isPettyTopupDialogOpen} onOpenChange={setIsPettyTopupDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+              Record Petty Cash Top-up
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Amount <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={pettyTopupData.amount || ''}
+                  onChange={(e) => setPettyTopupData({ ...pettyTopupData, amount: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={pettyTopupData.date}
+                  onChange={(e) => setPettyTopupData({ ...pettyTopupData, date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Received From</Label>
+              <Input
+                value={pettyTopupData.source}
+                onChange={(e) => setPettyTopupData({ ...pettyTopupData, source: e.target.value })}
+                placeholder="Main cash / bank / person"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Received By</Label>
+              <Input
+                value={pettyTopupData.received_by}
+                onChange={(e) => setPettyTopupData({ ...pettyTopupData, received_by: e.target.value })}
+                placeholder="Who physically received the cash"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Prepared By <span className="text-red-500">*</span></Label>
+              <Input
+                value={pettyTopupData.prepared_by}
+                onChange={(e) => setPettyTopupData({ ...pettyTopupData, prepared_by: e.target.value })}
+                placeholder="Your name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPettyTopupDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecordPettyTopup} disabled={pettySaving} className="bg-green-600 hover:bg-green-700">
+              {pettySaving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><CheckCircle className="h-4 w-4 mr-2" /> Record Top-up</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Petty Cash Adjustment Dialog */}
+      <Dialog open={isPettyAdjustmentDialogOpen} onOpenChange={setIsPettyAdjustmentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              Petty Cash Adjustment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="p-3 bg-muted rounded-lg flex justify-between text-sm">
+              <span className="text-muted-foreground">Current Balance:</span>
+              <span className="font-bold">{formatTZS(pettyBalance)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Direction</Label>
+                <Select
+                  value={pettyAdjustmentData.direction}
+                  onValueChange={(v) => setPettyAdjustmentData({ ...pettyAdjustmentData, direction: v as "increase" | "decrease" })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="increase">Increase balance</SelectItem>
+                    <SelectItem value="decrease">Decrease balance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Amount <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={pettyAdjustmentData.amount || ''}
+                  onChange={(e) => setPettyAdjustmentData({ ...pettyAdjustmentData, amount: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={pettyAdjustmentData.date}
+                onChange={(e) => setPettyAdjustmentData({ ...pettyAdjustmentData, date: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Reason <span className="text-red-500">*</span></Label>
+              <Input
+                value={pettyAdjustmentData.reason}
+                onChange={(e) => setPettyAdjustmentData({ ...pettyAdjustmentData, reason: e.target.value })}
+                placeholder="e.g. Opening float, counted variance correction"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Prepared By <span className="text-red-500">*</span></Label>
+              <Input
+                value={pettyAdjustmentData.prepared_by}
+                onChange={(e) => setPettyAdjustmentData({ ...pettyAdjustmentData, prepared_by: e.target.value })}
+                placeholder="Your name"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Adjustments are visible in the book for audit. Use them only for corrections such as the opening float or counted variances.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPettyAdjustmentDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRecordPettyAdjustment} disabled={pettySaving}>
+              {pettySaving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><CheckCircle className="h-4 w-4 mr-2" /> Record Adjustment</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Petty Cash Settings Dialog */}
+      <Dialog open={isPettySettingsDialogOpen} onOpenChange={setIsPettySettingsDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Imprest Limit
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Target float amount</Label>
+              <Input
+                type="number"
+                min={0}
+                value={imprestLimitInput}
+                onChange={(e) => setImprestLimitInput(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                When the balance falls below this limit, the Petty Cash tab shows a top-up warning. Set 0 to disable the warning.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPettySettingsDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSavePettySettings} disabled={pettySaving}>
+              {pettySaving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Petty Cash Void Dialog */}
+      <Dialog open={isPettyVoidDialogOpen} onOpenChange={setIsPettyVoidDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-600" />
+              Void Petty Cash Entry
+            </DialogTitle>
+          </DialogHeader>
+          {voidingPettyTxn && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Type:</span>
+                  <span className="font-medium capitalize">{voidingPettyTxn.txn_type}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Description:</span>
+                  <span className="font-medium">{voidingPettyTxn.description}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="font-medium">{formatTZS(Math.abs(pettySigned(voidingPettyTxn)))}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Reason <span className="text-red-500">*</span></Label>
+                <Input
+                  value={pettyVoidReason}
+                  onChange={(e) => setPettyVoidReason(e.target.value)}
+                  placeholder="Why is this entry being voided?"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Your Name <span className="text-red-500">*</span></Label>
+                <Input
+                  value={pettyVoidName}
+                  onChange={(e) => setPettyVoidName(e.target.value)}
+                  placeholder="Who is voiding this entry"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The entry stays in the book (marked voided) and a contra adjustment restores the balance.
+                {voidingPettyTxn.expense_id ? ' The linked expense record will be rejected.' : ''}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsPettyVoidDialogOpen(false); setVoidingPettyTxn(null); }}>Cancel</Button>
+            <Button onClick={handleVoidPettyTxn} disabled={pettySaving || !pettyVoidReason.trim() || !pettyVoidName.trim()} className="bg-red-600 hover:bg-red-700">
+              {pettySaving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Voiding...</>
+              ) : (
+                <><XCircle className="h-4 w-4 mr-2" /> Void Entry</>
               )}
             </Button>
           </DialogFooter>
