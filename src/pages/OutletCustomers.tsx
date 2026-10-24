@@ -818,13 +818,6 @@ export const OutletCustomers = ({ onBack, outletId }: OutletCustomersProps) => {
                     >
                       <Pencil className="h-4 w-4 text-blue-500" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteCustomer(customer.id!, `${customer.first_name} ${customer.last_name}`)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
