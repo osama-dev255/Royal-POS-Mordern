@@ -72,9 +72,14 @@ CREATE INDEX IF NOT EXISTS idx_petty_cash_settings_outlet_id ON outlet_petty_cas
 -- ============================================
 ALTER TABLE outlet_petty_cash_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outlet_petty_cash_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outlet_petty_cash_transactions FORCE ROW LEVEL SECURITY;
+ALTER TABLE outlet_petty_cash_settings FORCE ROW LEVEL SECURITY;
 
 -- 5. CREATE RLS POLICIES
 -- ============================================
+-- Authorization is derived from the authenticated user's outlet assignment
+-- (outlet_users) or platform admin role - never from the client-supplied
+-- outlet_id alone, so a client cannot read or write another outlet's ledger.
 DROP POLICY IF EXISTS "Users can view petty cash transactions" ON outlet_petty_cash_transactions;
 DROP POLICY IF EXISTS "Users can insert petty cash transactions" ON outlet_petty_cash_transactions;
 DROP POLICY IF EXISTS "Users can update petty cash transactions" ON outlet_petty_cash_transactions;
@@ -85,28 +90,142 @@ DROP POLICY IF EXISTS "Users can update petty cash settings" ON outlet_petty_cas
 DROP POLICY IF EXISTS "Users can delete petty cash settings" ON outlet_petty_cash_settings;
 
 CREATE POLICY "Users can view petty cash transactions" ON outlet_petty_cash_transactions
-  FOR SELECT USING (true);
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can insert petty cash transactions" ON outlet_petty_cash_transactions
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can update petty cash transactions" ON outlet_petty_cash_transactions
-  FOR UPDATE USING (true);
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can delete petty cash transactions" ON outlet_petty_cash_transactions
-  FOR DELETE USING (true);
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can view petty cash settings" ON outlet_petty_cash_settings
-  FOR SELECT USING (true);
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can insert petty cash settings" ON outlet_petty_cash_settings
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can update petty cash settings" ON outlet_petty_cash_settings
-  FOR UPDATE USING (true);
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 CREATE POLICY "Users can delete petty cash settings" ON outlet_petty_cash_settings
-  FOR DELETE USING (true);
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+      AND users.role = 'admin'
+    )
+    OR outlet_id IN (
+      SELECT outlet_id FROM outlet_users
+      WHERE user_id = auth.uid()
+      AND is_active = true
+    )
+  );
 
 -- 6. TRIGGER: AUTO-UPDATE updated_at
 -- ============================================
