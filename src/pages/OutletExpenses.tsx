@@ -442,6 +442,38 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
   const pettySigned = (t: OutletPettyCashTransaction) =>
     t.txn_type === 'payment' ? -Math.abs(t.amount) : t.amount;
 
+  // Running balance recomputed in chronological order from the whole book.
+  // Stored balance_after snapshots are taken at insert time, so they go stale
+  // when an entry is back-dated; deriving them from the sequence keeps the
+  // ledger column and the printout totals reconciling with the current balance.
+  const pettyRunningBalances = (() => {
+    const balances = new Map<string, number>();
+    let running = 0;
+    for (const t of pettyTransactions) {
+      running += pettySigned(t);
+      balances.set(t.id, running);
+    }
+    return balances;
+  })();
+
+  const pettyRunningBalance = (t: OutletPettyCashTransaction) =>
+    pettyRunningBalances.get(t.id) ?? (t.balance_after || 0);
+
+  // Column totals for ledger printouts (increase / decrease / opening / closing).
+  // opening + increase - decrease reconciles exactly with the closing balance.
+  const pettyTotals = (rows: OutletPettyCashTransaction[]) => {
+    let increase = 0;
+    let decrease = 0;
+    for (const t of rows) {
+      const signed = pettySigned(t);
+      if (signed > 0) increase += signed;
+      else decrease += Math.abs(signed);
+    }
+    const closing = rows.length > 0 ? pettyRunningBalance(rows[rows.length - 1]) : pettyBalance;
+    const opening = closing - (increase - decrease);
+    return { increase, decrease, opening, closing };
+  };
+
   const pettyEffective = pettyTransactions.filter(t => !t.is_voided);
 
   const pettyMonthIn = pettyEffective
@@ -676,21 +708,30 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     doc.setFontSize(9);
     doc.text(`Generated: ${new Date().toLocaleString()} | Balance: ${formatTZS(pettyBalance)}`, 14, 22);
 
+    const totals = pettyTotals(filteredPettyTransactions);
+    const pdfBody = filteredPettyTransactions.map(t => [
+      new Date(t.txn_date || '').toLocaleDateString(),
+      t.txn_type === 'topup' ? 'Top-up' : t.txn_type === 'payment' ? 'Payment' : 'Adjustment',
+      t.is_voided ? `${t.description} (VOIDED)` : t.description,
+      t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-'),
+      t.prepared_by || '-',
+      pettySigned(t) > 0 ? pettySigned(t).toFixed(2) : '',
+      pettySigned(t) < 0 ? Math.abs(pettySigned(t)).toFixed(2) : '',
+      pettyRunningBalance(t).toFixed(2)
+    ]);
+    // Opening balance of the exported range so increase/decrease reconcile with the closing balance
+    if (totals.opening !== 0) {
+      pdfBody.unshift(['Balance b/f', '', '', '', '', '', '', totals.opening.toFixed(2)]);
+    }
+
     autoTable(doc, {
       startY: 27,
       head: [['Date', 'Type', 'Description', 'Paid To / From', 'Prepared By', 'Amount Increase Balance', 'Amount Decrease Balance', 'Balance']],
-      body: filteredPettyTransactions.map(t => [
-        new Date(t.txn_date || '').toLocaleDateString(),
-        t.txn_type === 'topup' ? 'Top-up' : t.txn_type === 'payment' ? 'Payment' : 'Adjustment',
-        t.is_voided ? `${t.description} (VOIDED)` : t.description,
-        t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-'),
-        t.prepared_by || '-',
-        pettySigned(t) > 0 ? pettySigned(t).toFixed(2) : '',
-        pettySigned(t) < 0 ? Math.abs(pettySigned(t)).toFixed(2) : '',
-        (t.balance_after || 0).toFixed(2)
-      ]),
+      body: pdfBody,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [60, 60, 60] }
+      headStyles: { fillColor: [60, 60, 60] },
+      foot: [[{ content: 'Totals', styles: { halign: 'left' } }, '', '', '', '', totals.increase.toFixed(2), totals.decrease.toFixed(2), totals.closing.toFixed(2)]],
+      footStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold', halign: 'right' }
     });
 
     doc.save(`petty-cash-book-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -709,10 +750,29 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
         <td>${t.description}${t.void_reason ? ` (Voided: ${t.void_reason})` : ''}</td>
         <td>${t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-')}</td>
         <td>${t.prepared_by || '-'}</td>
-        <td style="text-align:right;color:#16a34a">${pettySigned(t) > 0 ? formatTZS(pettySigned(t)) : '-'}</td>
-        <td style="text-align:right;color:#dc2626">${pettySigned(t) < 0 ? formatTZS(Math.abs(pettySigned(t))) : '-'}</td>
-        <td style="text-align:right">${formatTZS(t.balance_after || 0)}</td>
+        <td style="text-align:right;color:${t.txn_type === 'adjustment' ? '#2563eb' : '#16a34a'}">${pettySigned(t) > 0 ? formatTZS(pettySigned(t)) : '-'}</td>
+        <td style="text-align:right;color:${t.txn_type === 'adjustment' ? '#2563eb' : '#dc2626'}">${pettySigned(t) < 0 ? formatTZS(Math.abs(pettySigned(t))) : '-'}</td>
+        <td style="text-align:right">${formatTZS(pettyRunningBalance(t))}</td>
       </tr>`).join('');
+
+    const totals = pettyTotals(filteredPettyTransactions);
+    // Opening balance of the printed range so increase/decrease reconcile with the closing balance
+    const openingRow = totals.opening !== 0
+      ? `
+      <tr class="opening">
+        <td colspan="5" class="num">Balance b/f</td>
+        <td></td>
+        <td></td>
+        <td style="text-align:right">${formatTZS(totals.opening)}</td>
+      </tr>`
+      : '';
+    const totalsRow = `
+      <tr class="totals">
+        <td colspan="5" class="num">Totals</td>
+        <td style="text-align:right;color:#16a34a">${formatTZS(totals.increase)}</td>
+        <td style="text-align:right;color:#dc2626">${formatTZS(totals.decrease)}</td>
+        <td style="text-align:right">${formatTZS(totals.closing)}</td>
+      </tr>`;
 
     const printWindow = window.open('', '_blank', 'width=950,height=650');
     if (!printWindow) return;
@@ -728,6 +788,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             th, td { border: 1px solid #ccc; padding: 6px 8px; }
             th { background: #f0f0f0; text-align: left; }
             .num { text-align: right; }
+            tfoot .totals td { background: #f0f0f0; font-weight: bold; border-top: 2px solid #333; }
+            tbody .opening td { font-style: italic; background: #fafafa; }
           </style>
         </head>
         <body>
@@ -737,7 +799,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
             <thead>
               <tr><th>Date</th><th>Type</th><th>Description</th><th>Paid To / From</th><th>Prepared By</th><th class="num">Amount Increase Balance</th><th class="num">Amount Decrease Balance</th><th class="num">Balance</th></tr>
             </thead>
-            <tbody>${rows}</tbody>
+            <tbody>${openingRow}${rows}</tbody>
+            <tfoot>${totalsRow}</tfoot>
           </table>
         </body>
       </html>`);
@@ -4024,13 +4087,13 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                           </TableCell>
                           <TableCell>{t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-')}</TableCell>
                           <TableCell>{t.prepared_by || '-'}</TableCell>
-                          <TableCell className="text-right font-medium text-green-600">
+                          <TableCell className={`text-right font-medium ${t.txn_type === 'adjustment' ? 'text-blue-600' : 'text-green-600'}`}>
                             {pettySigned(t) > 0 ? formatTZS(pettySigned(t)) : '-'}
                           </TableCell>
-                          <TableCell className="text-right font-medium text-red-600">
+                          <TableCell className={`text-right font-medium ${t.txn_type === 'adjustment' ? 'text-blue-600' : 'text-red-600'}`}>
                             {pettySigned(t) < 0 ? formatTZS(Math.abs(pettySigned(t))) : '-'}
                           </TableCell>
-                          <TableCell className="text-right">{formatTZS(t.balance_after || 0)}</TableCell>
+                          <TableCell className="text-right">{formatTZS(pettyRunningBalance(t))}</TableCell>
                           <TableCell className="text-right">
                             {!t.is_voided && (
                               <Button
