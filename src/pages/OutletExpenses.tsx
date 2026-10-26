@@ -2331,14 +2331,17 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={() => {
-            setEditingExpense(null);
-            setExpenseData(expenseForm);
-            setIsExpenseDialogOpen(true);
-          }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Expense
-          </Button>
+          {/* Add Expense is hidden on the Petty Cash tab - petty cash has its own Record Payment flow */}
+          {activeTab !== 'petty' && (
+            <Button onClick={() => {
+              setEditingExpense(null);
+              setExpenseData(expenseForm);
+              setIsExpenseDialogOpen(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Expense
+            </Button>
+          )}
         </div>
       </div>
 
