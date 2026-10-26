@@ -678,14 +678,15 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
 
     autoTable(doc, {
       startY: 27,
-      head: [['Date', 'Type', 'Description', 'Paid To / From', 'Prepared By', 'Amount', 'Balance']],
+      head: [['Date', 'Type', 'Description', 'Paid To / From', 'Prepared By', 'Amount Increase Balance', 'Amount Decrease Balance', 'Balance']],
       body: filteredPettyTransactions.map(t => [
         new Date(t.txn_date || '').toLocaleDateString(),
         t.txn_type === 'topup' ? 'Top-up' : t.txn_type === 'payment' ? 'Payment' : 'Adjustment',
         t.is_voided ? `${t.description} (VOIDED)` : t.description,
         t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-'),
         t.prepared_by || '-',
-        pettySigned(t).toFixed(2),
+        pettySigned(t) > 0 ? pettySigned(t).toFixed(2) : '',
+        pettySigned(t) < 0 ? Math.abs(pettySigned(t)).toFixed(2) : '',
         (t.balance_after || 0).toFixed(2)
       ]),
       styles: { fontSize: 8 },
@@ -708,7 +709,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
         <td>${t.description}${t.void_reason ? ` (Voided: ${t.void_reason})` : ''}</td>
         <td>${t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-')}</td>
         <td>${t.prepared_by || '-'}</td>
-        <td style="text-align:right;color:${pettySigned(t) < 0 ? '#dc2626' : '#16a34a'}">${pettySigned(t) < 0 ? '-' : '+'}${formatTZS(Math.abs(pettySigned(t)))}</td>
+        <td style="text-align:right;color:#16a34a">${pettySigned(t) > 0 ? formatTZS(pettySigned(t)) : '-'}</td>
+        <td style="text-align:right;color:#dc2626">${pettySigned(t) < 0 ? formatTZS(Math.abs(pettySigned(t))) : '-'}</td>
         <td style="text-align:right">${formatTZS(t.balance_after || 0)}</td>
       </tr>`).join('');
 
@@ -733,7 +735,7 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
           <div class="meta">Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Current Balance: <b>${formatTZS(pettyBalance)}</b></div>
           <table>
             <thead>
-              <tr><th>Date</th><th>Type</th><th>Description</th><th>Paid To / From</th><th>Prepared By</th><th class="num">Amount</th><th class="num">Balance</th></tr>
+              <tr><th>Date</th><th>Type</th><th>Description</th><th>Paid To / From</th><th>Prepared By</th><th class="num">Amount Increase Balance</th><th class="num">Amount Decrease Balance</th><th class="num">Balance</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
@@ -1370,15 +1372,12 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
       const filePath = `${outletId}/${year}/${month}/${timestamp}_${sanitizedFileName}`;
 
       // Upload file to Supabase Storage
+      // @supabase/supabase-js v2 upload options do not support an onUploadProgress callback
       const { data, error } = await supabase.storage
         .from('expense-receipts')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false,
-          onUploadProgress: (progress) => {
-            const percent = Math.round((progress.loaded / progress.total) * 100);
-            setUploadProgress(percent);
-          }
+          upsert: false
         });
 
       if (error) throw error;
@@ -2258,7 +2257,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
     // Try to use File constructor if available
     let pdfFile: File | null = null;
     try {
-      pdfFile = new File([pdfBlob], 'expense-report.pdf', { type: 'application/pdf' });
+      // window.File: the lucide-react 'File' icon import shadows the DOM File constructor
+      pdfFile = new window.File([pdfBlob], 'expense-report.pdf', { type: 'application/pdf' });
     } catch (error) {
       // File constructor not supported
       console.log('File constructor not available');
@@ -3994,7 +3994,8 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                         <TableHead>Description</TableHead>
                         <TableHead>Paid To / From</TableHead>
                         <TableHead>Prepared By</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Amount Increase Balance</TableHead>
+                        <TableHead className="text-right">Amount Decrease Balance</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -4023,8 +4024,11 @@ export const OutletExpenses = ({ onBack, outletId, outletName }: OutletExpensesP
                           </TableCell>
                           <TableCell>{t.txn_type === 'topup' ? (t.received_by || t.payee || '-') : (t.payee || '-')}</TableCell>
                           <TableCell>{t.prepared_by || '-'}</TableCell>
-                          <TableCell className={`text-right font-medium ${pettySigned(t) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {pettySigned(t) < 0 ? '-' : '+'}{formatTZS(Math.abs(pettySigned(t)))}
+                          <TableCell className="text-right font-medium text-green-600">
+                            {pettySigned(t) > 0 ? formatTZS(pettySigned(t)) : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-red-600">
+                            {pettySigned(t) < 0 ? formatTZS(Math.abs(pettySigned(t))) : '-'}
                           </TableCell>
                           <TableCell className="text-right">{formatTZS(t.balance_after || 0)}</TableCell>
                           <TableCell className="text-right">
