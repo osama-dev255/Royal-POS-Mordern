@@ -2664,7 +2664,8 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
         </Card>
       )}
 
-      {/* Receipts List */}
+      {/* Receipts List (hidden on Approvals tab - it renders its own list below) */}
+      {activeTab !== 'approvals' && (
       <div className="space-y-4">
         {loading ? (
           <Card>
@@ -2793,6 +2794,7 @@ export const OutletReceipts = ({ onBack, outletId }: OutletReceiptsProps) => {
           ))
         )}
       </div>
+      )}
 
       {/* Approvals Tab Content */}
       {activeTab === 'approvals' && (
