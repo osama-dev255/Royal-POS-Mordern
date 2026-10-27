@@ -292,7 +292,14 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
       setDeliveries(outletDeliveries);
 
       // Fetch sold quantities history for this outlet from the stock movements ledger
-      const outletSoldMovements = await getStockMovements({ outletId: propOutletId, movementType: 'SOLD', limit: 5000 });
+      // (includeOutletSales: outlet sales are hidden from the warehouse Movement Ledger
+      //  but are the source of this outlet's sold figures)
+      const outletSoldMovements = await getStockMovements({
+        outletId: propOutletId,
+        movementType: 'SOLD',
+        limit: 5000,
+        includeOutletSales: true
+      });
       setSoldMovements(outletSoldMovements);
       
       // Fetch inventory from database with sold quantities (everything from database)

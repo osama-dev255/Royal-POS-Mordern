@@ -146,6 +146,9 @@ export const getStockMovements = async (filters?: {
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
+  // Outlet-level consumers (e.g. Outlet Inventory sold history) can opt back into
+  // the SOLD rows written by Registered Outlet sales, which the ledger hides
+  includeOutletSales?: boolean;
 }): Promise<StockMovementWithDetails[]> => {
   try {
     let query = supabase
@@ -159,9 +162,19 @@ export const getStockMovements = async (filters?: {
       `)
       .not('movement_type', 'in', '(TRANSFER_IN,TRANSFER_OUT)')
       // Outlet Stock Takes and Outlet Customer Returns (Sales Management) must not
-      // affect the general Stock Movements ledger
-      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE,reference_type.neq.RETURN')
+      // affect the general Stock Movements ledger. Two separate OR groups are ANDed
+      // together so each reference type is genuinely excluded (rows without a
+      // reference type are always kept).
+      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE')
+      .or('reference_type.is.null,reference_type.neq.RETURN')
       .order('created_at', { ascending: false });
+
+    if (!filters?.includeOutletSales) {
+      // Sales made through Registered Outlets are outlet-level transactions and must not
+      // appear in the general Movement Ledger. They stay stored for outlet reporting,
+      // so only the readers hide them (rows without an outlet id are kept: general POS sales).
+      query = query.or('reference_type.is.null,reference_type.neq.SALE,outlet_id.is.null');
+    }
 
     if (filters?.productId) {
       query = query.eq('product_id', filters.productId);
@@ -225,13 +238,21 @@ export const getStockMovements = async (filters?: {
 export const getStockMovementSummary = async (filters?: {
   productId?: string;
   outletId?: string;
+  includeOutletSales?: boolean;
 }): Promise<StockMovementSummary[]> => {
   try {
     let query = supabase
       .from('stock_movements')
       .select('product_name, movement_type, quantity')
       // Outlet Stock Takes and Outlet Customer Returns must not affect the product movement summary
-      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE,reference_type.neq.RETURN');
+      // (two ANDed OR groups so each type is genuinely excluded)
+      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE')
+      .or('reference_type.is.null,reference_type.neq.RETURN');
+
+    if (!filters?.includeOutletSales) {
+      // Registered Outlet sales must not affect the product summary (same rule as the ledger)
+      query = query.or('reference_type.is.null,reference_type.neq.SALE,outlet_id.is.null');
+    }
 
     if (filters?.productId) {
       query = query.eq('product_id', filters.productId);
@@ -328,8 +349,11 @@ export const getMovedProductNames = async (): Promise<string[]> => {
     const { data, error } = await supabase
       .from('stock_movements')
       .select('product_name')
-      // Outlet Stock Takes and Outlet Customer Returns must not affect the general product name list
-      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE,reference_type.neq.RETURN')
+      // Outlet Stock Takes, Outlet Customer Returns and Registered Outlet sales
+      // must not affect the general product name list
+      .or('reference_type.is.null,reference_type.neq.STOCK_TAKE')
+      .or('reference_type.is.null,reference_type.neq.RETURN')
+      .or('reference_type.is.null,reference_type.neq.SALE,outlet_id.is.null')
       .order('product_name');
 
     if (error) {

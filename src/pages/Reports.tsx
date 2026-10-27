@@ -1375,7 +1375,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation 
-        title="Reports & Exports" 
+        title="Reports & Analytics" 
         onBack={onBack}
         onLogout={onLogout} 
         username={username}
@@ -1383,7 +1383,7 @@ export const Reports = ({ username, onBack, onLogout }: ReportsProps) => {
       
       <main className="container mx-auto p-6">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Reports & Exports</h2>
+          <h2 className="text-3xl font-bold mb-2">Reports & Analytics</h2>
           <p className="text-muted-foreground">
             Generate and export business reports
           </p>

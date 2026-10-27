@@ -6462,11 +6462,9 @@ export const deleteOutletCustomerReturn = async (id: string): Promise<boolean> =
         .update({ status: 'pending', updated_at: new Date().toISOString() })
         .eq('id', id);
 
-      // Remove the return's stock movements and take the restocked goods
-      // back out of the outlet's inventory
+      // Take the restocked goods back out of the outlet's inventory
+      // (customer returns are not recorded in the stock_movements ledger)
       const items = await getOutletCustomerReturnItemsByReturnId(id);
-      const { deleteStockMovementsByReference } = await import('@/utils/stockMovementUtils');
-      await deleteStockMovementsByReference('RETURN', existing.return_number);
       for (const item of items.filter(i => i.restock)) {
         await removeStockFromOutletInventory(existing.outlet_id, item.product_name, item.quantity);
       }
@@ -6488,8 +6486,9 @@ export const deleteOutletCustomerReturn = async (id: string): Promise<boolean> =
 // Approve a return: applies all side effects
 //  - DB trigger writes the customer_ledger 'refund' credit entry (credit_note only)
 //    and offsets the source debt's remaining_amount
-//  - here: record RETURN/DAMAGE stock movements + restock sellable goods into the
-//    outlet's own inventory (inventory_products.quantity) — never the warehouse
+//  - here: restock sellable goods into the outlet's own inventory
+//    (inventory_products.quantity) — never the warehouse
+//  - Registered Outlet customer returns are NOT recorded in the stock_movements ledger
 export const approveOutletCustomerReturn = async (
   id: string,
   approverName: string
@@ -6525,46 +6524,16 @@ export const approveOutletCustomerReturn = async (
 
     if (updateError) throw updateError;
 
-    // Idempotency guard: skip stock side effects if movements already exist (re-approval)
-    const { data: existingMovements } = await supabase
-      .from('stock_movements')
-      .select('id')
-      .eq('reference_id', id)
-      .limit(1);
-
-    if (existingMovements && existingMovements.length > 0) {
-      return true;
-    }
-
+    // Restock sellable goods into the outlet's own inventory stock.
+    // Returns handled inside a Registered Outlet are outlet-level transactions,
+    // so no RETURN/DAMAGE stock movement is recorded in the warehouse ledger.
     const items = await getOutletCustomerReturnItemsByReturnId(id);
-    if (items.length > 0) {
-      const { recordStockMovements } = await import('@/utils/stockMovementUtils');
-      const movements = items.map(item => ({
-        product_id: item.product_id || undefined,
-        product_name: item.product_name,
-        outlet_id: existing.outlet_id,
-        movement_type: (item.restock ? 'RETURN' : 'DAMAGE') as 'RETURN' | 'DAMAGE',
-        quantity: item.quantity,
-        reference_type: 'RETURN' as const,
-        reference_id: id,
-        reference_number: existing.return_number,
-        unit_cost: item.unit_price || 0,
-        total_cost: (item.unit_price || 0) * item.quantity,
-        notes: item.restock
-          ? `Customer return ${existing.return_number}`
-          : `Customer return ${existing.return_number} (damaged/unsellable)`
-      }));
-
-      await recordStockMovements(movements);
-
-      // Return sellable goods into the outlet's own inventory stock
-      for (const item of items.filter(i => i.restock)) {
-        await addStockToOutletInventory(existing.outlet_id, {
-          name: item.product_name,
-          unit_cost: 0,
-          selling_price: item.unit_price || 0
-        }, item.quantity);
-      }
+    for (const item of items.filter(i => i.restock)) {
+      await addStockToOutletInventory(existing.outlet_id, {
+        name: item.product_name,
+        unit_cost: 0,
+        selling_price: item.unit_price || 0
+      }, item.quantity);
     }
 
     return true;
@@ -6575,8 +6544,8 @@ export const approveOutletCustomerReturn = async (
 };
 
 // Reject a pending return, or revert an approved/rejected return (approved <-> rejected)
-// Reverting an approved return reverses: ledger refund entry + debt offset (DB trigger),
-// stock movements and sold_quantity (here)
+// Reverting an approved return reverses: ledger refund entry + debt offset (DB trigger)
+// and the restocked outlet inventory (here)
 export const reviewOutletCustomerReturn = async (
   id: string,
   action: 'reject' | 'revert',
@@ -6601,8 +6570,6 @@ export const reviewOutletCustomerReturn = async (
     // (the DB trigger reverses the ledger entry + debt offset on the status update below)
     if (wasApproved) {
       const items = await getOutletCustomerReturnItemsByReturnId(id);
-      const { deleteStockMovementsByReference } = await import('@/utils/stockMovementUtils');
-      await deleteStockMovementsByReference('RETURN', existing.return_number);
       for (const item of items.filter(i => i.restock)) {
         await removeStockFromOutletInventory(existing.outlet_id, item.product_name, item.quantity);
       }

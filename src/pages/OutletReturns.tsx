@@ -1577,7 +1577,7 @@ export const OutletReturns = ({ onBack, outletId }: OutletReturnsProps) => {
 
                 {reviewingReturn.status === 'approved' && approvalAction === 'reject' && (
                   <p className="text-xs text-orange-600">
-                    This return is already approved. Rejecting it will reverse the stock movements,
+                    This return is already approved. Rejecting it will reverse the restocked outlet inventory,
                     customer ledger refund entry and the source debt offset.
                   </p>
                 )}
