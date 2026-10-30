@@ -22,6 +22,7 @@ import {
   ArrowUpDown
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
+import { getUsers } from "@/services/databaseService";
 
 interface Module {
   id: string;
@@ -29,6 +30,10 @@ interface Module {
   description: string;
   icon: any;
   color: string;
+  /** Short tag rendered in the card footer */
+  badge?: string;
+  /** Live secondary line rendered in the card footer */
+  footer?: string;
 }
 
 interface ComprehensiveDashboardProps {
@@ -41,6 +46,7 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
   console.log("=== ComprehensiveDashboard RENDERING ===");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
+  const [staffSummary, setStaffSummary] = useState<{ total: number; active: number } | null>(null);
   console.log("Initial state - userRole:", userRole, "isRoleLoading:", isRoleLoading);
   
   useEffect(() => {
@@ -51,6 +57,20 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
         const role = await getCurrentUserRole();
         console.log("Fetched user role:", role);
         setUserRole(role);
+
+        // Only administrators and managers can open the staff register, so only
+        // they need the live headcount shown on the Employee Management card.
+        if (hasModuleAccess(role, "employees")) {
+          try {
+            const staff = await getUsers();
+            setStaffSummary({
+              total: staff.length,
+              active: staff.filter((member) => member.is_active !== false).length
+            });
+          } catch (error) {
+            console.error("Error loading staff summary:", error);
+          }
+        }
       } catch (error) {
         console.error("Error fetching user role:", error);
         setUserRole(null);
@@ -123,9 +143,13 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
     {
       id: "employees",
       title: "Employee Management",
-      description: "Manage staff information and payroll",
+      description: "Staff register with login roles, contact details and access status",
       icon: User,
-      color: "bg-white border border-gray-200"
+      color: "bg-white border border-gray-200",
+      badge: "HR",
+      footer: staffSummary
+        ? `${staffSummary.active} active of ${staffSummary.total}`
+        : "Staff register & access"
     },
     {
       id: "expenses",
@@ -228,7 +252,12 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
   ];
 
   // TEMPORARY FIX: Always show all modules including GRN
-  const modules = allModules;
+  // The staff register is hidden from roles that cannot open it, so nobody is
+  // sent to a page that immediately bounces them back.
+  const modules =
+    isRoleLoading || hasModuleAccess(userRole, "employees")
+      ? allModules
+      : allModules.filter((module) => module.id !== "employees");
   console.log("=== MODULES BEING RENDERED ===");
   console.log("Total modules:", modules.length);
   console.log("Module IDs:", modules.map(m => m.id));
@@ -402,6 +431,8 @@ export const ComprehensiveDashboard = ({ username, onNavigate, onLogout }: Compr
                     icon={module.icon}
                     onClick={() => handleNavigate(module.id)}
                     className={module.color}
+                    badge={module.badge}
+                    footer={module.footer}
                   />
                 </div>
               );

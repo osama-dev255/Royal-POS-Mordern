@@ -19,6 +19,7 @@ import {
   Warehouse
 } from "lucide-react";
 import { hasModuleAccess, getCurrentUserRole } from "@/utils/salesPermissionUtils";
+import { getUsers } from "@/services/databaseService";
 
 interface DashboardModule {
   id: string;
@@ -26,6 +27,10 @@ interface DashboardModule {
   description: string;
   icon: any;
   color: string;
+  /** Short tag rendered in the card footer */
+  badge?: string;
+  /** Live secondary line rendered in the card footer */
+  footer?: string;
 }
 
 interface DashboardProps {
@@ -36,11 +41,26 @@ interface DashboardProps {
 
 export const Dashboard = ({ username, onNavigate, onLogout }: DashboardProps) => {
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [staffSummary, setStaffSummary] = useState<{ total: number; active: number } | null>(null);
   
   useEffect(() => {
     const fetchUserRole = async () => {
       const role = await getCurrentUserRole();
       setUserRole(role);
+
+      // Only administrators and managers can open the staff register, so only
+      // they need the live headcount shown on the Employee Management card.
+      if (hasModuleAccess(role, "employees")) {
+        try {
+          const staff = await getUsers();
+          setStaffSummary({
+            total: staff.length,
+            active: staff.filter((member) => member.is_active !== false).length
+          });
+        } catch (error) {
+          console.error("Error loading staff summary:", error);
+        }
+      }
     };
     
     fetchUserRole();
@@ -99,9 +119,13 @@ export const Dashboard = ({ username, onNavigate, onLogout }: DashboardProps) =>
     {
       id: "employees",
       title: "Employee Management",
-      description: "Manage staff members and permissions",
+      description: "Staff register with login roles, contact details and access status",
       icon: Users,
-      color: "bg-white border border-gray-200"
+      color: "bg-white border border-gray-200",
+      badge: "HR",
+      footer: staffSummary
+        ? `${staffSummary.active} active of ${staffSummary.total}`
+        : "Staff register & access"
     },
     {
       id: "expenses",
@@ -209,6 +233,8 @@ export const Dashboard = ({ username, onNavigate, onLogout }: DashboardProps) =>
                   icon={dashboard.icon}
                   onClick={() => handleNavigate(dashboard.id)}
                   className={`${dashboard.color} card-padding`}
+                  badge={dashboard.badge}
+                  footer={dashboard.footer}
                 />
               </div>
             ))}

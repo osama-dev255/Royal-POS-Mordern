@@ -125,7 +125,7 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
     ],
     'manager': [
       'sales', 'inventory', 'customers', 'suppliers', 'purchase', 'finance', 
-      'expenses', 'returns', 'debts', 'discounts', 'audit', 
+      'employees', 'expenses', 'returns', 'debts', 'discounts', 'audit', 
       'reports', 'access-logs', 'settings', 'scanner', 'automated',
       'customer-settlements', 'supplier-settlements', 'payables-receivables', 'transactions',
       'sales-cart', 'sales-orders', 'products', 'test-data',

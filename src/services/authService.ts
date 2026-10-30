@@ -75,6 +75,38 @@ export const getCurrentUserRole = async () => {
   }
 };
 
+// Snapshot the signed-in session
+// Creating another account through signUp() replaces the active session when
+// email confirmation is disabled, so administrative screens capture the current
+// session first and restore it once the operation finishes.
+export const getSessionSnapshot = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) return null;
+    return {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    };
+  } catch (error) {
+    console.error('Error reading session:', error);
+    return null;
+  }
+};
+
+// Restore a previously captured session
+// Restoring the next tick keeps listeners from observing the transient session
+// created by signUp() for longer than one microtask.
+export const restoreSession = async (
+  snapshot: { access_token: string; refresh_token: string } | null
+) => {
+  if (!snapshot) return;
+  try {
+    await supabase.auth.setSession(snapshot);
+  } catch (error) {
+    console.error('Error restoring session:', error);
+  }
+};
+
 // Listen for auth state changes
 export const onAuthStateChange = (callback: (event: string, session: any) => void) => {
   const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);

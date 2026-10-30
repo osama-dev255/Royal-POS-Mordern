@@ -9,6 +9,12 @@ export interface User {
   last_name: string;
   role: string;
   is_active: boolean;
+  // Staff register profile (see 20261030_add_staff_fields_to_users.sql)
+  staff_code?: string | null;
+  position?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  hire_date?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -566,7 +572,7 @@ export const getUserById = async (id: string): Promise<User | null> => {
   }
 };
 
-export const createUser = async (user: Omit<User, 'id'>): Promise<User | null> => {
+export const createUser = async (user: User): Promise<User | null> => {
   try {
     const { data, error } = await supabase
       .from('users')
