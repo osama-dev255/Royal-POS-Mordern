@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { getOutletById } from "@/services/databaseService";
 import { setActiveOutletInfo, clearActiveOutletInfo } from "@/utils/outletBusinessInfo";
+import { getCurrentUserRole, isOutletScopedRole } from "@/utils/salesPermissionUtils";
 
 interface OutletLayoutProps {
   children: React.ReactNode;
@@ -56,6 +57,33 @@ export const OutletLayout = ({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [resolvedOutletName, setResolvedOutletName] = useState<string>(outletName);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Resolve the signed-in role so a restricted outlet manager never sees the
+  // "All Outlets" exit and is labelled correctly.
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUserRole().then((role) => {
+      if (!cancelled) setUserRole(role);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const outletScoped = isOutletScopedRole(userRole);
+
+  const roleLabel = (() => {
+    switch (userRole) {
+      case "admin": return "Administrator";
+      case "manager": return "Manager";
+      case "outlet_manager": return "Outlet Manager";
+      case "cashier": return "Cashier";
+      case "salesman": return "Salesman";
+      case "staff": return "Staff";
+      default: return "Outlet User";
+    }
+  })();
 
   // Resolve and cache the active outlet's real identity for documents and display
   useEffect(() => {
@@ -167,6 +195,12 @@ export const OutletLayout = ({
     }
   ];
 
+  // An outlet manager is pinned to this outlet, so the exit back to the outlet
+  // list is removed entirely rather than merely guarded.
+  const visibleMenuItems = outletScoped
+    ? menuItems.filter((item) => item.id !== "back")
+    : menuItems;
+
   const handleNavigation = (view: string, hash?: string) => {
     console.log("OutletLayout handleNavigation called with view:", view);
     if (hash) {
@@ -254,7 +288,7 @@ export const OutletLayout = ({
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <Button
                 key={item.id}
                 variant={currentView === item.id ? "default" : "ghost"}
@@ -279,7 +313,7 @@ export const OutletLayout = ({
               {sidebarOpen && (
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{username || "User"}</p>
-                  <p className="text-xs text-muted-foreground">Outlet Manager</p>
+                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
                 </div>
               )}
             </div>
@@ -329,7 +363,7 @@ export const OutletLayout = ({
             className="fixed inset-y-0 left-0 w-64 bg-card border-r z-50 lg:hidden pt-16"
           >
             <nav className="p-4 space-y-2">
-              {menuItems.map((item) => (
+              {visibleMenuItems.map((item) => (
                 <Button
                   key={item.id}
                   variant={currentView === item.id ? "default" : "ghost"}
@@ -348,7 +382,7 @@ export const OutletLayout = ({
                 </div>
                 <div>
                   <p className="text-sm font-medium">{username || "User"}</p>
-                  <p className="text-xs text-muted-foreground">Outlet Manager</p>
+                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
                 </div>
               </div>
               <Button variant="outline" className="w-full gap-2" onClick={onLogout}>

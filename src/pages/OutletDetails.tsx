@@ -41,6 +41,8 @@ import { format } from "date-fns";
 interface OutletDetailsProps {
   onBack: () => void;
   outletId?: string;
+  /** Outlet managers are pinned to one outlet, so the exit to the outlet list is dropped. */
+  showBackButton?: boolean;
 }
 
 interface OutletMetrics {
@@ -64,7 +66,7 @@ interface RecentActivity {
   amount?: number;
 }
 
-export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsProps) => {
+export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton = true }: OutletDetailsProps) => {
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,15 +216,17 @@ export const OutletDetails = ({ onBack, outletId: propOutletId }: OutletDetailsP
     <div className="container mx-auto py-6 px-4 max-w-7xl">
       {/* Header Section */}
       <div className="mb-6">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onBack}
-          className="flex items-center gap-2 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Outlets
-        </Button>
+        {showBackButton && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onBack}
+            className="flex items-center gap-2 mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Outlets
+          </Button>
+        )}
 
         {/* Welcome Banner */}
         <Card className="bg-gradient-to-r from-blue-600 to-blue-800 text-white border-0 shadow-lg">

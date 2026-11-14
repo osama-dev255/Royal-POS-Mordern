@@ -562,7 +562,7 @@ export const getUserById = async (id: string): Promise<User | null> => {
       .from('users')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
       
     if (error) throw error;
     return data || null;
@@ -572,20 +572,96 @@ export const getUserById = async (id: string): Promise<User | null> => {
   }
 };
 
-export const createUser = async (user: User): Promise<User | null> => {
+// users.username is UNIQUE and capped at 50 characters. Anything derived from
+// an email prefix has to survive both rules before it reaches the database.
+const USERNAME_MAX_LENGTH = 50;
+const USERNAME_INVALID_CHARS = /[^a-z0-9._-]/gi;
+
+export const normalizeUsernameBase = (value: string): string => {
+  const base = (value || '').trim().replace(USERNAME_INVALID_CHARS, '').toLowerCase();
+  // Leave room for the numeric uniqueness suffix appended below.
+  return (base || 'staff').slice(0, USERNAME_MAX_LENGTH - 3);
+};
+
+const isUniqueViolation = (error: { code?: string; message?: string } | null, target: string) =>
+  error?.code === '23505' && String(error.message || '').toLowerCase().includes(target);
+
+/**
+ * Return the first free username from base, base2, base3...
+ * Two logins sharing an email prefix (john@a.com / john@b.com) would otherwise
+ * collide on users_username_key and abort the insert with a 409.
+ */
+export const generateUniqueUsername = async (
+  rawBase: string,
+  excludeId?: string
+): Promise<string> => {
+  const base = normalizeUsernameBase(rawBase);
+
   try {
+    let query = supabase.from('users').select('id, username').ilike('username', `${base}%`);
+    if (excludeId) query = query.neq('id', excludeId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const taken = new Set((data || []).map((row) => String(row.username || '').toLowerCase()));
+    if (!taken.has(base)) return base;
+
+    let suffix = 2;
+    while (taken.has(`${base}${suffix}`)) suffix += 1;
+    return `${base}${suffix}`;
+  } catch (error) {
+    console.error('Error generating unique username:', error);
+    return base;
+  }
+};
+
+export const createUser = async (user: User): Promise<User | null> => {
+  const base = normalizeUsernameBase(user.username || user.email || user.id || '');
+
+  // Retry a few times: a username can be claimed between the lookup and the
+  // insert, and the next suffix resolves it.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const username = await generateUniqueUsername(base);
     const { data, error } = await supabase
       .from('users')
-      .insert([{ ...user, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+      .insert([{
+        ...user,
+        username,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
       .select()
-      .single();
-      
-    if (error) throw error;
-    return data || null;
-  } catch (error) {
+      .maybeSingle();
+
+    if (!error) return data || null;
+
+    // The login already owns a staff row (a previous attempt half succeeded):
+    // rewrite the profile instead of failing the whole operation.
+    if (isUniqueViolation(error, 'users_pkey') && user.id) {
+      const existing = await getUserById(user.id);
+      if (existing) {
+        const { username: _existingUsername, ...profile } = user;
+        const updated = await updateUser(user.id, profile);
+        return updated || existing;
+      }
+    }
+
+    if (isUniqueViolation(error, 'username')) continue;
+
     console.error('Error creating user:', error);
-    return null;
+
+    if (isUniqueViolation(error, 'email')) {
+      throw new Error(
+        'A staff record already uses this email address. Remove the old staff member first, or sign in with that account instead.'
+      );
+    }
+
+    throw error;
   }
+
+  console.error('Error creating user: no free username left for base', base);
+  return null;
 };
 
 export const updateUser = async (id: string, user: Partial<User>): Promise<User | null> => {
@@ -2264,7 +2340,7 @@ export const createSale = async (sale: Omit<Sale, 'id'>): Promise<Sale | null> =
         .from('users')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       // If user exists in the users table, use their ID
       if (userData && !userError) {

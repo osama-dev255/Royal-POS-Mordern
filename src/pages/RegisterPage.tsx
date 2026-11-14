@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Building2, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { createUser } from "@/services/databaseService";
+import { createUser, normalizeUsernameBase } from "@/services/databaseService";
 
 interface RegisterPageProps {
   onBack?: () => void;
@@ -131,10 +131,22 @@ const RegisterPage = ({ onBack }: RegisterPageProps) => {
 
       // If sign up is successful, create the user record in the database
       if (result.user) {
+        // Supabase answers a repeat sign-up for a known email with a throwaway
+        // user that owns no identities; writing a profile for it would create
+        // an orphan record and leave the real login without one.
+        if (result.user.identities && result.user.identities.length === 0) {
+          toast({
+            title: "Account already exists",
+            description: "Sign in with this email address instead, or reset its password.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         console.log("User signed up successfully, creating database record");
         const dbUserData = {
           id: result.user.id,
-          username: email.split("@")[0],
+          username: normalizeUsernameBase(email.split("@")[0]),
           email: email,
           first_name: firstName,
           last_name: lastName,
@@ -142,7 +154,11 @@ const RegisterPage = ({ onBack }: RegisterPageProps) => {
           is_active: true,
         };
 
-        const dbUser = await createUser(dbUserData);
+        const dbUser = await createUser(dbUserData).catch((dbError) => {
+          // The auth login exists already; surface why the staff row was not saved.
+          console.warn("Failed to create user record in database:", dbError);
+          return null;
+        });
         
         if (!dbUser) {
           console.warn("Failed to create user record in database");

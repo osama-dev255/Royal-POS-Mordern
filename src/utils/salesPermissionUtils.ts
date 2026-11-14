@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
-import { User } from '@/services/databaseService';
+import { createUser } from '@/services/databaseService';
 
 /**
  * Check if the current user has permission to create sales
@@ -20,69 +20,91 @@ export const canCreateSales = async (): Promise<boolean> => {
 };
 
 /**
+ * Read the role stored for a login, or null when the staff row is missing.
+ * maybeSingle() reports "no rows" as data=null instead of a 406, so a missing
+ * record is not logged as a transport error.
+ */
+const fetchUserRole = async (id: string): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching user role:', error);
+    return null;
+  }
+
+  return data?.role || null;
+};
+
+const resolveCurrentUserRole = async (): Promise<string | null> => {
+  // Get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const role = await fetchUserRole(user.id);
+  if (role) {
+    return role;
+  }
+
+  // The login exists in auth but has no staff row yet (for example an account
+  // whose profile write failed). Provision the row so the session is usable;
+  // createUser resolves the unique username and heals a half-written row.
+  try {
+    const created = await createUser({
+      id: user.id,
+      username: user.email?.split('@')[0] || user.id,
+      email: user.email || undefined,
+      first_name: user.user_metadata?.first_name || '',
+      last_name: user.user_metadata?.last_name || '',
+      role: 'cashier', // Default role
+      is_active: true,
+    });
+
+    if (created?.role) {
+      return created.role;
+    }
+
+    console.error('Error creating user: the staff record could not be saved for', user.email);
+  } catch (error) {
+    console.error('Error creating user:', error);
+  }
+
+  // Another staff row may already own this email (a login recreated after its
+  // record was deleted). Reuse its role instead of locking the account out.
+  if (user.email) {
+    const { data: legacy } = await supabase
+      .from('users')
+      .select('role')
+      .eq('email', user.email)
+      .maybeSingle();
+    if (legacy?.role) return legacy.role;
+  }
+
+  return null;
+};
+
+// Several screens ask for the role at mount; one shared lookup keeps a missing
+// staff row from being provisioned (and failing) three times in a row.
+let roleLookup: Promise<string | null> | null = null;
+
+/**
  * Get the current user's role
  * @returns Promise<string | null> - User's role or null if not available
  */
 export const getCurrentUserRole = async (): Promise<string | null> => {
-  try {
-    // Get the current user
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return null;
-    }
-    
-    // First, check if the user exists in the users table
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-    
-    // If user doesn't exist in the users table, create them
-    if (userError || !userData) {
-      // Create a new user record with default values
-      const newUser = {
-        id: user.id,
-        username: user.email?.split('@')[0] || user.id,
-        email: user.email || '',
-        first_name: user.user_metadata?.first_name || '',
-        last_name: user.user_metadata?.last_name || '',
-        role: 'cashier', // Default role
-        is_active: true
-      };
-      
-      const { data: createdUser, error: createError } = await supabase
-        .from('users')
-        .insert([newUser])
-        .select()
-        .single();
-      
-      if (createError) {
-        console.error('Error creating user:', createError);
-        return null;
-      }
-      
-      return createdUser?.role || 'cashier';
-    }
-    
-    // Get user details from the database
-    const { data, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching user role:', error);
-      return null;
-    }
-    
-    return data?.role || null;
-  } catch (error) {
-    console.error('Error getting current user role:', error);
-    return null;
+  if (!roleLookup) {
+    roleLookup = resolveCurrentUserRole().finally(() => {
+      roleLookup = null;
+    });
   }
+
+  return roleLookup;
 };
 
 /**
@@ -180,8 +202,19 @@ export const hasModuleAccess = (role: string | null, module: string): boolean =>
       'grn-inventory-dashboard',
       'sales-management-report'
     ],
+    // Outlet managers work inside one assigned outlet only. They own no
+    // head-office module, so every main dashboard card is denied; Index.tsx
+    // pins them to their own outlet views.
+    'outlet_manager': [],
   };
   
   // Check if the role exists and has access to the module
   return rolePermissions[role]?.includes(module) || false;
 };
+
+/**
+ * Roles that may only work inside their single assigned outlet
+ * @param role - User's role
+ * @returns true when the role is restricted to one outlet
+ */
+export const isOutletScopedRole = (role: string | null): boolean => role === 'outlet_manager';

@@ -58,6 +58,8 @@ import { syncSellingPricesToDatabase } from "@/utils/syncSellingPrices";
 interface OutletInventoryProps {
   onBack: () => void;
   outletId?: string;
+  /** Outlet managers are pinned to one outlet, so the exit to the outlet list is dropped. */
+  showBackButton?: boolean;
 }
 
 interface InventoryItem {
@@ -92,7 +94,7 @@ interface InventoryStats {
   totalDeliveries: number;
 }
 
-export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInventoryProps) => {
+export const OutletInventory = ({ onBack, outletId: propOutletId, showBackButton = true }: OutletInventoryProps) => {
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -627,15 +629,17 @@ export const OutletInventory = ({ onBack, outletId: propOutletId }: OutletInvent
     <div className="container mx-auto py-6 px-4 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onBack}
-          className="flex items-center gap-2 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Outlets
-        </Button>
+        {showBackButton && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onBack}
+            className="flex items-center gap-2 mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Outlets
+          </Button>
+        )}
 
         <Card className="bg-gradient-to-r from-purple-600 to-purple-800 text-white border-0 shadow-lg">
           <CardContent className="p-6">

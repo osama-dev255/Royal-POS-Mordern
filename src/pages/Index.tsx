@@ -85,7 +85,8 @@ import { OutletSavedStockTakes } from "@/pages/OutletSavedStockTakes";
 import { OutletReturns } from "@/pages/OutletReturns";
 import { OutletSalesOrders } from "@/pages/OutletSalesOrders";
 import { OutletPayroll } from "@/pages/OutletPayroll";
-import { getUserOutlet } from "@/services/outletAccessService";
+import { getUserOutlet, getUserOutletAssignment } from "@/services/outletAccessService";
+import { getCurrentUserRole, isOutletScopedRole } from "@/utils/salesPermissionUtils";
 
 // Import missing components
 import { Navigation } from "@/components/Navigation";
@@ -109,6 +110,14 @@ export const Index = () => {
   const [editingSPNData, setEditingSPNData] = useState<any>(null);
   const [editingPOData, setEditingPOData] = useState<any>(null);
   const [editingGRNData, setEditingGRNData] = useState<any>(null);
+
+  // Outlet-scoped logins (role 'outlet_manager') are pinned to a single outlet.
+  // role is the value from users.role, outletId the outlet they may work in.
+  const [outletScope, setOutletScope] = useState<{
+    role: string | null;
+    outletId: string | null;
+    ready: boolean;
+  }>({ role: null, outletId: null, ready: false });
 
   // Show splash screen for 2 seconds
   useEffect(() => {
@@ -333,6 +342,53 @@ export const Index = () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
+
+  // Resolve whether the signed-in account is restricted to one outlet
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveOutletScope = async () => {
+      if (!user?.id) {
+        setOutletScope({ role: null, outletId: null, ready: false });
+        return;
+      }
+
+      const role = await getCurrentUserRole();
+      if (cancelled) return;
+
+      if (!isOutletScopedRole(role)) {
+        setOutletScope({ role, outletId: null, ready: true });
+        return;
+      }
+
+      const assignment = await getUserOutletAssignment(user.id);
+      if (cancelled) return;
+
+      setOutletScope({ role, outletId: assignment?.outlet?.id ?? null, ready: true });
+    };
+
+    resolveOutletScope();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const outletManagerOutletId = isOutletScopedRole(outletScope.role) ? outletScope.outletId : null;
+
+  // Keep an outlet manager inside their own outlet: any other view is replaced
+  useEffect(() => {
+    if (!user || !outletScope.ready || !outletManagerOutletId) return;
+    if (currentView === 'login' || currentView === 'register') return;
+
+    const insideOwnOutlet =
+      currentView.startsWith('outlet-') && currentView.endsWith(outletManagerOutletId);
+    if (insideOwnOutlet) return;
+
+    console.log(`Outlet manager blocked from view: ${currentView}, redirecting to their outlet`);
+    window.location.hash = `#/outlet/${outletManagerOutletId}`;
+    setCurrentView(`outlet-details-${outletManagerOutletId}`);
+  }, [user, outletScope.ready, outletManagerOutletId, currentView]);
 
   const handleLogin = async (credentials: { username: string; password: string }) => {
     const { username, password } = credentials;
@@ -607,6 +663,56 @@ export const Index = () => {
     return <RegisterPage onBack={handleBack} />;
   }
 
+  // Wait for the outlet scope to resolve before rendering any view, so an
+  // outlet manager never sees a head-office page while the check is running.
+  if (!outletScope.ready) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Preparing your workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Outlet managers are restricted to their single assigned outlet
+  if (isOutletScopedRole(outletScope.role)) {
+    if (!outletManagerOutletId) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-6">
+          <div className="w-full max-w-md rounded-xl border bg-card p-8 text-center space-y-3">
+            <h2 className="text-lg font-semibold">No outlet assigned</h2>
+            <p className="text-sm text-muted-foreground">
+              This account is an outlet manager but is not linked to an outlet yet. Ask an
+              administrator to assign one in Employee Management.
+            </p>
+            <button
+              onClick={handleLogout}
+              className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const insideOwnOutlet =
+      currentView.startsWith('outlet-') && currentView.endsWith(outletManagerOutletId);
+
+    if (!insideOwnOutlet) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Taking you to your outlet...</p>
+          </div>
+        </div>
+      );
+    }
+  }
+
   // Ensure that we don't render unauthorized views
   const authorizedViews = [
     "comprehensive", "dashboard", "sales", "sales-cart", "sales-orders", 
@@ -719,6 +825,7 @@ export const Index = () => {
           <div className="p-6">
             <OutletDetails 
               outletId={outletId}
+              showBackButton={!outletManagerOutletId}
               onBack={() => {
                 setCurrentView("registered-outlets");
                 window.location.hash = "#/registered-outlets";
@@ -744,6 +851,7 @@ export const Index = () => {
           <div className="p-6">
             <OutletInventory 
               outletId={outletId}
+              showBackButton={!outletManagerOutletId}
               onBack={() => {
                 setCurrentView("registered-outlets");
                 window.location.hash = "#/registered-outlets";

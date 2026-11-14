@@ -52,6 +52,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Store,
   Trash2,
   UserCog,
   UserPlus,
@@ -59,12 +60,18 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createUser, deleteUser, getUsers, updateUser, User } from "@/services/databaseService";
+import { createUser, deleteUser, getOutlets, getUsers, normalizeUsernameBase, updateUser, User } from "@/services/databaseService";
 import { getSessionSnapshot, restoreSession, signUp } from "@/services/authService";
+import {
+  assignUserToOutlet,
+  clearUserOutlet,
+  getOutletAssignments,
+  setUserOutletActive,
+} from "@/services/outletAccessService";
 import { getCurrentUserRole, hasModuleAccess } from "@/utils/salesPermissionUtils";
 import { cn } from "@/lib/utils";
 
-type Role = "admin" | "manager" | "cashier" | "staff";
+type Role = "admin" | "manager" | "outlet_manager" | "cashier" | "staff";
 type StatusFilter = "all" | "active" | "inactive";
 
 const PAGE_SIZE = 8;
@@ -88,6 +95,12 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
     name: "Manager",
     description: "Runs outlets, sales, purchasing and the staff register.",
     badgeClass: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  },
+  {
+    id: "outlet_manager",
+    name: "Outlet Manager",
+    description: "Pinned to one assigned outlet with no access to head-office modules.",
+    badgeClass: "border-sky-200 bg-sky-50 text-sky-700",
   },
   {
     id: "cashier",
@@ -116,6 +129,8 @@ interface StaffRecord {
   department: string;
   phone: string;
   hireDate: string;
+  outletId: string;
+  outletName: string;
 }
 
 interface StaffForm {
@@ -130,6 +145,7 @@ interface StaffForm {
   role: Role;
   isActive: boolean;
   password: string;
+  outletId: string;
 }
 
 const emptyForm = (): StaffForm => ({
@@ -144,6 +160,7 @@ const emptyForm = (): StaffForm => ({
   role: "staff",
   isActive: true,
   password: "",
+  outletId: "",
 });
 
 const roleDefinitionFor = (role: Role) => ROLE_DEFINITIONS.find((item) => item.id === role);
@@ -192,6 +209,8 @@ const toStaffRecord = (user: User): StaffRecord => {
     department: user.department || "",
     phone: user.phone || "",
     hireDate,
+    outletId: "",
+    outletName: "",
   };
 };
 
@@ -237,6 +256,7 @@ export const EmployeeManagement = ({
   const [access, setAccess] = useState<"checking" | "granted" | "denied">("checking");
   const [actorRole, setActorRole] = useState<string | null>(null);
   const [records, setRecords] = useState<StaffRecord[]>([]);
+  const [outlets, setOutlets] = useState<{ id: string; name: string; location: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | Role>("all");
@@ -284,8 +304,37 @@ export const EmployeeManagement = ({
   const loadStaff = useCallback(async () => {
     setLoading(true);
     try {
-      const users = await getUsers();
-      setRecords(users.map(toStaffRecord));
+      const [users, assignments, outletList] = await Promise.all([
+        getUsers(),
+        getOutletAssignments(),
+        getOutlets(),
+      ]);
+
+      // A login is scoped to at most one outlet; the earliest active row wins,
+      // matching how Index.tsx resolves the outlet scope at login.
+      const assignmentByUser = new Map<string, { outletId: string; outletName: string }>();
+      assignments
+        .filter((assignment) => assignment.is_active && !assignmentByUser.has(assignment.user_id))
+        .forEach((assignment) => {
+          assignmentByUser.set(assignment.user_id, {
+            outletId: assignment.outlet_id,
+            outletName: assignment.outlet_name,
+          });
+        });
+
+      setRecords(
+        users.map((user) => {
+          const record = toStaffRecord(user);
+          const assignment = assignmentByUser.get(record.id);
+          return assignment ? { ...record, ...assignment } : record;
+        })
+      );
+
+      setOutlets(
+        outletList
+          .filter((outlet) => !!outlet.id)
+          .map((outlet) => ({ id: outlet.id as string, name: outlet.name, location: outlet.location }))
+      );
     } catch (error) {
       console.error("Error loading staff register:", error);
       toast({
@@ -397,21 +446,9 @@ export const EmployeeManagement = ({
       role: record.role,
       isActive: record.isActive,
       password: "",
+      outletId: record.outletId,
     });
     setFormOpen(true);
-  };
-
-  const buildUsername = (email: string) => {
-    const base = email.split("@")[0].replace(/[^a-z0-9._-]/gi, "").toLowerCase() || "staff";
-    let candidate = base;
-    let suffix = 1;
-
-    while (records.some((record) => record.username.toLowerCase() === candidate)) {
-      suffix += 1;
-      candidate = `${base}${suffix}`;
-    }
-
-    return candidate;
   };
 
   const validateForm = (): string | null => {
@@ -430,6 +467,10 @@ export const EmployeeManagement = ({
 
     if (!isAdminActor && form.role === "admin") {
       return "Managers cannot assign the administrator role.";
+    }
+
+    if (form.role === "outlet_manager" && !form.outletId) {
+      return "Select the outlet this manager is limited to.";
     }
 
     if (editing && isSelf(editing) && !form.isActive) {
@@ -470,7 +511,9 @@ export const EmployeeManagement = ({
     try {
       const email = form.email.trim().toLowerCase();
       const profile = {
-        username: buildUsername(email),
+        // createUser() claims the next free username, so a stale staff list
+        // cannot produce a users_username_key conflict here.
+        username: normalizeUsernameBase(email),
         email,
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
@@ -484,7 +527,7 @@ export const EmployeeManagement = ({
       };
 
       const result = (await signUp(email, form.password, profile)) as {
-        user?: { id?: string; confirmed_at?: string | null } | null;
+        user?: { id?: string; confirmed_at?: string | null; identities?: unknown[] } | null;
         error?: { message?: string };
       };
 
@@ -498,12 +541,30 @@ export const EmployeeManagement = ({
       if (!result.user?.id) {
         throw new Error("The login was created but no user id was returned.");
       }
+      // Supabase hides a repeat sign-up for a known email behind a throwaway
+      // user with no identities. Writing a staff row for it leaves an orphan
+      // profile, and the real login ends up with none.
+      if (result.user.identities && result.user.identities.length === 0) {
+        throw new Error(
+          "A login already exists for this email address. Reset that account's password instead of adding it again."
+        );
+      }
 
       const created = await createUser({ id: result.user.id, ...profile });
       if (!created) {
         throw new Error(
-          "The login was created, but the staff record could not be saved. Run migration 20261030_add_staff_fields_to_users.sql and try again."
+          "The login was created, but the staff record could not be saved. Delete the pending login and try again."
         );
+      }
+
+      // Binding the login to an outlet is what pins the account inside it.
+      let outletWarning = "";
+      if (form.role === "outlet_manager" && form.outletId) {
+        const bound = await assignUserToOutlet(result.user.id, form.outletId, "manager");
+        if (!bound) {
+          outletWarning =
+            " The outlet binding failed — run migration 20261031_add_outlet_manager_role.sql, then set the outlet from Edit details.";
+        }
       }
 
       setFormOpen(false);
@@ -512,9 +573,11 @@ export const EmployeeManagement = ({
 
       toast({
         title: "Staff member added",
-        description: result.user.confirmed_at
-          ? `${profile.first_name} ${profile.last_name} can now sign in.`
-          : "A confirmation email was sent. They must confirm it before signing in.",
+        description: `${
+          result.user.confirmed_at
+            ? `${profile.first_name} ${profile.last_name} can now sign in.`
+            : "A confirmation email was sent. They must confirm it before signing in."
+        }${outletWarning}`,
       });
     } catch (error) {
       console.error("Error creating staff member:", error);
@@ -554,10 +617,23 @@ export const EmployeeManagement = ({
         );
       }
 
+      // Keep the outlet binding in step with the role: outlet managers always
+      // point at exactly one outlet, every other role carries no scope.
+      let outletWarning = "";
+      if (form.role === "outlet_manager" && form.outletId) {
+        const bound = await assignUserToOutlet(editing.id, form.outletId, "manager");
+        if (!bound) {
+          outletWarning =
+            " The outlet binding failed — run migration 20261031_add_outlet_manager_role.sql and try again.";
+        }
+      } else if (editing.role === "outlet_manager") {
+        await clearUserOutlet(editing.id);
+      }
+
       setFormOpen(false);
       setEditing(null);
       await loadStaff();
-      toast({ title: "Staff member updated", description: `${name} has been saved.` });
+      toast({ title: "Staff member updated", description: `${name} has been saved.${outletWarning}` });
     } catch (error) {
       console.error("Error updating staff member:", error);
       toast({
@@ -595,6 +671,11 @@ export const EmployeeManagement = ({
       const updated = await updateUser(record.id, { is_active: !record.isActive });
       if (!updated) {
         throw new Error("Supabase rejected the update.");
+      }
+
+      // Deactivating an outlet manager must also release the outlet scope.
+      if (record.role === "outlet_manager") {
+        await setUserOutletActive(record.id, !record.isActive);
       }
 
       await loadStaff();
@@ -636,6 +717,9 @@ export const EmployeeManagement = ({
       if (!removed) {
         throw new Error("Supabase rejected the delete request.");
       }
+
+      // The staff record is gone, so its outlet assignment must not linger.
+      await clearUserOutlet(id);
 
       setRecords((current) => current.filter((record) => record.id !== id));
       setDeleteTarget(null);
@@ -710,7 +794,7 @@ export const EmployeeManagement = ({
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Employee Management</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Staff register, login roles and access status for your team.
+              Staff register, login roles, outlet restrictions and access status for your team.
             </p>
           </div>
         </div>
@@ -798,6 +882,7 @@ export const EmployeeManagement = ({
                 <TableHead>Staff code</TableHead>
                 <TableHead>Position</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Outlet</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Hire date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -807,14 +892,14 @@ export const EmployeeManagement = ({
               {loading ? (
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={`skeleton-${index}`}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <div className="h-10 animate-pulse rounded-md bg-muted/60" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : pageRows.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <div className="flex flex-col items-center gap-2 py-12 text-center">
                       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                         <Users className="h-6 w-6 text-muted-foreground" />
@@ -886,6 +971,22 @@ export const EmployeeManagement = ({
                         <Badge variant="outline" className={cn("border", role?.badgeClass)}>
                           {role?.name || record.role}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {record.outletId ? (
+                          <div className="flex items-center gap-1.5 text-sm">
+                            <Store className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <span className="max-w-[150px] truncate">
+                              {record.outletName || "Assigned outlet"}
+                            </span>
+                          </div>
+                        ) : record.role === "outlet_manager" ? (
+                          <Badge variant="outline" className="border-destructive/30 text-[10px] text-destructive">
+                            Not bound
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span
@@ -1110,6 +1211,29 @@ export const EmployeeManagement = ({
                     </SelectContent>
                   </Select>
                 </Field>
+                {form.role === "outlet_manager" && (
+                  <Field
+                    label="Assigned outlet"
+                    required
+                    hint="This login can only open this outlet. Every other part of the app is blocked."
+                  >
+                    <Select
+                      value={form.outletId || undefined}
+                      onValueChange={(value) => updateForm({ outletId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select outlet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {outlets.map((outlet) => (
+                          <SelectItem key={outlet.id} value={outlet.id}>
+                            {outlet.name}{outlet.location ? ` — ${outlet.location}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
                 <Field label="Access status" hint="Inactive staff keep their record but cannot work in the system.">
                   <Select
                     value={form.isActive ? "active" : "inactive"}
