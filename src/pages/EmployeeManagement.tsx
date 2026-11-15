@@ -61,7 +61,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createUser, deleteUser, getOutlets, getUsers, normalizeUsernameBase, updateUser, User } from "@/services/databaseService";
-import { getSessionSnapshot, restoreSession, signUp } from "@/services/authService";
+import { getSessionSnapshot, restoreSession, setUserLoginPassword, signUp } from "@/services/authService";
 import {
   assignUserToOutlet,
   clearUserOutlet,
@@ -243,6 +243,13 @@ const SectionHeading = ({ icon: Icon, title, hint }: { icon: typeof Users; title
   </div>
 );
 
+const DetailItem = ({ label, value }: { label: string; value: ReactNode }) => (
+  <div className="space-y-0.5">
+    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+    <dd className="break-words text-sm">{value}</dd>
+  </div>
+);
+
 export const EmployeeManagement = ({
   username,
   onBack,
@@ -268,6 +275,7 @@ export const EmployeeManagement = ({
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StaffRecord | null>(null);
+  const [viewTarget, setViewTarget] = useState<StaffRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -463,6 +471,8 @@ export const EmployeeManagement = ({
       if (records.some((record) => record.email.toLowerCase() === email.toLowerCase())) {
         return "An account with this email already exists.";
       }
+    } else if (form.password.trim() && form.password.length < 6) {
+      return "The new login password must be at least 6 characters.";
     }
 
     if (!isAdminActor && form.role === "admin") {
@@ -630,10 +640,26 @@ export const EmployeeManagement = ({
         await clearUserOutlet(editing.id);
       }
 
+      // The login password lives in Supabase Auth, not in the users row, so it
+      // is written through the role-guarded database helper. Blank means keep.
+      let passwordNote = "";
+      if (form.password.trim()) {
+        const passwordResult = await setUserLoginPassword(editing.id, form.password);
+        if (passwordResult.success) {
+          passwordNote = " The login password was updated.";
+        } else {
+          toast({
+            title: "Profile saved, password unchanged",
+            description: passwordResult.error,
+            variant: "destructive",
+          });
+        }
+      }
+
       setFormOpen(false);
       setEditing(null);
       await loadStaff();
-      toast({ title: "Staff member updated", description: `${name} has been saved.${outletWarning}` });
+      toast({ title: "Staff member updated", description: `${name} has been saved.${outletWarning}${passwordNote}` });
     } catch (error) {
       console.error("Error updating staff member:", error);
       toast({
@@ -885,6 +911,7 @@ export const EmployeeManagement = ({
                 <TableHead>Outlet</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Hire date</TableHead>
+                <TableHead className="w-[64px] text-center">Details</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -892,14 +919,14 @@ export const EmployeeManagement = ({
               {loading ? (
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={`skeleton-${index}`}>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <div className="h-10 animate-pulse rounded-md bg-muted/60" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : pageRows.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={9}>
                     <div className="flex flex-col items-center gap-2 py-12 text-center">
                       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                         <Users className="h-6 w-6 text-muted-foreground" />
@@ -1009,6 +1036,18 @@ export const EmployeeManagement = ({
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(record.hireDate)}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => setViewTarget(record)}
+                          aria-label={`View details for ${displayName(record)}`}
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1112,7 +1151,7 @@ export const EmployeeManagement = ({
             <DialogTitle>{editing ? "Edit staff member" : "Add staff member"}</DialogTitle>
             <DialogDescription>
               {editing
-                ? "Update the staff profile. The login email and password are managed by authentication."
+                ? "Update the staff profile and access. Set a new login password below when the employee needs one."
                 : "Creates a login account and a matching staff record in one step."}
             </DialogDescription>
           </DialogHeader>
@@ -1248,45 +1287,48 @@ export const EmployeeManagement = ({
                     </SelectContent>
                   </Select>
                 </Field>
-                {!editing && (
-                  <Field
-                    label="Temporary password"
-                    required
-                    hint="Share it securely. The employee can change it after signing in."
-                  >
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          value={form.password}
-                          onChange={(event) => updateForm({ password: event.target.value })}
-                          placeholder="Minimum 6 characters"
-                          className="pr-9"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((current) => !current)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      <Button
+                <Field
+                  label={editing ? "New login password" : "Temporary password"}
+                  required={!editing}
+                  hint={
+                    editing
+                      ? "Leave blank to keep the current password. The employee can sign in with it immediately."
+                      : "Share it securely. The employee can change it after signing in."
+                  }
+                >
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={form.password}
+                        onChange={(event) => updateForm({ password: event.target.value })}
+                        placeholder={editing ? "Leave blank to keep current" : "Minimum 6 characters"}
+                        className="pr-9"
+                        autoComplete="new-password"
+                      />
+                      <button
                         type="button"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() => {
-                          updateForm({ password: generatePassword() });
-                          setShowPassword(true);
-                        }}
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                       >
-                        <KeyRound className="mr-1.5 h-4 w-4" />
-                        Generate
-                      </Button>
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
-                  </Field>
-                )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => {
+                        updateForm({ password: generatePassword() });
+                        setShowPassword(true);
+                      }}
+                    >
+                      <KeyRound className="mr-1.5 h-4 w-4" />
+                      Generate
+                    </Button>
+                  </div>
+                </Field>
               </div>
             </section>
           </div>
@@ -1308,6 +1350,98 @@ export const EmployeeManagement = ({
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Read-only staff details */}
+      <Dialog open={!!viewTarget} onOpenChange={(open) => !open && setViewTarget(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          {viewTarget && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12 border">
+                    <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                      {initialsFor(viewTarget)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <DialogTitle className="truncate">{displayName(viewTarget)}</DialogTitle>
+                    <DialogDescription className="truncate">
+                      {viewTarget.email || "No email on file"}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn("border", roleDefinitionFor(viewTarget.role)?.badgeClass)}
+                >
+                  {roleDefinitionFor(viewTarget.role)?.name || viewTarget.role}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border",
+                    viewTarget.isActive
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-slate-100 text-slate-600"
+                  )}
+                >
+                  {viewTarget.isActive ? "Active" : "Inactive"}
+                </Badge>
+                {isSelf(viewTarget) && (
+                  <Badge variant="outline" className="border-primary/30 text-[10px] text-primary">
+                    You
+                  </Badge>
+                )}
+              </div>
+
+              <dl className="grid gap-4 py-2 sm:grid-cols-2">
+                <DetailItem label="Login username" value={viewTarget.username || "—"} />
+                <DetailItem label="Staff code" value={viewTarget.staffCode || "—"} />
+                <DetailItem label="Position" value={viewTarget.position || "—"} />
+                <DetailItem label="Department" value={viewTarget.department || "—"} />
+                <DetailItem label="Phone" value={viewTarget.phone || "—"} />
+                <DetailItem label="Hire date" value={formatDate(viewTarget.hireDate)} />
+                <DetailItem
+                  label="Assigned outlet"
+                  value={
+                    viewTarget.outletId ? (
+                      viewTarget.outletName || "Assigned outlet"
+                    ) : viewTarget.role === "outlet_manager" ? (
+                      <span className="text-destructive">Not bound to an outlet</span>
+                    ) : (
+                      "—"
+                    )
+                  }
+                />
+                <DetailItem
+                  label="Role access"
+                  value={roleDefinitionFor(viewTarget.role)?.description || "—"}
+                />
+              </dl>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setViewTarget(null)}>
+                  Close
+                </Button>
+                <Button
+                  disabled={!canManage(viewTarget)}
+                  onClick={() => {
+                    const record = viewTarget;
+                    setViewTarget(null);
+                    openEdit(record);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit details
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

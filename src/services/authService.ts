@@ -143,6 +143,39 @@ export const updatePassword = async (password: string) => {
   }
 };
 
+// Set another login's password
+export const setUserLoginPassword = async (
+  userId: string,
+  password: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // The Admin API needs the service role key, which must never ship in the
+    // browser bundle. public.admin_set_user_password does the same auth.users
+    // write and re-checks the caller's role server-side.
+    const { error } = await supabase.rpc('admin_set_user_password', {
+      target_user_id: userId,
+      new_password: password,
+    });
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Password update error:', error);
+    const message = (error as { message?: string }).message?.trim();
+    const code = (error as { code?: string }).code;
+
+    // PGRST202/42883 mean the helper function has not been created yet.
+    if (code === 'PGRST202' || code === '42883' || /admin_set_user_password/i.test(message || '')) {
+      return {
+        success: false,
+        error: 'Run migration 20261115_add_admin_set_user_password.sql in Supabase, then try again.',
+      };
+    }
+
+    return { success: false, error: message || 'The password could not be updated.' };
+  }
+};
+
 // Update user email
 export const updateEmail = async (email: string) => {
   try {
