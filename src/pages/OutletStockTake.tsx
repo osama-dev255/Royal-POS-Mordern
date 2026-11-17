@@ -281,19 +281,26 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
       }
   
       // Update sold quantities in database based on physical count
-      // Formula: Sold = Available Stock - Physical Count
+      // sold_quantity is cumulative (quantity - sold_quantity is the generated
+      // available_quantity column), so the new sold total must be derived from the
+      // total received quantity, not from the stock remaining since the last take.
+      // Formula: Cumulative Sold = Total Received Qty - Physical Count
       for (const item of selectedItems) {
-        const calculatedSoldQty = Math.max(0, item.stockRemain - item.physicalCount);
+        const cumulativeSoldQty = Math.max(0, item.originalQuantity - item.physicalCount);
           
         // Update sold_quantity in database
-        await supabase
+        const { error: soldError } = await supabase
           .from('inventory_products')
           .update({
-            sold_quantity: calculatedSoldQty,
+            sold_quantity: cumulativeSoldQty,
             updated_at: new Date().toISOString()
           })
           .eq('outlet_id', outletId)
           .eq('name', item.name);
+
+        if (soldError) {
+          console.error(`❌ Error updating sold quantity for "${item.name}":`, soldError);
+        }
       }
 
       // NOTE: Stock Takes intentionally do NOT record stock movements.
@@ -354,9 +361,23 @@ export const OutletStockTake = ({ onBack, outletId }: OutletStockTakeProps) => {
         title: "Stock Take Saved",
         description: `Stock take ${stockTakeNumber} has been saved successfully`
       });
+
+      // The counted products are already applied to the outlet inventory above, so the
+      // working list is cleared: the next stock take starts from an empty selection.
+      const selectionKey = `outlet_${outletId}_stock_take_selection`;
+      localStorage.removeItem(selectionKey);
+
+      const remainingCounts: Record<string, number> = JSON.parse(localStorage.getItem(physicalCountsKey) || '{}');
+      selectedItems.forEach(item => {
+        delete remainingCounts[item.id];
+      });
+      localStorage.setItem(physicalCountsKey, JSON.stringify(remainingCounts));
+
+      setSelectedIds([]);
+      setSearchTerm("");
         
-      // Reload data to reflect changes
-      loadStockData();
+      // Reload data to reflect the updated available quantities
+      await loadStockData();
     } catch (error) {
       console.error("Error saving stock take:", error);
       toast({
