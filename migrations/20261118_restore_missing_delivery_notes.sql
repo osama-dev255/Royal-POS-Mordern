@@ -29,6 +29,10 @@
 
 BEGIN;
 
+-- Re-runs are safe: the working tables are rebuilt from scratch.
+DROP TABLE IF EXISTS _restore_params;
+DROP TABLE IF EXISTS _missing_notes;
+
 -- ---------------------------------------------------------------- parameters
 CREATE TEMP TABLE _restore_params AS
 SELECT NULL::uuid AS only_outlet;                                      -- every outlet
@@ -42,10 +46,11 @@ WITH movements AS (
     sm.created_at::date                                AS note_date,
     MIN(sm.created_at)                                 AS first_movement,
     sm.outlet_id,
-    MIN(sm.godown_id)                                  AS godown_id,
-    MIN(sm.zone_id)                                    AS zone_id,
-    MIN(sm.business_id)                                AS business_id,
-    MIN(sm.created_by)                                 AS created_by,
+    -- uuid has no MIN()/MAX() aggregate, so take the first non-null value
+    (array_agg(sm.godown_id)   FILTER (WHERE sm.godown_id   IS NOT NULL))[1] AS godown_id,
+    (array_agg(sm.zone_id)     FILTER (WHERE sm.zone_id     IS NOT NULL))[1] AS zone_id,
+    (array_agg(sm.business_id) FILTER (WHERE sm.business_id IS NOT NULL))[1] AS business_id,
+    (array_agg(sm.created_by)  FILTER (WHERE sm.created_by  IS NOT NULL))[1] AS created_by,
     COUNT(*)                                           AS line_count,
     SUM(COALESCE(sm.total_cost, 0))                    AS total_value,
     jsonb_agg(
@@ -76,7 +81,14 @@ WITH movements AS (
 SELECT
   m.*,
   o.name                                              AS outlet_name,
-  b.name                                              AS business_name
+  b.name                                              AS business_name,
+  -- saved_delivery_notes.user_id has a FK to users, so every candidate must
+  -- come FROM users: a movement's created_by can be an auth id with no staff row.
+  COALESCE(
+    (SELECT u.id FROM users u WHERE u.id = m.created_by),
+    (SELECT u.id FROM users u WHERE u.role IN ('admin', 'super_admin') ORDER BY u.id LIMIT 1),
+    (SELECT u.id FROM users u ORDER BY u.id LIMIT 1)
+  )                                                   AS resolved_user_id
 FROM movements m
 LEFT JOIN outlets  o ON o.id = m.outlet_id
 LEFT JOIN businesses b ON b.id = m.business_id
@@ -95,12 +107,21 @@ SELECT
   note_number,
   note_date,
   outlet_name,
+  resolved_user_id,
   line_count            AS lines,
   total_value           AS cost_value
 FROM _missing_notes
 ORDER BY note_date;
 
 -- --------------------------------------------------------------- restore
+-- Fail before touching triggers if no staff row can own the restored notes.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM _missing_notes WHERE resolved_user_id IS NULL) THEN
+    RAISE EXCEPTION 'No row in users can own the restored notes; add a staff row first.';
+  END IF;
+END $$;
+
 ALTER TABLE saved_delivery_notes DISABLE TRIGGER USER;
 
 INSERT INTO saved_delivery_notes (
@@ -126,14 +147,12 @@ INSERT INTO saved_delivery_notes (
   business_name,
   business_id,
   delivery_notes,
+  approval_status,
   created_at,
   updated_at
 )
 SELECT
-  COALESCE(
-    m.created_by,
-    (SELECT u.id FROM users u WHERE u.role = 'admin' ORDER BY u.created_at LIMIT 1)
-  ),
+  m.resolved_user_id,
   m.note_number,
   m.note_date,
   COALESCE(m.outlet_name, 'Unknown'),
@@ -155,6 +174,7 @@ SELECT
   m.business_name,
   m.business_id,
   'Restored from the stock movement ledger: the note was delivered and processed but its save failed.',
+  'pending',
   m.first_movement,
   m.first_movement
 FROM _missing_notes m;
