@@ -4061,7 +4061,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
         }, 500);
       } catch (error) {
         console.error('Error saving delivery:', error);
-        alert('Error saving delivery. Please try again.');
+        // Surface the database reason instead of a generic "try again", so a rejected
+        // insert can never be mistaken for a saved delivery note.
+        alert(error instanceof Error ? error.message : 'Error saving delivery. Please try again.');
       }
     } else if (currentTemplate?.type === "purchase-order") {
       // Save purchase order to Supabase
@@ -6625,7 +6627,9 @@ Approved By: [APPROVED_BY]    Date: [APPROVED_DATE]`,
         // Don't reset here - let the user choose an option first
       } catch (error) {
         console.error('Error saving delivery:', error);
-        alert('Error saving delivery. Please try again.');
+        // Surface the database reason instead of a generic "try again", so a rejected
+        // insert can never be mistaken for a saved delivery note.
+        alert(error instanceof Error ? error.message : 'Error saving delivery. Please try again.');
       } finally {
         // Reset saving state
         setIsSavingDeliveryNote(false);

@@ -92,9 +92,19 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
         
       if (error) {
         console.error('Error saving delivery to database:', error);
-      } else {
-        dbSaveSuccessful = true;
+        // NEVER report success for a note that is not in the book: callers record
+        // stock movements and show a "saved" alert as soon as this resolves.
+        throw new Error(
+          `Delivery note ${delivery.deliveryNoteNumber} was NOT saved: ${error.message}${error.code ? ` (${error.code})` : ''}`
+        );
       }
+      dbSaveSuccessful = true;
+    } else {
+      // Without a session the insert never runs, so the note would only end up in
+      // this browser's localStorage while the stock movements are still written.
+      throw new Error(
+        `Delivery note ${delivery.deliveryNoteNumber} was NOT saved: no signed-in session. Sign in again and re-save.`
+      );
     }
     
     // Update localStorage ONLY with current user's deliveries to avoid duplicates
@@ -428,26 +438,115 @@ const updateDeliveryGodownStock = async (delivery: DeliveryData): Promise<void> 
   }
 };
 
+// ============================================
+// SAVED DELIVERY NOTES - SHARED, PAGED READS
+// ============================================
+// Supabase/PostgREST returns at most 1000 rows per request, so a single
+// unpaged select silently truncates the book: the newest page arrives and the
+// oldest notes vanish, which looks exactly like "only shows deliveries from
+// <some recent date>". Every read below walks the pages instead.
+const DELIVERY_PAGE_SIZE = 1000;
+
+interface DeliveryScope {
+  /** outlet manager: their own notes OR their assigned outlet */
+  orFilter?: string;
+  /** single-outlet lookups (one outlet's deliveries in/out) */
+  outletIds?: string[];
+}
+
+const applyDeliveryScope = (query: any, scope: DeliveryScope) =>
+  scope.orFilter ? query.or(scope.orFilter) : query;
+
+/**
+ * Fetches every matching note page by page. created_at is not unique, so id is
+ * appended as a tiebreaker - without it a page boundary can repeat or skip rows
+ * whenever two notes share a timestamp.
+ */
+const fetchAllDeliveryNotes = async (
+  scope: DeliveryScope
+): Promise<{ rows: any[]; error: any }> => {
+  const rows: any[] = [];
+
+  for (let from = 0; ; from += DELIVERY_PAGE_SIZE) {
+    let pageQuery: any = supabase
+      .from('saved_delivery_notes')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + DELIVERY_PAGE_SIZE - 1);
+
+    pageQuery = applyDeliveryScope(pageQuery, scope);
+    if (scope.outletIds && scope.outletIds.length > 0) {
+      pageQuery = pageQuery.in('outlet_id', scope.outletIds);
+    }
+
+    const { data, error } = await pageQuery;
+    if (error) return { rows, error };
+
+    rows.push(...(data || []));
+    if (!data || data.length < DELIVERY_PAGE_SIZE) break;
+  }
+
+  return { rows, error: null };
+};
+
+/**
+ * Saved delivery notes are shared documents, so the book is read business-wide
+ * and RLS decides what a login may see. The one narrow scope is an outlet
+ * manager, who is pinned to their assigned outlet plus the notes they authored.
+ *
+ * A missing or unreadable staff row is deliberately NOT treated as "scope this
+ * login": that default is what previously hid every note saved by another
+ * login behind a silently empty-looking list.
+ */
+const resolveDeliveryScope = async (): Promise<{ userId: string | null; scope: DeliveryScope }> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { userId: null, scope: {} };
+
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error resolving delivery scope role:', error);
+  }
+
+  if (profile?.role !== 'outlet_manager') {
+    return { userId: user.id, scope: {} };
+  }
+
+  const { data: assignments, error: assignmentError } = await supabase
+    .from('outlet_users')
+    .select('outlet_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true);
+
+  if (assignmentError) {
+    console.error('Error resolving delivery scope outlet:', assignmentError);
+  }
+
+  const outletIds = Array.from(
+    new Set((assignments || []).map((row: any) => row.outlet_id).filter(Boolean))
+  ) as string[];
+
+  const clauses = [`user_id.eq.${user.id}`];
+  if (outletIds.length > 0) {
+    clauses.push(`outlet_id.in.(${outletIds.join(',')})`);
+  }
+
+  return { userId: user.id, scope: { orFilter: clauses.join(',') } };
+};
+
 export const getSavedDeliveries = async (): Promise<DeliveryData[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Check if user is admin to determine query scope
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+      const { scope } = await resolveDeliveryScope();
       
-      let query = supabase.from('saved_delivery_notes').select('*');
-      
-      // Admins can see all deliveries, others see only their own
-      if (userData?.role !== 'admin') {
-        query = query.eq('user_id', user.id);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { rows: data, error } = await fetchAllDeliveryNotes(scope);
         
       if (error) {
         console.error('Error retrieving saved deliveries from database:', error);
@@ -515,19 +614,15 @@ export const deleteDelivery = async (deliveryId: string): Promise<void> => {
     let dbDeleteSuccessful = false;
     
     if (user) {
-      // Check if user is admin to determine delete scope
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+      // Scope the delete exactly like the list: business-wide, except an outlet
+      // manager who keeps their own outlet
+      const { scope } = await resolveDeliveryScope();
       
       let query = supabase.from('saved_delivery_notes').delete();
       
-      // Admins can delete any delivery, others can only delete their own
-      if (userData?.role !== 'admin') {
-        query = query.eq('user_id', user.id);
-      }
+      // Same scope as the list below, so a note that is visible is always
+      // deletable and a hidden one is never reported as deleted.
+      query = applyDeliveryScope(query, scope);
       
       const { error } = await query.eq('id', deliveryId);
         
@@ -861,14 +956,11 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
     if (user) {
       console.log('👤 User authenticated:', user.id);
       
-      // Check if user is admin to determine update scope
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+      // Scope the update exactly like the list: business-wide, except an outlet
+      // manager who keeps their own outlet
+      const { scope } = await resolveDeliveryScope();
       
-      console.log('📝 User role:', userData?.role);
+      console.log('📝 Delivery write scope resolved');
       
       // First, fetch the original delivery from database to compare items
       const { data: originalDelivery, error: fetchError } = await supabase
@@ -922,13 +1014,8 @@ export const updateDelivery = async (updatedDelivery: DeliveryData): Promise<voi
       
       let query = supabase.from('saved_delivery_notes').update(updateData);
       
-      // Admins can update any delivery, others can only update their own
-      if (userData?.role !== 'admin') {
-        query = query.eq('user_id', user.id);
-        console.log('🔒 Non-admin user: filtering by user_id');
-      } else {
-        console.log('🔓 Admin user: can update any delivery');
-      }
+      // Same scope as the list: an outlet manager stays inside their own outlet,
+      query = applyDeliveryScope(query, scope);
       
       const { error } = await query.eq('id', updatedDelivery.id);
         
@@ -1055,12 +1142,9 @@ export const getDeliveriesByOutletId = async (outletId: string): Promise<Deliver
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Query deliveries by outlet_id
-      const { data, error } = await supabase
-        .from('saved_delivery_notes')
-        .select('*')
-        .eq('outlet_id', outletId)
-        .order('created_at', { ascending: false });
+      // Paged read so an outlet with more than one response page of notes is not
+      // truncated to the newest 1000 notes.
+      const { rows: data, error } = await fetchAllDeliveryNotes({ outletIds: [outletId] });
         
       if (error) {
         console.error('Error retrieving deliveries by outlet ID from database:', error);
