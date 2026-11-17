@@ -90,11 +90,13 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
   // Filter deliveries based on search term and date
   const filteredDeliveries = deliveries.filter(delivery => {
     // Text search (delivery note number, customer, ID, driver)
-    const matchesText = 
-      delivery.deliveryNoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.driver.toLowerCase().includes(searchTerm.toLowerCase());
+    // Some fields are optional/nullable in saved rows, so compare defensively
+    const term = (searchTerm || '').toLowerCase().trim();
+    const matchesText =
+      String(delivery.deliveryNoteNumber ?? '').toLowerCase().includes(term) ||
+      String(delivery.customer ?? '').toLowerCase().includes(term) ||
+      String(delivery.id ?? '').toLowerCase().includes(term) ||
+      String(delivery.driver ?? '').toLowerCase().includes(term);
     
     // Date search
     let matchesDate = true;
@@ -335,7 +337,7 @@ export const SavedDeliveriesSection = ({ onBack, onLogout, username }: SavedDeli
           if (!itemName || !itemName.trim() || itemQuantity <= 0) continue;
 
           const product = allProducts.find(p =>
-            p.name.toLowerCase().trim() === String(itemName).toLowerCase().trim()
+            p.name && p.name.toLowerCase().trim() === String(itemName).toLowerCase().trim()
           );
           const itemGodownId = item.godown_id || item.godownId || undefined;
           const itemZoneId = item.zone_id || item.zoneId || undefined;
