@@ -2797,12 +2797,32 @@ export const Index = () => {
               );
             case "outlet-expenses":
               console.log("Rendering OutletExpenses");
-              return (
-                <OutletExpenses
-                  onBack={handleBack}
-                  outletName="Outlet Expenses"
-                />
-              );
+              // Expense management is per-outlet: OutletExpenses bails out of every
+              // loader when it has no outletId (petty cash included), so an
+              // outlet manager is sent straight into their own outlet while every
+              // other role picks an outlet from the registered list first.
+              if (outletManagerOutletId) {
+                return (
+                  <OutletLayout
+                    username={user?.email || "admin"}
+                    onLogout={handleLogout}
+                    outletId={outletManagerOutletId}
+                    outletName={`Outlet ${outletManagerOutletId.slice(0, 8)}`}
+                    currentView="expenses"
+                  >
+                    <div className="p-6">
+                      <OutletExpenses
+                        outletId={outletManagerOutletId}
+                        outletName={`Outlet ${outletManagerOutletId.slice(0, 8)}`}
+                        onBack={() => {
+                          setCurrentView(`outlet-details-${outletManagerOutletId}`);
+                        }}
+                      />
+                    </div>
+                  </OutletLayout>
+                );
+              }
+              return <RegisteredOutlets />;
             case "saved-supplier-settlements":
               console.log("Rendering SavedSupplierSettlementsSection");
               return (
