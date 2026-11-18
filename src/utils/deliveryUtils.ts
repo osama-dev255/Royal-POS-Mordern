@@ -44,8 +44,9 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
   try {
     console.log('💾 Saving delivery to database:', delivery.deliveryNoteNumber);
     
-    // NOTE: Database trigger has been DISABLED due to double-update bug
-    // We now handle inventory updates in JavaScript to ensure single update
+    // NOTE: The saved_delivery_notes inventory trigger is dropped by
+    // migrations/20261118_drop_delivery_inventory_triggers.sql, so this JavaScript
+    // block is the single writer for inventory_products.
     let dbSaveSuccessful = false;
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -164,99 +165,132 @@ export const saveDelivery = async (delivery: DeliveryData): Promise<void> => {
     localStorage.setItem(SAVED_DELIVERIES_KEY, JSON.stringify(deliveriesToStore));
     
     // CRITICAL: Update outlet inventory in JavaScript ONLY ONCE
-    // (Database trigger has been disabled)
+    // (the database trigger that used to do this has been dropped)
     if (dbSaveSuccessful && delivery.outletId && delivery.itemsList && delivery.itemsList.length > 0) {
       try {
-        console.log('📦 Updating outlet inventory in JavaScript (trigger disabled)...');
+        console.log('📦 Updating outlet inventory (single writer)...');
         console.log('📍 Outlet ID:', delivery.outletId);
         console.log('📋 Items:', delivery.itemsList.length);
-        
+
+        // Aggregate the delivered quantity per product first: the same product can sit
+        // on several rows of one note (one row per godown/zone), and applying each row
+        // separately used to insert a second inventory row for that product.
+        const itemsByProduct = new Map<string, {
+          name: string;
+          quantity: number;
+          unitCost: number;
+          sellingPrice: number;
+          sku?: string;
+          category?: string;
+        }>();
+
+        for (const item of delivery.itemsList) {
+          const productName = (item.name || item.description || '').toString().trim();
+          const deliveredQty = Number(item.quantity ?? item.delivered ?? 0);
+
+          if (!productName || !Number.isFinite(deliveredQty) || deliveredQty <= 0) {
+            console.log('⏭️ Skip:', productName, deliveredQty);
+            continue;
+          }
+
+          const key = productName.toLowerCase();
+          const aggregated = itemsByProduct.get(key);
+
+          if (aggregated) {
+            aggregated.quantity += deliveredQty;
+            aggregated.unitCost = item.rate ?? item.price ?? aggregated.unitCost;
+            aggregated.sellingPrice = item.sellingPrice ?? item.rate ?? item.price ?? aggregated.sellingPrice;
+          } else {
+            itemsByProduct.set(key, {
+              name: productName,
+              quantity: deliveredQty,
+              unitCost: item.rate ?? item.price ?? 0,
+              sellingPrice: item.sellingPrice ?? item.rate ?? item.price ?? 0,
+              sku: item.sku,
+              category: item.category
+            });
+          }
+        }
+
         // Get fresh inventory data
         const { data: outletInventory, error: inventoryError } = await supabase
           .from('inventory_products')
-          .select('*')
+          .select('id, name, quantity, unit_cost, selling_price')
           .eq('outlet_id', delivery.outletId);
-        
+
         if (inventoryError) {
           console.error('❌ Error loading inventory:', inventoryError);
         } else {
-          console.log('📊 Current inventory products:', outletInventory?.length || 0);
-          
-          // Process each item
-          for (const item of delivery.itemsList) {
-            const productName = item.name || item.description;
-            const deliveredQty = item.quantity || item.delivered || 0;
-            
-            if (!productName || deliveredQty <= 0) {
-              console.log('⏭️ Skip:', productName, deliveredQty);
-              continue;
+          // Match on the normalised name so a case/whitespace difference never creates
+          // a second row for a product the outlet already has.
+          const inventoryByName = new Map<string, { id: string; name: string; quantity: number; unit_cost: number; selling_price: number }>();
+          (outletInventory || []).forEach((p: any) => {
+            const key = (p.name || '').trim().toLowerCase();
+            if (!key) return;
+            const current = inventoryByName.get(key);
+            // Historical duplicates may exist: keep the largest row as the target
+            if (!current || (p.quantity || 0) > (current.quantity || 0)) {
+              inventoryByName.set(key, p);
             }
-            
-            // Get FRESH quantity from database (not cached)
-            const existingProduct = outletInventory?.find(p => p.name === productName);
-            
+          });
+
+          const nowIso = new Date().toISOString();
+
+          for (const product of itemsByProduct.values()) {
+            const key = product.name.toLowerCase();
+            const existingProduct = inventoryByName.get(key);
+
             if (existingProduct) {
-              // Re-query to get absolute latest value
-              const { data: freshData } = await supabase
-                .from('inventory_products')
-                .select('quantity')
-                .eq('id', existingProduct.id)
-                .single();
-              
-              const currentQty = freshData?.quantity || existingProduct.quantity || 0;
-              const newQty = currentQty + deliveredQty;
-              
-              // Get unit cost and selling price from delivery item
-              const unitCost = item.rate ?? item.price ?? existingProduct.unit_cost ?? 0;
-              const sellingPrice = item.sellingPrice ?? item.rate ?? item.price ?? existingProduct.selling_price ?? 0;
-              
-              console.log(`📝 ${productName}: ${currentQty} + ${deliveredQty} = ${newQty}`);
-              console.log(`💰 ${productName}: unit_cost=${unitCost}, selling_price=${sellingPrice}`);
-              
-              // Update the product in inventory
+              const currentQty = existingProduct.quantity || 0;
+              const newQty = currentQty + product.quantity;
+              const unitCost = product.unitCost || existingProduct.unit_cost || 0;
+              const sellingPrice = product.sellingPrice || existingProduct.selling_price || 0;
+
+              console.log(`📝 ${product.name}: ${currentQty} + ${product.quantity} = ${newQty}`);
+
               const { error: updateError } = await supabase
                 .from('inventory_products')
                 .update({
                   quantity: newQty,
                   unit_cost: unitCost,
                   selling_price: sellingPrice,
-                  updated_at: new Date().toISOString()
+                  delivery_note_number: delivery.deliveryNoteNumber,
+                  last_updated: nowIso,
+                  updated_at: nowIso
                 })
                 .eq('id', existingProduct.id);
-              
+
               if (updateError) {
-                console.error(`❌ Error updating ${productName}:`, updateError);
+                console.error(`❌ Error updating ${product.name}:`, updateError);
               } else {
-                console.log(`✅ Updated ${productName} inventory`);
+                existingProduct.quantity = newQty;
+                console.log(`✅ Updated ${product.name} inventory`);
               }
             } else {
-              // Create new inventory product
-              console.log(`🆕 Creating new inventory product for: ${productName}`);
-              console.log(`   - outlet_id: ${delivery.outletId}`);
-              console.log(`   - quantity: ${deliveredQty}`);
-              console.log(`   - unit_cost: ${item.rate ?? item.price ?? 0}`);
-              console.log(`   - selling_price: ${item.sellingPrice ?? item.rate ?? item.price ?? 0}`);
-              
-              const { data: insertData, error: insertError } = await supabase
+              // Create the product once, then remember it for the rest of this save
+              const { data: inserted, error: insertError } = await supabase
                 .from('inventory_products')
                 .insert({
                   outlet_id: delivery.outletId,
-                  name: productName,
-                  quantity: deliveredQty,
-                  unit_cost: item.rate ?? item.price ?? 0,
-                  selling_price: item.sellingPrice ?? item.rate ?? item.price ?? 0,
+                  name: product.name,
+                  quantity: product.quantity,
+                  unit_cost: product.unitCost,
+                  selling_price: product.sellingPrice,
+                  sku: product.sku || null,
+                  category: product.category || 'General',
                   delivery_note_number: delivery.deliveryNoteNumber,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
+                  created_at: nowIso,
+                  updated_at: nowIso,
+                  last_updated: nowIso
                 })
-                .select();
-              
+                .select('id, name, quantity, unit_cost, selling_price')
+                .single();
+
               if (insertError) {
-                console.error(`❌ Error creating inventory for ${productName}:`, insertError);
-                console.error(`   - Full error:`, JSON.stringify(insertError, null, 2));
-              } else {
-                console.log(`✅ Created inventory for ${productName}`);
-                console.log(`   - Inserted data:`, insertData);
+                console.error(`❌ Error creating inventory for ${product.name}:`, insertError);
+              } else if (inserted) {
+                inventoryByName.set(key, inserted as any);
+                console.log(`✅ Created inventory for ${product.name}`);
               }
             }
           }
