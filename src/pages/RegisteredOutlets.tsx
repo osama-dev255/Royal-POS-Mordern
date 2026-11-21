@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Building, 
   MapPin, 
@@ -17,10 +25,28 @@ import {
   X,
   Wallet,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { getOutlets, createOutlet, updateOutlet, Outlet } from "@/services/databaseService";
+
+const EMPTY_OUTLET_FORM: Omit<Outlet, 'id' | 'created_at' | 'updated_at'> = {
+  name: "",
+  location: "",
+  phone: "",
+  email: "",
+  manager: "",
+  employee_count: 0,
+  product_count: 0,
+  status: "active",
+  address: "",
+  city: "",
+  state: "",
+  zip_code: "",
+  country: "Tanzania",
+  opening_date: ""
+};
 
 export const RegisteredOutlets = () => {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -30,22 +56,12 @@ export const RegisteredOutlets = () => {
   const [filteredOutlets, setFilteredOutlets] = useState<Outlet[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const [newOutlet, setNewOutlet] = useState<Omit<Outlet, 'id' | 'created_at' | 'updated_at'>>({
-    name: "",
-    location: "",
-    phone: "",
-    email: "",
-    manager: "",
-    employee_count: 0,
-    product_count: 0,
-    status: "active",
-    address: "",
-    city: "",
-    state: "",
-    zip_code: "",
-    country: "Tanzania",
-    opening_date: ""
-  });
+  const [editingOutlet, setEditingOutlet] = useState<Outlet | null>(null);
+  const [editForm, setEditForm] = useState<Omit<Outlet, 'id' | 'created_at' | 'updated_at'>>(EMPTY_OUTLET_FORM);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const [newOutlet, setNewOutlet] = useState<Omit<Outlet, 'id' | 'created_at' | 'updated_at'>>(EMPTY_OUTLET_FORM);
 
   useEffect(() => {
     fetchOutlets();
@@ -86,22 +102,7 @@ export const RegisteredOutlets = () => {
       const createdOutlet = await createOutlet(outletToCreate);
       if (createdOutlet) {
         setOutlets([...outlets, createdOutlet]);
-        setNewOutlet({
-          name: "",
-          location: "",
-          phone: "",
-          email: "",
-          manager: "",
-          employee_count: 0,
-          product_count: 0,
-          status: "active",
-          address: "",
-          city: "",
-          state: "",
-          zip_code: "",
-          country: "Tanzania",
-          opening_date: ""
-        });
+        setNewOutlet({ ...EMPTY_OUTLET_FORM });
         setShowAddForm(false);
       } else {
         setError("Failed to create outlet. Please try again.");
@@ -134,6 +135,70 @@ export const RegisteredOutlets = () => {
 
   const handleViewExpenses = (outlet: Outlet) => {
     window.location.hash = `#/outlet-expenses/${outlet.id}`;
+  };
+
+  const handleOpenEdit = (outlet: Outlet) => {
+    setEditingOutlet(outlet);
+    setEditError(null);
+    setEditForm({
+      name: outlet.name || "",
+      location: outlet.location || "",
+      phone: outlet.phone || "",
+      email: outlet.email || "",
+      manager: outlet.manager || "",
+      employee_count: outlet.employee_count || 0,
+      product_count: outlet.product_count || 0,
+      status: outlet.status || "active",
+      address: outlet.address || "",
+      city: outlet.city || "",
+      state: outlet.state || "",
+      zip_code: outlet.zip_code || "",
+      country: outlet.country || "Tanzania",
+      opening_date: outlet.opening_date || ""
+    });
+  };
+
+  const handleCloseEdit = () => {
+    if (savingEdit) return;
+    setEditingOutlet(null);
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingOutlet?.id) {
+      setEditError("This outlet cannot be updated because it has no record ID.");
+      return;
+    }
+    if (!editForm.name.trim()) {
+      setEditError("Outlet name is required.");
+      return;
+    }
+    if (!editForm.location.trim()) {
+      setEditError("Location is required.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setEditError(null);
+      const updated = await updateOutlet(editingOutlet.id, {
+        ...editForm,
+        opening_date: editForm.opening_date || null
+      });
+
+      if (!updated) {
+        setEditError("Failed to update outlet. Please try again.");
+        return;
+      }
+
+      setOutlets(prev => prev.map(o => (o.id === editingOutlet.id ? { ...updated } : o)));
+      setEditingOutlet(null);
+    } catch (err) {
+      console.error("Error updating outlet:", err);
+      setEditError("Failed to update outlet. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   // Removed outlet details modal functionality
@@ -322,6 +387,7 @@ export const RegisteredOutlets = () => {
                         className="flex-1"
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleOpenEdit(outlet);
                         }}
                       >
                         <Edit className="h-4 w-4 mr-1" />
@@ -448,6 +514,118 @@ export const RegisteredOutlets = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Outlet Dialog */}
+      <Dialog open={!!editingOutlet} onOpenChange={(open) => { if (!open) handleCloseEdit(); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Edit Outlet
+            </DialogTitle>
+            <DialogDescription>
+              Update the details for {editingOutlet?.name || 'this outlet'}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Outlet Name *</label>
+              <Input
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Enter outlet name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Location *</label>
+              <Input
+                value={editForm.location}
+                onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                placeholder="Enter location"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Phone</label>
+              <Input
+                value={editForm.phone || ""}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="Enter phone number"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <Input
+                value={editForm.email || ""}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="Enter email"
+                type="email"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Manager</label>
+              <Input
+                value={editForm.manager || ""}
+                onChange={(e) => setEditForm({ ...editForm, manager: e.target.value })}
+                placeholder="Enter manager name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Status</label>
+              <select
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value as "active" | "inactive" | "maintenance" })}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="maintenance">Maintenance</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Address</label>
+              <Input
+                value={editForm.address || ""}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                placeholder="Enter street address"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">City</label>
+              <Input
+                value={editForm.city || ""}
+                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                placeholder="Enter city"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Opening Date</label>
+              <Input
+                value={editForm.opening_date || ""}
+                onChange={(e) => setEditForm({ ...editForm, opening_date: e.target.value })}
+                type="date"
+              />
+            </div>
+          </div>
+
+          {editError && (
+            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{editError}</span>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleCloseEdit} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
