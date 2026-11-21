@@ -8446,3 +8446,319 @@ export const bulkCreateAttendance = async (records: AttendanceRecord[]): Promise
     return false;
   }
 };
+
+// ============================================
+// OUTLET DASHBOARD SNAPSHOT
+// ============================================
+
+/**
+ * Live figures for the outlet dashboard. Every value is derived from the outlet
+ * transaction tables (cash/card/mobile sales + credit debts), the outlet stock
+ * ledger and the outlet staff assignments. Nothing here is hard-coded.
+ */
+export interface OutletDashboardActivity {
+  id: string;
+  type: 'sale' | 'order' | 'stock' | 'alert';
+  description: string;
+  occurredAt: string;
+  amount?: number;
+}
+
+export interface OutletDashboardSnapshot {
+  todaySales: number;
+  yesterdaySales: number;
+  weeklySales: number;
+  monthlySales: number;
+  /** null when there were no sales yesterday, so a percentage would be meaningless */
+  salesGrowth: number | null;
+  transactionsToday: number;
+  customerVisitsToday: number;
+  averageTransactionToday: number;
+  /** Average daily takings over the previous 7 complete days */
+  dailyBaseline: number;
+  /** Average takings per 7-day block over the previous 28 complete days */
+  weeklyBaseline: number;
+  /** Average of the previous 3 complete calendar months */
+  monthlyBaseline: number;
+  dailyTargetPercent: number;
+  weeklyTargetPercent: number;
+  monthlyTargetPercent: number;
+  pendingApprovals: number;
+  lowStockItems: number;
+  employeeCount: number;
+  productCount: number;
+  outstandingDebtAmount: number;
+  outstandingDebtCount: number;
+  recentActivity: OutletDashboardActivity[];
+}
+
+interface OutletDashboardTransaction {
+  id: string;
+  invoiceNumber: string;
+  description: string;
+  type: 'sale' | 'order';
+  occurredAt: Date;
+  amount: number;
+  customerId: string | null;
+}
+
+const dashboardStartOfDay = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const dashboardAddDays = (date: Date, days: number): Date => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const dashboardRound = (value: number): number => Math.round(value * 100) / 100;
+
+/** Row count for an outlet-scoped table, tolerant of missing columns/tables. */
+const countOutletRows = async (
+  table: string,
+  outletId: string,
+  column?: string,
+  values?: string[]
+): Promise<number> => {
+  try {
+    let query = supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .eq('outlet_id', outletId);
+
+    if (column && values) {
+      query = query.in(column, values);
+    }
+
+    const { count, error } = await query;
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error(`Error counting ${table} for outlet ${outletId}:`, error);
+    return 0;
+  }
+};
+
+/**
+ * Loads the aggregated dashboard snapshot for a single outlet.
+ * Each source is fetched independently so one unavailable table cannot blank the page.
+ */
+export const getOutletDashboardSnapshot = async (
+  outletId: string
+): Promise<OutletDashboardSnapshot> => {
+  const now = new Date();
+  const todayStart = dashboardStartOfDay(now);
+  const yesterdayStart = dashboardAddDays(todayStart, -1);
+  const mondayOffset = (now.getDay() + 6) % 7; // 0 = Monday
+  const weekStart = dashboardAddDays(todayStart, -mondayOffset);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Start of the month three months back: covers three complete comparison months.
+  const windowStart = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+
+  const transactions: OutletDashboardTransaction[] = [];
+
+  const loadSales = async (
+    table: string,
+    label: string,
+    dateColumn: string
+  ): Promise<OutletDashboardTransaction[]> => {
+    try {
+      const { data, error } = await supabase
+        .from(table)
+        .select('id, invoice_number, sale_date, total_amount, customer_id, approval_status')
+        .eq('outlet_id', outletId)
+        .gte(dateColumn, windowStart.toISOString());
+
+      if (error) throw error;
+
+      return (data || [])
+        .filter((row: Record<string, unknown>) => row.approval_status !== 'rejected')
+        .map((row: Record<string, unknown>) => {
+          const rawDate = row[dateColumn] as string | null;
+          return {
+            id: String(row.id),
+            invoiceNumber: String(row.invoice_number || ''),
+            description: `${label} - ${row.invoice_number || 'no invoice number'}`,
+            type: 'sale' as const,
+            occurredAt: rawDate ? new Date(rawDate) : now,
+            amount: Number(row.total_amount) || 0,
+            customerId: (row.customer_id as string | null) || null
+          };
+        })
+        .filter((txn) => !Number.isNaN(txn.occurredAt.getTime()));
+    } catch (error) {
+      console.error(`Error loading ${table} for outlet ${outletId}:`, error);
+      return [];
+    }
+  };
+
+  const loadDebts = async (): Promise<{
+    transactions: OutletDashboardTransaction[];
+    outstandingAmount: number;
+    outstandingCount: number;
+  }> => {
+    try {
+      const { data, error } = await supabase
+        .from('outlet_debts')
+        .select('id, invoice_number, debt_date, total_amount, amount_paid, remaining_amount, payment_status, customer_id')
+        .eq('outlet_id', outletId)
+        .gte('debt_date', windowStart.toISOString());
+
+      if (error) throw error;
+
+      const rows = (data || []).filter(
+        (row: Record<string, unknown>) => !['cancelled', 'refunded'].includes(String(row.payment_status))
+      );
+
+      const transactions = rows
+        .map((row: Record<string, unknown>) => ({
+          id: String(row.id),
+          invoiceNumber: String(row.invoice_number || ''),
+          description: `Credit sale - ${row.invoice_number || 'no invoice number'}`,
+          type: 'order' as const,
+          occurredAt: row.debt_date ? new Date(String(row.debt_date)) : now,
+          amount: Number(row.total_amount) || 0,
+          customerId: (row.customer_id as string | null) || null
+        }))
+        .filter((txn) => !Number.isNaN(txn.occurredAt.getTime()));
+
+      const outstanding = rows.filter((row: Record<string, unknown>) =>
+        ['unpaid', 'partial'].includes(String(row.payment_status))
+      );
+
+      const outstandingAmount = outstanding.reduce((sum: number, row: Record<string, unknown>) => {
+        const remaining = row.remaining_amount !== null && row.remaining_amount !== undefined
+          ? Number(row.remaining_amount)
+          : (Number(row.total_amount) || 0) - (Number(row.amount_paid) || 0);
+        return sum + (Number.isFinite(remaining) ? Math.max(remaining, 0) : 0);
+      }, 0);
+
+      return {
+        transactions,
+        outstandingAmount: dashboardRound(outstandingAmount),
+        outstandingCount: outstanding.length
+      };
+    } catch (error) {
+      console.error(`Error loading outlet_debts for outlet ${outletId}:`, error);
+      return { transactions: [], outstandingAmount: 0, outstandingCount: 0 };
+    }
+  };
+
+  const [cashTxns, cardTxns, mobileTxns, debtResult, pendingApprovals, lowStockItems, employeeCount, productCount] =
+    await Promise.all([
+      loadSales('outlet_cash_sales', 'Cash sale', 'sale_date'),
+      loadSales('outlet_card_sales', 'Card sale', 'sale_date'),
+      loadSales('outlet_mobile_sales', 'Mobile money sale', 'sale_date'),
+      loadDebts(),
+      Promise.all([
+        countOutletRows('outlet_cash_sales', outletId, 'approval_status', ['pending']),
+        countOutletRows('outlet_card_sales', outletId, 'approval_status', ['pending']),
+        countOutletRows('outlet_mobile_sales', outletId, 'approval_status', ['pending']),
+        countOutletRows('outlet_debts', outletId, 'approval_status', ['pending'])
+      ]).then((counts) => counts.reduce((sum, value) => sum + value, 0)),
+      countOutletRows('inventory_products', outletId, 'status', ['low-stock', 'out-of-stock']),
+      countOutletRows('outlet_users', outletId),
+      countOutletRows('inventory_products', outletId)
+    ]);
+
+  transactions.push(...cashTxns, ...cardTxns, ...mobileTxns, ...debtResult.transactions);
+
+  const salesInRange = (from: Date, to: Date): number =>
+    transactions.reduce((sum, txn) => (txn.occurredAt >= from && txn.occurredAt < to ? sum + txn.amount : sum), 0);
+
+  const todayTransactions = transactions.filter((txn) => txn.occurredAt >= todayStart);
+  const todaySales = dashboardRound(todayTransactions.reduce((sum, txn) => sum + txn.amount, 0));
+  const yesterdaySales = dashboardRound(salesInRange(yesterdayStart, todayStart));
+  const weeklySales = dashboardRound(salesInRange(weekStart, now));
+  const monthlySales = dashboardRound(salesInRange(monthStart, now));
+
+  // Daily takings for the trailing window, used for the comparison baselines.
+  const dayKeys = new Map<string, number>();
+  transactions.forEach((txn) => {
+    const dayStart = dashboardStartOfDay(txn.occurredAt);
+    const key = dayStart.toISOString();
+    dayKeys.set(key, (dayKeys.get(key) || 0) + txn.amount);
+  });
+  const dayTotal = (day: Date): number => dayKeys.get(dashboardStartOfDay(day).toISOString()) || 0;
+
+  const trailing7 = Array.from({ length: 7 }, (_, index) => dayTotal(dashboardAddDays(todayStart, -(index + 1))));
+  const trailing28 = Array.from({ length: 28 }, (_, index) => dayTotal(dashboardAddDays(todayStart, -(index + 1))));
+
+  const dailyBaseline = dashboardRound(trailing7.reduce((sum, value) => sum + value, 0) / 7);
+  const weeklyBaseline = dashboardRound(trailing28.reduce((sum, value) => sum + value, 0) / 4);
+
+  const previousMonthTotals = [1, 2, 3].map((offset) => {
+    const from = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
+    return salesInRange(from, to);
+  });
+  const monthlyBaseline = dashboardRound(
+    previousMonthTotals.reduce((sum, value) => sum + value, 0) / previousMonthTotals.length
+  );
+
+  const percentOfBaseline = (value: number, baseline: number): number =>
+    baseline > 0 ? Math.round((value / baseline) * 100) : 0;
+
+  const distinctCustomers = new Set(
+    todayTransactions.map((txn) => txn.customerId).filter((id): id is string => Boolean(id))
+  );
+  const walkInVisits = todayTransactions.filter((txn) => !txn.customerId).length;
+
+  const recentTransactions: OutletDashboardActivity[] = transactions
+    .slice()
+    .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+    .slice(0, 6)
+    .map((txn) => ({
+      id: txn.id,
+      type: txn.type,
+      description: txn.description,
+      occurredAt: txn.occurredAt.toISOString(),
+      amount: txn.amount
+    }));
+
+  const recentActivity: OutletDashboardActivity[] = [...recentTransactions];
+  if (lowStockItems > 0) {
+    recentActivity.push({
+      id: 'low-stock-summary',
+      type: 'stock',
+      description: `${lowStockItems} product${lowStockItems === 1 ? '' : 's'} at or below the reorder level`,
+      occurredAt: now.toISOString()
+    });
+  }
+  if (debtResult.outstandingCount > 0) {
+    recentActivity.push({
+      id: 'outstanding-debts-summary',
+      type: 'alert',
+      description: `${debtResult.outstandingCount} unpaid invoice${debtResult.outstandingCount === 1 ? '' : 's'} totalling ${new Intl.NumberFormat('en-TZ', {
+        style: 'currency',
+        currency: 'TZS',
+        maximumFractionDigits: 0
+      }).format(debtResult.outstandingAmount)}`,
+      occurredAt: now.toISOString()
+    });
+  }
+
+  return {
+    todaySales,
+    yesterdaySales,
+    weeklySales,
+    monthlySales,
+    salesGrowth: yesterdaySales > 0 ? dashboardRound(((todaySales - yesterdaySales) / yesterdaySales) * 100) : null,
+    transactionsToday: todayTransactions.length,
+    customerVisitsToday: distinctCustomers.size + walkInVisits,
+    averageTransactionToday: todayTransactions.length > 0 ? dashboardRound(todaySales / todayTransactions.length) : 0,
+    dailyBaseline,
+    weeklyBaseline,
+    monthlyBaseline,
+    dailyTargetPercent: percentOfBaseline(todaySales, dailyBaseline),
+    weeklyTargetPercent: percentOfBaseline(weeklySales, weeklyBaseline),
+    monthlyTargetPercent: percentOfBaseline(monthlySales, monthlyBaseline),
+    pendingApprovals,
+    lowStockItems,
+    employeeCount,
+    productCount,
+    outstandingDebtAmount: debtResult.outstandingAmount,
+    outstandingDebtCount: debtResult.outstandingCount,
+    recentActivity: recentActivity.slice(0, 6)
+  };
+};

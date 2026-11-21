@@ -35,7 +35,7 @@ import {
   ExternalLink,
   Receipt
 } from "lucide-react";
-import { getOutlets, Outlet } from "@/services/databaseService";
+import { getOutlets, getOutletDashboardSnapshot, Outlet, OutletDashboardSnapshot } from "@/services/databaseService";
 import { format } from "date-fns";
 
 interface OutletDetailsProps {
@@ -45,79 +45,42 @@ interface OutletDetailsProps {
   showBackButton?: boolean;
 }
 
-interface OutletMetrics {
-  todaySales: number;
-  weeklySales: number;
-  monthlySales: number;
-  salesGrowth: number;
-  totalTransactions: number;
-  pendingOrders: number;
-  lowStockItems: number;
-  activeEmployees: number;
-  customerVisits: number;
-  averageTransaction: number;
-}
-
-interface RecentActivity {
-  id: string;
-  type: 'sale' | 'order' | 'delivery' | 'stock' | 'alert';
-  description: string;
-  time: string;
-  amount?: number;
-}
+const EMPTY_SNAPSHOT: OutletDashboardSnapshot = {
+  todaySales: 0,
+  yesterdaySales: 0,
+  weeklySales: 0,
+  monthlySales: 0,
+  salesGrowth: null,
+  transactionsToday: 0,
+  customerVisitsToday: 0,
+  averageTransactionToday: 0,
+  dailyBaseline: 0,
+  weeklyBaseline: 0,
+  monthlyBaseline: 0,
+  dailyTargetPercent: 0,
+  weeklyTargetPercent: 0,
+  monthlyTargetPercent: 0,
+  pendingApprovals: 0,
+  lowStockItems: 0,
+  employeeCount: 0,
+  productCount: 0,
+  outstandingDebtAmount: 0,
+  outstandingDebtCount: 0,
+  recentActivity: []
+};
 
 export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton = true }: OutletDetailsProps) => {
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [metrics, setMetrics] = useState<OutletMetrics>({
-    todaySales: 0,
-    weeklySales: 0,
-    monthlySales: 0,
-    salesGrowth: 0,
-    totalTransactions: 0,
-    pendingOrders: 0,
-    lowStockItems: 0,
-    activeEmployees: 0,
-    customerVisits: 0,
-    averageTransaction: 0
-  });
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [snapshot, setSnapshot] = useState<OutletDashboardSnapshot>(EMPTY_SNAPSHOT);
 
   useEffect(() => {
     fetchOutlet();
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, [propOutletId]);
-
-  useEffect(() => {
-    if (outlet) {
-      // Simulate loading metrics (in real app, these would come from API)
-      setMetrics({
-        todaySales: 2456780,
-        weeklySales: 15678900,
-        monthlySales: 67894500,
-        salesGrowth: 12.5,
-        totalTransactions: 156,
-        pendingOrders: 8,
-        lowStockItems: 5,
-        activeEmployees: outlet.employee_count || 0,
-        customerVisits: 234,
-        averageTransaction: 15748
-      });
-
-      // Simulate recent activities
-      setRecentActivities([
-        { id: '1', type: 'sale', description: 'Sale completed - Invoice #INV-2024-001', time: '2 mins ago', amount: 125000 },
-        { id: '2', type: 'order', description: 'New order received from John Doe', time: '15 mins ago', amount: 45000 },
-        { id: '3', type: 'delivery', description: 'Delivery #DN-2024-089 dispatched', time: '30 mins ago' },
-        { id: '4', type: 'stock', description: 'Low stock alert: Product SKU-123', time: '1 hour ago' },
-        { id: '5', type: 'sale', description: 'Sale completed - Invoice #INV-2024-002', time: '1 hour ago', amount: 89000 },
-        { id: '6', type: 'alert', description: 'Payment pending from Customer ABC', time: '2 hours ago' },
-      ]);
-    }
-  }, [outlet]);
 
   const fetchOutlet = async () => {
     try {
@@ -129,11 +92,15 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
         return;
       }
       
-      const allOutlets = await getOutlets();
+      const [allOutlets, dashboardSnapshot] = await Promise.all([
+        getOutlets(),
+        getOutletDashboardSnapshot(propOutletId)
+      ]);
       const foundOutlet = allOutlets.find(o => o.id === propOutletId);
       
       if (foundOutlet) {
         setOutlet(foundOutlet);
+        setSnapshot(dashboardSnapshot);
       } else {
         setError("Outlet not found");
       }
@@ -173,6 +140,20 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
       maximumFractionDigits: 0
     }).format(amount);
   };
+
+  const formatRelativeTime = (iso: string) => {
+    const date = new Date(iso);
+    const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    const days = Math.round(hours / 24);
+    if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
+    return format(date, 'MMM d, yyyy');
+  };
+
+  const clampProgress = (value: number) => Math.max(0, Math.min(100, value));
 
   if (loading) {
     return (
@@ -270,11 +251,22 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Today's Sales</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.todaySales)}</p>
-                <div className="flex items-center gap-1 text-green-600 text-sm">
-                  <ArrowUpRight className="h-4 w-4" />
-                  <span>+{metrics.salesGrowth}%</span>
-                </div>
+                <p className="text-2xl font-bold">{formatCurrency(snapshot.todaySales)}</p>
+                {snapshot.salesGrowth === null ? (
+                  <p className="text-sm text-muted-foreground">
+                    {snapshot.yesterdaySales > 0 ? `vs ${formatCurrency(snapshot.yesterdaySales)} yesterday` : 'No sales yesterday'}
+                  </p>
+                ) : (
+                  <div className={`flex items-center gap-1 text-sm ${snapshot.salesGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {snapshot.salesGrowth >= 0 ? (
+                      <ArrowUpRight className="h-4 w-4" />
+                    ) : (
+                      <ArrowDownRight className="h-4 w-4" />
+                    )}
+                    <span>{snapshot.salesGrowth >= 0 ? '+' : ''}{snapshot.salesGrowth}%</span>
+                    <span className="text-muted-foreground">vs yesterday</span>
+                  </div>
+                )}
               </div>
               <div className="p-3 bg-green-100 rounded-full">
                 <DollarSign className="h-6 w-6 text-green-600" />
@@ -288,7 +280,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Transactions</p>
-                <p className="text-2xl font-bold">{metrics.totalTransactions}</p>
+                <p className="text-2xl font-bold">{snapshot.transactionsToday}</p>
                 <p className="text-sm text-muted-foreground">Today</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-full">
@@ -303,7 +295,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Customer Visits</p>
-                <p className="text-2xl font-bold">{metrics.customerVisits}</p>
+                <p className="text-2xl font-bold">{snapshot.customerVisitsToday}</p>
                 <p className="text-sm text-muted-foreground">Today</p>
               </div>
               <div className="p-3 bg-purple-100 rounded-full">
@@ -318,7 +310,7 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Avg. Transaction</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.averageTransaction)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(snapshot.averageTransactionToday)}</p>
                 <p className="text-sm text-muted-foreground">Per sale</p>
               </div>
               <div className="p-3 bg-orange-100 rounded-full">
@@ -358,21 +350,27 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">Today</p>
-                  <p className="text-xl font-bold">{formatCurrency(metrics.todaySales)}</p>
-                  <Progress value={75} className="mt-2 h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">75% of daily target</p>
+                  <p className="text-xl font-bold">{formatCurrency(snapshot.todaySales)}</p>
+                  <Progress value={clampProgress(snapshot.dailyTargetPercent)} className="mt-2 h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {snapshot.dailyTargetPercent}% of {formatCurrency(snapshot.dailyBaseline)} 7-day average
+                  </p>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">This Week</p>
-                  <p className="text-xl font-bold">{formatCurrency(metrics.weeklySales)}</p>
-                  <Progress value={60} className="mt-2 h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">60% of weekly target</p>
+                  <p className="text-xl font-bold">{formatCurrency(snapshot.weeklySales)}</p>
+                  <Progress value={clampProgress(snapshot.weeklyTargetPercent)} className="mt-2 h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {snapshot.weeklyTargetPercent}% of {formatCurrency(snapshot.weeklyBaseline)} 4-week average
+                  </p>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">This Month</p>
-                  <p className="text-xl font-bold">{formatCurrency(metrics.monthlySales)}</p>
-                  <Progress value={45} className="mt-2 h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">45% of monthly target</p>
+                  <p className="text-xl font-bold">{formatCurrency(snapshot.monthlySales)}</p>
+                  <Progress value={clampProgress(snapshot.monthlyTargetPercent)} className="mt-2 h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {snapshot.monthlyTargetPercent}% of {formatCurrency(snapshot.monthlyBaseline)} 3-month average
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -491,27 +489,43 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
                 <Clock className="h-5 w-5" />
                 Recent Activity
               </CardTitle>
-              <Button variant="ghost" size="sm">View All</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.location.hash = `#/outlet-saved-sales/${outlet.id}`}
+              >
+                View All
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="p-2 bg-muted rounded-full">
-                      {getActivityIcon(activity.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    </div>
-                    {activity.amount && (
-                      <div className="text-sm font-semibold text-green-600">
-                        +{formatCurrency(activity.amount)}
+              {snapshot.recentActivity.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Activity className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">No activity recorded yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sales, credit invoices and stock alerts will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {snapshot.recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="p-2 bg-muted rounded-full">
+                        {getActivityIcon(activity.type)}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground">{formatRelativeTime(activity.occurredAt)}</p>
+                      </div>
+                      {activity.amount !== undefined && activity.amount !== null && activity.amount > 0 && (
+                        <div className="text-sm font-semibold text-green-600">
+                          +{formatCurrency(activity.amount)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -528,29 +542,49 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {metrics.pendingOrders > 0 && (
+                {snapshot.pendingApprovals > 0 && (
                   <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <AlertTriangle className="h-5 w-5 text-yellow-600" />
                     <div>
-                      <p className="text-sm font-medium text-yellow-800">Pending Orders</p>
-                      <p className="text-xs text-yellow-600">{metrics.pendingOrders} orders awaiting processing</p>
+                      <p className="text-sm font-medium text-yellow-800">Pending Approvals</p>
+                      <p className="text-xs text-yellow-600">{snapshot.pendingApprovals} transaction{snapshot.pendingApprovals === 1 ? '' : 's'} awaiting approval</p>
                     </div>
                   </div>
                 )}
-                {metrics.lowStockItems > 0 && (
+                {snapshot.lowStockItems > 0 && (
                   <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <Package className="h-5 w-5 text-red-600" />
                     <div>
                       <p className="text-sm font-medium text-red-800">Low Stock Alert</p>
-                      <p className="text-xs text-red-600">{metrics.lowStockItems} items need restocking</p>
+                      <p className="text-xs text-red-600">{snapshot.lowStockItems} item{snapshot.lowStockItems === 1 ? '' : 's'} need restocking</p>
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                {snapshot.outstandingDebtCount > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-orange-600" />
+                    <div>
+                      <p className="text-sm font-medium text-orange-800">Outstanding Credit</p>
+                      <p className="text-xs text-orange-600">
+                        {formatCurrency(snapshot.outstandingDebtAmount)} across {snapshot.outstandingDebtCount} invoice{snapshot.outstandingDebtCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {snapshot.pendingApprovals === 0 && snapshot.lowStockItems === 0 && snapshot.outstandingDebtCount === 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Nothing Needs Attention</p>
+                      <p className="text-xs text-green-600">No pending approvals, stock or credit alerts</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 p-3 bg-muted border border-border rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="text-sm font-medium text-green-800">System Status</p>
-                    <p className="text-xs text-green-600">All systems operational</p>
+                    <p className="text-sm font-medium">Data Source</p>
+                    <p className="text-xs text-muted-foreground">Live outlet sales, stock and staff records</p>
                   </div>
                 </div>
               </div>
@@ -598,12 +632,12 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-muted rounded-lg">
                   <Users className="h-5 w-5 mx-auto mb-1 text-blue-600" />
-                  <p className="text-xl font-bold">{outlet.employee_count || 0}</p>
-                  <p className="text-xs text-muted-foreground">Employees</p>
+                  <p className="text-xl font-bold">{snapshot.employeeCount}</p>
+                  <p className="text-xs text-muted-foreground">Staff</p>
                 </div>
                 <div className="text-center p-3 bg-muted rounded-lg">
                   <Package className="h-5 w-5 mx-auto mb-1 text-purple-600" />
-                  <p className="text-xl font-bold">{outlet.product_count || 0}</p>
+                  <p className="text-xl font-bold">{snapshot.productCount}</p>
                   <p className="text-xs text-muted-foreground">Products</p>
                 </div>
               </div>
@@ -622,24 +656,33 @@ export const OutletDetails = ({ onBack, outletId: propOutletId, showBackButton =
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span>Daily Target</span>
-                    <span className="font-medium">75%</span>
+                    <span>Today vs 7-day average</span>
+                    <span className="font-medium">{snapshot.dailyTargetPercent}%</span>
                   </div>
-                  <Progress value={75} className="h-2" />
+                  <Progress value={clampProgress(snapshot.dailyTargetPercent)} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatCurrency(snapshot.todaySales)} of {formatCurrency(snapshot.dailyBaseline)}
+                  </p>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span>Weekly Target</span>
-                    <span className="font-medium">60%</span>
+                    <span>This week vs 4-week average</span>
+                    <span className="font-medium">{snapshot.weeklyTargetPercent}%</span>
                   </div>
-                  <Progress value={60} className="h-2" />
+                  <Progress value={clampProgress(snapshot.weeklyTargetPercent)} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatCurrency(snapshot.weeklySales)} of {formatCurrency(snapshot.weeklyBaseline)}
+                  </p>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span>Monthly Target</span>
-                    <span className="font-medium">45%</span>
+                    <span>This month vs 3-month average</span>
+                    <span className="font-medium">{snapshot.monthlyTargetPercent}%</span>
                   </div>
-                  <Progress value={45} className="h-2" />
+                  <Progress value={clampProgress(snapshot.monthlyTargetPercent)} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatCurrency(snapshot.monthlySales)} of {formatCurrency(snapshot.monthlyBaseline)}
+                  </p>
                 </div>
               </div>
             </CardContent>
